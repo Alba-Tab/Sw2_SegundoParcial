@@ -9,6 +9,7 @@ Thumbs.db
 
 # --- Documentación de diseño: se queda en local, no se sube ---
 docs/
+/*.docx
 
 # --- Office / Enterprise Architect (archivos temporales) ---
 ~$*

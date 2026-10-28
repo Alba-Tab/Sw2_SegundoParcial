@@ -59,7 +59,7 @@ Facturación fiscal del SIN (CUF, código de control, dosificación, NIT validad
 - **Ramas fijas:** `main` (lo que se despliega) y `develop` (integración). No se trabaja directo en ninguna de las dos.
 - **Toda rama sale de `develop`** y se publica rastreada desde el primer push: `git push -u origin <rama>`.
 - **El nombre de la rama dice dónde se trabajó y qué se hizo:** `<tipo>/<pieza>/<que-se-hizo>`, en minúsculas y con guiones. Ejemplos: `feat/viajes/alta-cliente`, `fix/flota/liberar-reserva`, `docs/specs/programar-viaje`, `chore/plataforma/compose-local`.
-  - `<pieza>` es la carpeta principal tocada: `viajes`, `flota`, `finanzas`, `analitica`, `gateway`, `mcp-server`, `cc-tablero`, `cc-operaciones`, `cc-flota`, `cc-finanzas`, `ui-comun`, `portal-cliente`, `app-chofer`, `contratos`, `plataforma`, `specs`, `ci`.
+  - `<pieza>` es la carpeta principal tocada: `viajes`, `flota`, `finanzas`, `analitica`, `gateway`, `mcp-server`, `cc-tablero`, `cc-operaciones`, `cc-flota`, `cc-finanzas`, `ui-comun`, `portal-cliente`, `app-chofer`, `contratos`, `plataforma`, `specs`, `ci`, `repo` (archivos de la raíz: `.gitignore`, README, AGENTS.md).
 - **Commits por feature, con Conventional Commits:** `<tipo>(<pieza>): <qué hace, en presente>`. Tipos: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `ci`, `perf`, `build`. Un commit = un cambio con sentido propio que compila y pasa sus pruebas.
 - **Nunca agregues coautoría ni firmas** en commits ni PR: nada de `Co-Authored-By`, `Signed-off-by` de un asistente, ni "Generated with…".
 - **Flujo:** rama → PR a `develop` → revisión y CI en verde → merge. `develop` pasa a `main` por PR cuando se quiere desplegar.
