@@ -1,0 +1,87 @@
+# --- Sistema operativo y editores ---
+.DS_Store
+Thumbs.db
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+*.swp
+
+# --- Documentación de diseño: se queda en local, no se sube ---
+docs/
+
+# --- Office / Enterprise Architect (archivos temporales) ---
+~$*
+*.ldb
+*.eap.lock
+
+# --- Secretos y entorno: solo se versiona .env.example ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.jks
+plataforma/vm/certs/
+plataforma/compose/certs/
+
+# --- Java (Viajes) ---
+target/
+build/
+.gradle/
+*.class
+hs_err_pid*
+
+# --- Node (Flota, Gateway, MCP, frontends) ---
+node_modules/
+dist/
+coverage/
+.angular/
+.nx/
+*.tsbuildinfo
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# --- PHP (Finanzas) ---
+vendor/
+.phpunit.cache/
+.phpunit.result.cache
+storage/*.key
+storage/logs/
+storage/framework/cache/
+storage/framework/sessions/
+storage/framework/views/
+bootstrap/cache/*.php
+rr
+.rr-*.yaml.local
+
+# --- Python (Analítica) ---
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+*.joblib
+
+# --- Expo / React Native (app del chofer) ---
+.expo/
+ios/
+android/
+*.ipa
+*.apk
+*.aab
+web-build/
+
+# --- Modelos de IA descargados (se bajan con script, no se versionan) ---
+*.gguf
+*.onnx
+*.tflite
+models/
+
+# --- Datos locales de docker compose ---
+plataforma/compose/data/
+*.log
