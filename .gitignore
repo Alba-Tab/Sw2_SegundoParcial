@@ -20,6 +20,7 @@ docs/
 .env
 .env.*
 !.env.example
+!.env.demo
 *.pem
 *.key
 *.p12
@@ -80,11 +81,11 @@ android/
 *.aab
 web-build/
 
-# --- Modelos de IA descargados (se bajan con script, no se versionan) ---
+# --- Modelos de IA descargados en el build (D38): solo en sus carpetas, no por extensión ---
+# Una carpeta de código llamada models/ (Python, Angular) sí se versiona.
 *.gguf
-*.onnx
-*.tflite
-models/
+/movil/app-chofer/assets/modelos/
+/frontends/**/public/modelos/
 
 # --- Datos locales de docker compose ---
 plataforma/compose/data/
