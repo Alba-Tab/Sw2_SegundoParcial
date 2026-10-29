@@ -1,0 +1,675 @@
+{
+  "events": [
+    {
+      "eventId": "1",
+      "eventTime": "2026-10-29T19:38:21.507Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_STARTED",
+      "workflowExecutionStartedEventAttributes": {
+        "workflowType": {
+          "name": "ProgramarViaje"
+        },
+        "taskQueue": {
+          "name": "viajes"
+        },
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg\u003d\u003d"
+              },
+              "data": "eyJzZXJ2aWNpb0lkIjoiMDE5MzNiNmUtNGMyYS03ZDEwLTlhM2UtNWYxYzJiN2E4ZDAxIiwidmlhamVJZCI6IjAxOTMzYjZlLTRjMmEtN2QxMC05YTNlLTVmMWMyYjdhOGQwMiIsImNsaWVudGVJZCI6IjAxOTMzYjVhLTFmMDAtN2EyMC04YjExLTBjMmQzZTRmNWEwMSIsImNvdGl6YWNpb25JZCI6IjAxOTMzYjZlLTRjMmEtN2QxMC05YTNlLTVmMWMyYjdhOGQwMyIsImNhbmFsIjoiUE9SVEFMIiwiY3JlYWRvUG9yIjoiNmYxYzJkM2UtNGI1YS00YzZkLThlN2YtOWEwYjFjMmQzZTRmIiwicGFyYW1ldHJvc1NhZ2EiOnsiZXNwZXJhQXByb2JhY2lvbiI6IlBUM00iLCJjb21wZW5zYWNpb24iOnsic2NoZWR1bGVUb0Nsb3NlIjoiUFQyTSIsIm1heGltb0ludGVudG9zIjoyfX19"
+            }
+          ]
+        },
+        "workflowExecutionTimeout": "315360000s",
+        "workflowRunTimeout": "315360000s",
+        "workflowTaskTimeout": "10s",
+        "originalExecutionRunId": "0a059c46-b32e-4e1f-967a-4aeb493ca531",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "firstExecutionRunId": "0a059c46-b32e-4e1f-967a-4aeb493ca531",
+        "attempt": 1,
+        "firstWorkflowTaskBackoff": "0s",
+        "header": {}
+      }
+    },
+    {
+      "eventId": "2",
+      "eventTime": "2026-10-29T19:38:21.507Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "viajes"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "3",
+      "eventTime": "2026-10-29T19:38:21.507Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "2",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "historySizeBytes": "640"
+      }
+    },
+    {
+      "eventId": "4",
+      "eventTime": "2026-10-29T19:38:21.511Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "2",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "sdkMetadata": {
+          "langUsedFlags": [
+            1,
+            3
+          ],
+          "sdkName": "temporal-java",
+          "sdkVersion": "1.40.0"
+        },
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "5",
+      "eventTime": "2026-10-29T19:38:21.511Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "c7a977d3-3416-3447-a6db-6fdf56110bad",
+        "activityType": {
+          "name": "Viajes.crearViaje"
+        },
+        "taskQueue": {
+          "name": "viajes"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg\u003d\u003d"
+              },
+              "data": "eyJzZXJ2aWNpb0lkIjoiMDE5MzNiNmUtNGMyYS03ZDEwLTlhM2UtNWYxYzJiN2E4ZDAxIiwidmlhamVJZCI6IjAxOTMzYjZlLTRjMmEtN2QxMC05YTNlLTVmMWMyYjdhOGQwMiIsImNsaWVudGVJZCI6IjAxOTMzYjVhLTFmMDAtN2EyMC04YjExLTBjMmQzZTRmNWEwMSIsImNvdGl6YWNpb25JZCI6IjAxOTMzYjZlLTRjMmEtN2QxMC05YTNlLTVmMWMyYjdhOGQwMyJ9"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "300s",
+        "scheduleToStartTimeout": "300s",
+        "startToCloseTimeout": "10s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "3",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "30s",
+          "nonRetryableErrorTypes": [
+            "VALIDACION"
+          ]
+        }
+      }
+    },
+    {
+      "eventId": "6",
+      "eventTime": "2026-10-29T19:38:21.511Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "5",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "7",
+      "eventTime": "2026-10-29T19:38:21.512Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {},
+        "scheduledEventId": "5",
+        "startedEventId": "6",
+        "identity": "63053@MacBook-Air-de-Brayan.local"
+      }
+    },
+    {
+      "eventId": "8",
+      "eventTime": "2026-10-29T19:38:21.512Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "viajes"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "9",
+      "eventTime": "2026-10-29T19:38:21.512Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "8",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "historySizeBytes": "1327"
+      }
+    },
+    {
+      "eventId": "10",
+      "eventTime": "2026-10-29T19:38:21.513Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "8",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "sdkMetadata": {
+          "sdkName": "temporal-java",
+          "sdkVersion": "1.40.0"
+        },
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "11",
+      "eventTime": "2026-10-29T19:38:21.513Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "c84de50b-f9a0-3df7-ac69-03c2a4aebcf4",
+        "activityType": {
+          "name": "Finanzas.validarYReservarCredito"
+        },
+        "taskQueue": {
+          "name": "finanzas"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg\u003d\u003d"
+              },
+              "data": "eyJzZXJ2aWNpb0lkIjoiMDE5MzNiNmUtNGMyYS03ZDEwLTlhM2UtNWYxYzJiN2E4ZDAxIiwiY2xpZW50ZUlkIjoiMDE5MzNiNWEtMWYwMC03YTIwLThiMTEtMGMyZDNlNGY1YTAxIiwiY290aXphY2lvbklkIjoiMDE5MzNiNmUtNGMyYS03ZDEwLTlhM2UtNWYxYzJiN2E4ZDAzIiwiZXNwZXJhQXByb2JhY2lvbiI6IlBUM00ifQ\u003d\u003d"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "1800s",
+        "scheduleToStartTimeout": "1800s",
+        "startToCloseTimeout": "15s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "9",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "30s",
+          "nonRetryableErrorTypes": [
+            "COTIZACION_VENCIDA",
+            "COTIZACION_AJENA",
+            "CREDITO_INSUFICIENTE"
+          ]
+        }
+      }
+    },
+    {
+      "eventId": "12",
+      "eventTime": "2026-10-29T19:38:21.513Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "11",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "13",
+      "eventTime": "2026-10-29T19:38:21.513Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg\u003d\u003d"
+              },
+              "data": "eyJyZXN1bHRhZG8iOiJSRVNFUlZBRE8iLCJyZXNlcnZhQ3JlZGl0b0lkIjoiMDlhOThiYTYtNGRjZS0zMjhhLWJiNDUtMGQxYjgyNjNkMWYyIiwicnV0YUlkIjoiMDE5MzNhMDAtMDAwMC03MDAwLTgwMDAtMDAwMDAwMDAwMDA0IiwidGlwb0NhcmdhIjoiR1JBTk9TIiwidG9uZWxhZGFzIjoyOCwiZmVjaGFWaWFqZSI6IjIwMjYtMTEtMDMiLCJtb250byI6eyJtb250byI6IjI4MDAuMDAiLCJtb25lZGEiOiJCT0IifX0\u003d"
+            }
+          ]
+        },
+        "scheduledEventId": "11",
+        "startedEventId": "12",
+        "identity": "63053@MacBook-Air-de-Brayan.local"
+      }
+    },
+    {
+      "eventId": "14",
+      "eventTime": "2026-10-29T19:38:21.513Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "viajes"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "15",
+      "eventTime": "2026-10-29T19:38:21.513Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "14",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "historySizeBytes": "2320"
+      }
+    },
+    {
+      "eventId": "16",
+      "eventTime": "2026-10-29T19:38:21.514Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "14",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "sdkMetadata": {
+          "sdkName": "temporal-java",
+          "sdkVersion": "1.40.0"
+        },
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "17",
+      "eventTime": "2026-10-29T19:38:21.514Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "9cd151cf-5806-3d8c-aec1-9576767005ec",
+        "activityType": {
+          "name": "Flota.reservarUnidad"
+        },
+        "taskQueue": {
+          "name": "flota"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg\u003d\u003d"
+              },
+              "data": "eyJzZXJ2aWNpb0lkIjoiMDE5MzNiNmUtNGMyYS03ZDEwLTlhM2UtNWYxYzJiN2E4ZDAxIiwidmlhamVJZCI6IjAxOTMzYjZlLTRjMmEtN2QxMC05YTNlLTVmMWMyYjdhOGQwMiIsInRpcG9DYXJnYSI6IkdSQU5PUyIsInRvbmVsYWRhcyI6MjgsImZlY2hhVmlhamUiOiIyMDI2LTExLTAzIn0\u003d"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "1800s",
+        "scheduleToStartTimeout": "1800s",
+        "startToCloseTimeout": "15s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "15",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "30s",
+          "nonRetryableErrorTypes": [
+            "SIN_UNIDAD_COMPATIBLE"
+          ]
+        }
+      }
+    },
+    {
+      "eventId": "18",
+      "eventTime": "2026-10-29T19:38:21.514Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "17",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "19",
+      "eventTime": "2026-10-29T19:38:21.515Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg\u003d\u003d"
+              },
+              "data": "eyJyZXNlcnZhVW5pZGFkSWQiOiIwOTk1YjlkMC00NDQ4LTMzYTAtOWIwNC0zODM1ZWNmOGNlMTciLCJ0cmFjdG9JZCI6IjAxOTMzYzAwLTAwMDAtNzAwMC04MDAwLTAwMDAwMDAwMDAwMSIsInJlbW9scXVlSWQiOiIwMTkzM2MwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMTEiLCJwbGFjYSI6IjQ1MjFLVFIiLCJjaG9mZXJJZCI6IjAxOTMzYzAwLTAwMDAtNzAwMC04MDAwLTAwMDAwMDAwMDAyMSIsImNob2Zlck5vbWJyZSI6Ikp1YW4gTWFtYW5pIiwiY2hvZmVyVXN1YXJpb1N1YiI6IjAxOTNhMDAwLTAwMDAtNzAwMC04MDAwLTAwMDAwMDAwMDAwNSJ9"
+            }
+          ]
+        },
+        "scheduledEventId": "17",
+        "startedEventId": "18",
+        "identity": "63053@MacBook-Air-de-Brayan.local"
+      }
+    },
+    {
+      "eventId": "20",
+      "eventTime": "2026-10-29T19:38:21.515Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "viajes"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "21",
+      "eventTime": "2026-10-29T19:38:21.515Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "20",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "historySizeBytes": "3320"
+      }
+    },
+    {
+      "eventId": "22",
+      "eventTime": "2026-10-29T19:38:21.516Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "20",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "sdkMetadata": {
+          "sdkName": "temporal-java",
+          "sdkVersion": "1.40.0"
+        },
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "23",
+      "eventTime": "2026-10-29T19:38:21.516Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "1cff530e-8d5c-391d-84d1-6717c477b1aa",
+        "activityType": {
+          "name": "Viajes.confirmarViaje"
+        },
+        "taskQueue": {
+          "name": "viajes"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg\u003d\u003d"
+              },
+              "data": "eyJ2aWFqZUlkIjoiMDE5MzNiNmUtNGMyYS03ZDEwLTlhM2UtNWYxYzJiN2E4ZDAyIiwicnV0YUlkIjoiMDE5MzNhMDAtMDAwMC03MDAwLTgwMDAtMDAwMDAwMDAwMDA0IiwidGlwb0NhcmdhIjoiR1JBTk9TIiwidG9uZWxhZGFzIjoyOCwiZmVjaGFWaWFqZSI6IjIwMjYtMTEtMDMiLCJtb250byI6eyJtb250byI6IjI4MDAuMDAiLCJtb25lZGEiOiJCT0IifSwicmVzZXJ2YVVuaWRhZElkIjoiMDk5NWI5ZDAtNDQ0OC0zM2EwLTliMDQtMzgzNWVjZjhjZTE3IiwidHJhY3RvSWQiOiIwMTkzM2MwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDEiLCJyZW1vbHF1ZUlkIjoiMDE5MzNjMDAtMDAwMC03MDAwLTgwMDAtMDAwMDAwMDAwMDExIiwicGxhY2EiOiI0NTIxS1RSIiwiY2hvZmVySWQiOiIwMTkzM2MwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMjEiLCJjaG9mZXJOb21icmUiOiJKdWFuIE1hbWFuaSIsImNob2ZlclVzdWFyaW9TdWIiOiIwMTkzYTAwMC0wMDAwLTcwMDAtODAwMC0wMDAwMDAwMDAwMDUifQ\u003d\u003d"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "10s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "21",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "30s"
+        }
+      }
+    },
+    {
+      "eventId": "24",
+      "eventTime": "2026-10-29T19:38:21.516Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "23",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "25",
+      "eventTime": "2026-10-29T19:38:21.517Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {},
+        "scheduledEventId": "23",
+        "startedEventId": "24",
+        "identity": "63053@MacBook-Air-de-Brayan.local"
+      }
+    },
+    {
+      "eventId": "26",
+      "eventTime": "2026-10-29T19:38:21.517Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "viajes"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "27",
+      "eventTime": "2026-10-29T19:38:21.517Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "26",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "historySizeBytes": "4311"
+      }
+    },
+    {
+      "eventId": "28",
+      "eventTime": "2026-10-29T19:38:21.517Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "26",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "sdkMetadata": {
+          "sdkName": "temporal-java",
+          "sdkVersion": "1.40.0"
+        },
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "29",
+      "eventTime": "2026-10-29T19:38:21.517Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "992fa866-55b6-3fd2-9b87-0c702595c319",
+        "activityType": {
+          "name": "Flota.confirmarReserva"
+        },
+        "taskQueue": {
+          "name": "flota"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg\u003d\u003d"
+              },
+              "data": "eyJyZXNlcnZhVW5pZGFkSWQiOiIwOTk1YjlkMC00NDQ4LTMzYTAtOWIwNC0zODM1ZWNmOGNlMTciLCJzZXJ2aWNpb0lkIjoiMDE5MzNiNmUtNGMyYS03ZDEwLTlhM2UtNWYxYzJiN2E4ZDAxIn0\u003d"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "15s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "27",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "60s"
+        }
+      }
+    },
+    {
+      "eventId": "30",
+      "eventTime": "2026-10-29T19:38:21.518Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "29",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "31",
+      "eventTime": "2026-10-29T19:38:21.518Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {},
+        "scheduledEventId": "29",
+        "startedEventId": "30",
+        "identity": "63053@MacBook-Air-de-Brayan.local"
+      }
+    },
+    {
+      "eventId": "32",
+      "eventTime": "2026-10-29T19:38:21.518Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "viajes"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "33",
+      "eventTime": "2026-10-29T19:38:21.518Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "32",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "historySizeBytes": "4894"
+      }
+    },
+    {
+      "eventId": "34",
+      "eventTime": "2026-10-29T19:38:21.518Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "32",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "sdkMetadata": {
+          "sdkName": "temporal-java",
+          "sdkVersion": "1.40.0"
+        },
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "35",
+      "eventTime": "2026-10-29T19:38:21.518Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_SCHEDULED",
+      "activityTaskScheduledEventAttributes": {
+        "activityId": "74e38725-347b-3c1d-9a5a-3484c7f3038b",
+        "activityType": {
+          "name": "Viajes.marcarConfirmacionCompleta"
+        },
+        "taskQueue": {
+          "name": "viajes"
+        },
+        "header": {},
+        "input": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg\u003d\u003d"
+              },
+              "data": "eyJzZXJ2aWNpb0lkIjoiMDE5MzNiNmUtNGMyYS03ZDEwLTlhM2UtNWYxYzJiN2E4ZDAxIn0\u003d"
+            }
+          ]
+        },
+        "scheduleToCloseTimeout": "315360000s",
+        "scheduleToStartTimeout": "315360000s",
+        "startToCloseTimeout": "10s",
+        "heartbeatTimeout": "0s",
+        "workflowTaskCompletedEventId": "33",
+        "retryPolicy": {
+          "initialInterval": "1s",
+          "backoffCoefficient": 2.0,
+          "maximumInterval": "30s"
+        }
+      }
+    },
+    {
+      "eventId": "36",
+      "eventTime": "2026-10-29T19:38:21.519Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_STARTED",
+      "activityTaskStartedEventAttributes": {
+        "scheduledEventId": "35",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "37",
+      "eventTime": "2026-10-29T19:38:21.519Z",
+      "eventType": "EVENT_TYPE_ACTIVITY_TASK_COMPLETED",
+      "activityTaskCompletedEventAttributes": {
+        "result": {},
+        "scheduledEventId": "35",
+        "startedEventId": "36",
+        "identity": "63053@MacBook-Air-de-Brayan.local"
+      }
+    },
+    {
+      "eventId": "38",
+      "eventTime": "2026-10-29T19:38:21.519Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_SCHEDULED",
+      "workflowTaskScheduledEventAttributes": {
+        "taskQueue": {
+          "name": "viajes"
+        },
+        "startToCloseTimeout": "10s",
+        "attempt": 1
+      }
+    },
+    {
+      "eventId": "39",
+      "eventTime": "2026-10-29T19:38:21.519Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_STARTED",
+      "workflowTaskStartedEventAttributes": {
+        "scheduledEventId": "38",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "historySizeBytes": "5430"
+      }
+    },
+    {
+      "eventId": "40",
+      "eventTime": "2026-10-29T19:38:21.519Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_TASK_COMPLETED",
+      "workflowTaskCompletedEventAttributes": {
+        "scheduledEventId": "38",
+        "identity": "63053@MacBook-Air-de-Brayan.local",
+        "sdkMetadata": {
+          "sdkName": "temporal-java",
+          "sdkVersion": "1.40.0"
+        },
+        "meteringMetadata": {}
+      }
+    },
+    {
+      "eventId": "41",
+      "eventTime": "2026-10-29T19:38:21.519Z",
+      "eventType": "EVENT_TYPE_WORKFLOW_EXECUTION_COMPLETED",
+      "workflowExecutionCompletedEventAttributes": {
+        "result": {
+          "payloads": [
+            {
+              "metadata": {
+                "encoding": "anNvbi9wbGFpbg\u003d\u003d"
+              },
+              "data": "eyJyZXN1bHRhZG8iOiJDT05GSVJNQURPIiwic2VydmljaW9JZCI6IjAxOTMzYjZlLTRjMmEtN2QxMC05YTNlLTVmMWMyYjdhOGQwMSIsInZpYWplSWQiOiIwMTkzM2I2ZS00YzJhLTdkMTAtOWEzZS01ZjFjMmI3YThkMDIifQ\u003d\u003d"
+            }
+          ]
+        },
+        "workflowTaskCompletedEventId": "39"
+      }
+    }
+  ]
+}

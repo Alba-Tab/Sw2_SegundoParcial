@@ -3,6 +3,8 @@ package bo.transporte.viajes.adaptadores.salida.persistencia;
 import bo.transporte.viajes.aplicacion.cliente.AltaDeCliente;
 import bo.transporte.viajes.aplicacion.cliente.ClienteVista;
 import bo.transporte.viajes.aplicacion.puerto.salida.RegistroIdempotente;
+import bo.transporte.viajes.aplicacion.servicio.ConfirmacionDeServicio;
+import bo.transporte.viajes.aplicacion.servicio.ServicioAceptado;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,7 +19,8 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 class RegistroIdempotenteJdbc implements RegistroIdempotente {
     /** Tipo de la respuesta guardada por operación. */
-    private static final Map<String, Class<?>> RESPUESTAS = Map.of(AltaDeCliente.OPERACION, ClienteVista.class);
+    private static final Map<String, Class<?>> RESPUESTAS = Map.of(
+            AltaDeCliente.OPERACION, ClienteVista.class, ConfirmacionDeServicio.OPERACION, ServicioAceptado.class);
 
     private final JdbcClient jdbc;
     private final JsonMapper json;
@@ -54,18 +57,37 @@ class RegistroIdempotenteJdbc implements RegistroIdempotente {
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public void guardarCompletada(UUID clave, String tipo, String hashCuerpo, int codigoHttp, Object respuesta) {
+        insertar(clave, tipo, hashCuerpo, "COMPLETADA", codigoHttp, respuesta);
+    }
+
+    private void insertar(UUID clave, String tipo, String hashCuerpo, String estado, int codigoHttp, Object respuesta) {
         try {
             jdbc.sql(
                             "INSERT INTO operacion_idempotente (clave, tipo_operacion, hash_cuerpo, estado, codigo_http, cuerpo_respuesta)"
-                                    + " VALUES (:clave, :tipo, :hash, 'COMPLETADA', :codigo, CAST(:cuerpo AS jsonb))")
+                                    + " VALUES (:clave, :tipo, :hash, :estado, :codigo, CAST(:cuerpo AS jsonb))")
                     .param("clave", clave)
                     .param("tipo", tipo)
                     .param("hash", hashCuerpo)
+                    .param("estado", estado)
                     .param("codigo", codigoHttp)
                     .param("cuerpo", json.writeValueAsString(respuesta))
                     .update();
         } catch (DuplicateKeyException e) {
             throw new ClaveRepetida(clave);
         }
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void guardarEnProceso(UUID clave, String tipo, String hashCuerpo, int codigoHttp, Object respuesta) {
+        insertar(clave, tipo, hashCuerpo, "EN_PROCESO", codigoHttp, respuesta);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.MANDATORY)
+    public void completar(UUID clave) {
+        jdbc.sql("UPDATE operacion_idempotente SET estado = 'COMPLETADA', actualizada_en = now() WHERE clave = :clave")
+                .param("clave", clave)
+                .update();
     }
 }

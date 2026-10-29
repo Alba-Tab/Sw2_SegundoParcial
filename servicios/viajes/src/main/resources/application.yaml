@@ -32,6 +32,19 @@ seguridad:
 identidad:
   secreto: ${KC_SECRETO_VIAJES:}
 
+# Temporal (contratos/temporal/programar-viaje.md). TEMPORAL_WORKER=false deja solo la API.
+temporal:
+  direccion: ${TEMPORAL_ADDRESS:localhost:7233}
+  namespace: transporte
+  worker.habilitado: ${TEMPORAL_WORKER:true}
+
+# parametrosSaga (spec 003). Normal: PT24H, PT10M, 8. Demo (.env.demo): PT3M, PT2M, 4.
+saga:
+  espera-aprobacion: ${SAGA_ESPERA_APROBACION:PT24H}
+  compensacion:
+    schedule-to-close: ${SAGA_COMPENSACION_SCHEDULE_TO_CLOSE:PT10M}
+    maximo-intentos: ${SAGA_COMPENSACION_MAXIMO_INTENTOS:8}
+
 outbox:
   intervalo: PT1S
   lote: 100
