@@ -8,63 +8,116 @@
       "type": "string",
       "format": "uuid",
       "description": "UUIDv7 en texto (000 §1).",
-      "examples": ["01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01"]
+      "examples": [
+        "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01"
+      ]
     },
     "Sub": {
       "type": "string",
       "minLength": 1,
       "maxLength": 64,
       "description": "Claim `sub` del usuario en Keycloak, o `sistema` para decisiones automáticas.",
-      "examples": ["6f1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e4f", "sistema"]
+      "examples": [
+        "6f1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e4f",
+        "sistema"
+      ]
     },
     "Instante": {
       "type": "string",
       "format": "date-time",
       "pattern": "Z$",
       "description": "Instante ISO-8601 en UTC con `Z` (000 §2).",
-      "examples": ["2026-11-03T14:05:00Z"]
+      "examples": [
+        "2026-11-03T14:05:00Z"
+      ]
     },
     "Fecha": {
       "type": "string",
       "format": "date",
       "description": "Fecha sin hora, interpretada en America/La_Paz (000 §2).",
-      "examples": ["2026-11-03"]
+      "examples": [
+        "2026-11-03"
+      ]
     },
     "Duracion": {
       "type": "string",
       "pattern": "^P(?!$)(\\d+D)?(T(?=\\d)(\\d+H)?(\\d+M)?(\\d+S)?)?$",
       "description": "Duración ISO-8601 (días, horas, minutos, segundos).",
-      "examples": ["PT24H", "PT3M"]
+      "examples": [
+        "PT24H",
+        "PT3M"
+      ]
     },
     "Monto": {
       "type": "object",
       "description": "Dinero: monto como texto decimal con 2 decimales y moneda ISO 4217 (000 §3). No negativo.",
-      "required": ["monto", "moneda"],
+      "required": [
+        "monto",
+        "moneda"
+      ],
       "additionalProperties": false,
       "properties": {
-        "monto": { "type": "string", "pattern": "^(0|[1-9]\\d{0,11})\\.\\d{2}$" },
-        "moneda": { "type": "string", "enum": ["BOB"] }
+        "monto": {
+          "type": "string",
+          "pattern": "^(0|[1-9]\\d{0,11})\\.\\d{2}$"
+        },
+        "moneda": {
+          "type": "string",
+          "enum": [
+            "BOB"
+          ]
+        }
       },
-      "examples": [{ "monto": "2800.00", "moneda": "BOB" }]
+      "examples": [
+        {
+          "monto": "2800.00",
+          "moneda": "BOB"
+        }
+      ]
     },
     "Coordenadas": {
       "type": "object",
       "description": "WGS84 en grados decimales (000 §3).",
-      "required": ["lat", "lng"],
+      "required": [
+        "lat",
+        "lng"
+      ],
       "additionalProperties": false,
       "properties": {
-        "lat": { "type": "number", "minimum": -90, "maximum": 90 },
-        "lng": { "type": "number", "minimum": -180, "maximum": 180 }
+        "lat": {
+          "type": "number",
+          "minimum": -90,
+          "maximum": 90
+        },
+        "lng": {
+          "type": "number",
+          "minimum": -180,
+          "maximum": 180
+        }
       },
-      "examples": [{ "lat": -17.7833, "lng": -63.1821 }]
+      "examples": [
+        {
+          "lat": -17.7833,
+          "lng": -63.1821
+        }
+      ]
     },
     "TipoCarga": {
       "type": "string",
-      "enum": ["GRANOS", "INSUMOS", "INSUMOS_LIQUIDOS", "CONTENEDOR"]
+      "enum": [
+        "GRANOS",
+        "INSUMOS",
+        "INSUMOS_LIQUIDOS",
+        "CONTENEDOR"
+      ]
     },
     "TipoRemolque": {
       "type": "string",
-      "enum": ["FURGON", "PLATAFORMA", "CISTERNA"]
+      "enum": [
+        "FURGON",
+        "PLATAFORMA",
+        "CISTERNA"
+      ]
     },
     "Toneladas": {
       "type": "number",
@@ -74,7 +127,10 @@
     },
     "CanalServicio": {
       "type": "string",
-      "enum": ["PORTAL", "TELEFONO"],
+      "enum": [
+        "PORTAL",
+        "TELEFONO"
+      ],
       "description": "PORTAL si lo creó el cliente; TELEFONO si lo creó atención comercial."
     },
     "EstadoViaje": {
@@ -96,11 +152,33 @@
       "type": "string",
       "pattern": "^[A-Z][A-Z_]*[A-Z]$",
       "description": "Código estable de 000 §5.",
-      "examples": ["CREDITO_INSUFICIENTE"]
+      "examples": [
+        "CREDITO_INSUFICIENTE"
+      ]
     },
     "OrigenCancelacion": {
       "type": "string",
-      "enum": ["SAGA", "USUARIO"]
+      "enum": [
+        "SAGA",
+        "USUARIO"
+      ]
+    },
+    "MotivoCancelacion": {
+      "type": "string",
+      "description": "Motivo (código) de un viaje CANCELADO: los errores de negocio de la saga, la falla técnica que agotó un paso, y los dos motivos propios de 000 §5.",
+      "enum": [
+        "COTIZACION_VENCIDA",
+        "COTIZACION_AJENA",
+        "CREDITO_INSUFICIENTE",
+        "CREDITO_RECHAZADO",
+        "APROBACION_VENCIDA",
+        "SIN_UNIDAD_COMPATIBLE",
+        "CLIENTE_NO_REPLICADO",
+        "DEPENDENCIA_NO_DISPONIBLE",
+        "VALIDACION",
+        "RESUELTO_MANUALMENTE",
+        "CANCELADO_POR_USUARIO"
+      ]
     }
   }
 }

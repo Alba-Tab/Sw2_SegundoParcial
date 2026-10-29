@@ -46,7 +46,7 @@ Nombres **explícitos**, iguales en los tres SDK:
 | `Viajes.marcarConfirmacionCompleta` | viajes | `MarcarConfirmacionCompletaEntrada` | — | 10 s | sin límite | sin límite | — |
 | `Flota.liberarReserva` | flota | `LiberarReservaEntrada` | — | 15 s | `compensacion.scheduleToClose` | `compensacion.maximoIntentos` | — |
 | `Finanzas.liberarCredito` | finanzas | `LiberarCreditoEntrada` | — | 15 s | igual | igual | — |
-| `Viajes.cancelarViaje` | viajes | `CancelarViajeEntrada` | — | 10 s | igual | igual | — |
+| `Viajes.cancelarViaje` | viajes | `CancelarViajeEntrada` | — | 15 s | igual | igual | — |
 | `Viajes.marcarRequiereIntervencion` | viajes | `MarcarRequiereIntervencionEntrada` | — | 10 s | sin límite | sin límite | — |
 
 "—" en Resultado significa que la actividad no devuelve nada (`void` / `null`). **Toda actividad es idempotente**: la llave es `servicioId` (o `viajeId` / `reservaUnidadId`), así que un reintento no duplica nada.

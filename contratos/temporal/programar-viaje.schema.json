@@ -130,7 +130,7 @@
           "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
         },
         "motivo": {
-          "$ref": "../comun/tipos.schema.json#/$defs/CodigoError"
+          "$ref": "../comun/tipos.schema.json#/$defs/MotivoCancelacion"
         }
       },
       "examples": [
@@ -482,10 +482,9 @@
     },
     "RegistrarDecisionCreditoEntrada": {
       "type": "object",
-      "description": "Finanzas.registrarDecisionCredito (paso 2b). Sin resultado. Idempotente por servicioId.",
+      "description": "Finanzas.registrarDecisionCredito (paso 2b). Sin resultado. Idempotente por servicioId. decision = APROBADA (señal aprobada), RECHAZADA (señal rechazada) o VENCIDA (venció esperaAprobacion).",
       "required": [
         "servicioId",
-        "aprobado",
         "aprobadoPor",
         "decision"
       ],
@@ -493,9 +492,6 @@
       "properties": {
         "servicioId": {
           "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
-        },
-        "aprobado": {
-          "type": "boolean"
         },
         "decision": {
           "type": "string",
@@ -517,18 +513,31 @@
       "examples": [
         {
           "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
-          "aprobado": true,
           "decision": "APROBADA",
           "aprobadoPor": "7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
         },
         {
           "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
-          "aprobado": false,
           "decision": "VENCIDA",
           "aprobadoPor": "sistema",
           "motivo": "Plazo de aprobación vencido"
         }
-      ]
+      ],
+      "if": {
+        "properties": {
+          "decision": {
+            "enum": [
+              "RECHAZADA",
+              "VENCIDA"
+            ]
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "motivo"
+        ]
+      }
     },
     "ReservarUnidadEntrada": {
       "type": "object",
@@ -779,7 +788,7 @@
           "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
         },
         "motivo": {
-          "$ref": "../comun/tipos.schema.json#/$defs/CodigoError"
+          "$ref": "../comun/tipos.schema.json#/$defs/MotivoCancelacion"
         }
       },
       "examples": [
@@ -802,7 +811,7 @@
           "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
         },
         "motivo": {
-          "$ref": "../comun/tipos.schema.json#/$defs/CodigoError"
+          "$ref": "../comun/tipos.schema.json#/$defs/MotivoCancelacion"
         },
         "detalle": {
           "type": "string",
