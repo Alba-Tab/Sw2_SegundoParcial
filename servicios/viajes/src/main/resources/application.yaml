@@ -1,0 +1,43 @@
+# Todo lo que cambia entre local y nube viene del entorno (000 §11). Valores locales en .env.example.
+spring:
+  application.name: viajes
+  threads.virtual.enabled: true
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/viajes}
+    username: ${DB_USUARIO:viajes}
+    password: ${DB_CLAVE:viajes}
+  jpa:
+    open-in-view: false
+    hibernate.ddl-auto: validate
+  flyway.enabled: true
+  rabbitmq:
+    host: ${AMQP_HOST:localhost}
+    port: ${AMQP_PORT:5672}
+    username: ${AMQP_USUARIO:viajes}
+    password: ${AMQP_CLAVE:viajes}
+    publisher-confirm-type: simple
+  jackson:
+    default-property-inclusion: non_null
+
+server:
+  port: ${PORT:8101}
+  shutdown: graceful
+
+seguridad:
+  issuer: ${OIDC_ISSUER:}
+  audiencia: viajes
+  cors-origenes: ${CORS_ORIGENES:}
+
+outbox:
+  intervalo: PT1S
+  lote: 100
+
+logging:
+  structured.format.console: ${FORMATO_LOG:bo.transporte.viajes.configuracion.FormatoLog}
+
+# Trazas: las activa TrazasSiHayEndpoint cuando OTEL_EXPORTER_OTLP_ENDPOINT existe (000 §10). Solo trazas, sin métricas ni logs OTLP.
+management:
+  endpoints.web.exposure.include: health
+  tracing.sampling.probability: 1.0
+  otlp.metrics.export.enabled: false
+  logging.export.otlp.enabled: false

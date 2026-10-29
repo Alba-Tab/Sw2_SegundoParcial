@@ -12,7 +12,7 @@ docker compose --profile core --profile plataforma down       # -v borra los dat
 
 | Perfil | Servicios |
 |---|---|
-| `core` | postgres-aws, postgres-azure, mongo (`rs0`), dynamodb-local, s3-local (RustFS) y sus inicializaciones. Viajes, Flota y Finanzas se agregan con sus esqueletos |
+| `core` | postgres-aws, postgres-azure, mongo (`rs0`), dynamodb-local, s3-local (RustFS) y sus inicializaciones; viajes (8101). Flota y Finanzas se agregan con sus esqueletos |
 | `plataforma` | temporal (esquema con `admin-tools`, namespace `transporte` de 30 días), temporal-ui, rabbitmq (topología y usuarios), keycloak (realm con keycloak-config-cli + `configurar-api.sh`), n8n, mailpit |
 | `trazas` | otel-collector y jaeger (D23). Los servicios exportan si `OTEL_EXPORTER_OTLP_ENDPOINT` apunta a `http://localhost:4317` |
 | `demo` | toxiproxy, con `--env-file .env --env-file .env.demo` para desviar Finanzas, RabbitMQ y el Gateway (N9) |
