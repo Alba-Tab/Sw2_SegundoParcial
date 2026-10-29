@@ -14,19 +14,15 @@ jest.setTimeout(60_000);
 
 /**
  * Mongo 8 con réplica rs0 de un nodo (las transacciones del Outbox la necesitan): se espera el log, se inicia la
- * réplica con exec y se espera a que el nodo sea primario. GLIBC_TUNABLES=glibc.pthread.rseq=0: con kernel 6.19 o
- * más nuevo (el runner de GitHub) MongoDB 8.0 no arranca si glibc registra rseq (SERVER-121912); es lo que pide mongod.
+ * réplica con exec y se espera a que el nodo sea primario. Por defecto la misma versión que el compose y Atlas M0;
+ * la CI usa MONGO_IMAGEN_PRUEBA=mongo:7.0 porque MongoDB 8.0 no arranca en kernels 6.19+ (SERVER-121912).
  */
 async function iniciarMongoRs0(): Promise<StartedTestContainer> {
-  const c = await new GenericContainer('mongo:8.0.34')
+  const c = await new GenericContainer(process.env.MONGO_IMAGEN_PRUEBA ?? 'mongo:8.0.34')
     .withCommand(['--replSet', 'rs0', '--bind_ip_all'])
-    .withEnvironment({ GLIBC_TUNABLES: 'glibc.pthread.rseq=0' })
     .withExposedPorts(27017)
     .withWaitStrategy(Wait.forLogMessage(/Waiting for connections/))
     .withStartupTimeout(120_000)
-    .withLogConsumer((salida) => {
-      if (process.env.CI) salida.on('data', (l) => process.stdout.write(`[mongo] ${String(l)}`));
-    })
     .start();
   const sh = (js: string) => c.exec(['mongosh', '--quiet', '--eval', js]);
   const inicio = await sh("rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:27017'}]}).ok");

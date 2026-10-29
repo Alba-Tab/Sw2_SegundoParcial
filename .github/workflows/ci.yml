@@ -99,6 +99,9 @@ jobs:
       - run: npm ci
       - name: Tipos, capas (dependency-cruiser), formato e integración (Testcontainers)
         run: npm run verificar
+        env:
+          # MongoDB 8.0 aborta en el kernel 6.19+ del runner (SERVER-121912); 7.0 usa el tcmalloc anterior.
+          MONGO_IMAGEN_PRUEBA: mongo:7.0.45
 
   finanzas:
     needs: cambios
