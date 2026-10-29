@@ -18,22 +18,25 @@ export class LiberarReserva {
   ) {}
 
   ejecutar(e: { servicioId: string; reservaUnidadId?: string }): Promise<void> {
-    return this.tx.ejecutar(async () => {
-      const r = await this.reservas.porServicio(e.servicioId);
-      if (!r) {
-        await this.reservas.insertar({
-          reservaUnidadId: e.reservaUnidadId ?? uuid7(),
-          servicioId: e.servicioId,
-          estado: 'LIBERADA',
-          creadaEn: new Date(),
-        });
-        return;
-      }
-      const { unidades, choferId } = aLiberar(r);
-      if (r.estado === 'LIBERADA') return;
-      for (const u of unidades) await this.unidades.devolver(u);
-      if (choferId) await this.choferes.devolver(choferId);
-      await this.reservas.actualizar({ ...r, estado: 'LIBERADA' });
-    });
+    return this.tx.ejecutar(() => this.aplicar(e));
+  }
+
+  /** Lo mismo dentro de una transacción ya abierta (el consumidor de ViajeCancelado la abre con su Inbox). */
+  async aplicar(e: { servicioId: string; reservaUnidadId?: string }): Promise<void> {
+    const r = await this.reservas.porServicio(e.servicioId);
+    if (!r) {
+      await this.reservas.insertar({
+        reservaUnidadId: e.reservaUnidadId ?? uuid7(),
+        servicioId: e.servicioId,
+        estado: 'LIBERADA',
+        creadaEn: new Date(),
+      });
+      return;
+    }
+    const { unidades, choferId } = aLiberar(r);
+    if (r.estado === 'LIBERADA') return;
+    for (const u of unidades) await this.unidades.devolver(u);
+    if (choferId) await this.choferes.devolver(choferId);
+    await this.reservas.actualizar({ ...r, estado: 'LIBERADA' });
   }
 }

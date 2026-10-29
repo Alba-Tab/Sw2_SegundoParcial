@@ -13,7 +13,7 @@ Unidades (tractos y remolques), choferes, reservas de la saga, combustible y man
 | Dos procesos: `main.ts` (API) y `worker.ts` (relay y actividades de Temporal; consumidores en F5) | `src/` |
 
 ```bash
-npm ci && npm run verificar     # 19 pruebas + tipos + capas + formato
+npm ci && npm run verificar     # 21 pruebas + tipos + capas + formato
 docker compose -f ../../plataforma/compose/compose.yaml --profile core --profile plataforma up -d --build flota-api flota-worker
 curl localhost:8102/health/ready
 ```
@@ -31,3 +31,10 @@ curl localhost:8102/health/ready
 - **`Flota.confirmarReserva`:** pasa de `PROVISIONAL` a `CONFIRMADA`.
 - **`Flota.liberarReserva`:** devuelve las unidades y el chofer. Si el servicio no tenía reserva, deja una lápida `LIBERADA` para que una reserva tardía no tome unidades.
 - **Pruebas:** `test/unitarias/reservas.spec.ts` (reglas de elección) y `test/integracion/reservas.spec.ts` (Mongo rs0: elección, concurrencia, falla sin unidad, idempotencia y lápida).
+
+## Cancelación (T4.7, spec 004)
+
+- **Consumidor:** `ConsumidorEventos` escucha `flota.eventos` en el worker. `CONSUMIR_EVENTOS=false` lo apaga.
+- **Mensajes sin manejador o que no son JSON:** van a la DLQ (nack sin reencolar). Si el manejador falla por algo técnico, el mensaje se reencola.
+- **`ViajeCancelado`** (de un usuario o de la saga): `LiberarPorCancelacion` libera la reserva del servicio en la misma transacción que el Inbox (`inboxEventos`, con el `eventId` como `_id`). Así se liberan solas las reservas de una intervención resuelta a mano (spec 011).
+- **Inbox:** primero consulta y después inserta. Una clave duplicada dentro de una transacción de Mongo la aborta, y mongoose la reintentaba sin fin.
