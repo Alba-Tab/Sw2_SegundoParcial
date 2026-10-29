@@ -106,6 +106,7 @@ export async function probarPush(): Promise<string> {
   await Notifications.setNotificationChannelAsync('viajes', { name: 'Viajes', importance: Notifications.AndroidImportance.HIGH });
   try {
     const token = await Notifications.getDevicePushTokenAsync();
+    console.log(`TOKEN_FCM ${token.data}`);
     return `token FCM (${token.type}): ${String(token.data).slice(0, 24)}… (${String(token.data).length} car.)`;
   } catch (e) {
     return `sin token FCM: ${String(e).slice(0, 160)}`;
