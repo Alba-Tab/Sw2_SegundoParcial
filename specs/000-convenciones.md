@@ -147,6 +147,7 @@ Formato **Problem Details (RFC 9457)**, `Content-Type: application/problem+json`
 | `VINCULACION_PENDIENTE` | 503 | — |
 | `LLM_NO_DISPONIBLE` | 503 | — |
 | `PREGUNTA_FUERA_DE_ALCANCE` | 422 | — |
+| `RESUELTO_MANUALMENTE` | — | — (motivo de cancelación de la saga, no se devuelve por HTTP; spec 011) |
 
 Cada spec agrega los suyos aquí, en la misma tabla.
 
