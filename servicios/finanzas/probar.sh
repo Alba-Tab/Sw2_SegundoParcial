@@ -12,4 +12,4 @@ docker run --rm --network "${COMPOSE_PROJECT_NAME:-transporte}_default" \
   -e DB_HOST=postgres-azure -e DB_PORT=5432 -e DB_USERNAME=finanzas -e DB_PASSWORD="$CLAVE_FINANZAS" \
   -e AMQP_HOST=rabbitmq -e AMQP_USUARIO=finanzas -e AMQP_CLAVE="$RABBITMQ_CLAVE_FINANZAS" \
   -e RABBITMQ_ADMIN="$RABBITMQ_ADMIN" -e RABBITMQ_ADMIN_CLAVE="$RABBITMQ_ADMIN_CLAVE" \
-  transporte/finanzas-dev:local sh -c 'vendor/bin/pest && vendor/bin/deptrac analyse --no-progress && vendor/bin/phpstan analyse --no-progress --memory-limit=1G'
+  transporte/finanzas-dev:local sh -c 'vendor/bin/pint --test && vendor/bin/pest && vendor/bin/deptrac analyse --no-progress && vendor/bin/phpstan analyse --no-progress --memory-limit=1G'

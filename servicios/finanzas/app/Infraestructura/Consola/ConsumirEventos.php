@@ -26,7 +26,7 @@ final class ConsumirEventos extends Command
     public function handle(ConexionAmqp $amqp): never
     {
         // Proceso largo: RoadRunner lo reinicia si termina (plugin service, D29).
-        for (;;) {
+        for (; ;) {
             try {
                 $canal = $amqp->canal();
                 $canal->basic_qos(0, 10, false);

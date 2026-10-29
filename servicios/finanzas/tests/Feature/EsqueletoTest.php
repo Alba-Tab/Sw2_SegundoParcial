@@ -44,6 +44,8 @@ it('el relay publica el sobre con confirmación y marca publicado_en', function 
     $c = config('servicio.amqp');
     $conexion = new AMQPStreamConnection($c['host'], $c['puerto'], env('RABBITMQ_ADMIN', 'admin'), env('RABBITMQ_ADMIN_CLAVE', 'admin'));
     $canal = $conexion->channel();
+    // Igual que plataforma/compose/rabbitmq/definitions.json; en CI RabbitMQ arranca sin la topología.
+    $canal->exchange_declare(RelayOutbox::EXCHANGE, 'topic', false, true, false);
     [$cola] = $canal->queue_declare('', false, false, true, true);
     $canal->queue_bind($cola, RelayOutbox::EXCHANGE, 'finanzas.prueba-esqueleto.v1');
 

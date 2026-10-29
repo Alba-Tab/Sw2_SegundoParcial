@@ -6,6 +6,7 @@ use App\Infraestructura\Http\Problemas;
 use Closure;
 use Firebase\JWT\JWK;
 use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Symfony\Component\HttpFoundation\Response;
@@ -17,7 +18,7 @@ use Symfony\Component\HttpFoundation\Response;
  */
 final class Autenticacion
 {
-    /** @var array<string, \Firebase\JWT\Key>|null */
+    /** @var array<string, Key>|null */
     private static ?array $llaves = null;
 
     private static int $vencen = 0;
@@ -50,7 +51,7 @@ final class Autenticacion
         return $siguiente($req);
     }
 
-    /** @return array<string, \Firebase\JWT\Key> */
+    /** @return array<string, Key> */
     private function llaves(string $issuer, string $token): array
     {
         $kid = json_decode(JWT::urlsafeB64Decode(explode('.', $token)[0]), true)['kid'] ?? null;

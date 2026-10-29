@@ -1,5 +1,6 @@
 <?php
 
+use App\Infraestructura\Log\FormatoJson;
 use Monolog\Handler\NullHandler;
 use Monolog\Handler\StreamHandler;
 use Monolog\Handler\SyslogUdpHandler;
@@ -109,7 +110,7 @@ return [
             'handler_with' => [
                 'stream' => 'php://stderr',
             ],
-            'formatter' => env('LOG_STDERR_FORMATTER', App\Infraestructura\Log\FormatoJson::class),
+            'formatter' => env('LOG_STDERR_FORMATTER', FormatoJson::class),
             'processors' => [PsrLogMessageProcessor::class],
         ],
 
