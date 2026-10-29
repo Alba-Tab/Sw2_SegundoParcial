@@ -147,8 +147,10 @@ services:
     depends_on:
       flota-api: { condition: service_started }
       rabbitmq-usuarios: { condition: service_completed_successfully, required: false }
+      temporal-namespace: { condition: service_completed_successfully, required: false }
     environment:
       <<: *flota-env
+      TEMPORAL_ADDRESS: temporal:7233
       OTEL_SERVICE_NAME: flota-worker
 
   finanzas-api:
