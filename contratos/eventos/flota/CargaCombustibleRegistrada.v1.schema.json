@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/eventos/flota/CargaCombustibleRegistrada.v1.schema.json",
+  "title": "CargaCombustibleRegistrada v1",
+  "description": "Carga de combustible registrada por el chofer (spec 009); idempotente por opId. Clave de enrutamiento: flota.carga-combustible-registrada.v1. Consumen: analitica.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../sobre.schema.json"
+    }
+  ],
+  "properties": {
+    "tipo": {
+      "const": "CargaCombustibleRegistrada"
+    },
+    "version": {
+      "const": 1
+    },
+    "productor": {
+      "const": "flota"
+    },
+    "datos": {
+      "type": "object",
+      "required": [
+        "cargaId",
+        "opId",
+        "tractoId",
+        "placa",
+        "choferId",
+        "litros",
+        "monto",
+        "kilometraje",
+        "registradaEn"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "cargaId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "opId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "tractoId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "placa": {
+          "type": "string",
+          "pattern": "^[0-9]{3,4}[A-Z]{3}$"
+        },
+        "choferId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "viajeId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "litros": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1500
+        },
+        "monto": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Monto"
+        },
+        "kilometraje": {
+          "type": "number",
+          "minimum": 0
+        },
+        "registradaEn": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Instante"
+        },
+        "posicion": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Coordenadas"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "01933d15-0000-7000-8000-000000000015",
+      "tipo": "CargaCombustibleRegistrada",
+      "version": 1,
+      "ocurridoEn": "2026-11-03T15:20:01Z",
+      "correlationId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8dff",
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "productor": "flota",
+      "datos": {
+        "cargaId": "01933c40-0000-7000-8000-00000000d001",
+        "opId": "01933c40-0000-7000-8000-00000000d0aa",
+        "tractoId": "01933900-0000-7000-8000-00000000a101",
+        "placa": "4521KTR",
+        "choferId": "01933900-0000-7000-8000-00000000c301",
+        "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+        "litros": 180.5,
+        "monto": {
+          "monto": "675.07",
+          "moneda": "BOB"
+        },
+        "kilometraje": 184320,
+        "registradaEn": "2026-11-03T12:45:00Z",
+        "posicion": {
+          "lat": -17.5,
+          "lng": -63.7
+        }
+      }
+    }
+  ]
+}

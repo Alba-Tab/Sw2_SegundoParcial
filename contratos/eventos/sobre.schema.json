@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/eventos/sobre.schema.json",
+  "title": "Sobre de evento",
+  "description": "Sobre común de todos los eventos publicados en el exchange transporte.events (000 §6). Cada evento fija tipo, version, productor y datos.",
+  "type": "object",
+  "required": ["id", "tipo", "version", "ocurridoEn", "correlationId", "traceparent", "productor", "datos"],
+  "additionalProperties": false,
+  "properties": {
+    "id": { "$ref": "../comun/tipos.schema.json#/$defs/Uuid", "description": "eventId: llave del Inbox de cada consumidor." },
+    "tipo": { "type": "string", "pattern": "^[A-Z][A-Za-z]+$" },
+    "version": { "type": "integer", "minimum": 1 },
+    "ocurridoEn": { "$ref": "../comun/tipos.schema.json#/$defs/Instante" },
+    "correlationId": { "$ref": "../comun/tipos.schema.json#/$defs/Uuid" },
+    "traceparent": { "type": "string", "pattern": "^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$", "description": "W3C Trace Context." },
+    "productor": { "type": "string", "enum": ["viajes", "flota", "finanzas", "analitica"] },
+    "datos": { "type": "object" }
+  }
+}

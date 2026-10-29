@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/eventos/viajes/ViajeIniciado.v1.schema.json",
+  "title": "ViajeIniciado v1",
+  "description": "El chofer registró la salida (spec 005). Flota pasa la unidad a EN_VIAJE (D20); Analítica guarda la hora real de salida. Clave de enrutamiento: viajes.viaje-iniciado.v1. Consumen: flota, analitica.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../sobre.schema.json"
+    }
+  ],
+  "properties": {
+    "tipo": {
+      "const": "ViajeIniciado"
+    },
+    "version": {
+      "const": 1
+    },
+    "productor": {
+      "const": "viajes"
+    },
+    "datos": {
+      "type": "object",
+      "required": [
+        "viajeId",
+        "servicioId",
+        "choferId",
+        "tractoId",
+        "remolqueId",
+        "placa",
+        "iniciadoEn"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "viajeId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "servicioId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "choferId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "tractoId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "remolqueId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "placa": {
+          "type": "string",
+          "pattern": "^[0-9]{3,4}[A-Z]{3}$"
+        },
+        "iniciadoEn": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Instante"
+        },
+        "posicion": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Coordenadas"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "01933d05-0000-7000-8000-000000000005",
+      "tipo": "ViajeIniciado",
+      "version": 1,
+      "ocurridoEn": "2026-11-03T15:20:01Z",
+      "correlationId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8dff",
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "productor": "viajes",
+      "datos": {
+        "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+        "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
+        "choferId": "01933900-0000-7000-8000-00000000c301",
+        "tractoId": "01933900-0000-7000-8000-00000000a101",
+        "remolqueId": "01933900-0000-7000-8000-00000000b201",
+        "placa": "4521KTR",
+        "iniciadoEn": "2026-11-03T11:02:10Z",
+        "posicion": {
+          "lat": -17.7833,
+          "lng": -63.1821
+        }
+      }
+    }
+  ]
+}

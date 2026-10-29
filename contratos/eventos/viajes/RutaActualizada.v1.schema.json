@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/eventos/viajes/RutaActualizada.v1.schema.json",
+  "title": "RutaActualizada v1",
+  "description": "Copia de la ruta para Finanzas (tarifas) y Analítica (spec 002). Clave de enrutamiento: viajes.ruta-actualizada.v1. Consumen: finanzas, analitica.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../sobre.schema.json"
+    }
+  ],
+  "properties": {
+    "tipo": {
+      "const": "RutaActualizada"
+    },
+    "version": {
+      "const": 1
+    },
+    "productor": {
+      "const": "viajes"
+    },
+    "datos": {
+      "type": "object",
+      "required": [
+        "rutaId",
+        "versionAgregado",
+        "nombre",
+        "origen",
+        "destino",
+        "distanciaKm",
+        "activa"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "rutaId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "versionAgregado": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "nombre": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 80
+        },
+        "origen": {
+          "type": "object",
+          "required": [
+            "nombre",
+            "coordenadas"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "nombre": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 80
+            },
+            "coordenadas": {
+              "$ref": "../../comun/tipos.schema.json#/$defs/Coordenadas"
+            }
+          }
+        },
+        "destino": {
+          "type": "object",
+          "required": [
+            "nombre",
+            "coordenadas",
+            "radioMetros"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "nombre": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 80
+            },
+            "coordenadas": {
+              "$ref": "../../comun/tipos.schema.json#/$defs/Coordenadas"
+            },
+            "radioMetros": {
+              "type": "integer",
+              "minimum": 50,
+              "maximum": 5000
+            }
+          }
+        },
+        "distanciaKm": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 5000
+        },
+        "activa": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "01933d01-0000-7000-8000-000000000001",
+      "tipo": "RutaActualizada",
+      "version": 1,
+      "ocurridoEn": "2026-11-03T15:20:01Z",
+      "correlationId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8dff",
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "productor": "viajes",
+      "datos": {
+        "rutaId": "01933a00-0000-7000-8000-000000000004",
+        "versionAgregado": 1,
+        "nombre": "Aula",
+        "origen": {
+          "nombre": "Santa Cruz",
+          "coordenadas": {
+            "lat": -17.7833,
+            "lng": -63.1821
+          }
+        },
+        "destino": {
+          "nombre": "Lugar de la defensa",
+          "coordenadas": {
+            "lat": -17.7766,
+            "lng": -63.1949
+          },
+          "radioMetros": 300
+        },
+        "distanciaKm": 120,
+        "activa": true
+      }
+    }
+  ]
+}

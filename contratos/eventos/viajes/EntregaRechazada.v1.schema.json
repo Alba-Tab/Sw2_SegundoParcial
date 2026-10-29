@@ -1,0 +1,107 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/eventos/viajes/EntregaRechazada.v1.schema.json",
+  "title": "EntregaRechazada v1",
+  "description": "El receptor rechazó la carga, o el despachador rechazó una entrega observada (spec 007). Finanzas no factura y libera el crédito; Flota libera la unidad. Clave de enrutamiento: viajes.entrega-rechazada.v1. Consumen: finanzas, flota, analitica.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../sobre.schema.json"
+    }
+  ],
+  "properties": {
+    "tipo": {
+      "const": "EntregaRechazada"
+    },
+    "version": {
+      "const": 1
+    },
+    "productor": {
+      "const": "viajes"
+    },
+    "datos": {
+      "type": "object",
+      "required": [
+        "viajeId",
+        "servicioId",
+        "clienteId",
+        "entregaId",
+        "origenRechazo",
+        "motivo",
+        "rechazadaEn",
+        "kmRecorridos",
+        "tractoId",
+        "remolqueId",
+        "choferId"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "viajeId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "servicioId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "clienteId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "entregaId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "origenRechazo": {
+          "type": "string",
+          "enum": [
+            "RECEPTOR",
+            "DESPACHADOR"
+          ]
+        },
+        "motivo": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 500
+        },
+        "rechazadaEn": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Instante"
+        },
+        "kmRecorridos": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 5000
+        },
+        "tractoId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "remolqueId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "choferId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "01933d11-0000-7000-8000-000000000011",
+      "tipo": "EntregaRechazada",
+      "version": 1,
+      "ocurridoEn": "2026-11-03T15:20:01Z",
+      "correlationId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8dff",
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "productor": "viajes",
+      "datos": {
+        "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+        "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
+        "clienteId": "01933b5a-1f00-7a20-8b11-0c2d3e4f5a01",
+        "entregaId": "01933c10-0000-7000-8000-00000000e001",
+        "origenRechazo": "RECEPTOR",
+        "motivo": "Grano con humedad por encima de lo pactado",
+        "rechazadaEn": "2026-11-03T15:25:00Z",
+        "kmRecorridos": 120,
+        "tractoId": "01933900-0000-7000-8000-00000000a101",
+        "remolqueId": "01933900-0000-7000-8000-00000000b201",
+        "choferId": "01933900-0000-7000-8000-00000000c301"
+      }
+    }
+  ]
+}

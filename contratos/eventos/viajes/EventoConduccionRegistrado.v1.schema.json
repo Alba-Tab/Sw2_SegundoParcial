@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/eventos/viajes/EventoConduccionRegistrado.v1.schema.json",
+  "title": "EventoConduccionRegistrado v1",
+  "description": "Frenada brusca (≥ 0,4 g, D08) o alerta de fatiga detectada en el celular. Analítica calcula el puntaje de conducción. Clave de enrutamiento: viajes.evento-conduccion-registrado.v1. Consumen: analitica.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../sobre.schema.json"
+    }
+  ],
+  "properties": {
+    "tipo": {
+      "const": "EventoConduccionRegistrado"
+    },
+    "version": {
+      "const": 1
+    },
+    "productor": {
+      "const": "viajes"
+    },
+    "datos": {
+      "type": "object",
+      "required": [
+        "eventoId",
+        "viajeId",
+        "choferId",
+        "tipo",
+        "posicion",
+        "registradoEn"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "eventoId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "viajeId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "choferId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "tipo": {
+          "type": "string",
+          "enum": [
+            "FRENADA_BRUSCA",
+            "ALERTA_FATIGA"
+          ]
+        },
+        "magnitudG": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 5
+        },
+        "posicion": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Coordenadas"
+        },
+        "registradoEn": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Instante"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "01933d08-0000-7000-8000-000000000008",
+      "tipo": "EventoConduccionRegistrado",
+      "version": 1,
+      "ocurridoEn": "2026-11-03T15:20:01Z",
+      "correlationId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8dff",
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "productor": "viajes",
+      "datos": {
+        "eventoId": "01933c80-0000-7000-8000-00000000dd01",
+        "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+        "choferId": "01933900-0000-7000-8000-00000000c301",
+        "tipo": "FRENADA_BRUSCA",
+        "magnitudG": 0.52,
+        "posicion": {
+          "lat": -17.55,
+          "lng": -63.6
+        },
+        "registradoEn": "2026-11-03T12:30:05Z"
+      }
+    }
+  ]
+}

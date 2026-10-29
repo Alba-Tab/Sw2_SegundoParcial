@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/eventos/flota/ChoferActualizado.v1.schema.json",
+  "title": "ChoferActualizado v1",
+  "description": "Copia del chofer para Analítica (reportes por chofer). Clave de enrutamiento: flota.chofer-actualizado.v1. Consumen: analitica.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../sobre.schema.json"
+    }
+  ],
+  "properties": {
+    "tipo": {
+      "const": "ChoferActualizado"
+    },
+    "version": {
+      "const": 1
+    },
+    "productor": {
+      "const": "flota"
+    },
+    "datos": {
+      "type": "object",
+      "required": [
+        "choferId",
+        "versionAgregado",
+        "nombre",
+        "usuarioSub",
+        "licenciaCategoria",
+        "licenciaVenceEl",
+        "activo"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "choferId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "versionAgregado": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "nombre": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 120
+        },
+        "usuarioSub": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Sub"
+        },
+        "licenciaCategoria": {
+          "type": "string",
+          "enum": [
+            "A",
+            "B",
+            "C"
+          ]
+        },
+        "licenciaVenceEl": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Fecha"
+        },
+        "activo": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "01933d02-0000-7000-8000-000000000002",
+      "tipo": "ChoferActualizado",
+      "version": 1,
+      "ocurridoEn": "2026-11-03T15:20:01Z",
+      "correlationId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8dff",
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "productor": "flota",
+      "datos": {
+        "choferId": "01933900-0000-7000-8000-00000000c301",
+        "versionAgregado": 2,
+        "nombre": "Juan Mamani Quispe",
+        "usuarioSub": "9c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f",
+        "licenciaCategoria": "C",
+        "licenciaVenceEl": "2028-03-15",
+        "activo": true
+      }
+    }
+  ]
+}
