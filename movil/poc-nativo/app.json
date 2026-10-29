@@ -1,0 +1,47 @@
+{
+  "expo": {
+    "name": "PoC Chofer",
+    "slug": "poc-chofer",
+    "version": "0.0.1",
+    "scheme": "transporte-chofer",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "bundleIdentifier": "bo.transporte.poc.chofer",
+      "appleTeamId": "C3W2LB2ZA4",
+      "supportsTablet": false,
+      "infoPlist": {
+        "UIBackgroundModes": ["location"],
+        "NSAppTransportSecurity": { "NSAllowsLocalNetworking": true },
+        "NSLocalNetworkUsageDescription": "Para conectarse a los servicios de la Mac durante la PoC."
+      }
+    },
+    "android": {
+      "package": "bo.transporte.poc.chofer",
+      "adaptiveIcon": {
+        "backgroundColor": "#E6F4FE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "permissions": ["POST_NOTIFICATIONS"],
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-web-browser",
+      "expo-asset",
+      ["expo-audio", { "microphonePermission": "Para dictar la bitácora del viaje." }],
+      ["expo-location", {
+        "locationWhenInUsePermission": "Para registrar la posición del viaje.",
+        "locationAlwaysAndWhenInUsePermission": "Para registrar la posición del viaje aunque la app esté en segundo plano.",
+        "isIosBackgroundLocationEnabled": true,
+        "isAndroidBackgroundLocationEnabled": true,
+        "isAndroidForegroundServiceEnabled": true
+      }],
+      ["expo-build-properties", { "android": { "usesCleartextTraffic": true } }],
+      ["react-native-fast-tflite", { "enableCoreMLDelegate": true, "enableAndroidGpuLibraries": true }]
+    ]
+  }
+}
