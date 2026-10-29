@@ -1,0 +1,6 @@
+# API de Finanzas: Octane sobre RoadRunner con 4 workers (T3a.4). Octane completa http y server al arrancar.
+version: "3"
+logs:
+  mode: production
+  level: warn
+  encoding: json

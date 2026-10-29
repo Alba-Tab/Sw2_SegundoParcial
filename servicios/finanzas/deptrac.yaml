@@ -1,0 +1,26 @@
+# DDD (AGENTS.md): Dominio no conoce Eloquent ni Laravel; Aplicacion solo usa Dominio y sus puertos.
+deptrac:
+  paths: [./app]
+  layers:
+    - name: Dominio
+      collectors: [{ type: classLike, value: ^App\\Dominio\\.* }]
+    - name: Aplicacion
+      collectors: [{ type: classLike, value: ^App\\Aplicacion\\.* }]
+    - name: Infraestructura
+      collectors:
+        - { type: classLike, value: ^App\\Infraestructura\\.* }
+        - { type: classLike, value: ^App\\Providers\\.* }
+    - name: Dinero
+      collectors: [{ type: classLike, value: ^Brick\\.* }]
+    - name: Framework
+      collectors:
+        - { type: classLike, value: ^Illuminate\\.* }
+        - { type: classLike, value: ^Temporal\\.* }
+        - { type: classLike, value: ^PhpAmqpLib\\.* }
+        - { type: classLike, value: ^Firebase\\.* }
+        - { type: classLike, value: ^Symfony\\.* }
+        - { type: classLike, value: ^Monolog\\.* }
+  ruleset:
+    Dominio: [Dinero]
+    Aplicacion: [Dominio, Dinero]
+    Infraestructura: [Aplicacion, Dominio, Dinero, Framework]
