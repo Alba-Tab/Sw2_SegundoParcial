@@ -34,6 +34,13 @@ final class CotizacionRepositorioDb implements CotizacionRepositorio
         return $f ? self::fila($f) : null;
     }
 
+    public function paraActualizar(string $id): ?Cotizacion
+    {
+        $f = DB::table('cotizacion')->where('cotizacion_id', $id)->lockForUpdate()->first();
+
+        return $f ? self::fila($f) : null;
+    }
+
     public function listar(?string $clienteId, ?string $despuesDe, int $limite): array
     {
         return DB::table('cotizacion')

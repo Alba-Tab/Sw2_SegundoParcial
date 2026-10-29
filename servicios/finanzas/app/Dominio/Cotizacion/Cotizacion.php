@@ -13,6 +13,7 @@ use DateTimeZone;
 /**
  * Agregado Cotizacion (spec 002). monto = tarifa × toneladas (HALF_UP al final). Estado VIGENTE o ACEPTADA;
  * VENCIDA no se guarda: se calcula con venceEn. Máximo 30 t por servicio (D03); fecha de hoy a 60 días en La Paz.
+ * El paso 2 de la saga la acepta y su compensación la devuelve a VIGENTE si sigue en plazo (spec 003).
  */
 final class Cotizacion
 {
@@ -66,5 +67,26 @@ final class Cotizacion
     public function vencida(DateTimeImmutable $ahora): bool
     {
         return $this->estado === 'VIGENTE' && $ahora > $this->venceEn;
+    }
+
+    /** Paso 2 de la saga, en este orden: del cliente (COTIZACION_AJENA) y VIGENTE en plazo (COTIZACION_VENCIDA). */
+    public function aceptar(string $clienteId, DateTimeImmutable $ahora): void
+    {
+        if ($clienteId !== $this->clienteId) {
+            throw new ErrorDeDominio('COTIZACION_AJENA', 'La cotización es de otro cliente');
+        }
+        if ($this->estado !== 'VIGENTE' || $this->vencida($ahora)) {
+            throw new ErrorDeDominio('COTIZACION_VENCIDA',
+                $this->estado === 'ACEPTADA' ? 'La cotización ya se usó en otro servicio' : 'La cotización venció');
+        }
+        $this->estado = 'ACEPTADA';
+    }
+
+    /** Compensación del paso 2: vuelve a VIGENTE solo si todavía está en plazo. */
+    public function volverAVigente(DateTimeImmutable $ahora): void
+    {
+        if ($this->estado === 'ACEPTADA' && $ahora <= $this->venceEn) {
+            $this->estado = 'VIGENTE';
+        }
     }
 }

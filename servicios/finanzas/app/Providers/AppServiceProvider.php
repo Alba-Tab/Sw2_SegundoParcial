@@ -9,13 +9,17 @@ use App\Aplicacion\Puertos\EvaluadorMora;
 use App\Aplicacion\Puertos\LineaCreditoRepositorio;
 use App\Aplicacion\Puertos\RegistroDeEventos;
 use App\Aplicacion\Puertos\Reloj;
+use App\Aplicacion\Puertos\ReservaCreditoRepositorio;
+use App\Aplicacion\Puertos\SolicitudAprobacionRepositorio;
 use App\Infraestructura\Mensajeria\ConexionAmqp;
 use App\Infraestructura\Persistencia\CatalogoRepositorioDb;
 use App\Infraestructura\Persistencia\CotizacionRepositorioDb;
-use App\Infraestructura\Persistencia\EvaluadorMoraSinFacturas;
+use App\Infraestructura\Persistencia\EvaluadorMoraDb;
 use App\Infraestructura\Persistencia\LineaCreditoRepositorioDb;
 use App\Infraestructura\Persistencia\RegistroDeEventosOutbox;
 use App\Infraestructura\Persistencia\RelojSistema;
+use App\Infraestructura\Persistencia\ReservaCreditoRepositorioDb;
+use App\Infraestructura\Persistencia\SolicitudAprobacionRepositorioDb;
 use DateInterval;
 use Illuminate\Support\ServiceProvider;
 
@@ -30,7 +34,9 @@ class AppServiceProvider extends ServiceProvider
         $this->app->bind(CotizacionRepositorio::class, CotizacionRepositorioDb::class);
         $this->app->bind(CatalogoRepositorio::class, CatalogoRepositorioDb::class);
         $this->app->bind(LineaCreditoRepositorio::class, LineaCreditoRepositorioDb::class);
-        $this->app->bind(EvaluadorMora::class, EvaluadorMoraSinFacturas::class);
+        $this->app->bind(EvaluadorMora::class, EvaluadorMoraDb::class);
+        $this->app->bind(ReservaCreditoRepositorio::class, ReservaCreditoRepositorioDb::class);
+        $this->app->bind(SolicitudAprobacionRepositorio::class, SolicitudAprobacionRepositorioDb::class);
         $this->app->bind(CrearCotizacion::class, fn ($app) => new CrearCotizacion($app->make(CotizacionRepositorio::class),
             $app->make(CatalogoRepositorio::class), $app->make(Reloj::class), new DateInterval(config('servicio.cotizacion_vigencia'))));
     }
