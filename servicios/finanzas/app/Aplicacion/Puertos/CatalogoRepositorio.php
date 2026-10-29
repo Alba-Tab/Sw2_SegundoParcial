@@ -12,6 +12,8 @@ interface CatalogoRepositorio
 
     public function rutaActiva(string $rutaId): bool;
 
+    public function razonSocial(string $clienteId): ?string;
+
     public function tarifa(string $rutaId, TipoCarga $tipoCarga): ?Tarifa;
 
     /**
