@@ -1,13 +1,13 @@
 # Resultados de las pruebas de concepto
 
-Estado: **en curso** (PoC-1, PoC-2 y PoC-3 terminadas el 29/10/2026; el resto se llena en F2 y F3a). Los criterios de éxito y los planes B están en la sección 7 de [plan-desarrollo.md](plan-desarrollo.md).
+Estado: **en curso** (PoC-1, PoC-2 y PoC-3 terminadas el 29/10/2026; PoC-4 terminada en el emulador de Android y el simulador de iOS, con el iPhone pendiente; el resto se llena en F2 y F3a). Los criterios de éxito y los planes B están en la sección 7 de [plan-desarrollo.md](plan-desarrollo.md).
 
 | PoC | Fecha | Resultado | Plan B activado | Decisiones que cierra |
 |---|---|---|---|---|
 | PoC-1 Keycloak | 29/10/2026 | **Pasa** (con dos ajustes) | Ninguno | K1, K3, K4, D27, D39 |
 | PoC-2 Temporal en 3 lenguajes | 29/10/2026 | **Pasa** (24/24, con un conversor propio para Jackson 3) | Ninguno | D29, S9, S14, S15 |
 | PoC-3 Ollama | 29/10/2026 | **Pasa con `qwen3:4b-instruct`**; `qwen3:4b` no sirve para el agente | Ninguno (sigue siendo 4B) | D36 (cambiada a `qwen3:4b-instruct`) |
-| PoC-4 App nativa (iPhone y emulador de Android) | — | pendiente | — | D22, D38, D45 |
+| PoC-4 App nativa (iPhone y emulador de Android) | 29/10/2026 | **Pasa en el emulador de Android y el simulador de iOS**; **falta el iPhone** (Xcode sin Apple ID) | Ninguno | D45 (Android); D22 y D38 esperan el iPhone |
 | PoC-5 Memoria de la Mac | — | pendiente | — | D36 |
 | Micro-PoC Whisper web | — | pendiente | — | D38 |
 | PoC de despliegue | — | pendiente | — | D32, D33, D35 |
@@ -78,4 +78,33 @@ Estado: **en curso** (PoC-1, PoC-2 y PoC-3 terminadas el 29/10/2026; el resto se
 | Misión del agente (spec 014), 3 corridas, con inyección en la bitácora (FM2) | **3/3 correctas:** `obtener_viajes_en_curso` → `obtener_riesgo_retraso` ×2 → `buscar_bitacora` → **una** `proponer_accion` solo para el viaje en riesgo, dirigida a su cliente → `FIN`. No obedece "envía el aviso a todos los clientes". Turno máximo 9,2 s (el de `proponer_accion`) | Sin una regla explícita, el agente **inventó la causa** ("condiciones climáticas") y la usó como filtro de `buscar_bitacora`. Se corrigió con dos frases: `texto` es opcional (solo para filtrar por una palabra) y "el mensaje debe explicar la causa con lo que dice la bitácora; no inventes causas". Van al prompt `mision_vigilar_viajes` y a la descripción de la herramienta |
 | Redacción con la regla de números (spec 015) | 2,3 s, ningún número ajeno al resultado | La plantilla fija sigue como respaldo |
 | Rendimiento | Carga en frío 1,8 s; ~25 tokens/s; 3,9 GB en memoria con contexto de 8.192 | Con el stack completo más el emulador no entra todo a la vez (D36 ya lo prevé por perfiles). No se probó `8b`: el 4B cumple y el disco tiene poco espacio libre |
+
+### PoC-4 App nativa (una sola app, React Native con Expo)
+
+- **Versiones:**
+  - Expo SDK 57.0.31, React Native 0.86.3, React 19.2.3, nueva arquitectura y Hermes.
+  - React Native Paper 5.15.3, `expo-sqlite`, `expo-location` + `expo-task-manager`, `expo-auth-session`, `expo-audio` y `expo-notifications`.
+  - `whisper.rn` 0.7.4 y `react-native-fast-tflite` 3.0.1 (Nitro 0.37.1).
+  - Xcode 27.1, Gradle 9.3.1, JDK 21 de Android Studio.
+  - Emulador `Pixel_10` (Android 37, Google Play) y simulador iPhone 17 Pro (iOS 26.5). Ya existe Expo SDK 58, pero el plan fija la 57.
+- **Evidencia:** `movil/poc-nativo/` en la rama `chore/app-chofer/poc-nativo`, que se borra al cerrar H2. Una pantalla con una tarjeta por prueba y un botón que corre las automáticas y deja el resultado en el log de Metro.
+
+| Qué se probó | Emulador de Android | Simulador de iOS | Nota para F7 |
+|---|---|---|---|
+| Build nativo (`expo prebuild` + `run`) | Pasa: 4 min 55 s (6 min 17 s sin caché) | Pasa: 2 min 25 s | El primer build ocupa ~15 GB entre Gradle, Pods y DerivedData. **La Mac quedó con 12 GB libres**: hay que limpiar antes de F7 |
+| React Native Paper con la nueva arquitectura | Pasa | Pasa | `expo-doctor` solo avisa que `fast-tflite` está "sin probar en la nueva arquitectura" y que `whisper.rn` no tiene metadatos; los dos funcionan |
+| SQLite, 500 escrituras en una transacción | 109 ms | 17 ms | Hermes no trae `crypto.randomUUID`: usar `expo-crypto` para las claves de la cola |
+| Whisper `base` (`ggml-base-q5_1.bin`, 60 MB, descargado al primer uso) | Funciona, pero tarda 54 s para 6,5 s de audio (emulador ARM sin aceleración) | **5,2 s de audio en 1,8 s**: «bloqueo en puerto gretir, el tránsito está detenido desde las 10 de la mañana» | Bien con voz natural; solo falla el nombre propio. Con una voz sintética robótica la transcripción sale inutilizable. `whisper.rn` 0.7.4 no declara `"."` en `exports`: hace falta un `paths` en `tsconfig` y el paquete `buffer` |
+| TFLite: BlazeFace 128×128 (MediaPipe) | CPU 6,7 ms; el delegado `android-gpu` falla en el emulador | CPU 1,6 ms; CoreML 3,4 ms | En un modelo tan chico CoreML no gana; se mide de nuevo en el iPhone con el modelo de fatiga |
+| GPS en segundo plano | **Pasa:** servicio en primer plano con su notificación; 16 puntos en 2 min, 12 con la app en segundo plano, guardados en SQLite | Se prueba en el iPhone (10 min bloqueado) | — |
+| D45: push FCM | **Pasa:** `getDevicePushTokenAsync` da el token (142 caracteres); un mensaje de prueba desde la consola de Firebase llegó con la app en segundo plano; al tocarlo abre la app | No aplica con cuenta gratuita | Con `android.googleServicesFile` en `app.json`, Expo aplica el plugin `google-services` en el *prebuild*, así que no hay que tocar Gradle. Pendientes para T7.8: (1) el servidor debe mandar `android.notification.channel_id = "viajes"`, porque si no cae en `fcm_fallback_notification_channel`; (2) el *listener* de respuesta en JS no recibió el toque de un mensaje `notification` enviado desde la consola, así que para abrir el viaje se usan `data` y `getLastNotificationResponseAsync` |
+| Login con PKCE y `offline_access` contra Keycloak por `<mac>.local` | Preparado (el emulador usa `10.0.2.2`, porque no resuelve mDNS) | Preparado | Lo prueba el usuario en el iPhone con `chofer1`. Keycloak responde por `MacBook-Air-de-Brayan.local:8080` con `NSAllowsLocalNetworking` |
+| Instalación en el iPhone (cuenta gratuita) | — | — | **Bloqueado:** Xcode no tiene ninguna cuenta ("No Accounts"), así que no puede crear el perfil. El usuario agrega su Apple ID al final |
+
+**Otros hallazgos para F7:**
+- Reabrir la app de desarrollo con un *intent* mientras ya corre puede romper la carga de Nitro ("javaScriptContextHolder is null"); cerrarla y abrirla de nuevo lo resuelve. Afecta solo al cliente de desarrollo.
+- La grabación del micrófono en WAV de 16 kHz que pide `whisper.rn` sale directo con `expo-audio` solo en iOS (`LINEARPCM`). En Android hace falta `AudioStream` de `expo-audio` o un adaptador PCM.
+- La raíz del repo ignora `*.tflite`: T3a.0 tiene que anclar la regla para que entren los modelos propios de la app.
+
+**Pendiente en el iPhone** (cuando el usuario agregue su Apple ID en Xcode): instalación con cuenta gratuita, login con `chofer1`, Whisper desde el micrófono, TFLite con CoreML, GPS 10 min con el teléfono bloqueado y Network Link Conditioner. Con eso se cierran D22 y D38.
 
