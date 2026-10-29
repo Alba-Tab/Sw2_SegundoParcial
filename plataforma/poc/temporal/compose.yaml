@@ -1,0 +1,100 @@
+# PoC-2: Temporal 1.32 sobre PostgreSQL 17 con workers en Java (viajes), PHP (finanzas) y TypeScript (flota).
+# Uso: docker compose -f plataforma/poc/temporal/compose.yaml up -d --build ; luego ./escenarios.sh
+name: poc-temporal
+
+x-temporal-env: &temporal-env
+  TEMPORAL_ADDRESS: temporal:7233
+
+services:
+  postgres-temporal:
+    image: postgres:17
+    environment: { POSTGRES_USER: temporal, POSTGRES_PASSWORD: temporal }
+    healthcheck: { test: ["CMD", "pg_isready", "-U", "temporal"], interval: 2s, retries: 30 }
+
+  temporal-esquema:
+    image: temporalio/admin-tools:1.32.1
+    depends_on: { postgres-temporal: { condition: service_healthy } }
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        T="temporal-sql-tool --plugin postgres12 --ep postgres-temporal -p 5432 -u temporal --pw temporal"
+        S=/etc/temporal/schema/postgresql/v12
+        for db in temporal temporal_visibility; do $$T --db $$db create || true; done
+        $$T --db temporal setup-schema -v 0.0 || true
+        $$T --db temporal update-schema -d $$S/temporal/versioned
+        $$T --db temporal_visibility setup-schema -v 0.0 || true
+        $$T --db temporal_visibility update-schema -d $$S/visibility/versioned
+    restart: "no"
+
+  temporal:
+    image: temporalio/server:1.32.1
+    depends_on: { temporal-esquema: { condition: service_completed_successfully } }
+    environment:
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: temporal
+      POSTGRES_SEEDS: postgres-temporal
+    volumes: ["./dynamicconfig:/etc/temporal/config/dynamicconfig:ro"]
+    ports: ["7233:7233"]
+    healthcheck: { test: ["CMD-SHELL", "nc -z $$(hostname -i) 7233"], interval: 3s, retries: 40 }
+
+  temporal-namespace:
+    image: temporalio/admin-tools:1.32.1
+    depends_on: { temporal: { condition: service_started } }
+    environment: *temporal-env
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        n=0; until temporal operator cluster health --address temporal:7233 >/dev/null 2>&1; do n=$$((n+1)); [ $$n -gt 60 ] && exit 1; sleep 2; done
+        temporal operator namespace describe -n transporte --address temporal:7233 >/dev/null 2>&1 \
+          || temporal operator namespace create -n transporte --retention 30d --address temporal:7233
+        temporal operator namespace describe -n transporte --address temporal:7233 | grep -i retention
+    restart: "no"
+
+  temporal-ui:
+    image: temporalio/ui:2.57.0
+    depends_on: [temporal]
+    environment: { TEMPORAL_ADDRESS: temporal:7233, TEMPORAL_DEFAULT_NAMESPACE: transporte }
+    ports: ["8233:8080"]
+
+  # CLI para los escenarios: docker compose run --rm cli temporal workflow ...
+  cli:
+    image: temporalio/admin-tools:1.32.1
+    environment: { TEMPORAL_ADDRESS: temporal:7233, TEMPORAL_NAMESPACE: transporte }
+    profiles: [cli]
+    entrypoint: ["sh", "-c"]
+
+  postgres-finanzas:
+    image: postgres:17
+    environment: { POSTGRES_USER: finanzas, POSTGRES_PASSWORD: finanzas, POSTGRES_DB: finanzas }
+    healthcheck: { test: ["CMD", "pg_isready", "-U", "finanzas"], interval: 2s, retries: 30 }
+
+  viajes:
+    build: { context: ../../.., dockerfile: plataforma/poc/temporal/viajes/Dockerfile }
+    image: poc-viajes
+    depends_on: { temporal-namespace: { condition: service_completed_successfully } }
+    environment: *temporal-env
+
+  flota:
+    build: { context: ../../.., dockerfile: plataforma/poc/temporal/flota/Dockerfile }
+    image: poc-flota
+    depends_on: { temporal-namespace: { condition: service_completed_successfully } }
+    environment: *temporal-env
+
+  finanzas:
+    build: { context: ../../.., dockerfile: plataforma/poc/temporal/finanzas/Dockerfile }
+    image: poc-finanzas
+    depends_on:
+      temporal-namespace: { condition: service_completed_successfully }
+      postgres-finanzas: { condition: service_healthy }
+    environment:
+      <<: *temporal-env
+      DB_CONNECTION: pgsql
+      DB_HOST: postgres-finanzas
+      DB_PORT: "5432"
+      DB_DATABASE: finanzas
+      DB_USERNAME: finanzas
+      DB_PASSWORD: finanzas
+      LOG_CHANNEL: stderr

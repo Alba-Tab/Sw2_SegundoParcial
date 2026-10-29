@@ -1,0 +1,15 @@
+{
+  "name": "poc-flota",
+  "private": true,
+  "type": "module",
+  "description": "PoC-2: worker de Flota (actividades Flota.*) con el SDK de TypeScript",
+  "scripts": { "start": "node src/worker.ts" },
+  "engines": { "node": ">=24" },
+  "dependencies": {
+    "@temporalio/activity": "1.25.0",
+    "@temporalio/common": "1.25.0",
+    "@temporalio/worker": "1.25.0",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  }
+}

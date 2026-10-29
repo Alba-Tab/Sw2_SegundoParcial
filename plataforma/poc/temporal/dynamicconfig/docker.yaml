@@ -1,0 +1,4 @@
+# Configuración dinámica mínima del servidor (el binario 1.32 la exige aunque esté vacía).
+limit.maxIDLength:
+  - value: 255
+    constraints: {}

@@ -1,0 +1,31 @@
+# D29: un solo proceso RoadRunner con 2 workers de Temporal (actividades) y el plugin service con los dos
+# procesos largos de Finanzas (consumidor de eventos y relay del Outbox). Si uno muere, RoadRunner lo reinicia.
+version: "3"
+rpc:
+  listen: tcp://127.0.0.1:6001
+server:
+  command: "php worker.php"
+temporal:
+  address: ${TEMPORAL_ADDRESS}
+  namespace: transporte
+  activities:
+    num_workers: 2
+service:
+  eventos:
+    command: "php artisan eventos:consumir"
+    process_num: 1
+    exec_timeout: 0s
+    remain_after_exit: true
+    restart_sec: 2
+    service_name_in_log: true
+  outbox:
+    command: "php artisan outbox:publicar"
+    process_num: 1
+    exec_timeout: 0s
+    remain_after_exit: true
+    restart_sec: 2
+    service_name_in_log: true
+logs:
+  mode: production
+  level: info
+  encoding: console
