@@ -24,9 +24,9 @@ Un cliente nuevo se registra en el portal y completa los datos de su empresa; at
 1. El usuario elige "Crear cuenta" en el portal; Keycloak muestra su formulario de registro y crea el usuario **sin roles**, dentro del grupo por defecto `registro-portal`.
 2. El portal recibe un token sin `clienteId` y muestra "Completa los datos de tu empresa": razón social, NIT, correo de facturación, teléfono y dirección.
 3. El portal hace `POST /api/v1/clientes` con `Idempotency-Key`. El endpoint solo exige un usuario autenticado.
-4. Viajes, en **una transacción**: guarda la operación en `operacion_idempotente`, crea el `Cliente` con el `sub` del usuario, `canal = PORTAL`, `versionAgregado = 1`, y deja `ClienteActualizado` en el Outbox.
+4. Viajes, en **una transacción**: crea el `Cliente` con el `sub` del usuario, `canal = PORTAL`, `versionAgregado = 1` y `vinculado = false`; deja `ClienteActualizado` en el Outbox; y guarda la operación en `operacion_idempotente` ya **`COMPLETADA`**, con la respuesta `201` y `vinculado: false`. Así un reenvío nunca queda bloqueado en `EN_PROCESO`, aunque Viajes caiga antes de responder.
 5. Después del commit, Viajes llama a la API de administración de Keycloak: escribe el atributo `clienteId` y asigna el rol `cliente`. Marca el cliente `vinculado = true`.
-6. Viajes responde `201` con el cliente y `vinculado: true`.
+6. Viajes responde `201` con el cliente y el `vinculado` real (`true` si el paso 5 salió bien). Un reenvío con la misma clave recibe la respuesta guardada (`vinculado: false`); el portal siempre lee el estado real con `GET /api/v1/clientes/mio`.
 7. El portal renueva el token, que ya trae `clienteId` y el rol `cliente`.
 8. Finanzas consume `ClienteActualizado` (Inbox): crea su copia y, si es el **primer** evento de ese cliente, una `LineaCredito` con límite **30.000,00 BOB** (D01).
 
@@ -66,7 +66,7 @@ Un cliente nuevo se registra en el portal y completa los datos de su empresa; at
 
 | Caso | Respuesta | Qué hace el portal |
 |---|---|---|
-| Falla Keycloak en el paso 5 | El cliente queda creado con `vinculado = false`; `201` con `vinculado: false` y aviso | Muestra "Reintentar vinculación" → `POST /api/v1/clientes/mio/vinculacion`, que repite **solo** el paso 5 |
+| Falla Keycloak en el paso 5 | El cliente queda creado con `vinculado = false`; `201` con `vinculado: false` y aviso | Muestra "Reintentar vinculación" → `POST /api/v1/clientes/mio/vinculacion` con `Idempotency-Key`, que repite **solo** el paso 5 (escribir el atributo y asignar el rol son idempotentes) |
 | Reintentar vinculación y Keycloak sigue caído | `503 VINCULACION_PENDIENTE` con `Retry-After` | Mantiene el botón |
 | Reenvío con la misma clave | La respuesta guardada (000 §4.1) | — |
 | Misma clave, otro cuerpo | `422 IDEMPOTENCIA_CUERPO_DISTINTO` | — |

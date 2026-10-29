@@ -1,6 +1,6 @@
 # 004 · Cancelar servicio
 
-Estado: **revisado** · Casos de uso: CU-22 Cancelar servicio (nuevo; la propuesta sugería CU-21, que ya es "Cerrar sesión") · Responsable: Brayan Albaro Garcia Taboada
+Estado: **revisado** · Casos de uso: CU-23 Cancelar servicio (nuevo; la propuesta sugería CU-21, que ya es "Cerrar sesión", y reserva CU-22 para "Registrar pago"; se anota para T12.4) · Responsable: Brayan Albaro Garcia Taboada
 
 El cliente, atención comercial o el despachador cancelan un servicio confirmado antes de que el viaje empiece. Es **coreografía**: Viajes cambia el estado y publica `ViajeCancelado`; Finanzas y Flota liberan por su cuenta. No hay nada que coordinar en orden, así que no usa Temporal. Decisiones: D17, D18, D45.
 
@@ -20,11 +20,11 @@ El cliente, atención comercial o el despachador cancelan un servicio confirmado
 ## Pasos (camino feliz)
 
 1. El portal (o el Centro de Control) hace `POST /api/v1/servicios/{servicioId}/cancelacion` con `{ "motivo": "…" }` y `Idempotency-Key`.
-2. Viajes, en una transacción: verifica estado y permiso, pasa el viaje a `CANCELADO` con el motivo, registra la auditoría y deja `ViajeCancelado` en el Outbox con `origen = USUARIO`, `canceladoPor = <sub>` y `estadoAnterior = CONFIRMADO`.
+2. Viajes, en una transacción: verifica estado y permiso, pasa el viaje a `CANCELADO` con el motivo, registra la auditoría y deja `ViajeCancelado` en el Outbox con estos datos: `servicioId`, `viajeId`, `clienteId`, `motivo`, `origen = USUARIO`, `canceladoPor = <sub>`, `estadoAnterior = CONFIRMADO` y, si hay chofer asignado, `choferUsuarioSub` (para el push).
 3. Responde `200` con el servicio cancelado.
 4. Reacciones (cada una idempotente con Inbox):
-   - **Finanzas:** la reserva de crédito del `servicioId` pasa de `ACTIVA` a `LIBERADA` (`reservado` baja). La cotización sigue `ACEPTADA`: no se reutiliza.
-   - **Flota:** la reserva de unidad pasa a `LIBERADA`; tracto, remolque y chofer vuelven a `DISPONIBLE`.
+   - **Finanzas:** la reserva de crédito del `servicioId` pasa de `ACTIVA` o `PENDIENTE_APROBACION` a `LIBERADA` (`reservado` baja). Con `origen = USUARIO` la cotización sigue `ACEPTADA` (no se reutiliza); con `origen = SAGA` vuelve a `VIGENTE` si sigue en plazo, igual que `Finanzas.liberarCredito`.
+   - **Flota:** la reserva de unidad (`PROVISIONAL` o `CONFIRMADA`) pasa a `LIBERADA`; tracto, remolque y chofer vuelven a `DISPONIBLE`.
    - **Analítica:** cierra los hechos del viaje como cancelado.
    - **Viajes (push, D45):** el consumidor interno del Outbox avisa al chofer asignado "Viaje cancelado" (solo con `origen = USUARIO`).
 
@@ -43,7 +43,7 @@ El cliente, atención comercial o el despachador cancelan un servicio confirmado
 |---|---|
 | Motivo | Obligatorio, 3 a 300 caracteres |
 | Liberación idempotente | Si la reserva ya está `LIBERADA` (por ejemplo, porque llegó también un `ViajeCancelado` de la saga), el consumidor no hace nada |
-| Mismo evento, dos orígenes | `ViajeCancelado` lo publica también la saga al compensar, con `origen = SAGA` (spec 003). Los consumidores tratan igual ambos orígenes; solo el push distingue |
+| Mismo evento, dos orígenes | `ViajeCancelado` lo publica también la saga al compensar o al marcar una intervención como resuelta, con `origen = SAGA` (specs 003 y 011). Los consumidores liberan igual en ambos casos (así se liberan solas las reservas que quedaron en `PENDIENTE_APROBACION` o `PROVISIONAL`); el origen solo cambia qué pasa con la cotización y si hay push |
 
 ## Estados que cambia
 

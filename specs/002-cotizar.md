@@ -38,7 +38,7 @@ El cliente (o comercial a su nombre) pide precio para una ruta, un tipo de carga
 | Toneladas | Mayor que 0 y como máximo **30** por servicio (D03); más da `422 TONELAJE_EXCEDIDO` |
 | Fecha del viaje | Hoy o posterior (en `America/La_Paz`) y como máximo 60 días adelante |
 | Vigencia | `PT24H`. Es configuración de la API de Finanzas (`COTIZACION_VIGENCIA`); en demo, `PT2M` |
-| Vencida | `VENCIDA` no se guarda: se calcula como `estado = VIGENTE` y `ahora > venceEn` |
+| Vencida | `VENCIDA` no se guarda: la respuesta trae el booleano `vencida`, calculado como `estado = VIGENTE` y `ahora > venceEn`. `estado` solo toma `VIGENTE` o `ACEPTADA` |
 | Propiedad | Con rol `cliente`, el `clienteId` sale del token y se ignora el del cuerpo. Con `comercial`, sale del cuerpo y se registra `canal = TELEFONO` |
 | Reserva | Cotizar no reserva crédito ni unidades |
 
@@ -69,10 +69,10 @@ El cliente (o comercial a su nombre) pide precio para una ruta, un tipo de carga
 | Caso | Respuesta |
 |---|---|
 | Ruta inexistente o inactiva | `404 NO_ENCONTRADO` |
-| Ruta sin tarifa para ese tipo de carga | `422 VALIDACION` con el campo `tipoCarga` |
+| Ruta sin tarifa para ese tipo de carga | `400 VALIDACION` con el campo `tipoCarga` |
 | Más de 30 t | `422 TONELAJE_EXCEDIDO` |
 | Fecha pasada o a más de 60 días | `400 VALIDACION` |
-| Cliente aún no replicado en Finanzas (acaba de registrarse) | `503 DEPENDENCIA_NO_DISPONIBLE` con `Retry-After: 2`; el portal reintenta solo |
+| Cliente aún no replicado en Finanzas (acaba de registrarse) | `503 CLIENTE_NO_REPLICADO` con `Retry-After: 2`; el portal reintenta solo |
 | `cliente` pide la cotización de otro cliente | `403 SIN_PERMISO` |
 | Reenvío con la misma clave | Respuesta guardada |
 

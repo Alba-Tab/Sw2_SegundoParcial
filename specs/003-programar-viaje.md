@@ -32,7 +32,7 @@ El cliente confirma una cotización. Viajes inicia el workflow `ProgramarViaje`,
 
 **Inicio (síncrono, en la API de Viajes)**
 
-1. El portal hace `POST /api/v1/servicios` con `{ "cotizacionId": "…" }` y `Idempotency-Key` (una clave **nueva por intento**: si un intento terminó compensado, el siguiente usa otra).
+1. El portal hace `POST /api/v1/servicios` con `{ "cotizacionId": "…", "clienteId": "…" }` y `Idempotency-Key` (una clave **nueva por intento**: si un intento terminó compensado, el siguiente usa otra). `clienteId` es **obligatorio con rol `comercial`** (se guarda `canal = TELEFONO`) y **se ignora con rol `cliente`** (sale del token, `canal = PORTAL`). Otro rol: `403 SIN_PERMISO`.
 2. Viajes, en una transacción: registra la clave en `operacion_idempotente` (`EN_PROCESO`), crea el `Servicio` con `servicioId`, `viajeId`, `clienteId`, `cotizacionId`, `canal`, `creadoPor` y `workflowId`.
 3. Viajes inicia el workflow con `WorkflowIdReusePolicy.REJECT_DUPLICATE`, conflicto `FAIL`, y la entrada `{servicioId, viajeId, clienteId, cotizacionId, canal, creadoPor, parametrosSaga}`. `parametrosSaga` lo arma la API desde su configuración (la del workflow no lee el entorno).
 4. Marca la clave `COMPLETADA` y responde **`202`** con `{servicioId, viajeId, estado: "PROGRAMANDO"}` y `Location: /api/v1/servicios/{servicioId}`.
@@ -43,10 +43,10 @@ El cliente confirma una cotización. Viajes inicia el workflow `ProgramarViaje`,
 | Paso | Actividad (cola) | Qué hace | Compensación |
 |---|---|---|---|
 | 1 | `Viajes.crearViaje` (viajes) | Crea el `Viaje` en `PROGRAMANDO` con `cotizacionId` y `clienteId` | `Viajes.cancelarViaje`: `CANCELADO` con motivo y `ViajeCancelado` (`origen = SAGA`) |
-| 2 | `Finanzas.validarYReservarCredito` (finanzas) | En una transacción: cotización `VIGENTE` y del cliente → `ACEPTADA`; disponible ≥ monto; reserva por `servicioId` (`ACTIVA`, o `PENDIENTE_APROBACION` si hay mora o monto alto). Devuelve los datos de la cotización y `resultado` (`RESERVADO` o `REQUIERE_APROBACION`) | `Finanzas.liberarCredito`: reserva `LIBERADA`; la cotización vuelve a `VIGENTE` si sigue en plazo |
+| 2 | `Finanzas.validarYReservarCredito` (finanzas) | Recibe además `esperaAprobacion` de `parametrosSaga`. En una transacción: cotización `VIGENTE` y del cliente → `ACEPTADA`; disponible ≥ monto; reserva por `servicioId` (`ACTIVA`, o `PENDIENTE_APROBACION` si hay mora o monto alto). Devuelve los datos de la cotización y `resultado` (`RESERVADO` o `REQUIERE_APROBACION`) | `Finanzas.liberarCredito`: reserva `LIBERADA`; la cotización vuelve a `VIGENTE` si sigue en plazo |
 | 2b | Espera de la señal `aprobacionCredito` (solo si `REQUIERE_APROBACION`) | Temporizador `parametrosSaga.esperaAprobacion`. Con la señal o al vencer, `Finanzas.registrarDecisionCredito`. Detalle en la spec 012 | Si se rechaza o vence: error de negocio y se compensa |
 | 3 | `Flota.reservarUnidad` (flota) | Tracto + remolque compatible + chofer habilitado (D11), en una operación atómica. Devuelve `reservaUnidadId`, `placa`, `tractoId`, `remolqueId`, `choferId`, `choferNombre`, `choferUsuarioSub` | `Flota.liberarReserva` |
-| 4 | `Viajes.confirmarViaje` (viajes) | **Pivote.** `CONFIRMADO`; guarda ruta, carga, toneladas, fecha, monto, placa y chofer; publica `ViajeConfirmado` por Outbox | — (punto de no retorno) |
+| 4 | `Viajes.confirmarViaje` (viajes) | **Pivote.** `CONFIRMADO`; guarda ruta, carga, toneladas, fecha, monto, placa y chofer; publica `ViajeConfirmado` por Outbox. El consumidor interno del Outbox avisa por push al chofer asignado "Viaje asignado" (D45) | — (punto de no retorno) |
 | 5 | `Flota.confirmarReserva` (flota) | La reserva pasa de provisional a confirmada. Idempotente e incondicional sobre su propia reserva | Reintento sin límite |
 | 6 | `Viajes.marcarConfirmacionCompleta` (viajes) | `confirmacionCompleta = true` en el `Servicio`. Desde aquí se puede cancelar (spec 004) | Reintento sin límite |
 
@@ -88,6 +88,7 @@ El workflow termina con `{resultado: "CONFIRMADO", servicioId, viajeId}`.
 | `Flota.confirmarReserva` | 15 s | sin límite | sin límite, máximo 1 min entre intentos | — |
 | `Viajes.marcarConfirmacionCompleta` | 10 s | sin límite | sin límite | — |
 | Compensaciones (`Flota.liberarReserva`, `Finanzas.liberarCredito`, `Viajes.cancelarViaje`) | 15 s | `compensacion.scheduleToClose` | `compensacion.maximoIntentos` | — |
+| `Viajes.marcarRequiereIntervencion` (spec 011) | 10 s | sin límite | sin límite | — |
 
 Si una compensación se agota, el viaje pasa a `REQUIERE_INTERVENCION` (spec 011).
 
@@ -130,7 +131,7 @@ Mientras el viaje está en `PROGRAMANDO`, la API consulta el workflow (consulta 
 ## Contratos que toca
 
 - REST: `contratos/openapi/viajes.yaml` → `crearServicio`, `obtenerServicio`, `listarServicios`.
-- Temporal: `contratos/temporal/programar-viaje.md` y `programar-viaje.schema.json` (workflow, 9 actividades, 2 señales, 1 consulta).
+- Temporal: `contratos/temporal/programar-viaje.md` y `programar-viaje.schema.json` (workflow, 11 actividades, 2 señales, 1 consulta).
 - Eventos: `ViajeConfirmado.v1`, `ViajeCancelado.v1`, `ViajeRequiereIntervencion.v1`.
 
 ## Errores y caminos alternativos
@@ -155,12 +156,13 @@ Mientras el viaje está en `PROGRAMANDO`, la API consulta el workflow (consulta 
 - **Dado** un cliente con crédito y una cotización vigente del Aula (2.800,00 BOB), **cuando** confirma, **entonces** recibe `202`, y en menos de 10 s el servicio queda `CONFIRMADO` con placa y chofer, `confirmacionCompleta = true`, reserva de crédito `ACTIVA` por 2.800,00 y la unidad `RESERVADA`.
 - **FS1. Dado** `COTIZACION_VIGENCIA=PT2M` y una cotización de hace más de 2 minutos, **cuando** se confirma, **entonces** el viaje queda `CANCELADO` con motivo `COTIZACION_VENCIDA`, sin reserva de crédito ni de unidad.
 - **FS2. Dado** "Ferretería Sin Crédito" (límite 5.000) y La Paz con 20 t de granos (7.600), **cuando** confirma, **entonces** `CANCELADO` con `CREDITO_INSUFICIENTE`.
-- **FS3. Dado** "Agro Moroso" (límite 30.000, factura de 5.000 vencida hace 20 días) y La Paz con 20 t (7.600), **cuando** confirma, **entonces** el servicio queda en `ESPERANDO_APROBACION` y aparece una `SolicitudAprobacion` `PENDIENTE`; **y cuando** administración aprueba, **entonces** sigue hasta `CONFIRMADO`; **y si** rechaza, **entonces** `CANCELADO` con `CREDITO_RECHAZADO` y el disponible vuelve a 25.000. Con Arica y 28 t (18.200) pasa lo mismo por monto alto.
+- **FS3. Dado** "Agro Moroso" (límite 30.000, factura de 5.000 vencida hace 20 días) y La Paz con 20 t (7.600), **cuando** confirma, **entonces** el servicio queda con `estado = PROGRAMANDO` y `etapa = ESPERANDO_APROBACION`, y aparece una `SolicitudAprobacion` `PENDIENTE`; **y cuando** administración aprueba, **entonces** sigue hasta `CONFIRMADO`; **y si** rechaza, **entonces** `CANCELADO` con `CREDITO_RECHAZADO` y el disponible vuelve a 25.000. Con Arica y 28 t (18.200) pasa lo mismo por monto alto.
 - **FS4. Dado** que la única cisterna está en `MANTENIMIENTO_PENDIENTE` y Cochabamba con 20 t de `INSUMOS_LIQUIDOS` (6.250), **cuando** confirma, **entonces** el historial de Temporal muestra `Finanzas.liberarCredito` antes que `Viajes.cancelarViaje`, y el viaje queda `CANCELADO` con `SIN_UNIDAD_COMPATIBLE`.
 - **FS5. Dado** el worker de Flota detenido, **cuando** se confirma y se enciende el worker 1 minuto después, **entonces** el servicio llega a `CONFIRMADO` sin intervención.
 - **FS6. Dado** FS5 en curso, **cuando** se detiene el contenedor de Viajes, se enciende Flota y luego Viajes, **entonces** el workflow sigue y existe un solo viaje para ese `servicioId`.
 - **FS7. Dado** dos `POST /servicios` simultáneos con la misma clave y cuerpo, **entonces** los dos reciben `202` con el mismo `servicioId` y hay un solo workflow.
 - **FS9. Dado** un servicio en `PROGRAMANDO`, **cuando** se intenta cancelar, **entonces** `409 CONFIRMACION_EN_CURSO` (spec 004).
+- **Dado** un usuario `comercial`, **cuando** confirma sin `clienteId`, **entonces** `403 SIN_PERMISO`; **y con** `clienteId`, **entonces** el servicio queda con `canal = TELEFONO` y `creadoPor` del comercial.
 - **Replay. Dado** un historial guardado del camino feliz, **cuando** corre la prueba de *replay* con el código actual, **entonces** no hay error de no determinismo.
 
 ## Cómo se demuestra en la defensa

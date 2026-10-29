@@ -23,7 +23,7 @@ Es el paso 2b de la saga (spec 003): cuando el cliente tiene mora o el monto es 
 
 ## Pasos
 
-1. `Finanzas.validarYReservarCredito`, en una transacción: cotización `ACEPTADA`, `ReservaCredito` en `PENDIENTE_APROBACION` (cuenta en `reservado`), y una `SolicitudAprobacion` `PENDIENTE` con `servicioId`, `clienteId`, monto, `motivos` (`MORA`, `MONTO_ALTO` o ambos) y `venceEn = ahora + esperaAprobacion`. Devuelve `resultado = REQUIERE_APROBACION`.
+1. `Finanzas.validarYReservarCredito`, en una transacción: cotización `ACEPTADA`, `ReservaCredito` en `PENDIENTE_APROBACION` (cuenta en `reservado`), y una `SolicitudAprobacion` `PENDIENTE` con `servicioId`, `clienteId`, monto, `motivos` (`MORA`, `MONTO_ALTO` o ambos) y `venceEn = ahora + esperaAprobacion` (el workflow le pasa `esperaAprobacion` desde `parametrosSaga` en la entrada de la actividad). Devuelve `resultado = REQUIERE_APROBACION`.
 2. El workflow pasa a la etapa `ESPERANDO_APROBACION` y espera la señal `aprobacionCredito` con un temporizador de `parametrosSaga.esperaAprobacion` (`PT24H`; demo `PT3M`).
 3. Administración ve las solicitudes en `GET /api/v1/solicitudes-aprobacion?estado=PENDIENTE` (Finanzas), con el detalle de facturas vencidas del cliente.
 4. Decide: `POST /api/v1/servicios/{servicioId}/aprobacion-credito` en **Viajes** con `{ "aprobado": true|false, "motivo": "…" }` e `Idempotency-Key`. Viajes verifica rol y que el workflow esté en `ESPERANDO_APROBACION` (consulta `estado`), y envía la señal con `aprobadoPor = <sub>`. Responde `202`.
