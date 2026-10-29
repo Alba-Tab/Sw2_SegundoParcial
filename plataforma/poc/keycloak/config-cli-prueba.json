@@ -1,0 +1,12 @@
+{
+  "realm": "transporte",
+  "roles": { "realm": [ { "name": "prueba_config_cli", "description": "Rol creado por keycloak-config-cli en la PoC" } ] },
+  "clients": [
+    {
+      "clientId": "gateway",
+      "publicClient": false,
+      "secret": "$(env:KC_SECRETO_GATEWAY)",
+      "attributes": { "standard.token.exchange.enabled": "true" }
+    }
+  ]
+}
