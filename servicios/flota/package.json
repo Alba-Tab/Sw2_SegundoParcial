@@ -42,7 +42,6 @@
   },
   "devDependencies": {
     "@nestjs/testing": "11.2.8",
-    "@testcontainers/mongodb": "11.14.0",
     "@testcontainers/rabbitmq": "11.14.0",
     "@types/amqplib": "0.10.8",
     "@types/express": "5.0.6",
