@@ -2,9 +2,14 @@ import { Controller, Get, Res } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import type { Response } from 'express';
 import type { Connection } from 'mongoose';
+import type { z } from 'zod';
+import type { SaludListaResponse, SaludResponse } from './contrato/flota.zod';
 import { ConexionAmqp } from '../mensajeria/conexion-amqp';
 
-/** GET /health (vivo) y GET /health/ready (Mongo y RabbitMQ), sin autenticación ni Keycloak (000 §4, P10). */
+/**
+ * GET /health (vivo) y GET /health/ready (Mongo y RabbitMQ), sin autenticación ni Keycloak (000 §4, P10).
+ * Los tipos de respuesta salen de contratos/openapi/flota.yaml (contrato/flota.zod.ts, generado por Orval).
+ */
 @Controller('health')
 export class SaludController {
   constructor(
@@ -13,21 +18,25 @@ export class SaludController {
   ) {}
 
   @Get()
-  vivo() {
+  vivo(): z.infer<typeof SaludResponse> {
     return { estado: 'UP' };
   }
 
   @Get('ready')
-  async listo(@Res({ passthrough: true }) res: Response) {
-    const mongo =
-      (await this.mongo.db
-        ?.admin()
-        .ping()
-        .then(() => 'UP')
-        .catch(() => 'DOWN')) ?? 'DOWN';
-    const rabbitmq = (await this.amqp.disponible()) ? 'UP' : 'DOWN';
+  async listo(@Res({ passthrough: true }) res: Response): Promise<z.infer<typeof SaludListaResponse>> {
+    const mongo = await this.pingMongo();
+    const rabbitmq: 'UP' | 'DOWN' = (await this.amqp.disponible()) ? 'UP' : 'DOWN';
     const arriba = mongo === 'UP' && rabbitmq === 'UP';
     res.status(arriba ? 200 : 503);
-    return { estado: arriba ? 'UP' : 'DOWN', dependencias: { mongo, rabbitmq } };
+    return { estado: arriba ? ('UP' as const) : ('DOWN' as const), dependencias: { mongo, rabbitmq } };
+  }
+
+  private async pingMongo(): Promise<'UP' | 'DOWN'> {
+    try {
+      await this.mongo.db?.admin().ping();
+      return this.mongo.db ? 'UP' : 'DOWN';
+    } catch {
+      return 'DOWN';
+    }
   }
 }

@@ -17,7 +17,9 @@
     "capas": "depcruise src --config .dependency-cruiser.cjs",
     "tipos": "tsc --noEmit -p tsconfig.json",
     "verificar": "npm run tipos && npm run capas && npm run formato && npm run test:todo",
-    "formato": "prettier --check src test"
+    "formato": "prettier --check src test",
+    "generar:contratos": "orval --config orval.config.cjs && prettier --write src/infraestructura/http/contrato --log-level warn",
+    "generar:contratos:verificar": "npm run generar:contratos && test -z \"$(git status --porcelain -- src/infraestructura/http/contrato)\" || (echo \"El código generado no coincide con contratos/openapi/flota.yaml: corre npm run generar:contratos y súbelo\" && git status --porcelain -- src/infraestructura/http/contrato && exit 1)"
   },
   "dependencies": {
     "@nestjs/common": "11.2.8",
@@ -50,6 +52,7 @@
     "@types/supertest": "6.0.3",
     "dependency-cruiser": "18.7.0",
     "jest": "30.5.2",
+    "orval": "8.45.0",
     "prettier": "3.9.10",
     "supertest": "7.3.1",
     "testcontainers": "11.14.0",
