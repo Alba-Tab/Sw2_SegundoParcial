@@ -44,16 +44,19 @@ jobs:
               - *eventos
               - servicios/viajes/**
               - contratos/openapi/viajes.yaml
+              - contratos/openapi/comun.yaml
             flota:
               - *ci
               - *eventos
               - servicios/flota/**
               - contratos/openapi/flota.yaml
+              - contratos/openapi/comun.yaml
             finanzas:
               - *ci
               - *eventos
               - servicios/finanzas/**
               - contratos/openapi/finanzas.yaml
+              - contratos/openapi/comun.yaml
             keycloak:
               - *ci
               - plataforma/keycloak/**

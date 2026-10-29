@@ -1,0 +1,9 @@
+# Contexto de build en la raíz (Viajes y los workers que leen contratos/): fuera todo lo pesado o local.
+**/node_modules
+**/target
+**/vendor
+**/dist
+**/.env
+docs
+movil
+.git
