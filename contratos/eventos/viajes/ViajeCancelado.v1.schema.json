@@ -41,7 +41,7 @@
           "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
         },
         "motivo": {
-          "$ref": "../../comun/tipos.schema.json#/$defs/CodigoError"
+          "$ref": "../../comun/tipos.schema.json#/$defs/MotivoCancelacion"
         },
         "detalle": {
           "type": "string",

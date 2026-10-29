@@ -77,9 +77,9 @@
       "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
       "productor": "flota",
       "datos": {
-        "unidadId": "01933900-0000-7000-8000-00000000a101",
-        "tipoUnidad": "TRACTO",
-        "placa": "4521KTR",
+        "unidadId": "01933900-0000-7000-8000-00000000b203",
+        "tipoUnidad": "REMOLQUE",
+        "placa": "3187XLM",
         "motivos": [
           "KILOMETRAJE"
         ],
