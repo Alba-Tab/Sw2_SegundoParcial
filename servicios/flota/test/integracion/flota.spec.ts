@@ -14,12 +14,13 @@ jest.setTimeout(60_000);
 
 /**
  * Mongo 8 con réplica rs0 de un nodo (las transacciones del Outbox la necesitan): se espera el log, se inicia la
- * réplica con exec y se espera a que el nodo sea primario. En CI corre en un runner arm64 porque MongoDB 8.0 no
- * arranca en amd64 con kernel 6.19 o más nuevo (SERVER-121912).
+ * réplica con exec y se espera a que el nodo sea primario. GLIBC_TUNABLES=glibc.pthread.rseq=0: con kernel 6.19 o
+ * más nuevo (el runner de GitHub) MongoDB 8.0 no arranca si glibc registra rseq (SERVER-121912); es lo que pide mongod.
  */
 async function iniciarMongoRs0(): Promise<StartedTestContainer> {
   const c = await new GenericContainer('mongo:8.0.34')
     .withCommand(['--replSet', 'rs0', '--bind_ip_all'])
+    .withEnvironment({ GLIBC_TUNABLES: 'glibc.pthread.rseq=0' })
     .withExposedPorts(27017)
     .withWaitStrategy(Wait.forLogMessage(/Waiting for connections/))
     .withStartupTimeout(120_000)
