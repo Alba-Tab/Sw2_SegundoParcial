@@ -17,7 +17,7 @@ El gerente (u otro rol interno) pregunta por voz en cc-tablero; Whisper transcri
 
 ## Precondiciones
 
-- Modelo de lectura al día (spec 013). Ollama con `qwen3:4b` (D36).
+- Modelo de lectura al día (spec 013). Ollama con `qwen3:4b-instruct` (D36).
 - Los modelos de Whisper se sirven desde el hosting propio, no desde un CDN (micro-PoC: la pestaña Red queda vacía al transcribir).
 
 ## Catálogo de reportes (propuesta 4.6)
@@ -40,12 +40,13 @@ Todos responden con `datosAl` ("datos al hh:mm") y se pueden exportar. Máximo 5
 
 1. El gerente mantiene pulsado el micrófono (máximo 15 s, D94). Whisper `tiny` transcribe en español en un Web Worker; el texto se ve y se puede corregir antes de enviar (D95).
 2. cc-tablero envía la mutación `preguntar(texto)` (3 a 300 caracteres). El Gateway intercambia el token (audiencia `analitica`) y llama a `POST /api/v1/voz/preguntas` con `{texto}`.
-3. Analítica pide al LLM la intención con salida JSON restringida por esquema (temperatura 0, 20 s): `{reporteId | null, periodo, mes?, anio?, desde?, hasta?, filtros: {clienteNombre?, placa?, rutaNombre?, agrupar?}, aclaracion?}`. El prompt lleva el catálogo y el vocabulario (los mismos recursos que publica el MCP, spec 014) y la fecha de hoy.
+3. Analítica pide al LLM la intención con salida JSON restringida por esquema (temperatura 0, 20 s): `{reporteId | null, periodo, mes?, anio?, desde?, hasta?, filtros: {clienteNombre?, placa?, rutaNombre?, agrupar?}, aclaracion?}`. El prompt lleva el catálogo y el vocabulario (los mismos recursos que publica el MCP, spec 014) y la fecha de hoy, **sin valores de ejemplo** (en la PoC-3 el modelo copió una placa del ejemplo) y con la regla "deja en null lo que el usuario no dijo". `format` siempre lleva el esquema completo: con `format = "json"` el modelo omitía `filtros`.
 4. **Validación en código** (pydantic), en este orden:
-   1. `reporteId` nulo o fuera del catálogo → `422 PREGUNTA_FUERA_DE_ALCANCE`;
-   2. el rol del token no está en los roles del reporte → `403 SIN_PERMISO`;
-   3. nombres a ids, con texto normalizado (minúsculas, sin tildes ni signos): `clienteNombre` contra las razones sociales de la copia `cliente` y `rutaNombre` contra `ruta`; primero coincidencia exacta y, si no hay, **por prefijo de palabra** (cada palabra dicha es el comienzo de una palabra del nombre: "agro" coincide con "Agro Moroso" y con "Agroexport SRL"); `placa` con su patrón. Ninguna coincidencia → `ACLARACION` ("No encontré ese cliente"); más de una → `ACLARACION` con hasta 3 opciones;
-   4. periodo a fechas y límites del reporte; si falta o se pasa → `ACLARACION`.
+   1. `reporteId` nulo o fuera del catálogo → `422 PREGUNTA_FUERA_DE_ALCANCE` (aunque venga `aclaracion`: el modelo también la llena en preguntas fuera de alcance);
+   2. `aclaracion` llena con un `reporteId` válido → `ACLARACION` con ese texto; las opciones salen del paso 4 si hay nombres ambiguos o, si no, de los reportes del catálogo que permite el rol, empezando por el propuesto (en la PoC-3, ante "muéstrame lo de agro", el modelo eligió un reporte y además pidió aclaración);
+   3. el rol del token no está en los roles del reporte → `403 SIN_PERMISO`;
+   4. nombres a ids, con texto normalizado (minúsculas, sin tildes ni signos): `clienteNombre` contra las razones sociales de la copia `cliente` y `rutaNombre` contra `ruta`; primero coincidencia exacta y, si no hay, **por prefijo de palabra** (cada palabra dicha es el comienzo de una palabra del nombre: "agro" coincide con "Agro Moroso" y con "Agroexport SRL"); `placa` con su patrón. Ninguna coincidencia → `ACLARACION` ("No encontré ese cliente"); más de una → `ACLARACION` con hasta 3 opciones;
+   5. periodo a fechas y límites del reporte; si falta o se pasa → `ACLARACION`.
 5. Analítica llama a `ejecutar_reporte` en el MCP con el token **intercambiado otra vez** (audiencia `mcp-server`); el MCP verifica el rol, audita e intercambia hacia `analitica` para llamar `GET /api/v1/reportes/{reporteId}`. Es la cadena de 3 intercambios: cc-tablero → gateway → analitica → mcp-server → analitica.
 6. Redacción: `prompts/get redactar_respuesta_reporte` y el LLM escribe hasta 3 oraciones en español. **Regla de números:** cada número del texto debe estar en `filas` o `totales` (con formato `2.800,00`); si no, o si el LLM no responde en 20 s, se usa una plantilla fija ("Hay 3 facturas por 8.400,00 BOB que vencen entre el 03/11 y el 09/11").
 7. Responde `200` con `RespuestaVoz {tipo: RESPUESTA, texto, reporteId, parametros, tabla: {columnas, filas}, grafico, totales, datosAl, exportable: true}`. cc-tablero muestra el texto, la tabla, el gráfico y "Exportar a Excel".
