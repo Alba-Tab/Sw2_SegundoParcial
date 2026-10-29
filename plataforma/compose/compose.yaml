@@ -112,6 +112,36 @@ services:
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_SERVICIOS_ENDPOINT:-}
     ports: ["8101:8101"]
 
+  flota-api:
+    <<: *comun
+    build: ../../servicios/flota
+    image: transporte/flota:local
+    profiles: [core]
+    depends_on:
+      mongo: { condition: service_healthy }
+      rabbitmq-usuarios: { condition: service_completed_successfully, required: false }
+    environment: &flota-env
+      MONGO_URI: mongodb://mongo:27017/flota?replicaSet=rs0
+      AMQP_URL: amqp://flota:${RABBITMQ_CLAVE_FLOTA}@rabbitmq:5672
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      CORS_ORIGENES: ${CORS_ORIGENES:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_SERVICIOS_ENDPOINT:-}
+      OTEL_SERVICE_NAME: flota-api
+    ports: ["8102:8102"]
+
+  flota-worker:
+    <<: *comun
+    image: transporte/flota:local
+    pull_policy: never
+    profiles: [core]
+    command: ["node", "dist/worker.js"]
+    depends_on:
+      flota-api: { condition: service_started }
+      rabbitmq-usuarios: { condition: service_completed_successfully, required: false }
+    environment:
+      <<: *flota-env
+      OTEL_SERVICE_NAME: flota-worker
+
   # ---------------------------------------------------------------- plataforma
   temporal-esquema:
     image: temporalio/admin-tools:1.32.1

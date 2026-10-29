@@ -28,7 +28,7 @@ ok "n8n responde" "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:567
 ok "mailpit responde" "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8025/api/v1/info)" 200
 ok "temporal ui responde" "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8233/)" 200
 echo "== Servicios"
-for s in "viajes 8101"; do set -- $s
+for s in "viajes 8101" "flota-api 8102"; do set -- $s
   if $DC ps --services --status running | grep -qx "$1"; then ok "$1: /health/ready" "$(curl -sf localhost:$2/health/ready | jq -r .estado)" UP; fi
 done
 echo; [ $F -eq 0 ] && echo "entorno OK" || { echo "$F verificaciones fallaron"; exit 1; }
