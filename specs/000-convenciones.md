@@ -100,6 +100,7 @@ GET /api/v1/viajes?limite=50&cursor=<opaco>
 - Misma clave mientras la primera sigue `EN_PROCESO`: `409` con código `IDEMPOTENCIA_EN_PROCESO`.
 - Tabla en PostgreSQL: `operacion_idempotente`. En Flota (Mongo): índice único sobre `opId`.
 - **Excepción: `POST /api/v1/servicios`** (D43). Con la misma clave y el mismo hash todavía `EN_PROCESO`, Viajes vuelve a llamar `start` con el `workflowId` guardado; `WorkflowExecutionAlreadyStarted` cuenta como éxito y responde `202` con el mismo `servicioId`. Es seguro porque iniciar el workflow es idempotente. Las demás operaciones siguen respondiendo `409`.
+- **Excepción: `POST /api/v1/viajes/{viajeId}/gps/lotes`** (spec 005). La `Idempotency-Key` es obligatoria (es el `loteId` y va a los logs), pero **no** se guarda en `operacion_idempotente`: la autoridad es la llave de DynamoDB (`viajeId` + `ts#seq`), como dice la propuesta 4.3. Un reenvío vuelve a escribir los mismos puntos y responde `200`; no hay `409 IDEMPOTENCIA_EN_PROCESO` ni `422 IDEMPOTENCIA_CUERPO_DISTINTO`. `PosicionActualizada` no se duplica porque solo se publica si el lote avanzó la última posición.
 
 ## 5. Errores
 
@@ -149,6 +150,15 @@ Formato **Problem Details (RFC 9457)**, `Content-Type: application/problem+json`
 | `PREGUNTA_FUERA_DE_ALCANCE` | 422 | — |
 | `RESUELTO_MANUALMENTE` | — | — (motivo de cancelación de la saga, no se devuelve por HTTP; spec 011) |
 | `CANCELADO_POR_USUARIO` | — | — (motivo de `ViajeCancelado` con `origen = USUARIO`; el texto del usuario va en `detalle`; spec 004) |
+| `EVIDENCIA_INCOMPLETA` | 422 | — (entrega o rechazo con una evidencia que no terminó de subir; specs 006 y 007) |
+| `PAGO_EXCEDE_SALDO` | 422 | — (spec 008) |
+| `PAGO_DUPLICADO` | 409 | — (otra clave con la misma `referencia` y el mismo `medio` en la misma factura; trae `pagoId`; spec 008) |
+| `CARGA_EXCEDE_TANQUE` | 422 | — (spec 009) |
+| `KILOMETRAJE_INVALIDO` | 422 | — (kilometraje menor que el último registrado; specs 009 y 010) |
+| `PLACA_DUPLICADA` | 409 | — (spec 010) |
+| `LIMITE_PETICIONES` | 429 | — (servidor MCP, 30 por minuto; incluye `Retry-After`; spec 014) |
+| `EXPORTACION_VENCIDA` | 404 | — (enlace de Excel de más de 10 min; spec 015) |
+| `CONSULTA_DEMASIADO_COMPLEJA` | 400 | — (consulta GraphQL que pasa los límites de profundidad o complejidad; va en `extensions.codigo`; spec 016) |
 
 Cada spec agrega los suyos aquí, en la misma tabla.
 
