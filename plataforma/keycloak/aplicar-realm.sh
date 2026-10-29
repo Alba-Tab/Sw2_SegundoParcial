@@ -10,7 +10,7 @@ IMAGEN=${KC_CONFIG_CLI_IMAGEN:-adorsys/keycloak-config-cli:6.5.1-26.5.5}
 # Desde el contenedor, localhost de la Mac es host.docker.internal.
 URL_CLI=${KC_URL/localhost/host.docker.internal}
 
-docker run --rm \
+docker run --rm --add-host=host.docker.internal:host-gateway \
   -e KEYCLOAK_URL="$URL_CLI" -e KEYCLOAK_USER="$KC_ADMIN" -e KEYCLOAK_PASSWORD="$KC_ADMIN_CLAVE" \
   -e KEYCLOAK_AVAILABILITYCHECK_ENABLED=true -e KEYCLOAK_AVAILABILITYCHECK_TIMEOUT=120s \
   -e IMPORT_FILES_LOCATIONS=/config/realm-transporte.json \
