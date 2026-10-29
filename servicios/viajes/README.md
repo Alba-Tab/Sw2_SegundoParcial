@@ -20,3 +20,13 @@ Clientes, cotizaciones confirmadas, servicios, viajes en ruta y la saga `Program
 docker compose -f ../../plataforma/compose/compose.yaml --profile core --profile plataforma up -d --build viajes   # contexto: raíz del repo
 curl localhost:8101/health/ready
 ```
+
+## Alta de cliente (T4.1, spec 001)
+
+- `POST /api/v1/clientes`: idempotente según 000 §4.1, con la respuesta guardada en `operacion_idempotente` en la misma transacción que el cliente, el Outbox y la auditoría. Después del commit vincula en Keycloak.
+- `POST /api/v1/clientes/mio/vinculacion`, `GET /api/v1/clientes`, `/mio` y `/{clienteId}`, y `GET /api/v1/rutas` con sus permisos.
+- **Vínculo en Keycloak** (`adaptadores/salida/identidad/VinculadorKeycloak`):
+  - Escribe `clienteId` usando el `sub` como id del usuario (PoC-1).
+  - Keycloak **asigna roles por id**, no por nombre (con solo el nombre responde 404 "Role not found"), y la cuenta `viajes` no puede leer el catálogo de roles. El id sale de `users/{sub}/role-mappings/realm/available`, donde FGAP solo deja ver `cliente`.
+- **Validación de eventos:** cada evento se valida contra `contratos/eventos` antes de entrar al Outbox (networknt 3.0, con Jackson 3). Si no hay petición ni traza en curso, se generan `correlationId` y `traceparent`, que son obligatorios en el sobre.
+

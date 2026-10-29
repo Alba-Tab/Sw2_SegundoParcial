@@ -28,6 +28,10 @@ seguridad:
   audiencia: viajes
   cors-origenes: ${CORS_ORIGENES:}
 
+# Cuenta de servicio viajes en Keycloak (spec 001): escribe clienteId y asigna el rol cliente.
+identidad:
+  secreto: ${KC_SECRETO_VIAJES:}
+
 outbox:
   intervalo: PT1S
   lote: 100

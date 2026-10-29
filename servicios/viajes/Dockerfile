@@ -1,4 +1,4 @@
-# Contexto: raíz del repo (las interfaces REST se generan desde contratos/openapi/viajes.yaml en el build).
+# Contexto: raíz del repo (interfaces REST desde contratos/openapi y esquemas de eventos desde contratos/eventos).
 # Imagen amd64 y arm64 (N11: la nube usa amd64).
 FROM eclipse-temurin:25-jdk AS build
 WORKDIR /src/servicios/viajes
@@ -6,6 +6,8 @@ COPY servicios/viajes/.mvn .mvn
 COPY servicios/viajes/mvnw servicios/viajes/pom.xml ./
 RUN ./mvnw -q -B dependency:go-offline
 COPY contratos/openapi /src/contratos/openapi
+COPY contratos/eventos /src/contratos/eventos
+COPY contratos/comun /src/contratos/comun
 COPY servicios/viajes/src src
 RUN ./mvnw -q -B -DskipTests package && java -Djarmode=tools -jar target/viajes-*.jar extract --layers --launcher --destination target/capas
 
