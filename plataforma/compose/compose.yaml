@@ -96,7 +96,7 @@ services:
   # ---------------------------------------------------------------- core: servicios
   viajes:
     <<: *comun
-    build: ../../servicios/viajes
+    build: { context: ../.., dockerfile: servicios/viajes/Dockerfile }
     image: transporte/viajes:local
     profiles: [core]
     depends_on:

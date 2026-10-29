@@ -63,7 +63,7 @@ class AplicacionIT {
 
     @Test
     void saludNoDependeDeKeycloak() throws Exception {
-        assertEquals(200, get("/health").statusCode());
+        assertEquals("{\"estado\":\"UP\"}", get("/health").body());
         HttpResponse<String> listo = get("/health/ready");
         assertEquals(200, listo.statusCode());
         JsonNode cuerpo = json.readTree(listo.body());

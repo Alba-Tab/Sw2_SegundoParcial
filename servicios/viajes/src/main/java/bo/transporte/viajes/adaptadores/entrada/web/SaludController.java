@@ -1,19 +1,23 @@
 package bo.transporte.viajes.adaptadores.entrada.web;
 
+import bo.transporte.viajes.adaptadores.entrada.web.api.SaludApi;
+import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.SaludDto;
+import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.SaludDto.EstadoEnum;
+import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.SaludDto.InnerEnum;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import javax.sql.DataSource;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * GET /health (vivo) y GET /health/ready (dependencias), sin autenticación (000 §4). No dependen de Keycloak (P10):
- * el servicio arranca y responde aunque el realm todavía no exista en la nube.
+ * GET /health (vivo) y GET /health/ready (dependencias), sin autenticación (000 §4). Implementa la interfaz generada
+ * desde contratos/openapi/viajes.yaml: las rutas y la forma de la respuesta salen del contrato. No dependen de
+ * Keycloak (P10): el servicio arranca y responde aunque el realm todavía no exista en la nube.
  */
 @RestController
-class SaludController {
+class SaludController implements SaludApi {
     private final DataSource baseDeDatos;
     private final ConnectionFactory rabbit;
 
@@ -22,14 +26,15 @@ class SaludController {
         this.rabbit = rabbit;
     }
 
-    @GetMapping("/health")
-    Map<String, Object> vivo() {
-        return Map.of("estado", "UP");
+    @Override
+    public ResponseEntity<SaludDto> salud() {
+        // El DTO generado inicializa dependencias vacío; en /health no aplica (contrato: es opcional).
+        return ResponseEntity.ok(new SaludDto().estado(EstadoEnum.UP).dependencias(null));
     }
 
-    @GetMapping("/health/ready")
-    ResponseEntity<Map<String, Object>> listo() {
-        Map<String, String> dependencias = new LinkedHashMap<>();
+    @Override
+    public ResponseEntity<SaludDto> saludLista() {
+        Map<String, InnerEnum> dependencias = new LinkedHashMap<>();
         dependencias.put("postgres", estado(() -> {
             try (var c = baseDeDatos.getConnection()) {
                 return c.isValid(2);
@@ -40,8 +45,9 @@ class SaludController {
                 return c.isOpen();
             }
         }));
-        boolean arriba = !dependencias.containsValue("DOWN");
-        Map<String, Object> cuerpo = Map.of("estado", arriba ? "UP" : "DOWN", "dependencias", dependencias);
+        boolean arriba = !dependencias.containsValue(InnerEnum.DOWN);
+        SaludDto cuerpo =
+                new SaludDto().estado(arriba ? EstadoEnum.UP : EstadoEnum.DOWN).dependencias(dependencias);
         return ResponseEntity.status(arriba ? 200 : 503).body(cuerpo);
     }
 
@@ -49,11 +55,11 @@ class SaludController {
         boolean ok() throws Exception;
     }
 
-    private static String estado(Chequeo chequeo) {
+    private static InnerEnum estado(Chequeo chequeo) {
         try {
-            return chequeo.ok() ? "UP" : "DOWN";
+            return chequeo.ok() ? InnerEnum.UP : InnerEnum.DOWN;
         } catch (Exception e) {
-            return "DOWN";
+            return InnerEnum.DOWN;
         }
     }
 }

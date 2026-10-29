@@ -13,9 +13,10 @@ Clientes, cotizaciones confirmadas, servicios, viajes en ruta y la saga `Program
 | Logs JSON (000 §10) y trazas OTLP solo si `OTEL_EXPORTER_OTLP_ENDPOINT` existe | `configuracion/FormatoLog`, `configuracion/TrazasSiHayEndpoint` |
 | CORS desde `CORS_ORIGENES` | `configuracion/SeguridadConfig` |
 | Hilos virtuales de Java 25 | `spring.threads.virtual.enabled` |
+| Interfaces REST y DTO generados desde `contratos/openapi/viajes.yaml` con openapi-generator 7.26 (`useSpringBoot4`, `useJackson3`); `SaludController` implementa `SaludApi` | `pom.xml`, `target/generated-sources/openapi` |
 
 ```bash
 ./mvnw verify                                            # 13 pruebas
-docker compose -f ../../plataforma/compose/compose.yaml --profile core --profile plataforma up -d --build viajes
+docker compose -f ../../plataforma/compose/compose.yaml --profile core --profile plataforma up -d --build viajes   # contexto: raíz del repo
 curl localhost:8101/health/ready
 ```
