@@ -1,0 +1,379 @@
+openapi: 3.0.3
+info:
+  title: API de Finanzas
+  version: 1.0.0
+  description: |
+    Núcleo de Finanzas (Laravel, DDD táctico): cotizaciones, líneas de crédito y solicitudes de aprobación.
+    Specs: 002, 003 y 012. Las actividades de la saga no pasan por esta API (van por Temporal).
+    Con rol `cliente`, el `clienteId` sale del token; con `comercial`, del cuerpo o la consulta.
+servers:
+  - url: http://localhost:8103
+    description: Local
+security:
+  - bearer: []
+tags:
+  - name: salud
+  - name: cotizaciones
+  - name: credito
+paths:
+  /health:
+    get:
+      tags: [salud]
+      operationId: salud
+      summary: El proceso está vivo.
+      security: []
+      responses:
+        '200':
+          $ref: './comun.yaml#/components/responses/Salud'
+  /health/ready:
+    get:
+      tags: [salud]
+      operationId: saludLista
+      summary: PostgreSQL, Temporal y RabbitMQ listos. No depende de Keycloak (P10).
+      security: []
+      responses:
+        '200':
+          $ref: './comun.yaml#/components/responses/Salud'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+
+  /api/v1/cotizaciones:
+    post:
+      tags: [cotizaciones]
+      operationId: crearCotizacion
+      summary: Calcula tarifa × toneladas y guarda una cotización VIGENTE (24 h; demo 2 min). Spec 002.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+        - $ref: './comun.yaml#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CotizacionNueva'
+      responses:
+        '201':
+          description: Cotización creada.
+          headers:
+            Location:
+              $ref: './comun.yaml#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cotizacion'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '422':
+          description: '`TONELAJE_EXCEDIDO` o `IDEMPOTENCIA_CUERPO_DISTINTO`.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: './comun.yaml#/components/schemas/Problema'
+        '503':
+          description: '`CLIENTE_NO_REPLICADO` (el cliente acaba de registrarse) u otra dependencia caída.'
+          headers:
+            Retry-After:
+              $ref: './comun.yaml#/components/headers/RetryAfter'
+          content:
+            application/problem+json:
+              schema:
+                $ref: './comun.yaml#/components/schemas/Problema'
+    get:
+      tags: [cotizaciones]
+      operationId: listarCotizaciones
+      summary: Cotizaciones del cliente del token; administracion, comercial y gerente pueden filtrar por cliente.
+      parameters:
+        - name: clienteId
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/Uuid'
+        - $ref: './comun.yaml#/components/parameters/Limite'
+        - $ref: './comun.yaml#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Página de cotizaciones.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaCotizaciones'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+  /api/v1/cotizaciones/{cotizacionId}:
+    parameters:
+      - name: cotizacionId
+        in: path
+        required: true
+        schema:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    get:
+      tags: [cotizaciones]
+      operationId: obtenerCotizacion
+      summary: Una cotización, con `vencida` calculado.
+      responses:
+        '200':
+          description: Cotización.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cotizacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+
+  /api/v1/lineas-credito/mia:
+    get:
+      tags: [credito]
+      operationId: obtenerMiLineaCredito
+      summary: Línea de crédito del cliente del token (portal).
+      responses:
+        '200':
+          description: Línea de crédito.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LineaCredito'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+  /api/v1/lineas-credito/{clienteId}:
+    parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    get:
+      tags: [credito]
+      operationId: obtenerLineaCredito
+      summary: Línea de crédito de un cliente (administracion, comercial, gerente).
+      responses:
+        '200':
+          description: Línea de crédito.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LineaCredito'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+
+  /api/v1/solicitudes-aprobacion:
+    get:
+      tags: [credito]
+      operationId: listarSolicitudesAprobacion
+      summary: Solicitudes del paso 2b (administracion y gerente). Spec 012.
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/EstadoSolicitud'
+        - $ref: './comun.yaml#/components/parameters/Limite'
+        - $ref: './comun.yaml#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Página de solicitudes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaSolicitudes'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+  /api/v1/solicitudes-aprobacion/{servicioId}:
+    parameters:
+      - name: servicioId
+        in: path
+        required: true
+        schema:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    get:
+      tags: [credito]
+      operationId: obtenerSolicitudAprobacion
+      summary: La solicitud de un servicio, con las facturas vencidas del cliente que la motivaron.
+      responses:
+        '200':
+          description: Solicitud.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SolicitudAprobacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token de Keycloak con audiencia `finanzas`.
+  schemas:
+    CotizacionNueva:
+      type: object
+      required: [rutaId, tipoCarga, toneladas, fechaViaje]
+      additionalProperties: false
+      properties:
+        rutaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        tipoCarga:
+          $ref: './comun.yaml#/components/schemas/TipoCarga'
+        toneladas:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          description: Más de 30 responde 422 TONELAJE_EXCEDIDO (por eso no lleva maximum aquí).
+        fechaViaje:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+        clienteId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+      description: '`clienteId` es obligatorio con rol comercial y se ignora con rol cliente.'
+    Cotizacion:
+      type: object
+      required: [cotizacionId, clienteId, rutaId, tipoCarga, toneladas, fechaViaje, tarifaPorTonelada, monto, estado, vencida, venceEn, creadaEn]
+      properties:
+        cotizacionId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        clienteId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        rutaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        tipoCarga:
+          $ref: './comun.yaml#/components/schemas/TipoCarga'
+        toneladas:
+          $ref: './comun.yaml#/components/schemas/Toneladas'
+        fechaViaje:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+        tarifaPorTonelada:
+          $ref: './comun.yaml#/components/schemas/Monto'
+        monto:
+          $ref: './comun.yaml#/components/schemas/Monto'
+        estado:
+          type: string
+          enum: [VIGENTE, ACEPTADA]
+        vencida:
+          type: boolean
+          description: true si estado es VIGENTE y ya pasó venceEn.
+        venceEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        canal:
+          $ref: './comun.yaml#/components/schemas/CanalServicio'
+        creadaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+    PaginaCotizaciones:
+      type: object
+      required: [items, siguienteCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Cotizacion'
+        siguienteCursor:
+          type: string
+          nullable: true
+    LineaCredito:
+      type: object
+      required: [clienteId, limite, reservado, utilizado, disponible, enMora, version]
+      properties:
+        clienteId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        limite:
+          $ref: './comun.yaml#/components/schemas/Monto'
+        reservado:
+          $ref: './comun.yaml#/components/schemas/Monto'
+        utilizado:
+          $ref: './comun.yaml#/components/schemas/Monto'
+        disponible:
+          $ref: './comun.yaml#/components/schemas/Monto'
+        enMora:
+          type: boolean
+          description: Tiene al menos una factura con saldo vencida hace más de 7 días (D04).
+        version:
+          type: integer
+          minimum: 0
+    EstadoSolicitud:
+      type: string
+      enum: [PENDIENTE, APROBADA, RECHAZADA, VENCIDA]
+    SolicitudAprobacion:
+      type: object
+      required: [servicioId, clienteId, razonSocial, monto, motivos, estado, creadaEn, venceEn]
+      properties:
+        servicioId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        clienteId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        razonSocial:
+          type: string
+        monto:
+          $ref: './comun.yaml#/components/schemas/Monto'
+        motivos:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            type: string
+            enum: [MORA, MONTO_ALTO]
+        estado:
+          $ref: '#/components/schemas/EstadoSolicitud'
+        facturasVencidas:
+          type: array
+          items:
+            type: object
+            required: [facturaId, numero, saldo, venceEl, diasVencida]
+            properties:
+              facturaId:
+                $ref: './comun.yaml#/components/schemas/Uuid'
+              numero:
+                type: string
+                pattern: '^FAC-[0-9]{6}$'
+              saldo:
+                $ref: './comun.yaml#/components/schemas/Monto'
+              venceEl:
+                $ref: './comun.yaml#/components/schemas/Fecha'
+              diasVencida:
+                type: integer
+                minimum: 1
+        creadaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        venceEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        decididaPor:
+          $ref: './comun.yaml#/components/schemas/Sub'
+        decididaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        motivoDecision:
+          type: string
+    PaginaSolicitudes:
+      type: object
+      required: [items, siguienteCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SolicitudAprobacion'
+        siguienteCursor:
+          type: string
+          nullable: true

@@ -7,12 +7,14 @@
     "node": ">=24"
   },
   "scripts": {
-    "validar": "npm run validar:esquemas && npm run validar:asyncapi",
+    "validar": "npm run validar:esquemas && npm run validar:asyncapi && npm run validar:openapi",
     "validar:esquemas": "node scripts/validar-esquemas.mjs",
-    "validar:asyncapi": "node scripts/validar-asyncapi.mjs"
+    "validar:asyncapi": "node scripts/validar-asyncapi.mjs",
+    "validar:openapi": "spectral lint openapi/*.yaml --fail-severity=warn"
   },
   "devDependencies": {
     "@asyncapi/parser": "^3.6.6",
+    "@stoplight/spectral-cli": "^6.17.0",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1"
   }

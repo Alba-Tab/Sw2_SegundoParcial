@@ -1,0 +1,245 @@
+openapi: 3.0.3
+info:
+  title: API de Flota
+  version: 1.0.0
+  description: |
+    Núcleo de Flota (NestJS, Clean): lectura de unidades y choferes para el Gateway y la app.
+    Las reservas de la saga no pasan por esta API (van por Temporal, spec 003). Las escrituras
+    (cargas de combustible, mantenimiento) se agregan en F5 junto con su código.
+servers:
+  - url: http://localhost:8102
+    description: Local
+security:
+  - bearer: []
+tags:
+  - name: salud
+  - name: unidades
+  - name: choferes
+paths:
+  /health:
+    get:
+      tags: [salud]
+      operationId: salud
+      summary: El proceso está vivo.
+      security: []
+      responses:
+        '200':
+          $ref: './comun.yaml#/components/responses/Salud'
+  /health/ready:
+    get:
+      tags: [salud]
+      operationId: saludLista
+      summary: MongoDB, Temporal y RabbitMQ listos. No depende de Keycloak (P10).
+      security: []
+      responses:
+        '200':
+          $ref: './comun.yaml#/components/responses/Salud'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+
+  /api/v1/unidades:
+    get:
+      tags: [unidades]
+      operationId: listarUnidades
+      summary: Tractos y remolques (jefe_flota, despachador, gerente).
+      parameters:
+        - name: tipo
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/TipoUnidad'
+        - name: estado
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/EstadoUnidad'
+        - $ref: './comun.yaml#/components/parameters/Limite'
+        - $ref: './comun.yaml#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Página de unidades.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaUnidades'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+  /api/v1/unidades/{unidadId}:
+    parameters:
+      - name: unidadId
+        in: path
+        required: true
+        schema:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    get:
+      tags: [unidades]
+      operationId: obtenerUnidad
+      summary: Una unidad con sus atributos variables (por ejemplo, la cisterna y el furgón tienen campos distintos).
+      responses:
+        '200':
+          description: Unidad.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unidad'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+
+  /api/v1/choferes:
+    get:
+      tags: [choferes]
+      operationId: listarChoferes
+      summary: Choferes (jefe_flota, despachador, gerente). Sin documentos personales (propuesta §8).
+      parameters:
+        - name: activo
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - $ref: './comun.yaml#/components/parameters/Limite'
+        - $ref: './comun.yaml#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Página de choferes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaChoferes'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+  /api/v1/choferes/{choferId}:
+    parameters:
+      - name: choferId
+        in: path
+        required: true
+        schema:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    get:
+      tags: [choferes]
+      operationId: obtenerChofer
+      summary: Un chofer. Con rol chofer, solo el propio.
+      responses:
+        '200':
+          description: Chofer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chofer'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token de Keycloak con audiencia `flota`.
+  schemas:
+    TipoUnidad:
+      type: string
+      enum: [TRACTO, REMOLQUE]
+    EstadoUnidad:
+      type: string
+      enum: [DISPONIBLE, RESERVADA, EN_VIAJE, MANTENIMIENTO_PENDIENTE, EN_MANTENIMIENTO, INACTIVA]
+    Documento:
+      type: object
+      required: [tipo, venceEl]
+      properties:
+        tipo:
+          type: string
+          enum: [SOAT, INSPECCION_TECNICA]
+        venceEl:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+    Unidad:
+      type: object
+      required: [unidadId, tipoUnidad, placa, estado, kmDesdeUltimoMantenimiento, documentos, atributos]
+      properties:
+        unidadId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        tipoUnidad:
+          $ref: '#/components/schemas/TipoUnidad'
+        placa:
+          $ref: './comun.yaml#/components/schemas/Placa'
+        tipoRemolque:
+          type: string
+          enum: [FURGON, PLATAFORMA, CISTERNA]
+          description: Solo en remolques.
+        capacidadToneladas:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          description: Solo en remolques.
+        estado:
+          $ref: '#/components/schemas/EstadoUnidad'
+        kilometraje:
+          type: number
+          minimum: 0
+        kmDesdeUltimoMantenimiento:
+          type: number
+          minimum: 0
+        documentos:
+          type: array
+          items:
+            $ref: '#/components/schemas/Documento'
+        atributos:
+          type: object
+          additionalProperties: true
+          description: Atributos variables según el tipo (por ejemplo, `compartimentos` y `capacidadLitros` en una cisterna; `volumenM3` en un furgón).
+          example:
+            compartimentos: 3
+            capacidadLitros: 30000
+    PaginaUnidades:
+      type: object
+      required: [items, siguienteCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Unidad'
+        siguienteCursor:
+          type: string
+          nullable: true
+    Chofer:
+      type: object
+      required: [choferId, nombre, usuarioSub, licenciaCategoria, licenciaVenceEl, activo, disponible]
+      properties:
+        choferId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        nombre:
+          type: string
+        usuarioSub:
+          $ref: './comun.yaml#/components/schemas/Sub'
+        licenciaCategoria:
+          type: string
+          enum: [A, B, C]
+        licenciaVenceEl:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+        activo:
+          type: boolean
+        disponible:
+          type: boolean
+          description: false si tiene una reserva activa (D11).
+    PaginaChoferes:
+      type: object
+      required: [items, siguienteCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Chofer'
+        siguienteCursor:
+          type: string
+          nullable: true

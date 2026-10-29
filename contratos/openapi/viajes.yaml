@@ -1,0 +1,607 @@
+openapi: 3.0.3
+info:
+  title: API de Viajes
+  version: 1.0.0
+  description: |
+    Núcleo de Viajes (Spring Boot, hexagonal): clientes, rutas, servicios (inicio de la saga), cancelación
+    y las señales de la saga. Specs: 001, 002, 003, 004, 011 y 012. Convenciones: specs/000-convenciones.md.
+    Con rol `cliente`, el `clienteId` sale del token y se ignora el del cuerpo o la consulta; con `comercial`,
+    sale del cuerpo o la consulta.
+servers:
+  - url: http://localhost:8101
+    description: Local
+security:
+  - bearer: []
+tags:
+  - name: salud
+  - name: clientes
+  - name: rutas
+  - name: servicios
+  - name: saga
+paths:
+  /health:
+    get:
+      tags: [salud]
+      operationId: salud
+      summary: El proceso está vivo.
+      security: []
+      responses:
+        '200':
+          $ref: './comun.yaml#/components/responses/Salud'
+  /health/ready:
+    get:
+      tags: [salud]
+      operationId: saludLista
+      summary: Las dependencias (PostgreSQL, Temporal, RabbitMQ) están listas. No depende de Keycloak (P10).
+      security: []
+      responses:
+        '200':
+          $ref: './comun.yaml#/components/responses/Salud'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+
+  /api/v1/clientes:
+    post:
+      tags: [clientes]
+      operationId: crearCliente
+      summary: Crea el cliente del usuario (alta desde el portal) o un cliente sin cuenta (rol comercial). Spec 001.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+        - $ref: './comun.yaml#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClienteNuevo'
+      responses:
+        '201':
+          description: Cliente creado. `vinculado` dice si Keycloak ya tiene `clienteId` y el rol `cliente`.
+          headers:
+            Location:
+              $ref: './comun.yaml#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+    get:
+      tags: [clientes]
+      operationId: listarClientes
+      summary: Lista clientes para el selector del modo comercial (roles comercial, despachador, administracion, gerente).
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Busca por razón social o NIT.
+          schema:
+            type: string
+            maxLength: 120
+        - $ref: './comun.yaml#/components/parameters/Limite'
+        - $ref: './comun.yaml#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Página de clientes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaClientes'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+  /api/v1/clientes/mio:
+    get:
+      tags: [clientes]
+      operationId: obtenerMiCliente
+      summary: El cliente del usuario del token (por su `sub`).
+      responses:
+        '200':
+          description: Cliente del usuario.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+  /api/v1/clientes/mio/vinculacion:
+    post:
+      tags: [clientes]
+      operationId: reintentarVinculacion
+      summary: Repite solo la escritura de `clienteId` y del rol `cliente` en Keycloak. Spec 001.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      responses:
+        '200':
+          description: Vinculación hecha; el portal debe renovar el token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/clientes/{clienteId}:
+    parameters:
+      - $ref: '#/components/parameters/ClienteId'
+    get:
+      tags: [clientes]
+      operationId: obtenerCliente
+      summary: Un cliente. Con rol cliente, solo el propio.
+      responses:
+        '200':
+          description: Cliente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+
+  /api/v1/rutas:
+    get:
+      tags: [rutas]
+      operationId: listarRutas
+      summary: Rutas activas (cualquier usuario autenticado). Spec 002.
+      responses:
+        '200':
+          description: Rutas.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Ruta'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+  /api/v1/rutas/{rutaId}:
+    parameters:
+      - name: rutaId
+        in: path
+        required: true
+        schema:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    get:
+      tags: [rutas]
+      operationId: obtenerRuta
+      summary: Una ruta.
+      responses:
+        '200':
+          description: Ruta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ruta'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+
+  /api/v1/servicios:
+    post:
+      tags: [servicios]
+      operationId: crearServicio
+      summary: Confirma una cotización e inicia la saga ProgramarViaje. Spec 003.
+      description: |
+        Responde 202 al iniciar el workflow. Con la misma clave y el mismo cuerpo todavía EN_PROCESO, vuelve a
+        llamar `start` con el mismo workflowId y responde otra vez 202 con el mismo servicioId (D43).
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+        - $ref: './comun.yaml#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ServicioNuevo'
+      responses:
+        '202':
+          description: Saga iniciada; consultar `Location` hasta que `estado` deje de ser PROGRAMANDO.
+          headers:
+            Location:
+              $ref: './comun.yaml#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ServicioAceptado'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+    get:
+      tags: [servicios]
+      operationId: listarServicios
+      summary: Servicios del cliente del token; con comercial, despachador, administracion o gerente se puede filtrar por cliente y estado.
+      parameters:
+        - name: clienteId
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/Uuid'
+        - name: estado
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/EstadoViaje'
+        - $ref: './comun.yaml#/components/parameters/Limite'
+        - $ref: './comun.yaml#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Página de servicios.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaServicios'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+  /api/v1/servicios/{servicioId}:
+    parameters:
+      - $ref: '#/components/parameters/ServicioId'
+    get:
+      tags: [servicios]
+      operationId: obtenerServicio
+      summary: Estado del servicio y su viaje; en PROGRAMANDO trae la etapa del workflow.
+      responses:
+        '200':
+          description: Servicio.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Servicio'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+  /api/v1/servicios/{servicioId}/cancelacion:
+    parameters:
+      - $ref: '#/components/parameters/ServicioId'
+    post:
+      tags: [servicios]
+      operationId: cancelarServicio
+      summary: Cancela un servicio CONFIRMADO con confirmacionCompleta (cliente propio, comercial o despachador). Spec 004.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Cancelacion'
+      responses:
+        '200':
+          description: Servicio cancelado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Servicio'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          description: '`CONFIRMACION_EN_CURSO`, `CANCELACION_NO_PERMITIDA` o `CONFLICTO_ESTADO`.'
+          content:
+            application/problem+json:
+              schema:
+                $ref: './comun.yaml#/components/schemas/Problema'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+  /api/v1/servicios/{servicioId}/aprobacion-credito:
+    parameters:
+      - $ref: '#/components/parameters/ServicioId'
+    post:
+      tags: [saga]
+      operationId: decidirAprobacionCredito
+      summary: Envía la señal aprobacionCredito al workflow (solo administracion). Spec 012.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionCredito'
+      responses:
+        '202':
+          description: Señal entregada; el resultado se ve en obtenerServicio.
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/viajes/{viajeId}/intervencion:
+    parameters:
+      - name: viajeId
+        in: path
+        required: true
+        schema:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    post:
+      tags: [saga]
+      operationId: resolverIntervencion
+      summary: Envía la señal resolverIntervencion (solo despachador). Spec 011.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Intervencion'
+      responses:
+        '202':
+          description: Señal entregada.
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token de Keycloak con audiencia `viajes`.
+  parameters:
+    ClienteId:
+      name: clienteId
+      in: path
+      required: true
+      schema:
+        $ref: './comun.yaml#/components/schemas/Uuid'
+    ServicioId:
+      name: servicioId
+      in: path
+      required: true
+      schema:
+        $ref: './comun.yaml#/components/schemas/Uuid'
+  schemas:
+    ClienteNuevo:
+      type: object
+      required: [razonSocial, nit, correo, telefono, direccion]
+      additionalProperties: false
+      properties:
+        razonSocial:
+          type: string
+          minLength: 3
+          maxLength: 120
+        nit:
+          type: string
+          pattern: '^[0-9]{5,20}$'
+        correo:
+          type: string
+          format: email
+          description: Correo de facturación; a él se envían los avisos.
+        telefono:
+          type: string
+          minLength: 6
+          maxLength: 20
+        direccion:
+          type: string
+          minLength: 3
+          maxLength: 200
+    Cliente:
+      allOf:
+        - $ref: '#/components/schemas/ClienteNuevo'
+        - type: object
+          required: [clienteId, canal, tieneCuenta, vinculado, creadoEn]
+          properties:
+            clienteId:
+              $ref: './comun.yaml#/components/schemas/Uuid'
+            canal:
+              $ref: './comun.yaml#/components/schemas/CanalServicio'
+            tieneCuenta:
+              type: boolean
+            vinculado:
+              type: boolean
+              description: Keycloak ya tiene `clienteId` y el rol `cliente`. Siempre false si tieneCuenta es false.
+            creadoPor:
+              $ref: './comun.yaml#/components/schemas/Sub'
+            creadoEn:
+              $ref: './comun.yaml#/components/schemas/Instante'
+    PaginaClientes:
+      type: object
+      required: [items, siguienteCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Cliente'
+        siguienteCursor:
+          type: string
+          nullable: true
+    Lugar:
+      type: object
+      required: [nombre, coordenadas]
+      properties:
+        nombre:
+          type: string
+        coordenadas:
+          $ref: './comun.yaml#/components/schemas/Coordenadas'
+    Ruta:
+      type: object
+      required: [rutaId, nombre, origen, destino, distanciaKm, activa]
+      properties:
+        rutaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        nombre:
+          type: string
+          example: Santa Cruz – La Paz
+        origen:
+          $ref: '#/components/schemas/Lugar'
+        destino:
+          allOf:
+            - $ref: '#/components/schemas/Lugar'
+            - type: object
+              required: [radioMetros]
+              properties:
+                radioMetros:
+                  type: integer
+                  minimum: 50
+                  maximum: 5000
+                  description: Radio de la geocerca (D06).
+        distanciaKm:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+        activa:
+          type: boolean
+    ServicioNuevo:
+      type: object
+      required: [cotizacionId]
+      additionalProperties: false
+      properties:
+        cotizacionId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        clienteId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+      description: '`clienteId` es obligatorio con rol comercial y se ignora con rol cliente.'
+    ServicioAceptado:
+      type: object
+      required: [servicioId, viajeId, estado]
+      properties:
+        servicioId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        viajeId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        estado:
+          type: string
+          enum: [PROGRAMANDO]
+    Servicio:
+      type: object
+      required: [servicioId, viajeId, clienteId, cotizacionId, canal, estado, confirmacionCompleta, creadoEn]
+      properties:
+        servicioId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        viajeId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        clienteId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        cotizacionId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        canal:
+          $ref: './comun.yaml#/components/schemas/CanalServicio'
+        creadoPor:
+          $ref: './comun.yaml#/components/schemas/Sub'
+        estado:
+          $ref: './comun.yaml#/components/schemas/EstadoViaje'
+        etapa:
+          type: string
+          enum: [INICIANDO, VALIDANDO_CREDITO, ESPERANDO_APROBACION, RESERVANDO_UNIDAD, CONFIRMANDO, COMPENSANDO, DESCONOCIDA]
+          description: Solo mientras estado es PROGRAMANDO (consulta `estado` del workflow).
+        motivo:
+          type: string
+          description: Código de 000 §5 cuando el servicio terminó CANCELADO (por ejemplo SIN_UNIDAD_COMPATIBLE).
+        confirmacionCompleta:
+          type: boolean
+        rutaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        tipoCarga:
+          $ref: './comun.yaml#/components/schemas/TipoCarga'
+        toneladas:
+          $ref: './comun.yaml#/components/schemas/Toneladas'
+        fechaViaje:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+        monto:
+          $ref: './comun.yaml#/components/schemas/Monto'
+        placa:
+          $ref: './comun.yaml#/components/schemas/Placa'
+        choferNombre:
+          type: string
+        ultimaPosicion:
+          $ref: './comun.yaml#/components/schemas/Coordenadas'
+        creadoEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+    PaginaServicios:
+      type: object
+      required: [items, siguienteCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Servicio'
+        siguienteCursor:
+          type: string
+          nullable: true
+    Cancelacion:
+      type: object
+      required: [motivo]
+      additionalProperties: false
+      properties:
+        motivo:
+          type: string
+          minLength: 3
+          maxLength: 300
+    DecisionCredito:
+      type: object
+      required: [aprobado]
+      additionalProperties: false
+      properties:
+        aprobado:
+          type: boolean
+        motivo:
+          type: string
+          minLength: 3
+          maxLength: 300
+          description: Obligatorio si aprobado es false.
+    Intervencion:
+      type: object
+      required: [opcion]
+      additionalProperties: false
+      properties:
+        opcion:
+          type: string
+          enum: [REINTENTAR_COMPENSACION, MARCAR_RESUELTO]
+        nota:
+          type: string
+          minLength: 3
+          maxLength: 500
+          description: Obligatoria con MARCAR_RESUELTO.
