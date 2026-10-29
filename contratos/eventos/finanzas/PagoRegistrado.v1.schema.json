@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/eventos/finanzas/PagoRegistrado.v1.schema.json",
+  "title": "PagoRegistrado v1",
+  "description": "Administración registró un pago (spec 008); la línea de crédito se abonó. Clave de enrutamiento: finanzas.pago-registrado.v1. Consumen: analitica.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../sobre.schema.json"
+    }
+  ],
+  "properties": {
+    "tipo": {
+      "const": "PagoRegistrado"
+    },
+    "version": {
+      "const": 1
+    },
+    "productor": {
+      "const": "finanzas"
+    },
+    "datos": {
+      "type": "object",
+      "required": [
+        "pagoId",
+        "facturaId",
+        "numeroFactura",
+        "clienteId",
+        "monto",
+        "fecha",
+        "medio",
+        "referencia",
+        "saldoFactura",
+        "estadoFactura"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "pagoId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "facturaId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "numeroFactura": {
+          "type": "string",
+          "pattern": "^FAC-[0-9]{6}$"
+        },
+        "clienteId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "monto": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Monto"
+        },
+        "fecha": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Fecha"
+        },
+        "medio": {
+          "type": "string",
+          "enum": [
+            "TRANSFERENCIA",
+            "DEPOSITO",
+            "EFECTIVO",
+            "CHEQUE"
+          ]
+        },
+        "referencia": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "saldoFactura": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Monto"
+        },
+        "estadoFactura": {
+          "type": "string",
+          "enum": [
+            "EMITIDA",
+            "PAGADA_PARCIAL",
+            "PAGADA"
+          ]
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "01933d14-0000-7000-8000-000000000014",
+      "tipo": "PagoRegistrado",
+      "version": 1,
+      "ocurridoEn": "2026-11-03T15:20:01Z",
+      "correlationId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8dff",
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "productor": "finanzas",
+      "datos": {
+        "pagoId": "01933c30-0000-7000-8000-00000000f101",
+        "facturaId": "01933c20-0000-7000-8000-00000000f001",
+        "numeroFactura": "FAC-000123",
+        "clienteId": "01933b5a-1f00-7a20-8b11-0c2d3e4f5a01",
+        "monto": {
+          "monto": "2800.00",
+          "moneda": "BOB"
+        },
+        "fecha": "2026-11-10",
+        "medio": "TRANSFERENCIA",
+        "referencia": "BNB-778812",
+        "saldoFactura": {
+          "monto": "0.00",
+          "moneda": "BOB"
+        },
+        "estadoFactura": "PAGADA"
+      }
+    }
+  ]
+}

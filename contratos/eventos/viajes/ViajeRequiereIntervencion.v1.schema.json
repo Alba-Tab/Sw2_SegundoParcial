@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/eventos/viajes/ViajeRequiereIntervencion.v1.schema.json",
+  "title": "ViajeRequiereIntervencion v1",
+  "description": "Una compensación de la saga se agotó (spec 011). Analítica crea la alerta para el despachador. Clave de enrutamiento: viajes.viaje-requiere-intervencion.v1. Consumen: analitica.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../sobre.schema.json"
+    }
+  ],
+  "properties": {
+    "tipo": {
+      "const": "ViajeRequiereIntervencion"
+    },
+    "version": {
+      "const": 1
+    },
+    "productor": {
+      "const": "viajes"
+    },
+    "datos": {
+      "type": "object",
+      "required": [
+        "viajeId",
+        "servicioId",
+        "compensacionFallida",
+        "error",
+        "intentos"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "viajeId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "servicioId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "compensacionFallida": {
+          "type": "string",
+          "enum": [
+            "Flota.liberarReserva",
+            "Finanzas.liberarCredito",
+            "Viajes.cancelarViaje"
+          ]
+        },
+        "error": {
+          "type": "object",
+          "required": [
+            "codigo",
+            "mensaje"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "codigo": {
+              "$ref": "../../comun/tipos.schema.json#/$defs/CodigoError"
+            },
+            "mensaje": {
+              "type": "string",
+              "maxLength": 500
+            }
+          }
+        },
+        "intentos": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "01933d12-0000-7000-8000-000000000012",
+      "tipo": "ViajeRequiereIntervencion",
+      "version": 1,
+      "ocurridoEn": "2026-11-03T15:20:01Z",
+      "correlationId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8dff",
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "productor": "viajes",
+      "datos": {
+        "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+        "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
+        "compensacionFallida": "Finanzas.liberarCredito",
+        "error": {
+          "codigo": "DEPENDENCIA_NO_DISPONIBLE",
+          "mensaje": "No se pudo conectar con la base de Finanzas"
+        },
+        "intentos": 4
+      }
+    }
+  ]
+}

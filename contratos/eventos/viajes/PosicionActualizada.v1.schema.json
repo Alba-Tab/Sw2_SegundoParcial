@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/eventos/viajes/PosicionActualizada.v1.schema.json",
+  "title": "PosicionActualizada v1",
+  "description": "Última posición de un viaje; uno por lote de GPS recibido, no uno por punto (D19). Clave de enrutamiento: viajes.posicion-actualizada.v1. Consumen: analitica.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../sobre.schema.json"
+    }
+  ],
+  "properties": {
+    "tipo": {
+      "const": "PosicionActualizada"
+    },
+    "version": {
+      "const": 1
+    },
+    "productor": {
+      "const": "viajes"
+    },
+    "datos": {
+      "type": "object",
+      "required": [
+        "viajeId",
+        "choferId",
+        "posicion",
+        "velocidadKmh",
+        "registradaEn",
+        "puntosEnLote"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "viajeId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "choferId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "posicion": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Coordenadas"
+        },
+        "velocidadKmh": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "registradaEn": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Instante"
+        },
+        "puntosEnLote": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "01933d07-0000-7000-8000-000000000007",
+      "tipo": "PosicionActualizada",
+      "version": 1,
+      "ocurridoEn": "2026-11-03T15:20:01Z",
+      "correlationId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8dff",
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "productor": "viajes",
+      "datos": {
+        "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+        "choferId": "01933900-0000-7000-8000-00000000c301",
+        "posicion": {
+          "lat": -17.6,
+          "lng": -63.5
+        },
+        "velocidadKmh": 72.5,
+        "registradaEn": "2026-11-03T12:10:30Z",
+        "puntosEnLote": 4
+      }
+    }
+  ]
+}
