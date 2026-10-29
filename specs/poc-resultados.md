@@ -1,6 +1,6 @@
 # Resultados de las pruebas de concepto
 
-Estado: **en curso** (PoC-1, PoC-2 y PoC-3 terminadas el 29/10/2026; PoC-4 terminada en el emulador de Android y el simulador de iOS, con el iPhone pendiente; el resto se llena en F2 y F3a). Los criterios de éxito y los planes B están en la sección 7 de [plan-desarrollo.md](plan-desarrollo.md).
+Estado: **en curso** (PoC-1, PoC-2 y PoC-3 terminadas el 29/10/2026; PoC-4 terminada en el emulador de Android y el simulador de iOS, con el iPhone pendiente; PoC-5 medida en T3a.1 a T3a.4). Los criterios de éxito y los planes B están en la sección 7 de [plan-desarrollo.md](plan-desarrollo.md).
 
 | PoC | Fecha | Resultado | Plan B activado | Decisiones que cierra |
 |---|---|---|---|---|
@@ -8,7 +8,7 @@ Estado: **en curso** (PoC-1, PoC-2 y PoC-3 terminadas el 29/10/2026; PoC-4 termi
 | PoC-2 Temporal en 3 lenguajes | 29/10/2026 | **Pasa** (24/24, con un conversor propio para Jackson 3) | Ninguno | D29, S9, S14, S15 |
 | PoC-3 Ollama | 29/10/2026 | **Pasa con `qwen3:4b-instruct`**; `qwen3:4b` no sirve para el agente | Ninguno (sigue siendo 4B) | D36 (cambiada a `qwen3:4b-instruct`) |
 | PoC-4 App nativa (iPhone y emulador de Android) | 29/10/2026 | **Pasa en el emulador de Android y el simulador de iOS**; **falta el iPhone** (Xcode sin Apple ID) | Ninguno | D45 (Android); D22 y D38 esperan el iPhone |
-| PoC-5 Memoria de la Mac | — | pendiente | — | D36 |
+| PoC-5 Memoria de la Mac | 29/10/2026 | **Pasa con perfiles**: el stack completo usa ~3 GB; no entra a la vez con Ollama y el emulador | Plan B parcial: no levantar todo junto | D36 |
 | Micro-PoC Whisper web | — | pendiente | — | D38 |
 | PoC de despliegue | — | pendiente | — | D32, D33, D35 |
 
@@ -107,4 +107,37 @@ Estado: **en curso** (PoC-1, PoC-2 y PoC-3 terminadas el 29/10/2026; PoC-4 termi
 - La raíz del repo ignora `*.tflite`: T3a.0 tiene que anclar la regla para que entren los modelos propios de la app.
 
 **Pendiente en el iPhone** (cuando el usuario agregue su Apple ID en Xcode): instalación con cuenta gratuita, login con `chofer1`, Whisper desde el micrófono, TFLite con CoreML, GPS 10 min con el teléfono bloqueado y Network Link Conditioner. Con eso se cierran D22 y D38.
+
+### PoC-5 Memoria de la Mac (T3a.1 a T3a.4)
+
+- **Equipo:** Mac con Apple M5 y 16 GB. OrbStack con un límite de 7,8 GB para la VM.
+- **Cómo se midió:** `docker stats` con `core`, `plataforma` y `trazas` levantados y los esqueletos de Viajes, Flota (API y worker) y Finanzas (API y worker) corriendo, sin carga.
+
+| Contenedor | MiB | Contenedor | MiB |
+|---|---|---|---|
+| keycloak | 778 | viajes | 420 |
+| n8n | 347 | rabbitmq | 198 |
+| finanzas-api (Octane, 4 workers) | 185 | finanzas-worker (RoadRunner) | 172 |
+| dynamodb-local | 156 | mongo | 114 |
+| postgres-aws | 109 | s3-local (RustFS) | 100 |
+| temporal | 99 | postgres-azure | 89 |
+| flota-api | 67 | flota-worker | 61 |
+| otel-collector | 39 | jaeger | 17 |
+| mailpit | 12 | temporal-ui | 8 |
+| **Total** | **~2.970** | VM de OrbStack (RSS) | ~3.550 |
+
+| Pieza fuera de Docker | Memoria |
+|---|---|
+| Ollama con `qwen3:4b-instruct` y contexto de 8.192 (PoC-3) | 3,9 GB |
+| Emulador de Android `Pixel_10` (PoC-4) | ~2,5 GB |
+| Analítica, Gateway y MCP (F8 a F10) | Sin medir; estimado 0,5 a 0,8 GB |
+
+**Conclusión:**
+- **Lo que entra:** el stack local completo (~3 GB, que serán ~3,8 GB con el perfil `ia`) cabe solo, pero no a la vez con Ollama y el emulador. Al medir, macOS ya usaba 14 GB de swap.
+- **Otros proyectos:** había ~1,6 GB en contenedores ajenos a este repo (supabase y frappe), que conviene apagar antes de ensayar.
+- **Cómo levantar el entorno:** se confirma D36. El entorno se levanta por perfiles según la demo:
+  - F7, app del chofer: `core` + `plataforma` + emulador, sin Ollama;
+  - F8 y F10, IA: `core` + `plataforma` + `ia` + Ollama, sin emulador;
+  - `trazas`: solo cuando se muestra Jaeger.
+- **Plan B (si hace falta):** `mem_limit` por contenedor, o correr nativo solo el servicio en el que se trabaja.
 
