@@ -8,5 +8,5 @@ package bo.transporte.viajes.aplicacion.puerto.salida;
  * @param datos contenido de {@code datos} del sobre; debe cumplir contratos/eventos
  */
 public interface RegistroDeEventos {
-	void registrar(String tipo, String claveEnrutamiento, Object datos);
+    void registrar(String tipo, String claveEnrutamiento, Object datos);
 }
