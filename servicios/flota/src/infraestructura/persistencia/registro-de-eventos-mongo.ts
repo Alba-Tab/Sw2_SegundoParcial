@@ -27,9 +27,11 @@ export class RegistroDeEventosMongo implements RegistroDeEventos {
       productor: 'flota',
       datos,
     };
-    await this.conexion.collection(OUTBOX).insertOne(
-      { _id: id as never, tipo, claveEnrutamiento, sobre, creadoEn: ahora, publicadoEn: null, reclamadoHasta: null },
-      { session: sesion },
-    );
+    await this.conexion
+      .collection(OUTBOX)
+      .insertOne(
+        { _id: id as never, tipo, claveEnrutamiento, sobre, creadoEn: ahora, publicadoEn: null, reclamadoHasta: null },
+        { session: sesion },
+      );
   }
 }

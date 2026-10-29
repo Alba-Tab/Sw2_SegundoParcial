@@ -83,11 +83,22 @@ describe('Flota (Mongo rs0 + RabbitMQ)', () => {
 
     const uow = worker.get<UnidadDeTrabajo>(UNIDAD_DE_TRABAJO);
     const registro = worker.get<RegistroDeEventos>(REGISTRO_DE_EVENTOS);
-    await uow.ejecutar(() => registro.registrar('ChoferActualizado', 'flota.chofer-actualizado.v1', { choferId: 'c1', versionAgregado: 1 }));
+    await uow.ejecutar(() =>
+      registro.registrar('ChoferActualizado', 'flota.chofer-actualizado.v1', { choferId: 'c1', versionAgregado: 1 }),
+    );
 
     const mensaje = await new Promise<amqp.ConsumeMessage>((resolver, rechazar) => {
       const t = setTimeout(() => rechazar(new Error('el relay no publicó')), 10_000);
-      void canal.consume(queue, (m) => { if (m) { clearTimeout(t); resolver(m); } }, { noAck: true });
+      void canal.consume(
+        queue,
+        (m) => {
+          if (m) {
+            clearTimeout(t);
+            resolver(m);
+          }
+        },
+        { noAck: true },
+      );
     });
     const sobre = JSON.parse(mensaje.content.toString());
     expect(sobre).toMatchObject({ tipo: 'ChoferActualizado', version: 1, productor: 'flota', datos: { choferId: 'c1' } });
