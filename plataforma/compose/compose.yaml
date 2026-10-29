@@ -1,0 +1,279 @@
+# Entorno local (plan-desarrollo.md §8). Uso:
+#   cp .env.example .env
+#   docker compose --profile core --profile plataforma up -d
+# Perfiles: core (bases y servicios), plataforma (Temporal, RabbitMQ, Keycloak, n8n, Mailpit), trazas (OTel + Jaeger),
+# demo (Toxiproxy, con --env-file .env.demo). Los servicios viajes, flota y finanzas se agregan con sus esqueletos.
+
+x-comun: &comun
+  restart: unless-stopped
+  extra_hosts: ["${MAC_LOCAL:-mac.local}:host-gateway"]
+
+x-temporal-env: &temporal-env
+  TEMPORAL_ADDRESS: temporal:7233
+
+services:
+  # ---------------------------------------------------------------- core: bases
+  postgres-aws:
+    <<: *comun
+    image: postgres:17
+    profiles: [core, plataforma]
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_CLAVE}
+      BASES: "viajes temporal temporal:temporal_visibility"
+      CLAVE_VIAJES: ${CLAVE_VIAJES}
+      CLAVE_TEMPORAL: ${CLAVE_TEMPORAL}
+    volumes:
+      - postgres-aws:/var/lib/postgresql/data
+      - ./postgres/crear-bases.sh:/docker-entrypoint-initdb.d/crear-bases.sh:ro
+    ports: ["5432:5432"]
+    healthcheck: { test: ["CMD", "pg_isready", "-U", "postgres", "-h", "127.0.0.1"], interval: 3s, retries: 30 }
+
+  postgres-azure:
+    <<: *comun
+    image: postgres:17
+    profiles: [core, plataforma]
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_CLAVE}
+      BASES: "finanzas keycloak n8n analitica"
+      CLAVE_FINANZAS: ${CLAVE_FINANZAS}
+      CLAVE_KEYCLOAK: ${CLAVE_KEYCLOAK}
+      CLAVE_N8N: ${CLAVE_N8N}
+      CLAVE_ANALITICA: ${CLAVE_ANALITICA}
+    volumes:
+      - postgres-azure:/var/lib/postgresql/data
+      - ./postgres/crear-bases.sh:/docker-entrypoint-initdb.d/crear-bases.sh:ro
+    ports: ["5433:5432"]
+    healthcheck: { test: ["CMD", "pg_isready", "-U", "postgres", "-h", "127.0.0.1"], interval: 3s, retries: 30 }
+
+  mongo:
+    <<: *comun
+    image: mongo:8.0.34
+    profiles: [core]
+    command: ["--replSet", "rs0", "--bind_ip_all"]
+    volumes: [mongo:/data/db]
+    ports: ["27017:27017"]
+    # Inicia la réplica rs0 de un nodo (las transacciones del Outbox de Flota la necesitan).
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "try { rs.status().ok } catch (e) { rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'mongo:27017'}]}).ok }"]
+      interval: 5s
+      retries: 30
+
+  dynamodb-local:
+    <<: *comun
+    image: amazon/dynamodb-local:3.3.2
+    profiles: [core]
+    user: root
+    command: ["-jar", "DynamoDBLocal.jar", "-sharedDb", "-dbPath", "/home/dynamodblocal/data"]
+    volumes: [dynamodb:/home/dynamodblocal/data]
+    ports: ["8000:8000"]
+
+  # S3 local compatible (MinIO ya no publica imágenes; RustFS usa los mismos puertos).
+  s3-local:
+    <<: *comun
+    image: rustfs/rustfs:1.0.4
+    profiles: [core]
+    environment:
+      RUSTFS_ACCESS_KEY: ${AWS_ACCESS_KEY_ID}
+      RUSTFS_SECRET_KEY: ${AWS_SECRET_ACCESS_KEY}
+    volumes: [s3:/data]
+    ports: ["9000:9000", "9001:9001"]
+
+  aws-local-iniciar:
+    image: amazon/aws-cli:2.39.1
+    profiles: [core]
+    depends_on: [dynamodb-local, s3-local]
+    entrypoint: ["sh", "/iniciar/aws-local.sh"]
+    environment:
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
+      S3_BUCKET: ${S3_BUCKET}
+    volumes: ["./iniciar:/iniciar:ro"]
+    restart: "no"
+
+  # ---------------------------------------------------------------- plataforma
+  temporal-esquema:
+    image: temporalio/admin-tools:1.32.1
+    profiles: [plataforma]
+    depends_on: { postgres-aws: { condition: service_healthy } }
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        T="temporal-sql-tool --plugin postgres12 --ep postgres-aws -p 5432 -u temporal --pw $${CLAVE_TEMPORAL}"
+        S=/etc/temporal/schema/postgresql/v12
+        $$T --db temporal setup-schema -v 0.0 || true
+        $$T --db temporal update-schema -d $$S/temporal/versioned
+        $$T --db temporal_visibility setup-schema -v 0.0 || true
+        $$T --db temporal_visibility update-schema -d $$S/visibility/versioned
+    environment: { CLAVE_TEMPORAL: "${CLAVE_TEMPORAL}" }
+    restart: "no"
+
+  temporal:
+    <<: *comun
+    image: temporalio/server:1.32.1
+    profiles: [plataforma]
+    depends_on: { temporal-esquema: { condition: service_completed_successfully } }
+    environment:
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: ${CLAVE_TEMPORAL}
+      POSTGRES_SEEDS: postgres-aws
+    volumes: ["./temporal:/etc/temporal/config/dynamicconfig:ro"]
+    ports: ["7233:7233"]
+
+  temporal-namespace:
+    image: temporalio/admin-tools:1.32.1
+    profiles: [plataforma]
+    depends_on: [temporal]
+    environment: *temporal-env
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        n=0; until temporal operator cluster health >/dev/null 2>&1; do n=$$((n+1)); [ $$n -gt 60 ] && exit 1; sleep 2; done
+        temporal operator namespace describe -n transporte >/dev/null 2>&1 \
+          || temporal operator namespace create -n transporte --retention 30d
+        temporal operator namespace describe -n transporte | grep -i retention
+    restart: "no"
+
+  temporal-ui:
+    <<: *comun
+    image: temporalio/ui:2.57.0
+    profiles: [plataforma]
+    depends_on: [temporal]
+    environment: { TEMPORAL_ADDRESS: temporal:7233, TEMPORAL_DEFAULT_NAMESPACE: transporte }
+    ports: ["8233:8080"]
+
+  rabbitmq:
+    <<: *comun
+    image: rabbitmq:4.4.0-management
+    profiles: [plataforma]
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_ADMIN}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_ADMIN_CLAVE}
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+      - ./rabbitmq/rabbitmq.conf:/etc/rabbitmq/conf.d/20-transporte.conf:ro
+      - ./rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+    ports: ["5672:5672", "15672:15672", "1883:1883"]
+    healthcheck: { test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"], interval: 5s, retries: 30 }
+
+  rabbitmq-usuarios:
+    image: alpine:3.24
+    profiles: [plataforma]
+    depends_on: { rabbitmq: { condition: service_healthy } }
+    entrypoint: ["sh", "-c", "apk add --no-cache -q bash curl jq >/dev/null && bash /iniciar/rabbitmq-usuarios.sh"]
+    env_file: [.env]
+    volumes: ["./iniciar:/iniciar:ro", "./rabbitmq:/rabbitmq:ro"]
+    restart: "no"
+
+  keycloak:
+    <<: *comun
+    image: quay.io/keycloak/keycloak:26.8
+    profiles: [plataforma]
+    command: ["start-dev"]
+    depends_on: { postgres-azure: { condition: service_healthy } }
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_ADMIN}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_ADMIN_CLAVE}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres-azure:5432/keycloak
+      KC_DB_USERNAME: keycloak
+      KC_DB_PASSWORD: ${CLAVE_KEYCLOAK}
+      # Mismo emisor para el navegador, el iPhone y los contenedores (MAC_LOCAL).
+      KC_HOSTNAME: http://${MAC_LOCAL:-mac.local}:8080
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+      KC_HEALTH_ENABLED: "true"
+    ports: ["8080:8080"]
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/127.0.0.1/9000 && printf 'GET /health/ready HTTP/1.0\\r\\n\\r\\n' >&3 && grep -q UP <&3"]
+      interval: 5s
+      retries: 60
+
+  keycloak-config:
+    image: adorsys/keycloak-config-cli:6.5.1-26.5.5
+    profiles: [plataforma]
+    depends_on: { keycloak: { condition: service_healthy } }
+    env_file: [.env]
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_USER: ${KC_ADMIN}
+      KEYCLOAK_PASSWORD: ${KC_ADMIN_CLAVE}
+      IMPORT_FILES_LOCATIONS: /config/realm-transporte.json
+      IMPORT_VARSUBSTITUTION_ENABLED: "true"
+      IMPORT_MANAGED_GROUP: no-delete
+      IMPORT_MANAGED_REQUIRED_ACTION: no-delete
+    volumes: ["../keycloak/realm-transporte.json:/config/realm-transporte.json:ro"]
+    restart: "no"
+
+  keycloak-realm:
+    image: alpine:3.24
+    profiles: [plataforma]
+    depends_on: { keycloak-config: { condition: service_completed_successfully } }
+    env_file: [.env]
+    environment: { KC_URL: http://keycloak:8080 }
+    entrypoint: ["sh", "/iniciar/keycloak-realm.sh"]
+    volumes: ["./iniciar:/iniciar:ro", "../keycloak:/realm:ro"]
+    restart: "no"
+
+  n8n:
+    <<: *comun
+    image: n8nio/n8n:2.46.2
+    profiles: [plataforma]
+    depends_on: { postgres-azure: { condition: service_healthy } }
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres-azure
+      DB_POSTGRESDB_DATABASE: n8n
+      DB_POSTGRESDB_USER: n8n
+      DB_POSTGRESDB_PASSWORD: ${CLAVE_N8N}
+      N8N_ENCRYPTION_KEY: ${N8N_CLAVE_CIFRADO}
+      N8N_EMAIL_MODE: smtp
+      N8N_SMTP_HOST: mailpit
+      N8N_SMTP_PORT: "1025"
+      N8N_SMTP_SSL: "false"
+      N8N_SMTP_SENDER: avisos@transporte.example
+      GENERIC_TIMEZONE: America/La_Paz
+      N8N_DIAGNOSTICS_ENABLED: "false"
+    volumes: [n8n:/home/node/.n8n]
+    ports: ["5678:5678"]
+
+  mailpit:
+    <<: *comun
+    image: axllent/mailpit:v1.32.0
+    profiles: [plataforma]
+    ports: ["8025:8025", "1025:1025"]
+
+  # ---------------------------------------------------------------- trazas (D23)
+  otel-collector:
+    <<: *comun
+    image: otel/opentelemetry-collector-contrib:0.164.0
+    profiles: [trazas]
+    command: ["--config=/etc/otel/collector.yaml"]
+    volumes: ["./otel/collector.yaml:/etc/otel/collector.yaml:ro"]
+    ports: ["4317:4317", "4318:4318"]
+
+  jaeger:
+    <<: *comun
+    image: jaegertracing/jaeger:2.22.0
+    profiles: [trazas]
+    ports: ["16686:16686"]
+
+  # ---------------------------------------------------------------- demo (fallos con Toxiproxy)
+  toxiproxy:
+    <<: *comun
+    image: ghcr.io/shopify/toxiproxy:2.13.0
+    profiles: [demo]
+    command: ["-host=0.0.0.0", "-config=/config/proxies.json"]
+    volumes: ["./toxiproxy/proxies.json:/config/proxies.json:ro"]
+    ports: ["8474:8474", "25433:25433", "25672:25672", "28103:28103"]
+
+volumes:
+  postgres-aws:
+  postgres-azure:
+  mongo:
+  dynamodb:
+  s3:
+  rabbitmq:
+  n8n:
