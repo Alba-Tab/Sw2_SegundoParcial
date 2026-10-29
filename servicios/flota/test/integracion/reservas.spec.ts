@@ -6,6 +6,8 @@ import type { StartedTestContainer } from 'testcontainers';
 import { uuid7 } from '../../src/dominio/comun/uuid7';
 import { ActividadesFlota } from '../../src/infraestructura/temporal/actividades-flota';
 import { CHOFERES, RESERVAS, UNIDADES } from '../../src/infraestructura/persistencia/colecciones-flota';
+import { LiberarPorCancelacion } from '../../src/aplicacion/reserva/liberar-por-cancelacion';
+import { INBOX_EVENTOS } from '../../src/infraestructura/persistencia/inbox-mongo';
 import { iniciarMongoRs0 } from './contenedores';
 
 /** Actividades Flota.* (spec 003, paso 3, 5 y compensación) contra Mongo rs0, como las llama el worker de Temporal. */
@@ -53,6 +55,7 @@ describe('Reservas de la saga (Mongo rs0)', () => {
   let conexion: Connection;
   let cerrar: () => Promise<void>;
   let flota: ReturnType<ActividadesFlota['mapa']>;
+  let cancelaciones: LiberarPorCancelacion;
 
   const reservar = (servicioId: string, tipoCarga = 'GRANOS', toneladas = 28) =>
     flota['Flota.reservarUnidad']({ servicioId, viajeId: uuid7(), tipoCarga: tipoCarga as never, toneladas, fechaViaje: '2026-11-10' });
@@ -72,12 +75,14 @@ describe('Reservas de la saga (Mongo rs0)', () => {
     mongo = await iniciarMongoRs0();
     process.env.MONGO_URI = `mongodb://${mongo.getHost()}:${mongo.getMappedPort(27017)}/flota?directConnection=true`;
     process.env.TEMPORAL_WORKER = 'false';
+    process.env.CONSUMIR_EVENTOS = 'false';
     process.env.OIDC_ISSUER = '';
     const { WorkerModule } = await import('../../src/worker.module');
     const app = (await Test.createTestingModule({ imports: [WorkerModule] }).compile()).createNestApplication();
     await app.init();
     conexion = app.get<Connection>(getConnectionToken());
     flota = app.get(ActividadesFlota).mapa();
+    cancelaciones = app.get(LiberarPorCancelacion);
     cerrar = () => app.close();
   }, 180_000);
 
@@ -87,7 +92,7 @@ describe('Reservas de la saga (Mongo rs0)', () => {
   }, 60_000);
 
   beforeEach(async () => {
-    await Promise.all([UNIDADES, CHOFERES, RESERVAS].map((c) => conexion.collection(c).deleteMany({})));
+    await Promise.all([UNIDADES, CHOFERES, RESERVAS, INBOX_EVENTOS].map((c) => conexion.collection(c).deleteMany({})));
     await conexion
       .collection(UNIDADES)
       .insertMany([
@@ -168,5 +173,15 @@ describe('Reservas de la saga (Mongo rs0)', () => {
     const f = await falla(reservar(servicio));
     expect(f.type).toBe('CONFLICTO_ESTADO');
     expect(await estado('f1')).toBe('DISPONIBLE');
+  });
+
+  it('ViajeCancelado libera unidades y chofer una sola vez (spec 004)', async () => {
+    const servicio = uuid7();
+    await reservar(servicio);
+    const sobre = { id: uuid7(), tipo: 'ViajeCancelado' as const, datos: { servicioId: servicio, origen: 'USUARIO' as const } };
+    expect(await cancelaciones.ejecutar(sobre)).toBe(true);
+    expect(await cancelaciones.ejecutar(sobre)).toBe(false);
+    expect([await estado('t2'), await estado('f1'), await libre('ch1')]).toEqual(['DISPONIBLE', 'DISPONIBLE', true]);
+    expect((await conexion.collection(RESERVAS).findOne({ servicioId: servicio }))?.estado).toBe('LIBERADA');
   });
 });

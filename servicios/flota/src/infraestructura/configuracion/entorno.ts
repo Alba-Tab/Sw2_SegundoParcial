@@ -10,6 +10,10 @@ const esquema = z.object({
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default(''),
   OUTBOX_INTERVALO_MS: z.coerce.number().default(1000),
   TEMPORAL_ADDRESS: z.string().default('localhost:7233'),
+  CONSUMIR_EVENTOS: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
   TEMPORAL_WORKER: z
     .enum(['true', 'false'])
     .default('true')

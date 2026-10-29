@@ -27,6 +27,10 @@ describe('Flota (Mongo rs0 + RabbitMQ)', () => {
     process.env.OIDC_ISSUER = '';
     process.env.OUTBOX_INTERVALO_MS = '200';
     process.env.TEMPORAL_WORKER = 'false';
+    // La topología real viene de plataforma/compose/rabbitmq; aquí basta la cola del consumidor.
+    const admin = await amqp.connect(rabbit.getAmqpUrl());
+    await (await admin.createChannel()).assertQueue('flota.eventos', { durable: true });
+    await admin.close();
     const { AppModule } = await import('../../src/app.module');
     const { WorkerModule } = await import('../../src/worker.module');
     api = (await Test.createTestingModule({ imports: [AppModule] }).compile()).createNestApplication();
@@ -110,5 +114,32 @@ describe('Flota (Mongo rs0 + RabbitMQ)', () => {
     const mongoConexion = worker.get<Connection>(getConnectionToken());
     expect(await mongoConexion.collection('outboxEventos').countDocuments({ publicadoEn: null })).toBe(0);
     await conexion.close();
+  });
+
+  it('consume ViajeCancelado de flota.eventos y libera la reserva', async () => {
+    const conexion = worker.get<Connection>(getConnectionToken());
+    const servicioId = '0193a000-0000-7000-8000-00000000c0de';
+    await conexion.collection('unidades').insertOne({ _id: 'tx' as never, tipoUnidad: 'TRACTO', placa: '9999ZZZ', estado: 'RESERVADA' });
+    await conexion.collection('reservasUnidad').insertOne({
+      _id: 'r-c0de' as never,
+      servicioId,
+      tractoId: 'tx',
+      estado: 'CONFIRMADA',
+      creadaEn: new Date(),
+    });
+    const c = await amqp.connect(rabbit.getAmqpUrl());
+    // Con confirmación: cerrar la conexión justo después de un sendToQueue sin confirmar puede perder el mensaje.
+    const canal = await c.createConfirmChannel();
+    const sobre = { id: '0193a000-0000-7000-8000-0000000e0001', tipo: 'ViajeCancelado', datos: { servicioId, origen: 'USUARIO' } };
+    canal.sendToQueue('flota.eventos', Buffer.from(JSON.stringify(sobre)));
+    canal.sendToQueue('flota.eventos', Buffer.from('no es json'));
+    await canal.waitForConfirms();
+    await c.close();
+    for (let i = 0; i < 50; i++) {
+      if ((await conexion.collection('reservasUnidad').findOne({ servicioId }))?.estado === 'LIBERADA') break;
+      await new Promise((r) => setTimeout(r, 200));
+    }
+    expect((await conexion.collection('reservasUnidad').findOne({ servicioId }))?.estado).toBe('LIBERADA');
+    expect((await conexion.collection('unidades').findOne({ _id: 'tx' as never }))?.estado).toBe('DISPONIBLE');
   });
 });
