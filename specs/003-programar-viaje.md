@@ -122,7 +122,8 @@ Si una compensación se agota, el viaje pasa a `REQUIERE_INTERVENCION` (spec 011
 | `Cotizacion` (Finanzas) | `VIGENTE` → `ACEPTADA` (paso 2) → `VIGENTE` si se compensa en plazo |
 | `ReservaCredito` (Finanzas) | — → `ACTIVA` o `PENDIENTE_APROBACION` → `ACTIVA` (aprobada) → `CONSUMIDA` (al facturar, spec 006) o `LIBERADA` |
 | `ReservaUnidad` (Flota) | — → `PROVISIONAL` (paso 3) → `CONFIRMADA` (paso 5) o `LIBERADA` |
-| Tracto, remolque y chofer (Flota) | `DISPONIBLE` → `RESERVADA` (paso 3) → `DISPONIBLE` si se libera |
+| Tracto y remolque (Flota) | `DISPONIBLE` → `RESERVADA` (paso 3) → `DISPONIBLE` si se libera |
+| Chofer (Flota) | `disponible`: `true` → `false` (paso 3) → `true` si se libera |
 
 ### Etapa visible en `GET /servicios/{id}`
 

@@ -28,7 +28,7 @@ Cuando una compensación de la saga agota sus reintentos, el sistema no puede de
 5. Viajes responde `202`: la señal se entregó; el resultado se ve en `GET /api/v1/servicios/{servicioId}`.
 6. El workflow actúa:
    - **Reintentar:** vuelve a correr **las compensaciones que faltaban**, en el mismo orden inverso y con los mismos límites. Si terminan, el viaje queda `CANCELADO` (`ViajeCancelado`, `origen = SAGA`). Si alguna vuelve a agotarse, regresa al paso 1 (otra vez `REQUIERE_INTERVENCION`).
-   - **Marcar como resuelto:** ejecuta `Viajes.cancelarViaje` con `motivo = "Resuelto manualmente: <nota>"` y `origen = SAGA`, y termina. Las reservas que quedaron sin liberar se liberan **solas** cuando su servicio vuelve, porque Finanzas y Flota consumen ese `ViajeCancelado` de forma idempotente. No hay paso manual.
+   - **Marcar como resuelto:** ejecuta `Viajes.cancelarViaje` con `motivo = RESUELTO_MANUALMENTE` (código), `detalle = "Resuelto manualmente: <nota>"` y `origen = SAGA`, y termina. Las reservas que quedaron sin liberar se liberan **solas** cuando su servicio vuelve, porque Finanzas y Flota consumen ese `ViajeCancelado` de forma idempotente. No hay paso manual.
 
 ## Reglas de negocio
 
@@ -67,7 +67,7 @@ Cuando una compensación de la saga agota sus reintentos, el sistema no puede de
 
 - **FS8. Dado** el script `saga-compensacion-agotada.sh` (worker de Flota apagado; confirmar Cochabamba con 20 t de `INSUMOS_LIQUIDOS`; cortar la base de Finanzas con Toxiproxy; encender el worker de Flota), **cuando** `Flota.reservarUnidad` falla con `SIN_UNIDAD_COMPATIBLE` y `Finanzas.liberarCredito` agota sus 4 intentos de demo, **entonces** el viaje queda `REQUIERE_INTERVENCION` y se publica `ViajeRequiereIntervencion` (visible en la cola `analitica.eventos`).
 - **Dado** FS8 y la base de Finanzas restaurada, **cuando** el despachador elige "Reintentar compensación", **entonces** la reserva de crédito queda `LIBERADA`, el viaje `CANCELADO` y el workflow termina.
-- **Dado** FS8 sin restaurar Finanzas, **cuando** el despachador elige "Marcar como resuelto" con nota, **entonces** el viaje queda `CANCELADO` con la nota en el motivo; **y cuando** Finanzas vuelve, **entonces** la reserva queda `LIBERADA` sin otra acción.
+- **Dado** FS8 sin restaurar Finanzas, **cuando** el despachador elige "Marcar como resuelto" con nota, **entonces** el viaje queda `CANCELADO` con `motivo = RESUELTO_MANUALMENTE` y la nota en `detalle`; **y cuando** Finanzas vuelve, **entonces** la reserva queda `LIBERADA` sin otra acción.
 - **Dado** un viaje `CONFIRMADO`, **cuando** se envía una intervención, **entonces** `409 CONFLICTO_ESTADO`.
 - **Dado** un usuario `gerente`, **cuando** envía una intervención, **entonces** `403 SIN_PERMISO`.
 

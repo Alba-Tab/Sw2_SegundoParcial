@@ -20,7 +20,7 @@ El cliente, atención comercial o el despachador cancelan un servicio confirmado
 ## Pasos (camino feliz)
 
 1. El portal (o el Centro de Control) hace `POST /api/v1/servicios/{servicioId}/cancelacion` con `{ "motivo": "…" }` y `Idempotency-Key`.
-2. Viajes, en una transacción: verifica estado y permiso, pasa el viaje a `CANCELADO` con el motivo, registra la auditoría y deja `ViajeCancelado` en el Outbox con estos datos: `servicioId`, `viajeId`, `clienteId`, `motivo`, `origen = USUARIO`, `canceladoPor = <sub>`, `estadoAnterior = CONFIRMADO` y, si hay chofer asignado, `choferUsuarioSub` (para el push).
+2. Viajes, en una transacción: verifica estado y permiso, pasa el viaje a `CANCELADO` con el motivo, registra la auditoría y deja `ViajeCancelado` en el Outbox con estos datos: `servicioId`, `viajeId`, `clienteId`, `motivo = CANCELADO_POR_USUARIO` (código), `detalle` = el texto que escribió el usuario, `origen = USUARIO`, `canceladoPor = <sub>`, `estadoAnterior = CONFIRMADO` y, si hay chofer asignado, `choferUsuarioSub` (para el push).
 3. Responde `200` con el servicio cancelado.
 4. Reacciones (cada una idempotente con Inbox):
    - **Finanzas:** la reserva de crédito del `servicioId` pasa de `ACTIVA` o `PENDIENTE_APROBACION` a `LIBERADA` (`reservado` baja). Con `origen = USUARIO` la cotización sigue `ACEPTADA` (no se reutiliza); con `origen = SAGA` vuelve a `VIGENTE` si sigue en plazo, igual que `Finanzas.liberarCredito`.
