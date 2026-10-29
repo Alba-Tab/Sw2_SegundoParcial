@@ -163,3 +163,32 @@ it('vencida la registra el sistema con su motivo; liberar sin reserva no hace na
     actividades()->liberarCredito(['servicioId' => (string) Str::uuid7(), 'motivo' => 'SIN_UNIDAD_COMPATIBLE']);
     expect(linea()->reservado)->toBe('7600.00');
 });
+
+function viajeCancelado(string $servicioId, string $origen, string $motivo): array
+{
+    return evento('ViajeCancelado', ['servicioId' => $servicioId, 'viajeId' => (string) Str::uuid7(), 'clienteId' => CLIENTE,
+        'motivo' => $motivo, 'origen' => $origen, 'estadoAnterior' => 'CONFIRMADO']);
+}
+
+it('ViajeCancelado del usuario libera una sola vez y la cotización sigue ACEPTADA (spec 004)', function () {
+    $servicio = (string) Str::uuid7();
+    $cot = cotizacion($this, AULA, 28);
+    reservar($servicio, $cot);
+    $e = viajeCancelado($servicio, 'USUARIO', 'CANCELADO_POR_USUARIO');
+    expect(consumidor()->aplicar($e))->toBeTrue()->and(consumidor()->aplicar($e))->toBeFalse();
+    consumidor()->aplicar(viajeCancelado($servicio, 'SAGA', 'SIN_UNIDAD_COMPATIBLE'));
+    expect(DB::table('reserva_credito')->first())->toMatchObject(['estado' => 'LIBERADA', 'motivo_liberacion' => 'CANCELADO_POR_USUARIO'])
+        ->and(linea()->reservado)->toBe('0.00')
+        ->and(DB::table('cotizacion')->where('cotizacion_id', $cot)->value('estado'))->toBe('ACEPTADA');
+});
+
+it('ViajeCancelado de la saga libera una reserva pendiente y devuelve la cotización (spec 011)', function () {
+    facturaVencida(CLIENTE, '2026-10-14');
+    $servicio = (string) Str::uuid7();
+    $cot = cotizacion($this, LA_PAZ, 20);
+    reservar($servicio, $cot);
+    consumidor()->aplicar(viajeCancelado($servicio, 'SAGA', 'RESUELTO_MANUALMENTE'));
+    expect(DB::table('reserva_credito')->value('estado'))->toBe('LIBERADA')
+        ->and(linea()->reservado)->toBe('0.00')
+        ->and(DB::table('cotizacion')->where('cotizacion_id', $cot)->value('estado'))->toBe('VIGENTE');
+});
