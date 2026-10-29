@@ -3,8 +3,10 @@ package bo.transporte.viajes.adaptadores.salida.persistencia;
 import bo.transporte.viajes.aplicacion.cliente.AltaDeCliente;
 import bo.transporte.viajes.aplicacion.cliente.ClienteVista;
 import bo.transporte.viajes.aplicacion.puerto.salida.RegistroIdempotente;
+import bo.transporte.viajes.aplicacion.servicio.CancelacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ConfirmacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ServicioAceptado;
+import bo.transporte.viajes.aplicacion.servicio.ServicioVista;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,7 +22,12 @@ import tools.jackson.databind.json.JsonMapper;
 class RegistroIdempotenteJdbc implements RegistroIdempotente {
     /** Tipo de la respuesta guardada por operación. */
     private static final Map<String, Class<?>> RESPUESTAS = Map.of(
-            AltaDeCliente.OPERACION, ClienteVista.class, ConfirmacionDeServicio.OPERACION, ServicioAceptado.class);
+            AltaDeCliente.OPERACION,
+            ClienteVista.class,
+            ConfirmacionDeServicio.OPERACION,
+            ServicioAceptado.class,
+            CancelacionDeServicio.OPERACION,
+            ServicioVista.class);
 
     private final JdbcClient jdbc;
     private final JsonMapper json;

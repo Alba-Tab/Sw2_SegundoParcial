@@ -10,6 +10,7 @@ import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.ServicioAceptadoD
 import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.ServicioDto;
 import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.ServicioNuevoDto;
 import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.TipoCargaDto;
+import bo.transporte.viajes.aplicacion.servicio.CancelacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ConfirmacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ConsultaDeServicios;
 import bo.transporte.viajes.aplicacion.servicio.ServicioVista;
@@ -30,11 +31,17 @@ import tools.jackson.databind.json.JsonMapper;
 class ServiciosController implements ServiciosApi {
     private final ConfirmacionDeServicio confirmacion;
     private final ConsultaDeServicios consulta;
+    private final CancelacionDeServicio cancelacion;
     private final JsonMapper json;
 
-    ServiciosController(ConfirmacionDeServicio confirmacion, ConsultaDeServicios consulta, JsonMapper json) {
+    ServiciosController(
+            ConfirmacionDeServicio confirmacion,
+            ConsultaDeServicios consulta,
+            CancelacionDeServicio cancelacion,
+            JsonMapper json) {
         this.confirmacion = confirmacion;
         this.consulta = consulta;
+        this.cancelacion = cancelacion;
         this.json = json;
     }
 
@@ -70,14 +77,11 @@ class ServiciosController implements ServiciosApi {
         return ResponseEntity.ok(dto(consulta.porId(SolicitanteActual.obtener(), servicioId)));
     }
 
-    /** Spec 004 (T4.7). Mientras tanto un servicio en PROGRAMANDO responde lo que dice D17. */
     @Override
-    public ResponseEntity<ServicioDto> cancelarServicio(UUID servicioId, UUID clave, CancelacionDto cancelacion) {
-        var v = consulta.porId(SolicitanteActual.obtener(), servicioId);
-        if (v.estado() == EstadoViaje.PROGRAMANDO) {
-            throw new ErrorDeDominio("CONFIRMACION_EN_CURSO", "El servicio todavía se está programando");
-        }
-        throw new ErrorDeDominio("CANCELACION_NO_PERMITIDA", "La cancelación de servicios todavía no está disponible");
+    public ResponseEntity<ServicioDto> cancelarServicio(UUID servicioId, UUID clave, CancelacionDto cuerpo) {
+        var v = cancelacion.ejecutar(
+                SolicitanteActual.obtener(), servicioId, cuerpo.getMotivo(), clave, HashCuerpo.de(json, cuerpo));
+        return ResponseEntity.ok(dto(v));
     }
 
     static ServicioDto dto(ServicioVista v) {
