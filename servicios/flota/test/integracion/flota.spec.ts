@@ -13,9 +13,9 @@ import { UNIDAD_DE_TRABAJO, UnidadDeTrabajo } from '../../src/aplicacion/puertos
 jest.setTimeout(60_000);
 
 /**
- * Mongo 8 con réplica rs0 de un nodo (las transacciones del Outbox la necesitan). No se usa el healthcheck de
- * @testcontainers/mongodb: en el runner de GitHub lo marcaba "unhealthy" a los 11 s. Aquí se espera el log, se
- * inicia la réplica con exec y se espera a que el nodo sea primario.
+ * Mongo 8 con réplica rs0 de un nodo (las transacciones del Outbox la necesitan): se espera el log, se inicia la
+ * réplica con exec y se espera a que el nodo sea primario. En CI corre en un runner arm64 porque MongoDB 8.0 no
+ * arranca en amd64 con kernel 6.19 o más nuevo (SERVER-121912).
  */
 async function iniciarMongoRs0(): Promise<StartedTestContainer> {
   const c = await new GenericContainer('mongo:8.0.34')
@@ -23,10 +23,6 @@ async function iniciarMongoRs0(): Promise<StartedTestContainer> {
     .withExposedPorts(27017)
     .withWaitStrategy(Wait.forLogMessage(/Waiting for connections/))
     .withStartupTimeout(120_000)
-    // En CI se imprime la salida de mongod para diagnosticar si el contenedor termina antes de quedar listo.
-    .withLogConsumer((salida) => {
-      if (process.env.CI) salida.on('data', (l) => process.stdout.write(`[mongo] ${String(l)}`));
-    })
     .start();
   const sh = (js: string) => c.exec(['mongosh', '--quiet', '--eval', js]);
   const inicio = await sh("rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:27017'}]}).ok");

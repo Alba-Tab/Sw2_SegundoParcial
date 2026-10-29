@@ -90,7 +90,9 @@ jobs:
   flota:
     needs: cambios
     if: needs.cambios.outputs.flota == 'true'
-    runs-on: ubuntu-latest
+    # MongoDB 8.0 se niega a arrancar en amd64 con kernel 6.19 o más nuevo (SERVER-121912), que ya trae el runner
+    # ubuntu-latest. En arm64 arranca (igual que en la Mac), así que este job corre en un runner arm.
+    runs-on: ubuntu-24.04-arm
     defaults: { run: { working-directory: servicios/flota } }
     steps:
       - uses: actions/checkout@v7
