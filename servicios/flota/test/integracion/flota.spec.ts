@@ -8,6 +8,7 @@ import request from 'supertest';
 import { GenericContainer, StartedTestContainer, Wait } from 'testcontainers';
 import { REGISTRO_DE_EVENTOS, RegistroDeEventos } from '../../src/aplicacion/puertos/registro-de-eventos';
 import { UNIDAD_DE_TRABAJO, UnidadDeTrabajo } from '../../src/aplicacion/puertos/unidad-de-trabajo';
+import { SaludListaResponse, SaludResponse } from '../../src/infraestructura/http/contrato/flota.zod';
 
 /** Mismas versiones que plataforma/compose. Sin OIDC_ISSUER (P10). */
 jest.setTimeout(60_000);
@@ -61,9 +62,12 @@ describe('Flota (Mongo rs0 + RabbitMQ)', () => {
   }, 60_000);
 
   it('salud no depende de Keycloak', async () => {
-    await request(api.getHttpServer()).get('/health').expect(200, { estado: 'UP' });
+    const vivo = await request(api.getHttpServer()).get('/health').expect(200, { estado: 'UP' });
     const listo = await request(api.getHttpServer()).get('/health/ready').expect(200);
     expect(listo.body.dependencias).toEqual({ mongo: 'UP', rabbitmq: 'UP' });
+    // Prueba de contrato: las respuestas reales cumplen contratos/openapi/flota.yaml.
+    expect(SaludResponse.safeParse(vivo.body).success).toBe(true);
+    expect(SaludListaResponse.safeParse(listo.body).success).toBe(true);
   });
 
   it('sin OIDC_ISSUER el negocio responde 503 con Problem Details y la correlación', async () => {

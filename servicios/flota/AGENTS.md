@@ -16,6 +16,7 @@ Manda dentro de `servicios/flota/`; lo demás está en el AGENTS.md de la raíz.
 - Dos procesos con la misma imagen: `main.ts` (API, Cloud Run service) y `worker.ts` (relay, y en F4 Temporal y los consumidores; Cloud Run worker pool).
 - Errores: lanzar `ErrorDeDominio(codigo, mensaje)`; `FiltroProblemas` arma el Problem Details.
 - Dinero con `Monto` (nunca `number`); colecciones en camelCase plural (000 §9).
+- Contrato primero: `src/infraestructura/http/contrato/flota.zod.ts` lo genera Orval desde `contratos/openapi/flota.yaml` (`npm run generar:contratos`) y **se versiona** (la imagen se construye sin `contratos/`). No se edita a mano; la CI falla si no coincide con el contrato. Los controladores validan entradas con esos esquemas y tipan sus respuestas con `z.infer`.
 
 ## Comandos
 

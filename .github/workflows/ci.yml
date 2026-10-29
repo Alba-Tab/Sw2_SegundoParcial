@@ -97,6 +97,8 @@ jobs:
       - uses: actions/setup-node@v7
         with: { node-version: 24, cache: npm, cache-dependency-path: servicios/flota/package-lock.json }
       - run: npm ci
+      - name: El código generado coincide con contratos/openapi/flota.yaml
+        run: npm run generar:contratos:verificar
       - name: Tipos, capas (dependency-cruiser), formato e integración (Testcontainers)
         run: npm run verificar
         env:
