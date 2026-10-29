@@ -225,7 +225,7 @@ La spec 005 se completa primero, con esta regla: si el viaje se canceló mientra
 | T8.5 Datos sintéticos | `feat/plataforma/datos-sinteticos` | 3 meses de hechos con fechas relativas |
 | T8.6 Acciones y aviso | `feat/analitica/acciones-propuestas`, `feat/plataforma/n8n-aviso-cliente` | Estados de la acción; `AvisoClienteAprobado` con relay en Python; **flujo n8n `aviso-cliente`** |
 | T8.7 Simulador de viaje | `feat/plataforma/simulador-viaje` | Segundo viaje con chofer2 (token por *device grant* en la nube): GPS, hitos de bloqueo y retraso, para llegar a un riesgo de 0,70 o más |
-| T8.8 Reinicio y escenario | `feat/plataforma/reiniciar-demo` y `feat/<pieza>/reiniciar-demo` en viajes, flota, finanzas y analitica | `reiniciar-demo.sh [--nube]`: corre `demo:reiniciar` en cada servicio (vuelve a la semilla con fechas relativas), borra al cliente del paso 1 en Keycloak, purga las colas y termina los workflows abiertos. `demo:reiniciar` es **un comando** (artisan, CLI de Spring, CLI de Nest, script de Python), **nunca un endpoint**. En la nube: `docker compose exec` por SSM en la EC2 (Viajes, `temporal workflow terminate`, `rabbitmqctl purge_queue`), Container Apps Jobs en Azure (Finanzas, Analítica y el Job `keycloak-config`, que también borra el usuario) y un Cloud Run Job en GCP (Flota). `escenario-completo.sh [--nube]` crece en cada hito |
+| T8.8 Reinicio y escenario | `feat/plataforma/reiniciar-demo` y `feat/<pieza>/reiniciar-demo` en viajes, flota, finanzas y analitica | `reiniciar-demo.sh [--nube]`, en el orden de D102: (1) detiene relays del Outbox y consumidores, n8n incluido; (2) purga las colas y termina los workflows abiertos; (3) corre `demo:reiniciar` en cada servicio, Analítica incluida, que carga `plataforma/semilla/*.json` directo en su base y sin eventos (fechas relativas); (4) borra al cliente del paso 1 en Keycloak; (5) enciende relays y consumidores. `demo:reiniciar` es **un comando** (artisan, CLI de Spring, CLI de Nest, script de Python), **nunca un endpoint**. En la nube: `docker compose exec` por SSM en la EC2 (Viajes, `temporal workflow terminate`, `rabbitmqctl purge_queue`), Container Apps Jobs en Azure (Finanzas, Analítica y el Job `keycloak-config`, que también borra el usuario) y un Cloud Run Job en GCP (Flota). `escenario-completo.sh [--nube]` crece en cada hito |
 
 **H8:** alertas de FS8, FO5, FF1 y FF2; rentabilidad uniendo 3 servicios; riesgo de 0,70 o más con el simulador.
 
@@ -315,9 +315,9 @@ Pools en B1MS: Keycloak 7, n8n 5, Finanzas 8 (Octane 4, más RoadRunner con 2 de
 | 001, 002, 003, 004, 011, 012; temporal; eventos v1; OpenAPI del núcleo | F1 |
 | 005 (parte de inicio), 006–010 | Inicio de F5 |
 | 005 completa | Inicio de F7 |
-| 013 y `analitica.yaml` v1 | Inicio de F8 |
-| GraphQL v1 | Inicio de F9 |
-| 014 y 015 | Inicio de F10 |
+| 013, catálogo de reportes y Excel de la 015 (T8.3) y `analitica.yaml` v1 | Inicio de F8 |
+| 016 y GraphQL v1 | Inicio de F9 |
+| 014 y la consulta por voz de la 015 | Inicio de F10 |
 
 **Códigos nuevos en 000 §5:**
 
@@ -330,6 +330,15 @@ Pools en B1MS: Keycloak 7, n8n 5, Finanzas 8 (Octane 4, más RoadRunner con 2 de
 | `VINCULACION_PENDIENTE` | 503 |
 | `LLM_NO_DISPONIBLE` | 503 |
 | `PREGUNTA_FUERA_DE_ALCANCE` | 422 |
+| `EVIDENCIA_INCOMPLETA` | 422 |
+| `PAGO_EXCEDE_SALDO` | 422 |
+| `PAGO_DUPLICADO` | 409 |
+| `CARGA_EXCEDE_TANQUE` | 422 |
+| `KILOMETRAJE_INVALIDO` | 422 |
+| `PLACA_DUPLICADA` | 409 |
+| `LIMITE_PETICIONES` | 429 |
+| `EXPORTACION_VENCIDA` | 404 |
+| `CONSULTA_DEMASIADO_COMPLEJA` | 400 |
 
 ---
 
