@@ -45,7 +45,8 @@ final class Problemas
     public static function desde(\Throwable $e): JsonResponse
     {
         return match (true) {
-            $e instanceof ErrorDeDominio => self::respuesta($e->codigo, $e->codigo, $e->getMessage()),
+            $e instanceof ErrorDeDominio => self::respuesta($e->codigo, $e->codigo, $e->getMessage(), null, [],
+                (self::ESTADOS[$e->codigo] ?? 422) === 503 ? ['Retry-After' => $e->codigo === 'CLIENTE_NO_REPLICADO' ? '2' : '10'] : []),
             $e instanceof ValidationException => self::respuesta('VALIDACION', 'Petición inválida', 'Revisa los campos indicados', 400,
                 ['errores' => collect($e->errors())->flatMap(fn ($m, $c) => array_map(fn ($x) => ['campo' => $c, 'mensaje' => $x], $m))->values()->all()]),
             $e instanceof AuthenticationException => self::respuesta('NO_AUTENTICADO', 'No autenticado', $e->getMessage(), 401),

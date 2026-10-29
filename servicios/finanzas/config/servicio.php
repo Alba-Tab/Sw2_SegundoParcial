@@ -13,5 +13,7 @@ return [
     ],
     // Copia de contratos/openapi en la imagen (Dockerfile); valida las peticiones (ValidarContrato).
     'contrato' => env('OPENAPI_CONTRATO', base_path('contrato/finanzas.yaml')),
+    // Vigencia de la cotización (spec 002): PT24H; en demo PT2M.
+    'cotizacion_vigencia' => env('COTIZACION_VIGENCIA', 'PT24H'),
     'outbox' => ['intervalo_ms' => (int) env('OUTBOX_INTERVALO_MS', 1000), 'lote' => 100],
 ];
