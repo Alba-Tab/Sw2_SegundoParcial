@@ -142,6 +142,53 @@ services:
       <<: *flota-env
       OTEL_SERVICE_NAME: flota-worker
 
+  finanzas-api:
+    <<: *comun
+    build: { context: ../../servicios/finanzas, target: app }
+    image: transporte/finanzas:local
+    profiles: [core]
+    depends_on:
+      postgres-azure: { condition: service_healthy }
+      rabbitmq-usuarios: { condition: service_completed_successfully, required: false }
+    environment: &finanzas-env
+      APP_ENV: local
+      APP_KEY: ${FINANZAS_APP_KEY:-}
+      LOG_CHANNEL: stderr
+      DB_CONNECTION: pgsql
+      DB_HOST: ${FINANZAS_DB_HOST:-postgres-azure}
+      DB_PORT: ${FINANZAS_DB_PORT:-5432}
+      DB_DATABASE: finanzas
+      DB_USERNAME: finanzas
+      DB_PASSWORD: ${CLAVE_FINANZAS}
+      AMQP_HOST: ${FINANZAS_AMQP_HOST:-rabbitmq}
+      AMQP_PORT: ${FINANZAS_AMQP_PORT:-5672}
+      AMQP_USUARIO: finanzas
+      AMQP_CLAVE: ${RABBITMQ_CLAVE_FINANZAS}
+      TEMPORAL_ADDRESS: temporal:7233
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      CORS_ORIGENES: ${CORS_ORIGENES:-}
+      SESSION_DRIVER: array
+      CACHE_STORE: array
+      QUEUE_CONNECTION: sync
+      OTEL_PHP_AUTOLOAD_ENABLED: ${OTEL_PHP_ACTIVO:-false}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_SERVICIOS_ENDPOINT:-}
+      OTEL_SERVICE_NAME: finanzas-api
+    ports: ["8103:8103"]
+
+  finanzas-worker:
+    <<: *comun
+    image: transporte/finanzas:local
+    pull_policy: never
+    profiles: [core]
+    command: ["sh", "-c", "php artisan migrate --force && rr serve -c .rr.yaml"]
+    depends_on:
+      finanzas-api: { condition: service_started }
+      rabbitmq-usuarios: { condition: service_completed_successfully, required: false }
+      temporal-namespace: { condition: service_completed_successfully, required: false }
+    environment:
+      <<: *finanzas-env
+      OTEL_SERVICE_NAME: finanzas-worker
+
   # ---------------------------------------------------------------- plataforma
   temporal-esquema:
     image: temporalio/admin-tools:1.32.1
