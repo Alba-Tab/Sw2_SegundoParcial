@@ -11,5 +11,7 @@ return [
         'usuario' => env('AMQP_USUARIO', 'finanzas'),
         'clave' => env('AMQP_CLAVE', 'finanzas'),
     ],
+    // Copia de contratos/openapi en la imagen (Dockerfile); valida las peticiones (ValidarContrato).
+    'contrato' => env('OPENAPI_CONTRATO', base_path('contrato/finanzas.yaml')),
     'outbox' => ['intervalo_ms' => (int) env('OUTBOX_INTERVALO_MS', 1000), 'lote' => 100],
 ];

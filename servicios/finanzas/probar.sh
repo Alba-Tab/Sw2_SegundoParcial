@@ -7,7 +7,7 @@ COMPOSE=../../plataforma/compose
 set -a; . "$COMPOSE/.env"; set +a
 docker compose -f "$COMPOSE/compose.yaml" exec -T postgres-azure psql -U postgres -tc "SELECT 1 FROM pg_database WHERE datname='finanzas_test'" | grep -q 1 \
   || docker compose -f "$COMPOSE/compose.yaml" exec -T postgres-azure psql -U postgres -c "CREATE DATABASE finanzas_test OWNER finanzas"
-docker build -q --target dev -t transporte/finanzas-dev:local . >/dev/null
+docker build -q -f Dockerfile --target dev -t transporte/finanzas-dev:local ../.. >/dev/null
 docker run --rm --network "${COMPOSE_PROJECT_NAME:-transporte}_default" \
   -e DB_HOST=postgres-azure -e DB_PORT=5432 -e DB_USERNAME=finanzas -e DB_PASSWORD="$CLAVE_FINANZAS" \
   -e AMQP_HOST=rabbitmq -e AMQP_USUARIO=finanzas -e AMQP_CLAVE="$RABBITMQ_CLAVE_FINANZAS" \

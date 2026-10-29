@@ -124,7 +124,8 @@ jobs:
       - name: Imagen de desarrollo (PHP 8.4)
         uses: docker/build-push-action@v7
         with:
-          context: servicios/finanzas
+          context: .
+          file: servicios/finanzas/Dockerfile
           target: dev
           tags: transporte/finanzas-dev:ci
           load: true
