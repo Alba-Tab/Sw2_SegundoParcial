@@ -2,7 +2,7 @@
 #   cp .env.example .env
 #   docker compose --profile core --profile plataforma up -d
 # Perfiles: core (bases y servicios), plataforma (Temporal, RabbitMQ, Keycloak, n8n, Mailpit), trazas (OTel + Jaeger),
-# demo (Toxiproxy, con --env-file .env.demo). Los servicios viajes, flota y finanzas se agregan con sus esqueletos.
+# demo (Toxiproxy, con --env-file .env.demo).
 
 x-comun: &comun
   restart: unless-stopped
@@ -90,6 +90,27 @@ services:
       S3_BUCKET: ${S3_BUCKET}
     volumes: ["./iniciar:/iniciar:ro"]
     restart: "no"
+
+  # ---------------------------------------------------------------- core: servicios
+  viajes:
+    <<: *comun
+    build: ../../servicios/viajes
+    image: transporte/viajes:local
+    profiles: [core]
+    depends_on:
+      postgres-aws: { condition: service_healthy }
+      rabbitmq-usuarios: { condition: service_completed_successfully, required: false }
+    environment:
+      DB_URL: jdbc:postgresql://postgres-aws:5432/viajes
+      DB_USUARIO: viajes
+      DB_CLAVE: ${CLAVE_VIAJES}
+      AMQP_HOST: rabbitmq
+      AMQP_USUARIO: viajes
+      AMQP_CLAVE: ${RABBITMQ_CLAVE_VIAJES}
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      CORS_ORIGENES: ${CORS_ORIGENES:-}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_SERVICIOS_ENDPOINT:-}
+    ports: ["8101:8101"]
 
   # ---------------------------------------------------------------- plataforma
   temporal-esquema:

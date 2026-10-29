@@ -27,4 +27,8 @@ ok "keycloak: login de gerente1 con id fijo" "$(curl -sf http://localhost:8080/r
 ok "n8n responde" "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:5678/healthz)" 200
 ok "mailpit responde" "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8025/api/v1/info)" 200
 ok "temporal ui responde" "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8233/)" 200
+echo "== Servicios"
+for s in "viajes 8101"; do set -- $s
+  if $DC ps --services --status running | grep -qx "$1"; then ok "$1: /health/ready" "$(curl -sf localhost:$2/health/ready | jq -r .estado)" UP; fi
+done
 echo; [ $F -eq 0 ] && echo "entorno OK" || { echo "$F verificaciones fallaron"; exit 1; }
