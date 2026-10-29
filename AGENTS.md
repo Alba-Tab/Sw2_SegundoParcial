@@ -5,7 +5,7 @@ Instrucciones para asistentes de código (Claude Code, Codex, Copilot) que traba
 ## Fuentes de verdad, en este orden
 
 1. `contratos/`: APIs, eventos, esquema GraphQL y contrato de Temporal.
-2. `specs/`: un archivo por flujo. `specs/000-convenciones.md` aplica a todo.
+2. `specs/`: `000-convenciones.md` aplica a todo; `decisiones.md` tiene las decisiones confirmadas (Dxx); `plan-desarrollo.md` dice qué se hace en cada fase; un archivo `NNN-<flujo>.md` por flujo.
 3. `docs/propuesta-tecnica-v3.md`: decisiones de arquitectura y alcance.
 4. El código existente.
 5. `docs/diagramas-plantuml-transporte/`: solo guía. Si un diagrama contradice al código o a la propuesta, no lo sigas.
@@ -21,7 +21,8 @@ Si dos fuentes se contradicen, no elijas por tu cuenta: señálalo y pregunta.
 - **Eventos:** se publican con Outbox (misma transacción que el cambio) y se consumen con Inbox (`eventId` como llave). Nunca publiques directo al broker desde un caso de uso.
 - **Dinero:** nunca `float`/`double`. Ver `specs/000-convenciones.md`.
 - **Seguridad:** cada servicio valida el token y filtra las filas por `clienteId` o `sub`; el menú del frontend no es seguridad. No reenvíes tokens entre servicios: se intercambian (RFC 8693).
-- **Sin secretos en el repo.** Solo `.env.example` con valores de ejemplo.
+- **Sin secretos en el repo.** Solo `.env.example` y `.env.demo` con valores de ejemplo. El realm de Keycloak (`plataforma/keycloak/**`) solo lleva marcadores `${KC_SECRETO_*}` / `${KC_CLAVE_*}`; los valores viven en los secretos de cada nube. gitleaks lo verifica en CI.
+- **No cambies una decisión de `specs/decisiones.md` por tu cuenta.** Si el código la contradice, señálalo.
 
 ## Fuera de alcance: no lo agregues
 
@@ -59,10 +60,11 @@ Facturación fiscal del SIN (CUF, código de control, dosificación, NIT validad
 - **Ramas fijas:** `main` (lo que se despliega) y `develop` (integración). No se trabaja directo en ninguna de las dos.
 - **Toda rama sale de `develop`** y se publica rastreada desde el primer push: `git push -u origin <rama>`.
 - **El nombre de la rama dice dónde se trabajó y qué se hizo:** `<tipo>/<pieza>/<que-se-hizo>`, en minúsculas y con guiones. Ejemplos: `feat/viajes/alta-cliente`, `fix/flota/liberar-reserva`, `docs/specs/programar-viaje`, `chore/plataforma/compose-local`.
-  - `<pieza>` es la carpeta principal tocada: `viajes`, `flota`, `finanzas`, `analitica`, `gateway`, `mcp-server`, `cc-tablero`, `cc-operaciones`, `cc-flota`, `cc-finanzas`, `ui-comun`, `portal-cliente`, `app-chofer`, `contratos`, `plataforma`, `specs`, `ci`, `repo` (archivos de la raíz: `.gitignore`, README, AGENTS.md).
+  - `<pieza>` es la carpeta principal tocada: `viajes`, `flota`, `finanzas`, `analitica`, `gateway`, `mcp-server`, `cc-tablero`, `cc-operaciones`, `cc-flota`, `cc-finanzas`, `ui-comun`, `portal-cliente`, `app-chofer`, `design-tokens`, `intercambio-token`, `contratos`, `plataforma`, `specs`, `ci` (`.github/workflows`), `repo` (archivos de la raíz: `.gitignore`, README, AGENTS.md).
 - **Commits por feature, con Conventional Commits:** `<tipo>(<pieza>): <qué hace, en presente>`. Tipos: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `ci`, `perf`, `build`. Un commit = un cambio con sentido propio que compila y pasa sus pruebas.
 - **Nunca agregues coautoría ni firmas** en commits ni PR: nada de `Co-Authored-By`, `Signed-off-by` de un asistente, ni "Generated with…".
-- **Flujo:** rama → PR a `develop` → revisión y CI en verde → merge. `develop` pasa a `main` por PR cuando se quiere desplegar.
+- **Flujo:** rama → PR a `develop` → revisión y CI en verde → merge. `develop` pasa a `main` por PR solo al cerrar un hito del plan (o para poner a punto un pipeline).
+- **Excepción:** las ramas de prueba de concepto `chore/<pieza>/poc-*` no se mergean; lo que sirve entra por otra rama y se borran al cerrar el hito H2.
 - `docs/` no se sube (está en `.gitignore`): la propuesta y el análisis viven solo en local.
 
 ## Comandos
