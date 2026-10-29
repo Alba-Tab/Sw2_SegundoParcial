@@ -122,7 +122,7 @@ Criterios en la sección 7. Orden: PoC-1 → T2.2 → PoC-2 → PoC-4 → PoC-3.
 | Tarea | Rama | Entregable |
 |---|---|---|
 | T2.1 PoC-1 Keycloak | `chore/plataforma/poc-keycloak` (no se mergea) | Resultado |
-| T2.2 Realm definitivo | `feat/plataforma/realm-keycloak` | `plataforma/keycloak/realm-transporte.json` **solo con `$(env:KC_SECRETO_*)` y `$(env:KC_CLAVE_*)`** (K2–K5, D26, D27), aplicado con keycloak-config-cli y sustitución de variables; `demo-cli` (D39); README con **solo** las contraseñas locales |
+| T2.2 Realm definitivo | `feat/plataforma/realm-keycloak` | `plataforma/keycloak/realm-transporte.json` **solo con `$(env:KC_SECRETO_*)` y `$(env:KC_CLAVE_*)`** (K2–K5, D26, D27), aplicado con keycloak-config-cli y sustitución de variables; perfil de usuario, usuarios de semilla con ids fijos y FGAP v2 por `configurar-api.sh` (keycloak-config-cli no los aplica); `demo-cli` (D39); README con **solo** las contraseñas locales |
 | T2.3 PoC-2 Temporal | `chore/plataforma/poc-temporal` | Resultado |
 | T2.4 PoC-4 app nativa | `chore/app-chofer/poc-nativo` | Resultado (D22, D38) |
 | T2.5 PoC-3 Ollama | `chore/plataforma/poc-ollama` | Resultado (D36) |
@@ -139,7 +139,7 @@ Criterios en la sección 7. Orden: PoC-1 → T2.2 → PoC-2 → PoC-4 → PoC-3.
 | T3a.2 Esqueleto de Viajes | `feat/viajes/esqueleto` | Hexagonal, ArchUnit, Flyway (tablas comunes), relay del Outbox, Problem Details, correlación, SDK de OTel, regla P10, CORS | `mvn verify` |
 | T3a.3 Esqueleto de Flota | `feat/flota/esqueleto` | Clean, dependency-cruiser, `main.ts` y `worker.ts`, Outbox con transacción Mongo, OTel, P10 | Jest |
 | T3a.4 Esqueleto de Finanzas | `feat/finanzas/esqueleto` | DDD, Deptrac, Pest, Larastan; Octane con 4 workers; `.rr.yaml` según D29; `Monto`; OTel; P10 | Pest y Deptrac |
-| T3a.5 CI de PR | `ci/ci/pipelines-pr` | `ci.yml` con `paths-filter` y un job agregador `ci-ok`; job **gitleaks** con una regla que falla si `plataforma/keycloak/**` trae un secreto literal (sin `$(env:`); `contratos.yml`; **commitlint** sobre los commits del PR (Conventional Commits y regla que rechaza `Co-Authored-By`) dentro de `ci-ok` | `ci-ok` es el *required check* |
+| T3a.5 CI de PR | `ci/ci/pipelines-pr` | `ci.yml` con `paths-filter` y un job agregador `ci-ok`; job **gitleaks** con una regla que falla si `plataforma/keycloak/*.json` trae un secreto literal (sin `$(env:`); `contratos.yml`; **commitlint** sobre los commits del PR (Conventional Commits y regla que rechaza `Co-Authored-By`) dentro de `ci-ok` | `ci-ok` es el *required check* |
 
 ### F3b: Esqueleto en la nube (3 j)
 
@@ -262,7 +262,7 @@ Primero las specs 014 y 015 (`docs/specs/agente-voz`) y la micro-PoC de Whisper 
 |---|---|---|---|
 | T11.1 Cuenta de Azure, pago por uso, presupuesto y cuota de GPU | — (configuración) | H10, o T9.9 | Alertas activas y cuota de GPU visible |
 | T11.2 B1MS con 4 bases y un usuario por base | `feat/plataforma/postgres-b1ms` | T11.1 | Conexión TLS desde Container Apps |
-| T11.3 Keycloak en Container Apps (K7). El realm se aplica con keycloak-config-cli corriendo como **Container Apps Job `keycloak-config`**, que recibe los `KC_SECRETO_*`, `KC_CLAVE_*` y la contraseña de administración desde los secretos de Container Apps. El pipeline solo lo dispara (`az containerapp job start`, con identidad federada) y espera su resultado: ningún secreto pasa por GitHub. Keycloak con pool de 7 conexiones | `feat/plataforma/keycloak-nube`, `ci/ci/deploy-keycloak` | T11.2 | `/.well-known/openid-configuration` responde, entra un usuario por rol, y volver a aplicar el realm cambia lo que debe |
+| T11.3 Keycloak en Container Apps (K7). El realm se aplica con los dos pasos de `aplicar-realm.sh` (keycloak-config-cli y luego `configurar-api.sh`) corriendo como **Container Apps Job `keycloak-config`** (imagen propia con keycloak-config-cli, `curl` y `jq`), que recibe los `KC_SECRETO_*`, `KC_CLAVE_*` y la contraseña de administración desde los secretos de Container Apps. El pipeline solo lo dispara (`az containerapp job start`, con identidad federada) y espera su resultado: ningún secreto pasa por GitHub. Keycloak con pool de 7 conexiones | `feat/plataforma/keycloak-nube`, `ci/ci/deploy-keycloak` | T11.2 | `/.well-known/openid-configuration` responde, entra un usuario por rol, y volver a aplicar el realm cambia lo que debe |
 | T11.4 Finanzas API y worker (`maxReplicas = 1`) | `ci/ci/deploy-finanzas-azure` | T11.3 | El worker aparece en la cola `finanzas`; consumidores conectados por AMQPS |
 | T11.5 Analítica (`maxReplicas = 1`) | `ci/ci/deploy-analitica-azure` | T11.3 | Una sola misión por intervalo |
 | T11.6 n8n (`maxReplicas = 1`), flujos importados por su API | `feat/plataforma/n8n-nube`, `ci/ci/deploy-n8n` | T11.2 | Llega un correo real |

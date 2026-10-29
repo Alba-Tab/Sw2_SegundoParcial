@@ -1,0 +1,235 @@
+{
+  "ifResourceExists": "SKIP",
+  "users": [
+    {
+      "id": "0193a000-0000-7000-8000-000000000001",
+      "username": "gerente1",
+      "email": "gerente1@transporte.example",
+      "emailVerified": true,
+      "firstName": "Gabriela",
+      "lastName": "Rojas",
+      "enabled": true,
+      "realmRoles": [
+        "gerente"
+      ],
+      "groups": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "$(env:KC_CLAVE_SEMILLA)",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0193a000-0000-7000-8000-000000000002",
+      "username": "despachador1",
+      "email": "despachador1@transporte.example",
+      "emailVerified": true,
+      "firstName": "Diego",
+      "lastName": "Suárez",
+      "enabled": true,
+      "realmRoles": [
+        "despachador"
+      ],
+      "groups": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "$(env:KC_CLAVE_SEMILLA)",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0193a000-0000-7000-8000-000000000003",
+      "username": "jefeflota1",
+      "email": "jefeflota1@transporte.example",
+      "emailVerified": true,
+      "firstName": "Julio",
+      "lastName": "Mendoza",
+      "enabled": true,
+      "realmRoles": [
+        "jefe_flota"
+      ],
+      "groups": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "$(env:KC_CLAVE_SEMILLA)",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0193a000-0000-7000-8000-000000000004",
+      "username": "administracion1",
+      "email": "administracion1@transporte.example",
+      "emailVerified": true,
+      "firstName": "Ana",
+      "lastName": "Vargas",
+      "enabled": true,
+      "realmRoles": [
+        "administracion"
+      ],
+      "groups": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "$(env:KC_CLAVE_SEMILLA)",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0193a000-0000-7000-8000-000000000005",
+      "username": "comercial1",
+      "email": "comercial1@transporte.example",
+      "emailVerified": true,
+      "firstName": "Carla",
+      "lastName": "Justiniano",
+      "enabled": true,
+      "realmRoles": [
+        "comercial"
+      ],
+      "groups": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "$(env:KC_CLAVE_SEMILLA)",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0193a000-0000-7000-8000-000000000011",
+      "username": "chofer1",
+      "email": "chofer1@transporte.example",
+      "emailVerified": true,
+      "firstName": "Marco",
+      "lastName": "Quispe",
+      "enabled": true,
+      "realmRoles": [
+        "chofer"
+      ],
+      "groups": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "$(env:KC_CLAVE_SEMILLA)",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0193a000-0000-7000-8000-000000000012",
+      "username": "chofer2",
+      "email": "chofer2@transporte.example",
+      "emailVerified": true,
+      "firstName": "René",
+      "lastName": "Choque",
+      "enabled": true,
+      "realmRoles": [
+        "chofer"
+      ],
+      "groups": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "$(env:KC_CLAVE_SEMILLA)",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0193a000-0000-7000-8000-000000000013",
+      "username": "chofer3",
+      "email": "chofer3@transporte.example",
+      "emailVerified": true,
+      "firstName": "Luis",
+      "lastName": "Mamani",
+      "enabled": true,
+      "realmRoles": [
+        "chofer"
+      ],
+      "groups": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "$(env:KC_CLAVE_SEMILLA)",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0193a000-0000-7000-8000-000000000014",
+      "username": "chofer4",
+      "email": "chofer4@transporte.example",
+      "emailVerified": true,
+      "firstName": "Pedro",
+      "lastName": "Flores",
+      "enabled": true,
+      "realmRoles": [
+        "chofer"
+      ],
+      "groups": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "$(env:KC_CLAVE_SEMILLA)",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0193a000-0000-7000-8000-000000000021",
+      "username": "agroexport",
+      "email": "compras@agroexport.example",
+      "emailVerified": true,
+      "firstName": "Agroexport",
+      "lastName": "SRL",
+      "enabled": true,
+      "attributes": {
+        "clienteId": [
+          "0193a000-0000-7000-8000-0000000c0001"
+        ]
+      },
+      "realmRoles": [
+        "cliente"
+      ],
+      "groups": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "$(env:KC_CLAVE_SEMILLA)",
+          "temporary": false
+        }
+      ]
+    },
+    {
+      "id": "0193a000-0000-7000-8000-000000000022",
+      "username": "agromoroso",
+      "email": "pagos@agromoroso.example",
+      "emailVerified": true,
+      "firstName": "Agro",
+      "lastName": "Moroso",
+      "enabled": true,
+      "attributes": {
+        "clienteId": [
+          "0193a000-0000-7000-8000-0000000c0002"
+        ]
+      },
+      "realmRoles": [
+        "cliente"
+      ],
+      "groups": [],
+      "credentials": [
+        {
+          "type": "password",
+          "value": "$(env:KC_CLAVE_SEMILLA)",
+          "temporary": false
+        }
+      ]
+    }
+  ]
+}

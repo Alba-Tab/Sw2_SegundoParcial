@@ -100,7 +100,7 @@ ollama pull <modelo-elegido>
 
 ## Usuarios de prueba
 
-> Pendiente: se definen en el realm exportado (`plataforma/keycloak/`), uno por rol: chofer, despachador, jefe_flota, administracion, gerente, comercial, cliente.
+Están en [plataforma/keycloak/README.md](plataforma/keycloak/README.md): uno por rol interno, 4 choferes y 2 clientes, con contraseña local `Clave123!`. En la nube la contraseña sale de un secreto y no se documenta.
 
 ## Mapa de puertos
 
