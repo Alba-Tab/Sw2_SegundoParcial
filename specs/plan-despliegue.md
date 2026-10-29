@@ -66,6 +66,6 @@ Reutilizables: `_build-push-image`, `_deploy-ec2`, `_deploy-cloudrun`, `_deploy-
 - **Build de la app:** `google-services.json` sale de un secreto en el build; no se versiona.
 - **Secret Manager de GCP:** certificado de cliente de flota-worker, usuario de Atlas, RabbitMQ y los secretos de `gateway` y `mcp-server`.
 - **Secretos de Container Apps:** B1MS, administrador de Keycloak, **`KC_SECRETO_*` y `KC_CLAVE_*` del realm**, certificado de Temporal para Finanzas, n8n, SMTP, `analitica` y `agente`.
-- El realm y las imágenes públicas **solo llevan `${...}`**, y gitleaks lo verifica.
+- El realm y las imágenes públicas **solo llevan `$(env:...)`**, y gitleaks lo verifica.
 
 ---

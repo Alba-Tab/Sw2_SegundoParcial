@@ -93,7 +93,7 @@ Jornadas disponibles = (semanas entre hoy e I1) × I2.
 | T0.2 Crear el remoto | — (configuración) | Repo en GitHub con la visibilidad de D44, push de `main` y `develop`, `develop` por defecto, **`main` y `develop` protegidas (solo PR)** | `git remote -v` apunta a GitHub |
 | T0.3 Registrar las decisiones y actualizar 000 | `docs/specs/decisiones-fase0` | `specs/decisiones.md` y cambios en 000: §1 (1:1, D03); §4.1 (excepción de `POST /servicios`, D43); §5 (códigos nuevos); §7 (retención y `parametrosSaga`); §10 (D23); §12 (excepción de PoC, P7) | PR mergeado y ningún "Pendiente" en 000 |
 | T0.4 Publicar el plan | `docs/specs/plan-desarrollo` | Los otros 4 archivos (`decisiones.md` va en T0.3), con la tabla de costos de T0.1 en `plan-despliegue.md` | PR mergeado |
-| T0.5 Actualizar AGENTS.md | `docs/repo/agents-piezas-poc` | Piezas `design-tokens` e `intercambio-token`, excepción de PoC, regla "el realm solo lleva `${...}`" | PR mergeado |
+| T0.5 Actualizar AGENTS.md | `docs/repo/agents-piezas-poc` | Piezas `design-tokens` e `intercambio-token`, excepción de PoC, regla "el realm solo lleva `$(env:...)`" | PR mergeado |
 
 T0.1 quedó respondida el 28/10/2026; los datos de entrada y las 49 decisiones están en [decisiones.md](decisiones.md).
 
@@ -122,7 +122,7 @@ Criterios en la sección 7. Orden: PoC-1 → T2.2 → PoC-2 → PoC-4 → PoC-3.
 | Tarea | Rama | Entregable |
 |---|---|---|
 | T2.1 PoC-1 Keycloak | `chore/plataforma/poc-keycloak` (no se mergea) | Resultado |
-| T2.2 Realm definitivo | `feat/plataforma/realm-keycloak` | `plataforma/keycloak/realm-transporte.json` **solo con `${KC_SECRETO_*}` y `${KC_CLAVE_*}`** (K2–K5, D26, D27), aplicado con keycloak-config-cli y sustitución de variables; `demo-cli` (D39); README con **solo** las contraseñas locales |
+| T2.2 Realm definitivo | `feat/plataforma/realm-keycloak` | `plataforma/keycloak/realm-transporte.json` **solo con `$(env:KC_SECRETO_*)` y `$(env:KC_CLAVE_*)`** (K2–K5, D26, D27), aplicado con keycloak-config-cli y sustitución de variables; `demo-cli` (D39); README con **solo** las contraseñas locales |
 | T2.3 PoC-2 Temporal | `chore/plataforma/poc-temporal` | Resultado |
 | T2.4 PoC-4 app nativa | `chore/app-chofer/poc-nativo` | Resultado (D22, D38) |
 | T2.5 PoC-3 Ollama | `chore/plataforma/poc-ollama` | Resultado (D36) |
@@ -139,7 +139,7 @@ Criterios en la sección 7. Orden: PoC-1 → T2.2 → PoC-2 → PoC-4 → PoC-3.
 | T3a.2 Esqueleto de Viajes | `feat/viajes/esqueleto` | Hexagonal, ArchUnit, Flyway (tablas comunes), relay del Outbox, Problem Details, correlación, SDK de OTel, regla P10, CORS | `mvn verify` |
 | T3a.3 Esqueleto de Flota | `feat/flota/esqueleto` | Clean, dependency-cruiser, `main.ts` y `worker.ts`, Outbox con transacción Mongo, OTel, P10 | Jest |
 | T3a.4 Esqueleto de Finanzas | `feat/finanzas/esqueleto` | DDD, Deptrac, Pest, Larastan; Octane con 4 workers; `.rr.yaml` según D29; `Monto`; OTel; P10 | Pest y Deptrac |
-| T3a.5 CI de PR | `ci/ci/pipelines-pr` | `ci.yml` con `paths-filter` y un job agregador `ci-ok`; job **gitleaks** con una regla que falla si `plataforma/keycloak/**` trae un secreto literal (sin `${`); `contratos.yml`; **commitlint** sobre los commits del PR (Conventional Commits y regla que rechaza `Co-Authored-By`) dentro de `ci-ok` | `ci-ok` es el *required check* |
+| T3a.5 CI de PR | `ci/ci/pipelines-pr` | `ci.yml` con `paths-filter` y un job agregador `ci-ok`; job **gitleaks** con una regla que falla si `plataforma/keycloak/**` trae un secreto literal (sin `$(env:`); `contratos.yml`; **commitlint** sobre los commits del PR (Conventional Commits y regla que rechaza `Co-Authored-By`) dentro de `ci-ok` | `ci-ok` es el *required check* |
 
 ### F3b: Esqueleto en la nube (3 j)
 
@@ -477,7 +477,7 @@ Pools en B1MS: Keycloak 7, n8n 5, Finanzas 8 (Octane 4, más RoadRunner con 2 de
 ## 7. Pruebas de concepto
 
 **PoC-1 Keycloak (1 j)**
-- Qué se prueba: `clienteId` y su mapper; FGAP v2; cadena de 3 intercambios con K2; intercambio del token del agente en `mcp-server`; K3; SSO y cierre de sesión entre 2 SPA; **keycloak-config-cli con `${...}`**; *device grant* de `demo-cli`.
+- Qué se prueba: `clienteId` y su mapper; FGAP v2; cadena de 3 intercambios con K2; intercambio del token del agente en `mcp-server`; K3; SSO y cierre de sesión entre 2 SPA; **keycloak-config-cli con `$(env:...)`**; *device grant* de `demo-cli`.
 - Éxito: el tercer intercambio da 200 con el mismo `sub`; el cierre de sesión se detecta al volver a la pestaña.
 - Plan B: 2 saltos; `manage-users` con el riesgo escrito; un realm generado por script.
 

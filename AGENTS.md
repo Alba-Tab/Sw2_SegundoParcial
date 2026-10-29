@@ -21,7 +21,7 @@ Si dos fuentes se contradicen, no elijas por tu cuenta: señálalo y pregunta.
 - **Eventos:** se publican con Outbox (misma transacción que el cambio) y se consumen con Inbox (`eventId` como llave). Nunca publiques directo al broker desde un caso de uso.
 - **Dinero:** nunca `float`/`double`. Ver `specs/000-convenciones.md`.
 - **Seguridad:** cada servicio valida el token y filtra las filas por `clienteId` o `sub`; el menú del frontend no es seguridad. No reenvíes tokens entre servicios: se intercambian (RFC 8693).
-- **Sin secretos en el repo.** Solo `.env.example` y `.env.demo` con valores de ejemplo. El realm de Keycloak (`plataforma/keycloak/**`) solo lleva marcadores `${KC_SECRETO_*}` / `${KC_CLAVE_*}`; los valores viven en los secretos de cada nube. gitleaks lo verifica en CI.
+- **Sin secretos en el repo.** Solo `.env.example` y `.env.demo` con valores de ejemplo. El realm de Keycloak (`plataforma/keycloak/**`) solo lleva marcadores `$(env:KC_SECRETO_*)` / `$(env:KC_CLAVE_*)`; los valores viven en los secretos de cada nube. gitleaks lo verifica en CI.
 - **No cambies una decisión de `specs/decisiones.md` por tu cuenta.** Si el código la contradice, señálalo.
 
 ## Fuera de alcance: no lo agregues
