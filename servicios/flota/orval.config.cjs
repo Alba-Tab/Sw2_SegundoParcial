@@ -10,7 +10,6 @@ module.exports = {
       client: 'zod',
       mode: 'single',
       target: 'src/infraestructura/http/contrato/flota.zod.ts',
-      prettier: true,
       override: { zod: { generate: { param: true, query: true, header: true, body: true, response: true } } },
     },
   },

@@ -18,7 +18,7 @@
     "tipos": "tsc --noEmit -p tsconfig.json",
     "verificar": "npm run tipos && npm run capas && npm run formato && npm run test:todo",
     "formato": "prettier --check src test",
-    "generar:contratos": "orval --config orval.config.cjs",
+    "generar:contratos": "orval --config orval.config.cjs && prettier --write src/infraestructura/http/contrato --log-level warn",
     "generar:contratos:verificar": "npm run generar:contratos && test -z \"$(git status --porcelain -- src/infraestructura/http/contrato)\" || (echo \"El código generado no coincide con contratos/openapi/flota.yaml: corre npm run generar:contratos y súbelo\" && git status --porcelain -- src/infraestructura/http/contrato && exit 1)"
   },
   "dependencies": {
