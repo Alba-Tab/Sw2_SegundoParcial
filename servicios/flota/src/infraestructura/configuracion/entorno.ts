@@ -9,6 +9,11 @@ const esquema = z.object({
   CORS_ORIGENES: z.string().default(''),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default(''),
   OUTBOX_INTERVALO_MS: z.coerce.number().default(1000),
+  TEMPORAL_ADDRESS: z.string().default('localhost:7233'),
+  TEMPORAL_WORKER: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
 });
 export type Entorno = z.infer<typeof esquema>;
 export const entorno = (fuente: NodeJS.ProcessEnv = process.env): Entorno => esquema.parse(fuente);
