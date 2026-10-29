@@ -102,6 +102,7 @@ services:
     depends_on:
       postgres-aws: { condition: service_healthy }
       rabbitmq-usuarios: { condition: service_completed_successfully, required: false }
+      temporal-namespace: { condition: service_completed_successfully, required: false }
     environment:
       DB_URL: jdbc:postgresql://postgres-aws:5432/viajes
       DB_USUARIO: viajes
@@ -111,6 +112,11 @@ services:
       AMQP_CLAVE: ${RABBITMQ_CLAVE_VIAJES}
       OIDC_ISSUER: ${OIDC_ISSUER:-}
       KC_SECRETO_VIAJES: ${KC_SECRETO_VIAJES}
+      TEMPORAL_ADDRESS: temporal:7233
+      # parametrosSaga (spec 003): .env.demo los acorta para la defensa.
+      SAGA_ESPERA_APROBACION: ${SAGA_ESPERA_APROBACION:-PT24H}
+      SAGA_COMPENSACION_SCHEDULE_TO_CLOSE: ${SAGA_COMPENSACION_SCHEDULE_TO_CLOSE:-PT10M}
+      SAGA_COMPENSACION_MAXIMO_INTENTOS: ${SAGA_COMPENSACION_MAXIMO_INTENTOS:-8}
       CORS_ORIGENES: ${CORS_ORIGENES:-}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_SERVICIOS_ENDPOINT:-}
     ports: ["8101:8101"]
@@ -168,6 +174,7 @@ services:
       AMQP_USUARIO: finanzas
       AMQP_CLAVE: ${RABBITMQ_CLAVE_FINANZAS}
       TEMPORAL_ADDRESS: temporal:7233
+      COTIZACION_VIGENCIA: ${COTIZACION_VIGENCIA:-PT24H}
       OIDC_ISSUER: ${OIDC_ISSUER:-}
       CORS_ORIGENES: ${CORS_ORIGENES:-}
       SESSION_DRIVER: array

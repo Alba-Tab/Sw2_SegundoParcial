@@ -17,6 +17,14 @@ public interface RegistroIdempotente {
     /** Guarda la operación ya terminada con su respuesta; si la clave ya existe lanza {@link ClaveRepetida}. */
     void guardarCompletada(UUID clave, String tipo, String hashCuerpo, int codigoHttp, Object respuesta);
 
+    /**
+     * Guarda la operación en EN_PROCESO con la respuesta que tendrá al completarse: un reenvío en EN_PROCESO la
+     * necesita para repetir el paso pendiente (D43). Si la clave ya existe lanza {@link ClaveRepetida}.
+     */
+    void guardarEnProceso(UUID clave, String tipo, String hashCuerpo, int codigoHttp, Object respuesta);
+
+    void completar(UUID clave);
+
     class ClaveRepetida extends RuntimeException {
         public ClaveRepetida(UUID clave) {
             super("Clave de idempotencia ya registrada: " + clave);

@@ -16,7 +16,7 @@ Clientes, cotizaciones confirmadas, servicios, viajes en ruta y la saga `Program
 | Interfaces REST y DTO generados desde `contratos/openapi/viajes.yaml` con openapi-generator 7.26 (`useSpringBoot4`, `useJackson3`); `SaludController` implementa `SaludApi` | `pom.xml`, `target/generated-sources/openapi` |
 
 ```bash
-./mvnw verify                                            # 13 pruebas
+./mvnw verify                                            # 38 pruebas (Testcontainers + Temporal en memoria)
 docker compose -f ../../plataforma/compose/compose.yaml --profile core --profile plataforma up -d --build viajes   # contexto: raíz del repo
 curl localhost:8101/health/ready
 ```
@@ -30,3 +30,29 @@ curl localhost:8101/health/ready
   - Keycloak **asigna roles por id**, no por nombre (con solo el nombre responde 404 "Role not found"), y la cuenta `viajes` no puede leer el catálogo de roles. El id sale de `users/{sub}/role-mappings/realm/available`, donde FGAP solo deja ver `cliente`.
 - **Validación de eventos:** cada evento se valida contra `contratos/eventos` antes de entrar al Outbox (networknt 3.0, con Jackson 3). Si no hay petición ni traza en curso, se generan `correlationId` y `traceparent`, que son obligatorios en el sobre.
 
+
+## Programar viaje (T4.3, spec 003)
+
+- `POST /api/v1/servicios` responde `202`. Pasos:
+  1. Registra la clave en `EN_PROCESO`, con la respuesta ya guardada, y crea el `Servicio` con sus ids.
+  2. Después del commit inicia `ProgramarViaje` con `REJECT_DUPLICATE` y conflicto `FAIL`.
+  3. Marca la clave `COMPLETADA`.
+- Un reenvío con la clave en `EN_PROCESO` repite el inicio; `WorkflowExecutionAlreadyStarted` cuenta como éxito (D43, FS7). Si Temporal no responde, la API devuelve `503` y la clave sigue en `EN_PROCESO`.
+- `GET /api/v1/servicios/{id}` trae la `etapa` mientras el viaje está en `PROGRAMANDO`. Sale de la consulta `estado`, con 2 s de límite; si Temporal no responde, la etapa es `DESCONOCIDA`.
+- `GET /api/v1/servicios` filtra por cliente y estado, ordena del más nuevo al más viejo y pagina con cursor.
+- **Workflow** (`adaptadores/temporal/ProgramarViajeImpl`):
+  - Corre los pasos 1, 2, 2b, 3, el pivote, 5 y 6, con los timeouts de D15.
+  - Compensa en orden inverso. Un paso que falló por algo técnico también se compensa, porque el otro servicio pudo haber reservado antes de que venciera el tiempo.
+  - Si una compensación se agota, el viaje pasa a `REQUIERE_INTERVENCION` y el workflow espera la señal `resolverIntervencion`.
+  - Ya maneja las señales `aprobacionCredito` y `resolverIntervencion`; los endpoints que las envían llegan en T4.6.
+- **Actividades `Viajes.*`** (`aplicacion/viaje/ProgramacionDeViaje`): todas son idempotentes. `cancelarViaje` crea el viaje ya cancelado si el paso 1 no llegó a crearlo, para que el servicio no quede en `PROGRAMANDO`.
+- **Conversor** `ConversorTemporal`: Jackson 3, `NON_NULL` y `FAIL_ON_UNKNOWN_PROPERTIES` (PoC-2).
+- **Variables:**
+  - `TEMPORAL_ADDRESS`;
+  - `TEMPORAL_WORKER=false` deja solo la API;
+  - `SAGA_ESPERA_APROBACION`, `SAGA_COMPENSACION_SCHEDULE_TO_CLOSE` y `SAGA_COMPENSACION_MAXIMO_INTENTOS`, con los valores de demo en `.env.demo`.
+- **Pruebas:**
+  - `ContratoSagaTest`: los ejemplos del contrato, ida y vuelta (S15).
+  - `ProgramarViajeTest`: camino feliz, errores de negocio, falla técnica, aprobación (aprobada, rechazada o vencida) e intervención.
+  - Replay del historial guardado en `src/test/resources/historiales/` (S16). Para volver a grabarlo: `./mvnw test -Dtest=ProgramarViajeTest -DgrabarHistorial=true`.
+  - `ServiciosIT`: la API y el worker real contra Temporal en memoria.

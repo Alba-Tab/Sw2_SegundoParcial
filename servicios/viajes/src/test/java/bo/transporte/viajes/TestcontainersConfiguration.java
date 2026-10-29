@@ -3,12 +3,14 @@ package bo.transporte.viajes;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.rabbitmq.RabbitMQContainer;
 import org.testcontainers.utility.DockerImageName;
 
-/** Las mismas versiones que plataforma/compose. */
+/** Las mismas versiones que plataforma/compose, y Temporal en memoria. */
 @TestConfiguration(proxyBeanMethods = false)
+@Import(TemporalDePrueba.class)
 class TestcontainersConfiguration {
 
     @Bean
