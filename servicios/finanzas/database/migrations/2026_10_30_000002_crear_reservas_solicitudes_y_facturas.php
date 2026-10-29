@@ -38,7 +38,6 @@ return new class extends Migration
                 CHECK (estado = 'PENDIENTE' OR (decidida_por IS NOT NULL AND decidida_en IS NOT NULL))
             );
             CREATE INDEX solicitud_aprobacion_estado ON solicitud_aprobacion (estado, servicio_id);
-            CREATE SEQUENCE factura_numero_seq;
             CREATE TABLE factura (
                 factura_id   uuid PRIMARY KEY,
                 numero       varchar(10)   NOT NULL UNIQUE CHECK (numero ~ '^FAC-[0-9]{6}$'),
@@ -57,11 +56,14 @@ return new class extends Migration
                 creada_en    timestamptz   NOT NULL DEFAULT now()
             );
             CREATE INDEX factura_cliente_saldo ON factura (cliente_id, vence_el) WHERE saldo > 0;
+            -- Propiedad de la columna: se borra con la tabla (migrate:fresh no borra secuencias sueltas).
+            CREATE SEQUENCE IF NOT EXISTS factura_numero_seq;
+            ALTER SEQUENCE factura_numero_seq OWNED BY factura.numero;
             SQL);
     }
 
     public function down(): void
     {
-        DB::unprepared('DROP TABLE factura, solicitud_aprobacion, reserva_credito; DROP SEQUENCE factura_numero_seq');
+        DB::unprepared('DROP TABLE factura, solicitud_aprobacion, reserva_credito');
     }
 };

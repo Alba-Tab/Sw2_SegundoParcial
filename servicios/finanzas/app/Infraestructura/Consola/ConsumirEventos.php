@@ -3,6 +3,7 @@
 namespace App\Infraestructura\Consola;
 
 use App\Aplicacion\Catalogo\AplicarCopias;
+use App\Aplicacion\Saga\LiberarPorCancelacion;
 use App\Infraestructura\Mensajeria\ConexionAmqp;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Context;
@@ -24,9 +25,9 @@ final class ConsumirEventos extends Command
     /** @var array<string, callable(array<string, mixed>): void> tipo => manejador */
     private array $manejadores = [];
 
-    public function handle(ConexionAmqp $amqp, AplicarCopias $copias): never
+    public function handle(ConexionAmqp $amqp, AplicarCopias $copias, LiberarPorCancelacion $cancelaciones): never
     {
-        $this->registrarManejadores($copias);
+        $this->registrarManejadores($copias, $cancelaciones);
 
         // Proceso largo: RoadRunner lo reinicia si termina (plugin service, D29).
         for (; ;) {
@@ -45,11 +46,12 @@ final class ConsumirEventos extends Command
     }
 
     /** tipo de evento => caso de uso. Los que no están aquí van a la DLQ. */
-    public function registrarManejadores(AplicarCopias $copias): void
+    public function registrarManejadores(AplicarCopias $copias, LiberarPorCancelacion $cancelaciones): void
     {
         $this->manejadores = [
             'ClienteActualizado' => $copias->clienteActualizado(...),
             'RutaActualizada' => $copias->rutaActualizada(...),
+            'ViajeCancelado' => $cancelaciones->viajeCancelado(...),
         ];
     }
 

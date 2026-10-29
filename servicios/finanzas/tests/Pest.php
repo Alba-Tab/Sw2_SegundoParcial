@@ -4,6 +4,7 @@
 
 use App\Aplicacion\Catalogo\AplicarCopias;
 use App\Aplicacion\Puertos\Reloj;
+use App\Aplicacion\Saga\LiberarPorCancelacion;
 use App\Infraestructura\Consola\ConsumirEventos;
 use App\Infraestructura\Http\Middleware\Autenticacion;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
@@ -63,7 +64,7 @@ function rutaActualizada(string $rutaId, string $nombre, int $version, bool $act
 function consumidor(): ConsumirEventos
 {
     $c = app(ConsumirEventos::class);
-    $c->registrarManejadores(app(AplicarCopias::class));
+    $c->registrarManejadores(app(AplicarCopias::class), app(LiberarPorCancelacion::class));
 
     return $c;
 }
