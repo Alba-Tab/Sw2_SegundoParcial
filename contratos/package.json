@@ -1,0 +1,15 @@
+{
+  "name": "tms-contratos",
+  "private": true,
+  "type": "module",
+  "description": "Validación de los contratos del sistema (JSON Schema, AsyncAPI y OpenAPI).",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "validar": "npm run validar:esquemas",
+    "validar:esquemas": "node scripts/validar-esquemas.mjs"
+  },
+  "devDependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1"
+  }
+}

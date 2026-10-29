@@ -1,0 +1,911 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/temporal/programar-viaje.schema.json",
+  "title": "Workflow ProgramarViaje",
+  "description": "Payloads del workflow, sus señales, su consulta y sus actividades. Cada $defs trae ejemplos que sirven de fixtures para los tres SDK. Detalle en programar-viaje.md.",
+  "$defs": {
+    "ParametrosSaga": {
+      "type": "object",
+      "description": "Valores configurables que arma la API de Viajes y entran en la entrada del workflow (el workflow no lee el entorno).",
+      "required": [
+        "esperaAprobacion",
+        "compensacion"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "esperaAprobacion": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Duracion"
+        },
+        "compensacion": {
+          "type": "object",
+          "required": [
+            "scheduleToClose",
+            "maximoIntentos"
+          ],
+          "additionalProperties": false,
+          "properties": {
+            "scheduleToClose": {
+              "$ref": "../comun/tipos.schema.json#/$defs/Duracion"
+            },
+            "maximoIntentos": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        }
+      },
+      "examples": [
+        {
+          "esperaAprobacion": "PT24H",
+          "compensacion": {
+            "scheduleToClose": "PT10M",
+            "maximoIntentos": 8
+          }
+        },
+        {
+          "esperaAprobacion": "PT3M",
+          "compensacion": {
+            "scheduleToClose": "PT2M",
+            "maximoIntentos": 4
+          }
+        }
+      ]
+    },
+    "EntradaProgramarViaje": {
+      "type": "object",
+      "description": "Entrada del workflow. workflowId = programar-viaje-<servicioId>.",
+      "required": [
+        "servicioId",
+        "viajeId",
+        "clienteId",
+        "cotizacionId",
+        "canal",
+        "creadoPor",
+        "parametrosSaga"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "servicioId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "viajeId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "clienteId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "cotizacionId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "canal": {
+          "$ref": "../comun/tipos.schema.json#/$defs/CanalServicio"
+        },
+        "creadoPor": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Sub"
+        },
+        "parametrosSaga": {
+          "$ref": "#/$defs/ParametrosSaga"
+        }
+      },
+      "examples": [
+        {
+          "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
+          "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+          "clienteId": "01933b5a-1f00-7a20-8b11-0c2d3e4f5a01",
+          "cotizacionId": "01933b60-2a10-7b30-9c22-1d3e4f5a6b01",
+          "canal": "PORTAL",
+          "creadoPor": "6f1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e4f",
+          "parametrosSaga": {
+            "esperaAprobacion": "PT24H",
+            "compensacion": {
+              "scheduleToClose": "PT10M",
+              "maximoIntentos": 8
+            }
+          }
+        }
+      ]
+    },
+    "ResultadoProgramarViaje": {
+      "type": "object",
+      "description": "Resultado del workflow. Un viaje en intervención no termina el workflow: espera la señal resolverIntervencion.",
+      "required": [
+        "resultado",
+        "servicioId",
+        "viajeId"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "resultado": {
+          "type": "string",
+          "enum": [
+            "CONFIRMADO",
+            "CANCELADO"
+          ]
+        },
+        "servicioId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "viajeId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "motivo": {
+          "$ref": "../comun/tipos.schema.json#/$defs/CodigoError"
+        }
+      },
+      "examples": [
+        {
+          "resultado": "CONFIRMADO",
+          "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
+          "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02"
+        },
+        {
+          "resultado": "CANCELADO",
+          "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
+          "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+          "motivo": "SIN_UNIDAD_COMPATIBLE"
+        }
+      ]
+    },
+    "EstadoProgramarViaje": {
+      "type": "object",
+      "description": "Resultado de la consulta `estado`.",
+      "required": [
+        "etapa",
+        "pasosCompletados"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "etapa": {
+          "type": "string",
+          "enum": [
+            "INICIANDO",
+            "VALIDANDO_CREDITO",
+            "ESPERANDO_APROBACION",
+            "RESERVANDO_UNIDAD",
+            "CONFIRMANDO",
+            "COMPENSANDO",
+            "REQUIERE_INTERVENCION",
+            "TERMINADO"
+          ]
+        },
+        "pasosCompletados": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "CREAR_VIAJE",
+              "RESERVAR_CREDITO",
+              "APROBACION_CREDITO",
+              "RESERVAR_UNIDAD",
+              "CONFIRMAR_VIAJE",
+              "CONFIRMAR_RESERVA",
+              "CONFIRMACION_COMPLETA"
+            ]
+          }
+        },
+        "esperaAprobacionVenceEn": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Instante"
+        },
+        "motivo": {
+          "$ref": "../comun/tipos.schema.json#/$defs/CodigoError"
+        },
+        "compensacionesPendientes": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "Flota.liberarReserva",
+              "Finanzas.liberarCredito",
+              "Viajes.cancelarViaje"
+            ]
+          }
+        }
+      },
+      "examples": [
+        {
+          "etapa": "ESPERANDO_APROBACION",
+          "pasosCompletados": [
+            "CREAR_VIAJE",
+            "RESERVAR_CREDITO"
+          ],
+          "esperaAprobacionVenceEn": "2026-11-04T14:05:00Z"
+        },
+        {
+          "etapa": "REQUIERE_INTERVENCION",
+          "pasosCompletados": [
+            "CREAR_VIAJE",
+            "RESERVAR_CREDITO"
+          ],
+          "motivo": "SIN_UNIDAD_COMPATIBLE",
+          "compensacionesPendientes": [
+            "Finanzas.liberarCredito",
+            "Viajes.cancelarViaje"
+          ]
+        }
+      ]
+    },
+    "SenalAprobacionCredito": {
+      "type": "object",
+      "description": "Señal `aprobacionCredito`. La envía Viajes por pedido del Gateway; aprobadoPor sale del token.",
+      "required": [
+        "aprobado",
+        "aprobadoPor"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "aprobado": {
+          "type": "boolean"
+        },
+        "aprobadoPor": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Sub"
+        },
+        "motivo": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 300
+        }
+      },
+      "if": {
+        "properties": {
+          "aprobado": {
+            "const": false
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "motivo"
+        ]
+      },
+      "examples": [
+        {
+          "aprobado": true,
+          "aprobadoPor": "7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+        },
+        {
+          "aprobado": false,
+          "aprobadoPor": "7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d",
+          "motivo": "Mora de 20 días sin acuerdo de pago"
+        }
+      ]
+    },
+    "SenalResolverIntervencion": {
+      "type": "object",
+      "description": "Señal `resolverIntervencion` (spec 011).",
+      "required": [
+        "opcion",
+        "resueltoPor"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "opcion": {
+          "type": "string",
+          "enum": [
+            "REINTENTAR_COMPENSACION",
+            "MARCAR_RESUELTO"
+          ]
+        },
+        "resueltoPor": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Sub"
+        },
+        "nota": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 500
+        }
+      },
+      "if": {
+        "properties": {
+          "opcion": {
+            "const": "MARCAR_RESUELTO"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "nota"
+        ]
+      },
+      "examples": [
+        {
+          "opcion": "REINTENTAR_COMPENSACION",
+          "resueltoPor": "8b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e"
+        },
+        {
+          "opcion": "MARCAR_RESUELTO",
+          "resueltoPor": "8b3c4d5e-6f7a-4b8c-9d0e-1f2a3b4c5d6e",
+          "nota": "Crédito liberado a mano en Finanzas tras restaurar la base"
+        }
+      ]
+    },
+    "CrearViajeEntrada": {
+      "type": "object",
+      "description": "Viajes.crearViaje (paso 1). Sin resultado. Idempotente por viajeId.",
+      "required": [
+        "servicioId",
+        "viajeId",
+        "clienteId",
+        "cotizacionId"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "servicioId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "viajeId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "clienteId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "cotizacionId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        }
+      },
+      "examples": [
+        {
+          "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
+          "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+          "clienteId": "01933b5a-1f00-7a20-8b11-0c2d3e4f5a01",
+          "cotizacionId": "01933b60-2a10-7b30-9c22-1d3e4f5a6b01"
+        }
+      ]
+    },
+    "ValidarYReservarCreditoEntrada": {
+      "type": "object",
+      "description": "Finanzas.validarYReservarCredito (paso 2). Idempotente: una reserva por servicioId. esperaAprobacion viene de parametrosSaga y fija el venceEn de la SolicitudAprobacion.",
+      "required": [
+        "servicioId",
+        "clienteId",
+        "cotizacionId",
+        "esperaAprobacion"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "servicioId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "clienteId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "cotizacionId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "esperaAprobacion": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Duracion"
+        }
+      },
+      "examples": [
+        {
+          "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
+          "clienteId": "01933b5a-1f00-7a20-8b11-0c2d3e4f5a01",
+          "cotizacionId": "01933b60-2a10-7b30-9c22-1d3e4f5a6b01",
+          "esperaAprobacion": "PT24H"
+        }
+      ]
+    },
+    "ValidarYReservarCreditoResultado": {
+      "type": "object",
+      "description": "Resultado del paso 2. REQUIERE_APROBACION no es un error: lleva al paso 2b.",
+      "required": [
+        "resultado",
+        "reservaCreditoId",
+        "rutaId",
+        "tipoCarga",
+        "toneladas",
+        "fechaViaje",
+        "monto"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "resultado": {
+          "type": "string",
+          "enum": [
+            "RESERVADO",
+            "REQUIERE_APROBACION"
+          ]
+        },
+        "reservaCreditoId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "rutaId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "tipoCarga": {
+          "$ref": "../comun/tipos.schema.json#/$defs/TipoCarga"
+        },
+        "toneladas": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Toneladas"
+        },
+        "fechaViaje": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Fecha"
+        },
+        "monto": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Monto"
+        },
+        "motivosAprobacion": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "MORA",
+              "MONTO_ALTO"
+            ]
+          }
+        }
+      },
+      "if": {
+        "properties": {
+          "resultado": {
+            "const": "REQUIERE_APROBACION"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "motivosAprobacion"
+        ]
+      },
+      "examples": [
+        {
+          "resultado": "RESERVADO",
+          "reservaCreditoId": "01933b6e-5000-7e20-8a40-6a7b8c9d0e01",
+          "rutaId": "01933a00-0000-7000-8000-000000000004",
+          "tipoCarga": "GRANOS",
+          "toneladas": 28,
+          "fechaViaje": "2026-11-03",
+          "monto": {
+            "monto": "2800.00",
+            "moneda": "BOB"
+          }
+        },
+        {
+          "resultado": "REQUIERE_APROBACION",
+          "reservaCreditoId": "01933b6e-5000-7e20-8a40-6a7b8c9d0e02",
+          "rutaId": "01933a00-0000-7000-8000-000000000002",
+          "tipoCarga": "GRANOS",
+          "toneladas": 20,
+          "fechaViaje": "2026-11-05",
+          "monto": {
+            "monto": "7600.00",
+            "moneda": "BOB"
+          },
+          "motivosAprobacion": [
+            "MORA"
+          ]
+        }
+      ]
+    },
+    "RegistrarDecisionCreditoEntrada": {
+      "type": "object",
+      "description": "Finanzas.registrarDecisionCredito (paso 2b). Sin resultado. Idempotente por servicioId.",
+      "required": [
+        "servicioId",
+        "aprobado",
+        "aprobadoPor",
+        "decision"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "servicioId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "aprobado": {
+          "type": "boolean"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "APROBADA",
+            "RECHAZADA",
+            "VENCIDA"
+          ]
+        },
+        "aprobadoPor": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Sub"
+        },
+        "motivo": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 300
+        }
+      },
+      "examples": [
+        {
+          "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
+          "aprobado": true,
+          "decision": "APROBADA",
+          "aprobadoPor": "7a2b3c4d-5e6f-4a7b-8c9d-0e1f2a3b4c5d"
+        },
+        {
+          "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
+          "aprobado": false,
+          "decision": "VENCIDA",
+          "aprobadoPor": "sistema",
+          "motivo": "Plazo de aprobación vencido"
+        }
+      ]
+    },
+    "ReservarUnidadEntrada": {
+      "type": "object",
+      "description": "Flota.reservarUnidad (paso 3). Idempotente: una reserva por servicioId.",
+      "required": [
+        "servicioId",
+        "viajeId",
+        "tipoCarga",
+        "toneladas",
+        "fechaViaje"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "servicioId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "viajeId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "tipoCarga": {
+          "$ref": "../comun/tipos.schema.json#/$defs/TipoCarga"
+        },
+        "toneladas": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Toneladas"
+        },
+        "fechaViaje": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Fecha"
+        }
+      },
+      "examples": [
+        {
+          "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
+          "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+          "tipoCarga": "GRANOS",
+          "toneladas": 28,
+          "fechaViaje": "2026-11-03"
+        }
+      ]
+    },
+    "ReservarUnidadResultado": {
+      "type": "object",
+      "required": [
+        "reservaUnidadId",
+        "tractoId",
+        "remolqueId",
+        "placa",
+        "choferId",
+        "choferNombre",
+        "choferUsuarioSub"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "reservaUnidadId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "tractoId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "remolqueId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "placa": {
+          "type": "string",
+          "pattern": "^[0-9]{3,4}[A-Z]{3}$",
+          "description": "Placa del tracto (formato boliviano)."
+        },
+        "choferId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "choferNombre": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 120
+        },
+        "choferUsuarioSub": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Sub"
+        }
+      },
+      "examples": [
+        {
+          "reservaUnidadId": "01933b6e-6000-7f30-9b50-7b8c9d0e1f01",
+          "tractoId": "01933900-0000-7000-8000-00000000a101",
+          "remolqueId": "01933900-0000-7000-8000-00000000b201",
+          "placa": "4521KTR",
+          "choferId": "01933900-0000-7000-8000-00000000c301",
+          "choferNombre": "Juan Mamani Quispe",
+          "choferUsuarioSub": "9c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f"
+        }
+      ]
+    },
+    "ConfirmarViajeEntrada": {
+      "type": "object",
+      "description": "Viajes.confirmarViaje (paso 4, pivote). Sin resultado. Publica ViajeConfirmado por Outbox.",
+      "required": [
+        "viajeId",
+        "rutaId",
+        "tipoCarga",
+        "toneladas",
+        "fechaViaje",
+        "monto",
+        "reservaUnidadId",
+        "tractoId",
+        "remolqueId",
+        "placa",
+        "choferId",
+        "choferNombre",
+        "choferUsuarioSub"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "viajeId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "rutaId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "tipoCarga": {
+          "$ref": "../comun/tipos.schema.json#/$defs/TipoCarga"
+        },
+        "toneladas": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Toneladas"
+        },
+        "fechaViaje": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Fecha"
+        },
+        "monto": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Monto"
+        },
+        "reservaUnidadId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "tractoId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "remolqueId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "placa": {
+          "type": "string",
+          "pattern": "^[0-9]{3,4}[A-Z]{3}$"
+        },
+        "choferId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "choferNombre": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 120
+        },
+        "choferUsuarioSub": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Sub"
+        }
+      },
+      "examples": [
+        {
+          "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+          "rutaId": "01933a00-0000-7000-8000-000000000004",
+          "tipoCarga": "GRANOS",
+          "toneladas": 28,
+          "fechaViaje": "2026-11-03",
+          "monto": {
+            "monto": "2800.00",
+            "moneda": "BOB"
+          },
+          "reservaUnidadId": "01933b6e-6000-7f30-9b50-7b8c9d0e1f01",
+          "tractoId": "01933900-0000-7000-8000-00000000a101",
+          "remolqueId": "01933900-0000-7000-8000-00000000b201",
+          "placa": "4521KTR",
+          "choferId": "01933900-0000-7000-8000-00000000c301",
+          "choferNombre": "Juan Mamani Quispe",
+          "choferUsuarioSub": "9c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f"
+        }
+      ]
+    },
+    "ConfirmarReservaEntrada": {
+      "type": "object",
+      "description": "Flota.confirmarReserva (paso 5). Sin resultado. Idempotente e incondicional sobre su propia reserva.",
+      "required": [
+        "reservaUnidadId",
+        "servicioId"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "reservaUnidadId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "servicioId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        }
+      },
+      "examples": [
+        {
+          "reservaUnidadId": "01933b6e-6000-7f30-9b50-7b8c9d0e1f01",
+          "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01"
+        }
+      ]
+    },
+    "MarcarConfirmacionCompletaEntrada": {
+      "type": "object",
+      "description": "Viajes.marcarConfirmacionCompleta (paso 6). Sin resultado.",
+      "required": [
+        "servicioId"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "servicioId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        }
+      },
+      "examples": [
+        {
+          "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01"
+        }
+      ]
+    },
+    "LiberarReservaEntrada": {
+      "type": "object",
+      "description": "Flota.liberarReserva (compensación del paso 3). Sin resultado. Si ya está liberada, no hace nada.",
+      "required": [
+        "servicioId"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "servicioId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "reservaUnidadId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        }
+      },
+      "examples": [
+        {
+          "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
+          "reservaUnidadId": "01933b6e-6000-7f30-9b50-7b8c9d0e1f01"
+        }
+      ]
+    },
+    "LiberarCreditoEntrada": {
+      "type": "object",
+      "description": "Finanzas.liberarCredito (compensación del paso 2). Sin resultado. Libera la reserva del servicioId y devuelve la cotización a VIGENTE si sigue en plazo. Si ya está liberada, no hace nada.",
+      "required": [
+        "servicioId",
+        "motivo"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "servicioId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "motivo": {
+          "$ref": "../comun/tipos.schema.json#/$defs/CodigoError"
+        }
+      },
+      "examples": [
+        {
+          "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
+          "motivo": "SIN_UNIDAD_COMPATIBLE"
+        }
+      ]
+    },
+    "CancelarViajeEntrada": {
+      "type": "object",
+      "description": "Viajes.cancelarViaje (compensación del paso 1). Sin resultado. Pasa el viaje a CANCELADO y publica ViajeCancelado con origen SAGA. Si ya está cancelado, no hace nada.",
+      "required": [
+        "viajeId",
+        "motivo"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "viajeId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "motivo": {
+          "$ref": "../comun/tipos.schema.json#/$defs/CodigoError"
+        },
+        "detalle": {
+          "type": "string",
+          "maxLength": 600,
+          "description": "Texto libre; en MARCAR_RESUELTO lleva 'Resuelto manualmente: <nota>'."
+        }
+      },
+      "examples": [
+        {
+          "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+          "motivo": "COTIZACION_VENCIDA"
+        },
+        {
+          "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+          "motivo": "RESUELTO_MANUALMENTE",
+          "detalle": "Resuelto manualmente: crédito liberado a mano en Finanzas"
+        }
+      ]
+    },
+    "MarcarRequiereIntervencionEntrada": {
+      "type": "object",
+      "description": "Viajes.marcarRequiereIntervencion. Sin resultado. Pasa el viaje a REQUIERE_INTERVENCION y publica ViajeRequiereIntervencion.",
+      "required": [
+        "viajeId",
+        "servicioId",
+        "compensacionFallida",
+        "error",
+        "intentos"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "viajeId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "servicioId": {
+          "$ref": "../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "compensacionFallida": {
+          "type": "string",
+          "enum": [
+            "Flota.liberarReserva",
+            "Finanzas.liberarCredito",
+            "Viajes.cancelarViaje"
+          ]
+        },
+        "error": {
+          "$ref": "#/$defs/DetalleFallo"
+        },
+        "intentos": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "examples": [
+        {
+          "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+          "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
+          "compensacionFallida": "Finanzas.liberarCredito",
+          "error": {
+            "codigo": "DEPENDENCIA_NO_DISPONIBLE",
+            "mensaje": "No se pudo conectar con la base de Finanzas"
+          },
+          "intentos": 4
+        }
+      ]
+    },
+    "DetalleFallo": {
+      "type": "object",
+      "description": "Detalle que acompaña a un ApplicationFailure. El `type` del ApplicationFailure es igual a `codigo`.",
+      "required": [
+        "codigo",
+        "mensaje"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "codigo": {
+          "$ref": "../comun/tipos.schema.json#/$defs/CodigoError"
+        },
+        "mensaje": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "datos": {
+          "type": "object",
+          "description": "Datos opcionales del error (por ejemplo, disponible y monto)."
+        }
+      },
+      "examples": [
+        {
+          "codigo": "CREDITO_INSUFICIENTE",
+          "mensaje": "El disponible es 5000.00 BOB y el servicio cuesta 7600.00 BOB",
+          "datos": {
+            "disponible": {
+              "monto": "5000.00",
+              "moneda": "BOB"
+            },
+            "monto": {
+              "monto": "7600.00",
+              "moneda": "BOB"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

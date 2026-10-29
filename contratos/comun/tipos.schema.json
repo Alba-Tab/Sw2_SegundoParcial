@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/comun/tipos.schema.json",
+  "title": "Tipos comunes",
+  "description": "Tipos compartidos por los contratos de Temporal, eventos y OpenAPI. Reglas en specs/000-convenciones.md.",
+  "$defs": {
+    "Uuid": {
+      "type": "string",
+      "format": "uuid",
+      "description": "UUIDv7 en texto (000 §1).",
+      "examples": ["01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01"]
+    },
+    "Sub": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64,
+      "description": "Claim `sub` del usuario en Keycloak, o `sistema` para decisiones automáticas.",
+      "examples": ["6f1c2d3e-4b5a-4c6d-8e7f-9a0b1c2d3e4f", "sistema"]
+    },
+    "Instante": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "Z$",
+      "description": "Instante ISO-8601 en UTC con `Z` (000 §2).",
+      "examples": ["2026-11-03T14:05:00Z"]
+    },
+    "Fecha": {
+      "type": "string",
+      "format": "date",
+      "description": "Fecha sin hora, interpretada en America/La_Paz (000 §2).",
+      "examples": ["2026-11-03"]
+    },
+    "Duracion": {
+      "type": "string",
+      "pattern": "^P(?!$)(\\d+D)?(T(?=\\d)(\\d+H)?(\\d+M)?(\\d+S)?)?$",
+      "description": "Duración ISO-8601 (días, horas, minutos, segundos).",
+      "examples": ["PT24H", "PT3M"]
+    },
+    "Monto": {
+      "type": "object",
+      "description": "Dinero: monto como texto decimal con 2 decimales y moneda ISO 4217 (000 §3). No negativo.",
+      "required": ["monto", "moneda"],
+      "additionalProperties": false,
+      "properties": {
+        "monto": { "type": "string", "pattern": "^(0|[1-9]\\d{0,11})\\.\\d{2}$" },
+        "moneda": { "type": "string", "enum": ["BOB"] }
+      },
+      "examples": [{ "monto": "2800.00", "moneda": "BOB" }]
+    },
+    "Coordenadas": {
+      "type": "object",
+      "description": "WGS84 en grados decimales (000 §3).",
+      "required": ["lat", "lng"],
+      "additionalProperties": false,
+      "properties": {
+        "lat": { "type": "number", "minimum": -90, "maximum": 90 },
+        "lng": { "type": "number", "minimum": -180, "maximum": 180 }
+      },
+      "examples": [{ "lat": -17.7833, "lng": -63.1821 }]
+    },
+    "TipoCarga": {
+      "type": "string",
+      "enum": ["GRANOS", "INSUMOS", "INSUMOS_LIQUIDOS", "CONTENEDOR"]
+    },
+    "TipoRemolque": {
+      "type": "string",
+      "enum": ["FURGON", "PLATAFORMA", "CISTERNA"]
+    },
+    "Toneladas": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 30,
+      "description": "Toneladas por servicio; máximo 30 (D03)."
+    },
+    "CanalServicio": {
+      "type": "string",
+      "enum": ["PORTAL", "TELEFONO"],
+      "description": "PORTAL si lo creó el cliente; TELEFONO si lo creó atención comercial."
+    },
+    "EstadoViaje": {
+      "type": "string",
+      "enum": [
+        "PROGRAMANDO",
+        "CONFIRMADO",
+        "EN_RUTA",
+        "ENTREGADO",
+        "CERRADO",
+        "CANCELADO",
+        "ENTREGA_OBSERVADA",
+        "ENTREGA_RECHAZADA",
+        "REQUIERE_INTERVENCION"
+      ],
+      "description": "Máquina de estados en specs/003-programar-viaje.md."
+    },
+    "CodigoError": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z_]*[A-Z]$",
+      "description": "Código estable de 000 §5.",
+      "examples": ["CREDITO_INSUFICIENTE"]
+    },
+    "OrigenCancelacion": {
+      "type": "string",
+      "enum": ["SAGA", "USUARIO"]
+    }
+  }
+}
