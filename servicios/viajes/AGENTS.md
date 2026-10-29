@@ -17,7 +17,7 @@ Manda dentro de `servicios/viajes/`; lo demás está en el AGENTS.md de la raíz
 - Un evento se publica **solo** con `RegistroDeEventos.registrar(...)` dentro de la transacción del caso de uso (`Propagation.MANDATORY`); el relay lo publica después del commit.
 - Errores: lanzar `ErrorDeDominio(codigo, mensaje)`; `ManejadorDeProblemas` lo convierte en Problem Details con su estado.
 - Migraciones nuevas en `src/main/resources/db/migration/V<n>__<que>.sql`; nunca editar una aplicada.
-- Contratos primero: `contratos/openapi/viajes.yaml` y `contratos/temporal/` antes del código.
+- Contratos primero: `contratos/openapi/viajes.yaml` y `contratos/temporal/` antes del código. Las interfaces REST (`adaptadores.entrada.web.api.*Api`) y sus DTO (`...api.modelo.*Dto`) los genera openapi-generator en cada build (`target/generated-sources/openapi`, no se versionan): un controlador nuevo **implementa** la interfaz generada en lugar de declarar sus propias rutas. Si el contrato cambia, deja de compilar. Los DTO no entran al dominio: el controlador los traduce.
 
 ## Comandos
 
