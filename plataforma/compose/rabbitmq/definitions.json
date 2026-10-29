@@ -1,0 +1,435 @@
+{
+  "rabbit_version": "4.4.0",
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "transporte.events",
+      "vhost": "/",
+      "type": "topic",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    },
+    {
+      "name": "transporte.dlx",
+      "vhost": "/",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false,
+      "internal": false,
+      "arguments": {}
+    }
+  ],
+  "queues": [
+    {
+      "name": "viajes.eventos",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-delivery-limit": 5,
+        "x-dead-letter-exchange": "transporte.dlx",
+        "x-dead-letter-routing-key": "viajes.eventos.dlq"
+      }
+    },
+    {
+      "name": "viajes.eventos.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    },
+    {
+      "name": "finanzas.eventos",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-delivery-limit": 5,
+        "x-dead-letter-exchange": "transporte.dlx",
+        "x-dead-letter-routing-key": "finanzas.eventos.dlq"
+      }
+    },
+    {
+      "name": "finanzas.eventos.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    },
+    {
+      "name": "flota.eventos",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-delivery-limit": 5,
+        "x-dead-letter-exchange": "transporte.dlx",
+        "x-dead-letter-routing-key": "flota.eventos.dlq"
+      }
+    },
+    {
+      "name": "flota.eventos.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    },
+    {
+      "name": "analitica.eventos",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-delivery-limit": 5,
+        "x-dead-letter-exchange": "transporte.dlx",
+        "x-dead-letter-routing-key": "analitica.eventos.dlq"
+      }
+    },
+    {
+      "name": "analitica.eventos.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    },
+    {
+      "name": "n8n.eventos",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-delivery-limit": 5,
+        "x-dead-letter-exchange": "transporte.dlx",
+        "x-dead-letter-routing-key": "n8n.eventos.dlq"
+      }
+    },
+    {
+      "name": "n8n.eventos.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
+      }
+    },
+    {
+      "name": "flota.sensor",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum",
+        "x-delivery-limit": 5
+      }
+    }
+  ],
+  "bindings": [
+    {
+      "source": "transporte.dlx",
+      "vhost": "/",
+      "destination": "viajes.eventos.dlq",
+      "destination_type": "queue",
+      "routing_key": "viajes.eventos.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "viajes.eventos",
+      "destination_type": "queue",
+      "routing_key": "finanzas.factura-emitida.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.dlx",
+      "vhost": "/",
+      "destination": "finanzas.eventos.dlq",
+      "destination_type": "queue",
+      "routing_key": "finanzas.eventos.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "finanzas.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.cliente-actualizado.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "finanzas.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.ruta-actualizada.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "finanzas.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.viaje-cancelado.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "finanzas.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.entrega-confirmada.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "finanzas.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.entrega-rechazada.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.dlx",
+      "vhost": "/",
+      "destination": "flota.eventos.dlq",
+      "destination_type": "queue",
+      "routing_key": "flota.eventos.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "flota.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.viaje-cancelado.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "flota.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.viaje-iniciado.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "flota.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.entrega-confirmada.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "flota.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.entrega-rechazada.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.dlx",
+      "vhost": "/",
+      "destination": "analitica.eventos.dlq",
+      "destination_type": "queue",
+      "routing_key": "analitica.eventos.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.cliente-actualizado.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.ruta-actualizada.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "flota.chofer-actualizado.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.viaje-confirmado.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.viaje-cancelado.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.viaje-iniciado.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.hito-registrado.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.posicion-actualizada.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.evento-conduccion-registrado.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.entrega-confirmada.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.entrega-observada.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.entrega-rechazada.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "viajes.viaje-requiere-intervencion.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "finanzas.factura-emitida.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "finanzas.pago-registrado.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "flota.carga-combustible-registrada.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "flota.caida-combustible-detectada.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "analitica.eventos",
+      "destination_type": "queue",
+      "routing_key": "flota.mantenimiento-requerido.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.dlx",
+      "vhost": "/",
+      "destination": "n8n.eventos.dlq",
+      "destination_type": "queue",
+      "routing_key": "n8n.eventos.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "n8n.eventos",
+      "destination_type": "queue",
+      "routing_key": "finanzas.factura-emitida.v1",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.events",
+      "vhost": "/",
+      "destination": "n8n.eventos",
+      "destination_type": "queue",
+      "routing_key": "analitica.aviso-cliente-aprobado.v1",
+      "arguments": {}
+    },
+    {
+      "source": "amq.topic",
+      "vhost": "/",
+      "destination": "flota.sensor",
+      "destination_type": "queue",
+      "routing_key": "camion.*.combustible",
+      "arguments": {}
+    }
+  ]
+}
