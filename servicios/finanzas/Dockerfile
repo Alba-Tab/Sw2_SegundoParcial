@@ -1,5 +1,6 @@
 # Finanzas: una imagen para la API (Octane sobre RoadRunner, 4 workers) y el worker (RoadRunner con Temporal y el
 # plugin service, D29). Etapas: base (PHP 8.4 y herramientas), dev (con dependencias de desarrollo), app (producción).
+# Contexto: raíz del repo, para copiar contratos/openapi (ValidarContrato).
 FROM ghcr.io/roadrunner-server/roadrunner:3.0.1 AS rr
 # Octane 2.22 compara la versión de rr contra 2023.3.0 (versionado por fecha) y trata 3.x como vieja: la API usa
 # 2025.1.15 en /app/rr, donde Octane busca primero; el worker usa 3.0.1 (/usr/local/bin/rr, PoC-2).
@@ -16,16 +17,18 @@ COPY --from=composer /usr/bin/composer /usr/local/bin/composer
 WORKDIR /app
 
 FROM base AS dev
-COPY composer.json composer.lock ./
+COPY servicios/finanzas/composer.json servicios/finanzas/composer.lock ./
 RUN composer install --no-interaction --no-scripts --no-autoloader
-COPY . .
+COPY servicios/finanzas .
+COPY contratos/openapi/finanzas.yaml contratos/openapi/comun.yaml contrato/
 RUN composer dump-autoload --optimize && cp -n .env.example .env
 
 FROM base AS app
 ENV APP_ENV=production
-COPY composer.json composer.lock ./
+COPY servicios/finanzas/composer.json servicios/finanzas/composer.lock ./
 RUN composer install --no-interaction --no-dev --no-scripts --no-autoloader
-COPY . .
+COPY servicios/finanzas .
+COPY contratos/openapi/finanzas.yaml contratos/openapi/comun.yaml contrato/
 COPY --from=rr-octane /usr/bin/rr /app/rr
 RUN composer dump-autoload --optimize --classmap-authoritative \
   && useradd --system --uid 10001 finanzas && chown -R finanzas storage bootstrap/cache

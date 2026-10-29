@@ -146,7 +146,7 @@ services:
 
   finanzas-api:
     <<: *comun
-    build: { context: ../../servicios/finanzas, target: app }
+    build: { context: ../.., dockerfile: servicios/finanzas/Dockerfile, target: app }
     image: transporte/finanzas:local
     profiles: [core]
     depends_on:
