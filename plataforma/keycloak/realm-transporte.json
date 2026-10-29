@@ -1,0 +1,736 @@
+{
+  "realm": "transporte",
+  "displayName": "Transporte de Carga",
+  "enabled": true,
+  "registrationAllowed": true,
+  "registrationEmailAsUsername": false,
+  "verifyEmail": false,
+  "loginWithEmailAllowed": true,
+  "resetPasswordAllowed": false,
+  "rememberMe": false,
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 10,
+  "sslRequired": "$(env:KC_SSL_REQUIRED:-external)",
+  "accessTokenLifespan": "$(env:KC_ACCESS_TOKEN_SEG:-300)",
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "offlineSessionIdleTimeout": 2592000,
+  "oauth2DeviceCodeLifespan": 600,
+  "oauth2DevicePollingInterval": 5,
+  "adminPermissionsEnabled": true,
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "es"
+  ],
+  "defaultLocale": "es",
+  "roles": {
+    "realm": [
+      {
+        "name": "default-roles-transporte",
+        "description": "Rol por defecto vacío (K3)",
+        "composite": false
+      },
+      {
+        "name": "chofer",
+        "description": "Registra en ruta sus viajes",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "offline_access"
+          ]
+        }
+      },
+      {
+        "name": "despachador",
+        "description": "Viajes, entregas observadas, intervenciones y acciones del agente"
+      },
+      {
+        "name": "jefe_flota",
+        "description": "Unidades, mantenimiento y combustible"
+      },
+      {
+        "name": "administracion",
+        "description": "Cotizaciones, aprobación de crédito, facturas y pagos"
+      },
+      {
+        "name": "gerente",
+        "description": "Todo en lectura, tablero, voz y reportes"
+      },
+      {
+        "name": "comercial",
+        "description": "Portal en nombre de un cliente; registra clientes sin cuenta"
+      },
+      {
+        "name": "cliente",
+        "description": "Sus cotizaciones, servicios, viajes, POD y facturas"
+      },
+      {
+        "name": "agente_lectura",
+        "description": "Herramientas de lectura del MCP y proponer_accion"
+      }
+    ]
+  },
+  "groups": [
+    {
+      "name": "registro-portal",
+      "path": "/registro-portal"
+    }
+  ],
+  "defaultGroups": [
+    "/registro-portal"
+  ],
+  "clientScopes": [
+    {
+      "name": "cliente-id",
+      "description": "Claim clienteId desde el atributo del usuario (propuesta 7.3)",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "clienteId",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "config": {
+            "user.attribute": "clienteId",
+            "claim.name": "clienteId",
+            "jsonType.label": "String",
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "aud-gateway",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "aud-gateway",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "gateway",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "aud-analitica",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "aud-analitica",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "analitica",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "aud-mcp-server",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "aud-mcp-server",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "mcp-server",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "aud-viajes",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "aud-viajes",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "viajes",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "aud-finanzas",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "aud-finanzas",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "finanzas",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    },
+    {
+      "name": "aud-flota",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "aud-flota",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "config": {
+            "included.client.audience": "flota",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "cc-tablero",
+      "name": "Centro de Control: tablero",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "fullScopeAllowed": false,
+      "rootUrl": "$(env:KC_URL_CC_TABLERO:-http://localhost:4201)",
+      "redirectUris": [
+        "$(env:KC_URL_CC_TABLERO:-http://localhost:4201)/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "profile",
+        "email",
+        "roles",
+        "web-origins",
+        "aud-gateway"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "cc-operaciones",
+      "name": "Centro de Control: operaciones",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "fullScopeAllowed": false,
+      "rootUrl": "$(env:KC_URL_CC_OPERACIONES:-http://localhost:4202)",
+      "redirectUris": [
+        "$(env:KC_URL_CC_OPERACIONES:-http://localhost:4202)/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "profile",
+        "email",
+        "roles",
+        "web-origins",
+        "aud-gateway"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "cc-flota",
+      "name": "Centro de Control: flota",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "fullScopeAllowed": false,
+      "rootUrl": "$(env:KC_URL_CC_FLOTA:-http://localhost:4203)",
+      "redirectUris": [
+        "$(env:KC_URL_CC_FLOTA:-http://localhost:4203)/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "profile",
+        "email",
+        "roles",
+        "web-origins",
+        "aud-gateway"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "cc-finanzas",
+      "name": "Centro de Control: finanzas",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "fullScopeAllowed": false,
+      "rootUrl": "$(env:KC_URL_CC_FINANZAS:-http://localhost:4204)",
+      "redirectUris": [
+        "$(env:KC_URL_CC_FINANZAS:-http://localhost:4204)/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "profile",
+        "email",
+        "roles",
+        "web-origins",
+        "aud-gateway"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "portal-cliente",
+      "name": "Portal del cliente",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "fullScopeAllowed": false,
+      "rootUrl": "$(env:KC_URL_PORTAL:-http://localhost:5173)",
+      "redirectUris": [
+        "$(env:KC_URL_PORTAL:-http://localhost:5173)/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "+"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "profile",
+        "email",
+        "roles",
+        "web-origins",
+        "cliente-id",
+        "aud-viajes",
+        "aud-finanzas"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "app-chofer",
+      "name": "App del chofer",
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "implicitFlowEnabled": false,
+      "fullScopeAllowed": false,
+      "redirectUris": [
+        "transporte-chofer://*"
+      ],
+      "webOrigins": [],
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "post.logout.redirect.uris": "transporte-chofer://*"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "profile",
+        "email",
+        "roles",
+        "aud-viajes",
+        "aud-flota"
+      ],
+      "optionalClientScopes": [
+        "offline_access"
+      ]
+    },
+    {
+      "clientId": "demo-cli",
+      "name": "Scripts de demo (D39)",
+      "publicClient": true,
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": "$(env:KC_DEMO_CLI_DIRECT_GRANT:-false)",
+      "implicitFlowEnabled": false,
+      "fullScopeAllowed": false,
+      "redirectUris": [],
+      "webOrigins": [],
+      "attributes": {
+        "oauth2.device.authorization.grant.enabled": "true"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "profile",
+        "email",
+        "roles",
+        "cliente-id",
+        "aud-gateway",
+        "aud-viajes",
+        "aud-finanzas",
+        "aud-flota",
+        "aud-analitica"
+      ],
+      "optionalClientScopes": [
+        "offline_access"
+      ]
+    },
+    {
+      "clientId": "gateway",
+      "name": "Gateway GraphQL",
+      "publicClient": false,
+      "secret": "$(env:KC_SECRETO_GATEWAY)",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "attributes": {
+        "standard.token.exchange.enabled": "true"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "profile",
+        "email",
+        "roles"
+      ],
+      "optionalClientScopes": [
+        "aud-analitica",
+        "aud-viajes",
+        "aud-finanzas",
+        "aud-flota"
+      ]
+    },
+    {
+      "clientId": "analitica",
+      "name": "Analítica",
+      "publicClient": false,
+      "secret": "$(env:KC_SECRETO_ANALITICA)",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "attributes": {
+        "standard.token.exchange.enabled": "true"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "profile",
+        "email",
+        "roles"
+      ],
+      "optionalClientScopes": [
+        "aud-mcp-server",
+        "aud-viajes",
+        "aud-finanzas",
+        "aud-flota"
+      ]
+    },
+    {
+      "clientId": "mcp-server",
+      "name": "Servidor MCP",
+      "publicClient": false,
+      "secret": "$(env:KC_SECRETO_MCP_SERVER)",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": false,
+      "attributes": {
+        "standard.token.exchange.enabled": "true"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "profile",
+        "email",
+        "roles"
+      ],
+      "optionalClientScopes": [
+        "aud-analitica",
+        "aud-viajes",
+        "aud-finanzas",
+        "aud-flota"
+      ]
+    },
+    {
+      "clientId": "agente",
+      "name": "Agente de vigilancia",
+      "publicClient": false,
+      "secret": "$(env:KC_SECRETO_AGENTE)",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "roles",
+        "aud-mcp-server"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "viajes",
+      "name": "Viajes",
+      "publicClient": false,
+      "secret": "$(env:KC_SECRETO_VIAJES)",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "fullScopeAllowed": false,
+      "attributes": {
+        "standard.token.exchange.enabled": "true"
+      },
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "roles"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "finanzas",
+      "name": "Finanzas",
+      "publicClient": false,
+      "secret": "$(env:KC_SECRETO_FINANZAS)",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "roles"
+      ],
+      "optionalClientScopes": []
+    },
+    {
+      "clientId": "flota",
+      "name": "Flota",
+      "publicClient": false,
+      "secret": "$(env:KC_SECRETO_FLOTA)",
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "fullScopeAllowed": false,
+      "defaultClientScopes": [
+        "basic",
+        "acr",
+        "roles"
+      ],
+      "optionalClientScopes": []
+    }
+  ],
+  "scopeMappings": [
+    {
+      "client": "cc-tablero",
+      "roles": [
+        "gerente",
+        "despachador",
+        "jefe_flota",
+        "administracion",
+        "comercial"
+      ]
+    },
+    {
+      "client": "cc-operaciones",
+      "roles": [
+        "gerente",
+        "despachador",
+        "jefe_flota",
+        "administracion",
+        "comercial"
+      ]
+    },
+    {
+      "client": "cc-flota",
+      "roles": [
+        "gerente",
+        "despachador",
+        "jefe_flota",
+        "administracion",
+        "comercial"
+      ]
+    },
+    {
+      "client": "cc-finanzas",
+      "roles": [
+        "gerente",
+        "despachador",
+        "jefe_flota",
+        "administracion",
+        "comercial"
+      ]
+    },
+    {
+      "client": "portal-cliente",
+      "roles": [
+        "cliente",
+        "comercial"
+      ]
+    },
+    {
+      "client": "app-chofer",
+      "roles": [
+        "chofer",
+        "offline_access"
+      ]
+    },
+    {
+      "client": "demo-cli",
+      "roles": [
+        "chofer",
+        "despachador",
+        "jefe_flota",
+        "administracion",
+        "gerente",
+        "comercial",
+        "cliente",
+        "offline_access"
+      ]
+    },
+    {
+      "client": "gateway",
+      "roles": [
+        "chofer",
+        "despachador",
+        "jefe_flota",
+        "administracion",
+        "gerente",
+        "comercial",
+        "cliente",
+        "agente_lectura"
+      ]
+    },
+    {
+      "client": "analitica",
+      "roles": [
+        "chofer",
+        "despachador",
+        "jefe_flota",
+        "administracion",
+        "gerente",
+        "comercial",
+        "cliente",
+        "agente_lectura"
+      ]
+    },
+    {
+      "client": "mcp-server",
+      "roles": [
+        "chofer",
+        "despachador",
+        "jefe_flota",
+        "administracion",
+        "gerente",
+        "comercial",
+        "cliente",
+        "agente_lectura"
+      ]
+    },
+    {
+      "client": "agente",
+      "roles": [
+        "agente_lectura"
+      ]
+    },
+    {
+      "client": "viajes",
+      "roles": [
+        "chofer",
+        "despachador",
+        "jefe_flota",
+        "administracion",
+        "gerente",
+        "comercial",
+        "cliente",
+        "agente_lectura"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "service-account-agente",
+      "serviceAccountClientId": "agente",
+      "enabled": true,
+      "realmRoles": [
+        "agente_lectura"
+      ]
+    },
+    {
+      "username": "service-account-viajes",
+      "serviceAccountClientId": "viajes",
+      "enabled": true,
+      "clientRoles": {
+        "realm-management": [
+          "query-users"
+        ]
+      }
+    }
+  ]
+}
