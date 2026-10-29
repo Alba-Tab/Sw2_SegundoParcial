@@ -3,6 +3,8 @@ package bo.transporte.viajes.adaptadores.temporal;
 import bo.transporte.viajes.adaptadores.temporal.ContratoSaga.Compensacion;
 import bo.transporte.viajes.adaptadores.temporal.ContratoSaga.EntradaProgramarViaje;
 import bo.transporte.viajes.adaptadores.temporal.ContratoSaga.EstadoProgramarViaje;
+import bo.transporte.viajes.adaptadores.temporal.ContratoSaga.SenalAprobacionCredito;
+import bo.transporte.viajes.adaptadores.temporal.ContratoSaga.SenalResolverIntervencion;
 import bo.transporte.viajes.aplicacion.puerto.salida.Orquestador;
 import bo.transporte.viajes.aplicacion.servicio.ParametrosSaga;
 import bo.transporte.viajes.dominio.viaje.Servicio;
@@ -65,6 +67,24 @@ class OrquestadorTemporal implements Orquestador {
         } catch (RuntimeException e) {
             LOG.debug("Sin etapa para {}: {}", workflowId, e.getMessage());
             return Optional.empty();
+        }
+    }
+
+    @Override
+    public void aprobarCredito(String workflowId, boolean aprobado, String aprobadoPor, String motivo) {
+        senal(workflowId, w -> w.aprobacionCredito(new SenalAprobacionCredito(aprobado, aprobadoPor, motivo)));
+    }
+
+    @Override
+    public void resolverIntervencion(String workflowId, String opcion, String resueltoPor, String nota) {
+        senal(workflowId, w -> w.resolverIntervencion(new SenalResolverIntervencion(opcion, resueltoPor, nota)));
+    }
+
+    private void senal(String workflowId, java.util.function.Consumer<ProgramarViaje> enviar) {
+        try {
+            enviar.accept(cliente.newWorkflowStub(ProgramarViaje.class, workflowId));
+        } catch (RuntimeException e) {
+            throw new NoDisponible("Temporal no recibió la señal para " + workflowId, e);
         }
     }
 }

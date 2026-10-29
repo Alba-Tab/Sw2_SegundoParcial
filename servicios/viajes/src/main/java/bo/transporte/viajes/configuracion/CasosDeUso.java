@@ -14,6 +14,8 @@ import bo.transporte.viajes.aplicacion.puerto.salida.Transacciones;
 import bo.transporte.viajes.aplicacion.puerto.salida.ViajeRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.VinculadorIdentidad;
 import bo.transporte.viajes.aplicacion.ruta.ConsultaDeRutas;
+import bo.transporte.viajes.aplicacion.saga.DecisionDeCredito;
+import bo.transporte.viajes.aplicacion.saga.ResolucionDeIntervencion;
 import bo.transporte.viajes.aplicacion.servicio.ConfirmacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ConsultaDeServicios;
 import bo.transporte.viajes.aplicacion.servicio.ParametrosSaga;
@@ -96,5 +98,25 @@ class CasosDeUso {
             Transacciones tx,
             Clock reloj) {
         return new ProgramacionDeViaje(servicios, viajes, eventos, tx, reloj);
+    }
+
+    @Bean
+    DecisionDeCredito decisionDeCredito(
+            ServicioRepositorio servicios,
+            RegistroIdempotente idempotencia,
+            Auditoria auditoria,
+            Transacciones tx,
+            Orquestador orquestador) {
+        return new DecisionDeCredito(servicios, idempotencia, auditoria, tx, orquestador);
+    }
+
+    @Bean
+    ResolucionDeIntervencion resolucionDeIntervencion(
+            ServicioRepositorio servicios,
+            RegistroIdempotente idempotencia,
+            Auditoria auditoria,
+            Transacciones tx,
+            Orquestador orquestador) {
+        return new ResolucionDeIntervencion(servicios, idempotencia, auditoria, tx, orquestador);
     }
 }
