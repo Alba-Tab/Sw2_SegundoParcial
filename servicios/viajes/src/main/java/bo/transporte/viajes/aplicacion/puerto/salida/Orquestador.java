@@ -12,6 +12,12 @@ public interface Orquestador {
     /** Etapa de la consulta {@code estado}; vacío si el motor no responde a tiempo. */
     Optional<String> etapa(String workflowId);
 
+    /** Señal {@code aprobacionCredito} (spec 012). Lanza {@link NoDisponible} si Temporal no la recibe. */
+    void aprobarCredito(String workflowId, boolean aprobado, String aprobadoPor, String motivo);
+
+    /** Señal {@code resolverIntervencion} (spec 011). Lanza {@link NoDisponible} si Temporal no la recibe. */
+    void resolverIntervencion(String workflowId, String opcion, String resueltoPor, String nota);
+
     class NoDisponible extends RuntimeException {
         public NoDisponible(String mensaje, Throwable causa) {
             super(mensaje, causa);

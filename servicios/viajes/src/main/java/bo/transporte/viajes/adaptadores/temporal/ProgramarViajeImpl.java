@@ -170,7 +170,7 @@ public class ProgramarViajeImpl implements ProgramarViaje {
                 e.servicioId(),
                 decision,
                 llego ? aprobacion.aprobadoPor() : "sistema",
-                llego ? aprobacion.motivo() : null));
+                llego ? aprobacion.motivo() : "Plazo de aprobación vencido"));
         if (!llego) {
             throw ApplicationFailure.newNonRetryableFailure(
                     "Venció la espera de aprobación de crédito", "APROBACION_VENCIDA");

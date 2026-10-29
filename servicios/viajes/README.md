@@ -16,7 +16,7 @@ Clientes, cotizaciones confirmadas, servicios, viajes en ruta y la saga `Program
 | Interfaces REST y DTO generados desde `contratos/openapi/viajes.yaml` con openapi-generator 7.26 (`useSpringBoot4`, `useJackson3`); `SaludController` implementa `SaludApi` | `pom.xml`, `target/generated-sources/openapi` |
 
 ```bash
-./mvnw verify                                            # 38 pruebas (Testcontainers + Temporal en memoria)
+./mvnw verify                                            # 41 pruebas (Testcontainers + Temporal en memoria)
 docker compose -f ../../plataforma/compose/compose.yaml --profile core --profile plataforma up -d --build viajes   # contexto: raíz del repo
 curl localhost:8101/health/ready
 ```
@@ -44,7 +44,7 @@ curl localhost:8101/health/ready
   - Corre los pasos 1, 2, 2b, 3, el pivote, 5 y 6, con los timeouts de D15.
   - Compensa en orden inverso. Un paso que falló por algo técnico también se compensa, porque el otro servicio pudo haber reservado antes de que venciera el tiempo.
   - Si una compensación se agota, el viaje pasa a `REQUIERE_INTERVENCION` y el workflow espera la señal `resolverIntervencion`.
-  - Ya maneja las señales `aprobacionCredito` y `resolverIntervencion`; los endpoints que las envían llegan en T4.6.
+  - Maneja las señales `aprobacionCredito` y `resolverIntervencion`.
 - **Actividades `Viajes.*`** (`aplicacion/viaje/ProgramacionDeViaje`): todas son idempotentes. `cancelarViaje` crea el viaje ya cancelado si el paso 1 no llegó a crearlo, para que el servicio no quede en `PROGRAMANDO`.
 - **Conversor** `ConversorTemporal`: Jackson 3, `NON_NULL` y `FAIL_ON_UNKNOWN_PROPERTIES` (PoC-2).
 - **Variables:**
@@ -56,3 +56,11 @@ curl localhost:8101/health/ready
   - `ProgramarViajeTest`: camino feliz, errores de negocio, falla técnica, aprobación (aprobada, rechazada o vencida) e intervención.
   - Replay del historial guardado en `src/test/resources/historiales/` (S16). Para volver a grabarlo: `./mvnw test -Dtest=ProgramarViajeTest -DgrabarHistorial=true`.
   - `ServiciosIT`: la API y el worker real contra Temporal en memoria.
+
+## Decisiones humanas de la saga (T4.6, specs 011 y 012)
+
+- `POST /api/v1/servicios/{servicioId}/aprobacion-credito` (solo `administracion`): exige el servicio en `PROGRAMANDO` y el workflow en `ESPERANDO_APROBACION`. Envía `aprobacionCredito` con `aprobadoPor = sub`. Al rechazar, `motivo` es obligatorio.
+- `POST /api/v1/viajes/{viajeId}/intervencion` (solo `despachador`): exige el viaje en `REQUIERE_INTERVENCION` y el workflow esperando. Envía `resolverIntervencion` con `resueltoPor = sub`. Para `MARCAR_RESUELTO`, `nota` es obligatoria.
+- **Idempotencia y auditoría** (`aplicacion/saga/SenalDeSaga`): la clave queda `COMPLETADA`, con la auditoría, recién cuando Temporal recibió la señal.
+  - Un reenvío devuelve `202` sin volver a enviarla.
+  - Si Temporal no responde, la API devuelve `503`, no se guarda nada y el reenvío con la misma clave vuelve a intentar.

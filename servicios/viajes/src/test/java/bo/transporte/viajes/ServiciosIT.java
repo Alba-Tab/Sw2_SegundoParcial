@@ -30,7 +30,11 @@ import tools.jackson.databind.json.JsonMapper;
 /** Spec 003 de punta a punta en Viajes: la API, el worker real de la cola viajes y dobles de Finanzas y Flota. */
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = {"seguridad.issuer=http://localhost:1/realms/transporte", "outbox.intervalo=PT1H"})
+        properties = {
+            "seguridad.issuer=http://localhost:1/realms/transporte",
+            "outbox.intervalo=PT1H",
+            "saga.compensacion.maximo-intentos=2"
+        })
 @Import({TestcontainersConfiguration.class, TokensDePrueba.class})
 class ServiciosIT {
     static final String CLIENTE = "01933b5a-1f00-7a20-8b11-0c2d3e4f5a01";
@@ -78,6 +82,7 @@ class ServiciosIT {
         flota.respuesta = FlotaFalsa::reservada;
         finanzas.llamadas.clear();
         flota.llamadas.clear();
+        finanzas.alLiberar = () -> {};
     }
 
     private Respuesta pedir(String metodo, String ruta, String token, UUID clave, String cuerpo) throws Exception {
@@ -288,6 +293,146 @@ class ServiciosIT {
         assertEquals(
                 404,
                 pedir("GET", "/api/v1/servicios/" + UUID.randomUUID(), cliente(CLIENTE), null, null)
+                        .estado());
+    }
+
+    private String esperandoAprobacion() throws Exception {
+        finanzas.respuesta = e -> {
+            var r = FinanzasFalsa.reservado(e);
+            return new ValidarYReservarCreditoResultado(
+                    "REQUIERE_APROBACION",
+                    r.reservaCreditoId(),
+                    r.rutaId(),
+                    r.tipoCarga(),
+                    r.toneladas(),
+                    r.fechaViaje(),
+                    r.monto(),
+                    List.of("MORA"));
+        };
+        String servicioId = confirmar(cliente(CLIENTE), "{\"cotizacionId\":\"" + COTIZACION + "\"}")
+                .cuerpo()
+                .get("servicioId")
+                .asString();
+        esperar(servicioId, c -> c.has("etapa") && c.get("etapa").asString().equals("ESPERANDO_APROBACION"));
+        return servicioId;
+    }
+
+    @Test
+    void administracionApruebaYElServicioSigueHastaConfirmar() throws Exception {
+        String servicioId = esperandoAprobacion();
+        String ruta = "/api/v1/servicios/" + servicioId + "/aprobacion-credito";
+        String adm = TokensDePrueba.token("sub-adm", "administracion", null);
+
+        assertEquals(
+                403,
+                pedir(
+                                "POST",
+                                ruta,
+                                TokensDePrueba.token("c", "comercial", null),
+                                UUID.randomUUID(),
+                                "{\"aprobado\":true}")
+                        .estado());
+        var sinMotivo = pedir("POST", ruta, adm, UUID.randomUUID(), "{\"aprobado\":false}");
+        assertEquals(400, sinMotivo.estado());
+        assertEquals(
+                "motivo", sinMotivo.cuerpo().get("errores").get(0).get("campo").asString());
+
+        UUID clave = UUID.randomUUID();
+        assertEquals(202, pedir("POST", ruta, adm, clave, "{\"aprobado\":true}").estado());
+        JsonNode s = esperar(servicioId, c -> c.get("confirmacionCompleta").asBoolean());
+        assertEquals("CONFIRMADO", s.get("estado").asString());
+        assertTrue(finanzas.llamadas.contains("Finanzas.registrarDecisionCredito:APROBADA"));
+
+        assertEquals(
+                202, pedir("POST", ruta, adm, clave, "{\"aprobado\":true}").estado(), "reenvío: la respuesta guardada");
+        var tarde = pedir("POST", ruta, adm, UUID.randomUUID(), "{\"aprobado\":true}");
+        assertEquals(409, tarde.estado());
+        assertEquals("CONFLICTO_ESTADO", tarde.cuerpo().get("codigo").asString());
+        assertEquals(
+                1,
+                jdbc.sql("SELECT count(*) FROM auditoria WHERE accion = 'DECIDIR_CREDITO'")
+                        .query(Integer.class)
+                        .single());
+    }
+
+    @Test
+    void rechazoConMotivoCancelaConCreditoRechazado() throws Exception {
+        String servicioId = esperandoAprobacion();
+        var r = pedir(
+                "POST",
+                "/api/v1/servicios/" + servicioId + "/aprobacion-credito",
+                TokensDePrueba.token("sub-adm", "administracion", null),
+                UUID.randomUUID(),
+                "{\"aprobado\":false,\"motivo\":\"Mora de 20 días\"}");
+        assertEquals(202, r.estado());
+        JsonNode s = esperar(servicioId, c -> c.get("estado").asString().equals("CANCELADO"));
+        assertEquals("CREDITO_RECHAZADO", s.get("motivo").asString());
+        assertTrue(finanzas.llamadas.contains("Finanzas.liberarCredito:CREDITO_RECHAZADO"));
+    }
+
+    @Test
+    void compensacionAgotadaQuedaEnIntervencionYElDespachadorLaResuelve() throws Exception {
+        flota.respuesta = e -> {
+            throw ApplicationFailure.newNonRetryableFailure(
+                    "Sin cisterna",
+                    "SIN_UNIDAD_COMPATIBLE",
+                    new DetalleFallo("SIN_UNIDAD_COMPATIBLE", "No hay cisterna", null));
+        };
+        finanzas.alLiberar = () -> {
+            throw new IllegalStateException("PostgreSQL de Finanzas caído");
+        };
+        var aceptado = confirmar(cliente(CLIENTE), "{\"cotizacionId\":\"" + COTIZACION + "\"}")
+                .cuerpo();
+        String servicioId = aceptado.get("servicioId").asString();
+        String viajeId = aceptado.get("viajeId").asString();
+        esperar(servicioId, c -> c.get("estado").asString().equals("REQUIERE_INTERVENCION"));
+        JsonNode evento = sobre("ViajeRequiereIntervencion").get("datos");
+        assertEquals(
+                "Finanzas.liberarCredito", evento.get("compensacionFallida").asString());
+        assertEquals(2, evento.get("intentos").asInt());
+
+        String ruta = "/api/v1/viajes/" + viajeId + "/intervencion";
+        String despachador = TokensDePrueba.token("sub-desp", "despachador", null);
+        assertEquals(
+                403,
+                pedir(
+                                "POST",
+                                ruta,
+                                TokensDePrueba.token("g", "gerente", null),
+                                UUID.randomUUID(),
+                                "{\"opcion\":\"REINTENTAR_COMPENSACION\"}")
+                        .estado());
+        assertEquals(
+                400,
+                pedir("POST", ruta, despachador, UUID.randomUUID(), "{\"opcion\":\"MARCAR_RESUELTO\"}")
+                        .estado());
+        assertEquals(
+                202,
+                pedir(
+                                "POST",
+                                ruta,
+                                despachador,
+                                UUID.randomUUID(),
+                                "{\"opcion\":\"MARCAR_RESUELTO\",\"nota\":\"Liberado a mano en Finanzas\"}")
+                        .estado());
+
+        JsonNode s = esperar(servicioId, c -> c.get("estado").asString().equals("CANCELADO"));
+        assertEquals("RESUELTO_MANUALMENTE", s.get("motivo").asString());
+        assertEquals(
+                "Resuelto manualmente: Liberado a mano en Finanzas",
+                sobre("ViajeCancelado").get("datos").get("detalle").asString());
+        assertEquals(
+                409,
+                pedir("POST", ruta, despachador, UUID.randomUUID(), "{\"opcion\":\"REINTENTAR_COMPENSACION\"}")
+                        .estado());
+        assertEquals(
+                404,
+                pedir(
+                                "POST",
+                                "/api/v1/viajes/" + UUID.randomUUID() + "/intervencion",
+                                despachador,
+                                UUID.randomUUID(),
+                                "{\"opcion\":\"REINTENTAR_COMPENSACION\"}")
                         .estado());
     }
 }
