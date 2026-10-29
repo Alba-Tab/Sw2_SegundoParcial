@@ -39,7 +39,7 @@ Este plan lo escribió un agente planificador y lo revisó un agente revisor en 
 | P6 | Ramas `<tipo>/<pieza>/<que-se-hizo>` desde `develop`, publicadas con `git push -u` y con PR a `develop` |
 | P7 | **Excepción declarada** (se escribe en T0.3 y T0.5): las ramas `chore/<pieza>/poc-*` no se mergean. Lo que sirve (realm, resultados) entra por otra rama. Las ramas de PoC se borran, en local y en el remoto, al cerrar H2 |
 | P8 | La **primera versión** de un contrato va en su propio PR antes del código: temporal, eventos y OpenAPI del núcleo en F1; `analitica.yaml` en F8; GraphQL en F9. **Todo cambio posterior** va en el mismo PR que sus productores y consumidores (000 §12) |
-| P9 | **Promoción de `develop` a `main` solo al cerrar los hitos H3, H5, H7, H9, H10 y H11**, más las promociones necesarias para poner a punto los pipelines durante F3b y T9.9, y los arreglos durante F11 y F12. Cada promoción sigue `encender-demo.sh` → despliegue → smoke → `apagar-demo.sh` (salvo en F11 y F12) |
+| P9 | **Promoción de `develop` a `main` solo al cerrar los hitos H5, H7, H9 y H10 (sin despliegue, para fijar versiones estables) y desde H3 (que pasa al final, ver 1.5)**, más los arreglos durante F11 y F12. Desde H3, cada promoción sigue `encender-demo.sh` → despliegue → smoke → `apagar-demo.sh` (salvo en F11 y F12) |
 | P10 | Hasta que Keycloak exista en la nube: `/health` y `/health/ready` no dependen de Keycloak, y los endpoints de negocio responden 503 `DEPENDENCIA_NO_DISPONIBLE` si `OIDC_ISSUER` está vacío |
 
 ### 1.3 Duración (base del revisor, colchón de 20 %)
@@ -65,6 +65,29 @@ Este plan lo escribió un agente planificador y lo revisó un agente revisor en 
 | **Con niveles 1 y 2 (−9,5 j) y colchón** | 48,5 × 1,2 | **58,2** | — |
 
 Si se activa T9.9 (Azure temprano), F9 pasa a 9,5 j y F11 a 3 j; el total no cambia y el control por fase usa esos valores.
+
+### 1.5 Orden de ejecución: el despliegue va al final (cambio del usuario, 29/10/2026)
+
+Al cerrar F3a el usuario decidió hacer **primero todo el código y dejar el despliegue para el final**. Las fases y tareas no cambian, solo el orden:
+
+| Antes | Ahora |
+|---|---|
+| F3a → **F3b** → F4 … F10 → F11 → F12 | F3a → F4 … F10 → **F3b → F11 → F12** |
+
+Consecuencias:
+- **Generación de código desde los contratos (§15.4)** se adelanta al inicio de F4: es lo primero que se hace después de F3a.
+- **H3** (primera promoción con despliegue) pasa a cerrar después de H10. Hasta entonces las promociones a `main` de P9 no despliegan; la CI de PR (`ci-ok`) sigue siendo la puerta de cada merge.
+- **T9.9 (Azure temprano)** no aplica.
+- **Tareas que mencionan la nube antes del final** se hacen en local y su parte de nube queda para F3b o F11:
+  - T5.4: solo `mqtt://` en local; `mqtts://` con la CA propia, en F3b;
+  - T7.8 (FCM): en local, una cuenta de servicio de Firebase fuera del repo; la WIF desde la EC2, en F11;
+  - T8.7 y T8.8: sin `--nube` hasta F11;
+  - FO4 y la demo del TTL (N10): solo la prueba con *throttling* simulado hasta F11.
+- **Las cuentas de nube** (D41, D42 y Azure) se crean al empezar F3b. Las fechas de crédito y presupuesto de 9.1 cuentan desde ahí.
+- **Riesgo:** sube el de "despliegue concentrado al final" (sección 13). Se mitiga así:
+  - imágenes y Dockerfiles listos desde F3a, con builds amd64 en CI;
+  - `escenario-completo.sh` en cada hito sobre el compose local;
+  - la variable `--nube` prevista en los scripts desde el inicio.
 
 ### 1.4 Regla de recorte desde el día 0
 
@@ -141,7 +164,7 @@ Criterios en la sección 7. Orden: PoC-1 → T2.2 → PoC-2 → PoC-4 → PoC-3.
 | T3a.4 Esqueleto de Finanzas | `feat/finanzas/esqueleto` | DDD, Deptrac, Pest, Larastan; Octane con 4 workers; `.rr.yaml` según D29; `Monto`; OTel; P10 | Pest y Deptrac |
 | T3a.5 CI de PR | `ci/ci/pipelines-pr` | `ci.yml` con `paths-filter` y un job agregador `ci-ok`; job **gitleaks** con una regla que falla si `plataforma/keycloak/*.json` trae un secreto literal (sin `$(env:`); `contratos.yml`; **commitlint** sobre los commits del PR (Conventional Commits y regla que rechaza `Co-Authored-By`) dentro de `ci-ok` | `ci-ok` es el *required check* |
 
-### F3b: Esqueleto en la nube (3 j)
+### F3b: Esqueleto en la nube (3 j). Se ejecuta después de F10 (1.5)
 
 | Tarea | Rama | Depende de | Entregable | Hecho cuando |
 |---|---|---|---|---|
@@ -620,7 +643,7 @@ Ver [guion-fallos.md](guion-fallos.md).
 | Riesgo | Mitigación |
 |---|---|
 | Tiempo | 1.4, controles por fase, adelantar F11 |
-| **Despliegue concentrado al final** (Azure, Gateway, MCP y 5 apps en F11) | Esqueleto en F3b; promociones en cada hito (P9); T9.9 Azure temprano; `escenario-completo.sh` en cada hito; adelantar F11 si el atraso pasa del 20 % |
+| **Despliegue concentrado al final** (Azure, Gateway, MCP y 5 apps en F11; además F3b pasó al final, ver 1.5) | Esqueleto en F3b; promociones en cada hito (P9); T9.9 Azure temprano; `escenario-completo.sh` en cada hito; adelantar F11 si el atraso pasa del 20 % |
 | Intercambio encadenado (K1) | PoC-1; 2 saltos |
 | Worker PHP | PoC-2 |
 | Costos y créditos | T0.1; D41, D42; apagar después de cada hito; worker pool en 0; Budgets |
