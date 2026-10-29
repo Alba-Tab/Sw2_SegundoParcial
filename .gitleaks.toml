@@ -1,0 +1,19 @@
+# gitleaks (T3a.5). Reglas por defecto más la del realm de Keycloak: sus JSON solo llevan $(env:KC_SECRETO_*) y
+# $(env:KC_CLAVE_*), nunca un valor literal (AGENTS.md).
+title = "transporte"
+
+[extend]
+useDefault = true
+
+[[rules]]
+id = "keycloak-secreto-literal"
+description = "Secreto o contraseña literal en un JSON del realm (debe ser $(env:...))"
+path = '''plataforma/keycloak/[^/]+\.json$'''
+regex = '''"(secret|value)"\s*:\s*"([^$"][^"]*)"'''
+secretGroup = 2
+keywords = ["secret", "value"]
+
+[[allowlists]]
+description = "Claves de enrutamiento de RabbitMQ: parecen claves de API para la regla genérica, pero no son secretos"
+regexTarget = "line"
+regexes = ['''"routing_key"\s*:''']

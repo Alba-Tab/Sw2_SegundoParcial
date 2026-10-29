@@ -1,0 +1,15 @@
+{
+  "name": "sw2-segundo-parcial",
+  "private": true,
+  "description": "Herramientas del monorepo: commitlint y lefthook (§15.3). Cada pieza tiene su propio package.json o build.",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "prepare": "lefthook install",
+    "commitlint": "commitlint"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "21.2.4",
+    "@commitlint/config-conventional": "21.2.4",
+    "lefthook": "2.2.2"
+  }
+}
