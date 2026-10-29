@@ -40,6 +40,7 @@ describe('validación de peticiones contra el contrato', function () {
     });
 
     it('deja pasar una petición que cumple el contrato', function () {
-        $this->getJson('/api/v1/cotizaciones?limite=10')->assertStatus(404)->assertJsonPath('codigo', 'NO_ENCONTRADO');
+        autenticacionDePrueba();
+        $this->withHeaders(['X-Prueba' => 'sub-a~administracion~'])->getJson('/api/v1/cotizaciones?limite=10')->assertOk();
     });
 });

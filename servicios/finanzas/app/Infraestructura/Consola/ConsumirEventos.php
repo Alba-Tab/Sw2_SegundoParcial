@@ -2,6 +2,7 @@
 
 namespace App\Infraestructura\Consola;
 
+use App\Aplicacion\Catalogo\AplicarCopias;
 use App\Infraestructura\Mensajeria\ConexionAmqp;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Context;
@@ -23,8 +24,10 @@ final class ConsumirEventos extends Command
     /** @var array<string, callable(array<string, mixed>): void> tipo => manejador */
     private array $manejadores = [];
 
-    public function handle(ConexionAmqp $amqp): never
+    public function handle(ConexionAmqp $amqp, AplicarCopias $copias): never
     {
+        $this->registrarManejadores($copias);
+
         // Proceso largo: RoadRunner lo reinicia si termina (plugin service, D29).
         for (; ;) {
             try {
@@ -41,23 +44,45 @@ final class ConsumirEventos extends Command
         }
     }
 
+    /** tipo de evento => caso de uso. Los que no están aquí van a la DLQ. */
+    public function registrarManejadores(AplicarCopias $copias): void
+    {
+        $this->manejadores = [
+            'ClienteActualizado' => $copias->clienteActualizado(...),
+            'RutaActualizada' => $copias->rutaActualizada(...),
+        ];
+    }
+
     private function procesar(AMQPMessage $mensaje): void
     {
         $sobre = json_decode($mensaje->getBody(), true);
-        $manejador = is_array($sobre) ? ($this->manejadores[$sobre['tipo'] ?? ''] ?? null) : null;
-        if ($manejador === null) {
-            Log::warning('Evento sin manejador o inválido: va a la DLQ', ['tipo' => $sobre['tipo'] ?? null]);
+        if (! is_array($sobre) || ! isset($this->manejadores[$sobre['tipo'] ?? ''])) {
+            Log::warning('Evento sin manejador o inválido: va a la DLQ', ['tipo' => is_array($sobre) ? ($sobre['tipo'] ?? null) : null]);
             $mensaje->reject(false);
 
             return;
         }
+        $this->aplicar($sobre);
+        $mensaje->ack();
+    }
+
+    /**
+     * Inbox (000 §6): el registro del eventId y el efecto van en la misma transacción.
+     *
+     * @param  array<string, mixed>  $sobre
+     * @return bool true si el evento era nuevo y se aplicó
+     */
+    public function aplicar(array $sobre): bool
+    {
         Context::add('correlationId', $sobre['correlationId'] ?? null);
-        DB::transaction(function () use ($sobre, $manejador) {
+
+        return DB::transaction(function () use ($sobre) {
             $nuevo = DB::table('inbox_eventos')->insertOrIgnore(['event_id' => $sobre['id'], 'tipo' => $sobre['tipo']]);
             if ($nuevo === 1) {
-                $manejador($sobre['datos']);
+                ($this->manejadores[$sobre['tipo']])($sobre['datos']);
             }
+
+            return $nuevo === 1;
         });
-        $mensaje->ack();
     }
 }
