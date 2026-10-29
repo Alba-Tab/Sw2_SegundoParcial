@@ -23,48 +23,48 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Component
 class RelayOutbox {
-	private static final Logger LOG = LoggerFactory.getLogger(RelayOutbox.class);
-	static final String EXCHANGE = "transporte.events";
+    private static final Logger LOG = LoggerFactory.getLogger(RelayOutbox.class);
+    static final String EXCHANGE = "transporte.events";
 
-	private record Pendiente(UUID id, String clave, String sobre) {}
+    private record Pendiente(UUID id, String clave, String sobre) {}
 
-	private final JdbcClient jdbc;
-	private final RabbitTemplate rabbit;
-	private final int lote;
+    private final JdbcClient jdbc;
+    private final RabbitTemplate rabbit;
+    private final int lote;
 
-	RelayOutbox(JdbcClient jdbc, RabbitTemplate rabbit, @Value("${outbox.lote:100}") int lote) {
-		this.jdbc = jdbc;
-		this.rabbit = rabbit;
-		this.lote = lote;
-	}
+    RelayOutbox(JdbcClient jdbc, RabbitTemplate rabbit, @Value("${outbox.lote:100}") int lote) {
+        this.jdbc = jdbc;
+        this.rabbit = rabbit;
+        this.lote = lote;
+    }
 
-	@Scheduled(fixedDelayString = "${outbox.intervalo:PT1S}")
-	@Transactional
-	public void publicarPendientes() {
-		List<Pendiente> pendientes = jdbc.sql("""
+    @Scheduled(fixedDelayString = "${outbox.intervalo:PT1S}")
+    @Transactional
+    public void publicarPendientes() {
+        List<Pendiente> pendientes = jdbc.sql("""
 				SELECT id, clave_enrutamiento, sobre::text FROM outbox_eventos
 				WHERE publicado_en IS NULL ORDER BY creado_en LIMIT :lote FOR UPDATE SKIP LOCKED""")
-			.param("lote", lote)
-			.query((rs, i) -> new Pendiente(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3)))
-			.list();
-		if (pendientes.isEmpty()) return;
-		rabbit.invoke(ops -> {
-			for (Pendiente p : pendientes) ops.send(EXCHANGE, p.clave(), mensaje(p));
-			ops.waitForConfirmsOrDie(Duration.ofSeconds(10).toMillis());
-			return null;
-		});
-		jdbc.sql("UPDATE outbox_eventos SET publicado_en = now() WHERE id IN (:ids)")
-			.param("ids", pendientes.stream().map(Pendiente::id).toList())
-			.update();
-		LOG.info("Outbox: {} eventos publicados", pendientes.size());
-	}
+                .param("lote", lote)
+                .query((rs, i) -> new Pendiente(rs.getObject(1, UUID.class), rs.getString(2), rs.getString(3)))
+                .list();
+        if (pendientes.isEmpty()) return;
+        rabbit.invoke(ops -> {
+            for (Pendiente p : pendientes) ops.send(EXCHANGE, p.clave(), mensaje(p));
+            ops.waitForConfirmsOrDie(Duration.ofSeconds(10).toMillis());
+            return null;
+        });
+        jdbc.sql("UPDATE outbox_eventos SET publicado_en = now() WHERE id IN (:ids)")
+                .param("ids", pendientes.stream().map(Pendiente::id).toList())
+                .update();
+        LOG.info("Outbox: {} eventos publicados", pendientes.size());
+    }
 
-	private static Message mensaje(Pendiente p) {
-		return MessageBuilder.withBody(p.sobre().getBytes(StandardCharsets.UTF_8))
-			.setContentType(MessageProperties.CONTENT_TYPE_JSON)
-			.setContentEncoding("UTF-8")
-			.setMessageId(p.id().toString())
-			.setDeliveryMode(org.springframework.amqp.core.MessageDeliveryMode.PERSISTENT)
-			.build();
-	}
+    private static Message mensaje(Pendiente p) {
+        return MessageBuilder.withBody(p.sobre().getBytes(StandardCharsets.UTF_8))
+                .setContentType(MessageProperties.CONTENT_TYPE_JSON)
+                .setContentEncoding("UTF-8")
+                .setMessageId(p.id().toString())
+                .setDeliveryMode(org.springframework.amqp.core.MessageDeliveryMode.PERSISTENT)
+                .build();
+    }
 }

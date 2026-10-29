@@ -19,7 +19,12 @@ export class SaludController {
 
   @Get('ready')
   async listo(@Res({ passthrough: true }) res: Response) {
-    const mongo = await this.mongo.db?.admin().ping().then(() => 'UP').catch(() => 'DOWN') ?? 'DOWN';
+    const mongo =
+      (await this.mongo.db
+        ?.admin()
+        .ping()
+        .then(() => 'UP')
+        .catch(() => 'DOWN')) ?? 'DOWN';
     const rabbitmq = (await this.amqp.disponible()) ? 'UP' : 'DOWN';
     const arriba = mongo === 'UP' && rabbitmq === 'UP';
     res.status(arriba ? 200 : 503);

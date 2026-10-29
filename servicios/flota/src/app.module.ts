@@ -10,9 +10,7 @@ import { SaludController } from './infraestructura/http/salud.controller';
 @Module({
   imports: [ComunModule],
   controllers: [SaludController],
-  providers: [
-    { provide: APP_FILTER, useClass: FiltroProblemas },
-  ],
+  providers: [{ provide: APP_FILTER, useClass: FiltroProblemas }],
 })
 export class AppModule implements NestModule {
   configure(consumidor: MiddlewareConsumer) {

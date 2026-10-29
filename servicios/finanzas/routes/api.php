@@ -1,7 +1,7 @@
 <?php
 
-use App\Infraestructura\Http\SaludController;
 use App\Infraestructura\Http\Middleware\Autenticacion;
+use App\Infraestructura\Http\SaludController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/health', [SaludController::class, 'vivo']);

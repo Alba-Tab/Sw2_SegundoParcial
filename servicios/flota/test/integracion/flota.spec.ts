@@ -1,29 +1,48 @@
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getConnectionToken } from '@nestjs/mongoose';
-import { MongoDBContainer, StartedMongoDBContainer } from '@testcontainers/mongodb';
 import { RabbitMQContainer, StartedRabbitMQContainer } from '@testcontainers/rabbitmq';
 import * as amqp from 'amqplib';
 import type { Connection } from 'mongoose';
 import request from 'supertest';
+import { GenericContainer, StartedTestContainer, Wait } from 'testcontainers';
 import { REGISTRO_DE_EVENTOS, RegistroDeEventos } from '../../src/aplicacion/puertos/registro-de-eventos';
 import { UNIDAD_DE_TRABAJO, UnidadDeTrabajo } from '../../src/aplicacion/puertos/unidad-de-trabajo';
 
 /** Mismas versiones que plataforma/compose. Sin OIDC_ISSUER (P10). */
 jest.setTimeout(60_000);
 
+/**
+ * Mongo 8 con réplica rs0 de un nodo (las transacciones del Outbox la necesitan): se espera el log, se inicia la
+ * réplica con exec y se espera a que el nodo sea primario. Por defecto la misma versión que el compose y Atlas M0;
+ * la CI usa MONGO_IMAGEN_PRUEBA=mongo:7.0 porque MongoDB 8.0 no arranca en kernels 6.19+ (SERVER-121912).
+ */
+async function iniciarMongoRs0(): Promise<StartedTestContainer> {
+  const c = await new GenericContainer(process.env.MONGO_IMAGEN_PRUEBA ?? 'mongo:8.0.34')
+    .withCommand(['--replSet', 'rs0', '--bind_ip_all'])
+    .withExposedPorts(27017)
+    .withWaitStrategy(Wait.forLogMessage(/Waiting for connections/))
+    .withStartupTimeout(120_000)
+    .start();
+  const sh = (js: string) => c.exec(['mongosh', '--quiet', '--eval', js]);
+  const inicio = await sh("rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:27017'}]}).ok");
+  if (inicio.exitCode !== 0) throw new Error(`rs.initiate falló: ${inicio.output}`);
+  for (let i = 0; i < 120; i++) {
+    if ((await sh('db.hello().isWritablePrimary')).output.trim() === 'true') return c;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error('la réplica rs0 no llegó a primaria en 60 s');
+}
+
 describe('Flota (Mongo rs0 + RabbitMQ)', () => {
-  let mongo: StartedMongoDBContainer;
+  let mongo: StartedTestContainer;
   let rabbit: StartedRabbitMQContainer;
   let api: INestApplication;
   let worker: INestApplication;
 
   beforeAll(async () => {
-    [mongo, rabbit] = await Promise.all([
-      new MongoDBContainer('mongo:8.0.34').start(),
-      new RabbitMQContainer('rabbitmq:4.4.0-management').start(),
-    ]);
-    process.env.MONGO_URI = `${mongo.getConnectionString()}/flota?directConnection=true`;
+    [mongo, rabbit] = await Promise.all([iniciarMongoRs0(), new RabbitMQContainer('rabbitmq:4.4.0-management').start()]);
+    process.env.MONGO_URI = `mongodb://${mongo.getHost()}:${mongo.getMappedPort(27017)}/flota?directConnection=true`;
     process.env.AMQP_URL = rabbit.getAmqpUrl();
     process.env.OIDC_ISSUER = '';
     process.env.OUTBOX_INTERVALO_MS = '200';
@@ -83,11 +102,22 @@ describe('Flota (Mongo rs0 + RabbitMQ)', () => {
 
     const uow = worker.get<UnidadDeTrabajo>(UNIDAD_DE_TRABAJO);
     const registro = worker.get<RegistroDeEventos>(REGISTRO_DE_EVENTOS);
-    await uow.ejecutar(() => registro.registrar('ChoferActualizado', 'flota.chofer-actualizado.v1', { choferId: 'c1', versionAgregado: 1 }));
+    await uow.ejecutar(() =>
+      registro.registrar('ChoferActualizado', 'flota.chofer-actualizado.v1', { choferId: 'c1', versionAgregado: 1 }),
+    );
 
     const mensaje = await new Promise<amqp.ConsumeMessage>((resolver, rechazar) => {
       const t = setTimeout(() => rechazar(new Error('el relay no publicó')), 10_000);
-      void canal.consume(queue, (m) => { if (m) { clearTimeout(t); resolver(m); } }, { noAck: true });
+      void canal.consume(
+        queue,
+        (m) => {
+          if (m) {
+            clearTimeout(t);
+            resolver(m);
+          }
+        },
+        { noAck: true },
+      );
     });
     const sobre = JSON.parse(mensaje.content.toString());
     expect(sobre).toMatchObject({ tipo: 'ChoferActualizado', version: 1, productor: 'flota', datos: { choferId: 'c1' } });

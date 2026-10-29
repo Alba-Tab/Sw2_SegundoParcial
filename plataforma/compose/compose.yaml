@@ -50,6 +50,8 @@ services:
     image: mongo:8.0.34
     profiles: [core]
     command: ["--replSet", "rs0", "--bind_ip_all"]
+    # MongoDB 8.0 no arranca en Linux con kernel 6.19+ (SERVER-121912). En la Mac (OrbStack) arranca; en un Linux
+    # con ese kernel, usar mongo:7.0 hasta que MongoDB publique la corrección.
     volumes: [mongo:/data/db]
     ports: ["27017:27017"]
     # Inicia la réplica rs0 de un nodo (las transacciones del Outbox de Flota la necesitan).

@@ -8,11 +8,16 @@ import org.springframework.core.env.MapPropertySource;
 
 /** 000 §10 y D23: se exportan trazas solo si OTEL_EXPORTER_OTLP_ENDPOINT está definido (perfil trazas o la nube). */
 public class TrazasSiHayEndpoint implements EnvironmentPostProcessor {
-	@Override
-	public void postProcessEnvironment(ConfigurableEnvironment env, SpringApplication app) {
-		String endpoint = env.getProperty("OTEL_EXPORTER_OTLP_ENDPOINT", "");
-		env.getPropertySources().addLast(new MapPropertySource("trazas", Map.of(
-			"management.tracing.export.enabled", !endpoint.isBlank(),
-			"management.opentelemetry.tracing.export.otlp.endpoint", endpoint.isBlank() ? "" : endpoint.replaceAll("/$", "") + "/v1/traces")));
-	}
+    @Override
+    public void postProcessEnvironment(ConfigurableEnvironment env, SpringApplication app) {
+        String endpoint = env.getProperty("OTEL_EXPORTER_OTLP_ENDPOINT", "");
+        env.getPropertySources()
+                .addLast(new MapPropertySource(
+                        "trazas",
+                        Map.of(
+                                "management.tracing.export.enabled",
+                                !endpoint.isBlank(),
+                                "management.opentelemetry.tracing.export.otlp.endpoint",
+                                endpoint.isBlank() ? "" : endpoint.replaceAll("/$", "") + "/v1/traces")));
+    }
 }
