@@ -23,6 +23,10 @@ async function iniciarMongoRs0(): Promise<StartedTestContainer> {
     .withExposedPorts(27017)
     .withWaitStrategy(Wait.forLogMessage(/Waiting for connections/))
     .withStartupTimeout(120_000)
+    // En CI se imprime la salida de mongod para diagnosticar si el contenedor termina antes de quedar listo.
+    .withLogConsumer((salida) => {
+      if (process.env.CI) salida.on('data', (l) => process.stdout.write(`[mongo] ${String(l)}`));
+    })
     .start();
   const sh = (js: string) => c.exec(['mongosh', '--quiet', '--eval', js]);
   const inicio = await sh("rs.initiate({_id: 'rs0', members: [{_id: 0, host: 'localhost:27017'}]}).ok");
