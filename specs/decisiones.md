@@ -70,7 +70,7 @@ La columna "#11" es el número de la decisión en la sección 11 de `docs/analis
 | D26 | — | Verificar correo (K6) | Desactivado | — | — |
 | D27 | — | Tokens | Access token de 5 min (demo 2). `refresh_token` sin iframe. Sesión de 30 min inactiva y 10 h máximo. `offline_access` solo el chofer. Renovación al volver a la pestaña | — | — |
 | D28 | — | Temporal UI y consola de RabbitMQ | **Solo por túnel SSM** (análisis); no se publican | OIDC de Temporal UI contra Keycloak, como mejora (+0,5 j) | — |
-| D29 | — | Procesos PHP | RoadRunner: 2 workers `temporal` y plugin `service` con `eventos:consumir` y `outbox:publicar`. Plan B: supervisord | — | PoC |
+| D29 | — | Procesos PHP | RoadRunner: 2 workers `temporal` de actividades (más el de workflows que RoadRunner levanta siempre) y plugin `service` con `eventos:consumir` y `outbox:publicar`. Plan B: supervisord | — | — (PoC-2 pasó el 29/10/2026) |
 | D30 | — | Sensor | Flota consume `amq.topic` por AMQP; `mqtt` solo en el simulador | — | — |
 | D31 | — | Hosting | Firebase Hosting, 5 sitios. Plan B: S3 + CloudFront | — | — |
 | D32 | — | Dominio | sslip.io sobre la IP elástica con Caddy, o el dominio propio (I4) | — | PoC (F3b) |
