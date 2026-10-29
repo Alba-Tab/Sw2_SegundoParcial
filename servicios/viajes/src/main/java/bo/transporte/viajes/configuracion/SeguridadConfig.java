@@ -34,7 +34,8 @@ import tools.jackson.databind.json.JsonMapper;
 class SeguridadConfig {
 
     @Bean
-    SecurityFilterChain cadena(HttpSecurity http, SeguridadPropiedades props, JsonMapper json) throws Exception {
+    SecurityFilterChain cadena(HttpSecurity http, SeguridadPropiedades props, JsonMapper json, JwtDecoder decodificador)
+            throws Exception {
         http.csrf(c -> c.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .cors(c -> c.configurationSource(cors(props)));
@@ -68,8 +69,7 @@ class SeguridadConfig {
                         .authenticated()
                         .anyRequest()
                         .denyAll())
-                .oauth2ResourceServer(o -> o.jwt(
-                                j -> j.decoder(decodificador(props)).jwtAuthenticationConverter(conversor()))
+                .oauth2ResourceServer(o -> o.jwt(j -> j.decoder(decodificador).jwtAuthenticationConverter(conversor()))
                         .authenticationEntryPoint((req, res, e) -> escribir(
                                 res,
                                 json,
@@ -87,7 +87,13 @@ class SeguridadConfig {
      * Las llaves se bajan en la primera petición y se cachean (withIssuerLocation consulta Keycloak al arrancar y
      * rompería P10). Se validan igual el emisor, las fechas y la audiencia.
      */
-    static JwtDecoder decodificador(SeguridadPropiedades props) {
+    @Bean
+    JwtDecoder decodificador(SeguridadPropiedades props) {
+        if (props.issuer() == null || props.issuer().isBlank()) {
+            return token -> {
+                throw new org.springframework.security.oauth2.jwt.BadJwtException("OIDC_ISSUER no está configurado");
+            };
+        }
         String issuer = props.issuer().replaceAll("/$", "");
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(issuer + "/protocol/openid-connect/certs")
                 .build();

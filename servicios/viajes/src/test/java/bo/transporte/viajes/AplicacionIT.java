@@ -111,10 +111,14 @@ class AplicacionIT {
         admin.declareQueue(cola);
         admin.declareBinding(BindingBuilder.bind(cola).to(exchange).with("viajes.#"));
 
+        // Datos válidos según el contrato: el Outbox valida cada evento contra su esquema (000 §6).
+        JsonNode ejemplo = json.readTree(
+                        getClass().getResourceAsStream("/contratos/eventos/viajes/ViajeConfirmado.v1.schema.json"))
+                .get("examples")
+                .get(0)
+                .get("datos");
         tx.executeWithoutResult(s -> registro.registrar(
-                "ViajeConfirmado",
-                "viajes.viaje-confirmado.v1",
-                Map.of("viajeId", "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02")));
+                "ViajeConfirmado", "viajes.viaje-confirmado.v1", json.treeToValue(ejemplo, Map.class)));
 
         var mensaje = rabbit.receive("prueba.viajes", 10_000);
         assertNotNull(mensaje, "el relay no publicó");
@@ -122,9 +126,7 @@ class AplicacionIT {
         assertEquals("ViajeConfirmado", sobre.get("tipo").asString());
         assertEquals(1, sobre.get("version").asInt());
         assertEquals("viajes", sobre.get("productor").asString());
-        assertEquals(
-                "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
-                sobre.get("datos").get("viajeId").asString());
+        assertEquals(ejemplo, sobre.get("datos"));
         assertEquals(sobre.get("id").asString(), mensaje.getMessageProperties().getMessageId());
         Thread.sleep(300);
         assertEquals(

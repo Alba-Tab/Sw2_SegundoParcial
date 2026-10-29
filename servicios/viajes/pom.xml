@@ -141,7 +141,13 @@
 			<artifactId>testcontainers-rabbitmq</artifactId>
 			<scope>test</scope>
 		</dependency>
-			<dependency>
+			<!-- El productor valida cada evento contra contratos/eventos antes de escribirlo en el Outbox (000 §6). -->
+		<dependency>
+			<groupId>com.networknt</groupId>
+			<artifactId>json-schema-validator</artifactId>
+			<version>3.0.8</version>
+		</dependency>
+		<dependency>
 			<groupId>com.tngtech.archunit</groupId>
 			<artifactId>archunit-junit5</artifactId>
 			<version>1.5.1</version>
@@ -151,6 +157,32 @@
 
 	<build>
 		<plugins>
+			<!-- Esquemas de eventos y tipos comunes al classpath: el Outbox valida cada evento contra su contrato (000 §6). -->
+			<plugin>
+				<groupId>org.apache.maven.plugins</groupId>
+				<artifactId>maven-resources-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>contratos-eventos</id>
+						<phase>generate-resources</phase>
+						<goals>
+							<goal>copy-resources</goal>
+						</goals>
+						<configuration>
+							<outputDirectory>${project.build.outputDirectory}/contratos</outputDirectory>
+							<resources>
+								<resource>
+									<directory>${project.basedir}/../../contratos</directory>
+									<includes>
+										<include>eventos/**/*.schema.json</include>
+										<include>comun/*.schema.json</include>
+									</includes>
+								</resource>
+							</resources>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 			<!--
 				Contrato primero (§15.2, D49): las interfaces de los controladores y sus modelos se generan en cada build desde
 				contratos/openapi/viajes.yaml. Si el contrato cambia, el controlador que lo implementa deja de compilar.
