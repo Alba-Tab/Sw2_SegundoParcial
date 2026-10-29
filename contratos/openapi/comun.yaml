@@ -1,0 +1,224 @@
+openapi: 3.0.3
+info:
+  title: Componentes comunes
+  version: 1.0.0
+  description: |
+    Esquemas, parámetros, encabezados y respuestas que comparten las APIs REST (000 §3–§5 y §8).
+    No es una API: los demás archivos lo referencian con `$ref: './comun.yaml#/components/...'`.
+    Se escribe en OpenAPI 3.0.3 porque el validador de Finanzas solo soporta 3.0.
+servers:
+  - url: http://localhost
+    description: Sin servidor propio; solo lo referencian las demás APIs.
+paths: {}
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token de Keycloak (realm `transporte`) con la audiencia del servicio.
+
+  parameters:
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: UUID generado por el cliente, uno por intento (000 §4.1).
+      schema:
+        $ref: '#/components/schemas/Uuid'
+    CorrelationId:
+      name: X-Correlation-Id
+      in: header
+      required: false
+      description: Si no viene, lo genera el primer servicio y lo propaga (000 §4).
+      schema:
+        $ref: '#/components/schemas/Uuid'
+    Limite:
+      name: limite
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Cursor:
+      name: cursor
+      in: query
+      required: false
+      description: Valor opaco devuelto en `siguienteCursor`.
+      schema:
+        type: string
+        maxLength: 500
+
+  headers:
+    RetryAfter:
+      description: Segundos que conviene esperar antes de reintentar.
+      schema:
+        type: integer
+        minimum: 1
+    Location:
+      description: URL del recurso creado o aceptado.
+      schema:
+        type: string
+
+  schemas:
+    Uuid:
+      type: string
+      format: uuid
+      example: 01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01
+    Sub:
+      type: string
+      minLength: 1
+      maxLength: 64
+      description: Claim `sub` de Keycloak.
+    Instante:
+      type: string
+      format: date-time
+      description: ISO-8601 en UTC con `Z`.
+      example: '2026-11-03T14:05:00Z'
+    Fecha:
+      type: string
+      format: date
+      description: Fecha sin hora, en America/La_Paz.
+      example: '2026-11-03'
+    Monto:
+      type: object
+      required: [monto, moneda]
+      additionalProperties: false
+      properties:
+        monto:
+          type: string
+          pattern: '^(0|[1-9]\d{0,11})\.\d{2}$'
+          example: '2800.00'
+        moneda:
+          type: string
+          enum: [BOB]
+    Coordenadas:
+      type: object
+      required: [lat, lng]
+      additionalProperties: false
+      properties:
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+        lng:
+          type: number
+          minimum: -180
+          maximum: 180
+    TipoCarga:
+      type: string
+      enum: [GRANOS, INSUMOS, INSUMOS_LIQUIDOS, CONTENEDOR]
+    Toneladas:
+      type: number
+      minimum: 0
+      exclusiveMinimum: true
+      maximum: 30
+    CanalServicio:
+      type: string
+      enum: [PORTAL, TELEFONO]
+    EstadoViaje:
+      type: string
+      enum: [PROGRAMANDO, CONFIRMADO, EN_RUTA, ENTREGADO, CERRADO, CANCELADO, ENTREGA_OBSERVADA, ENTREGA_RECHAZADA, REQUIERE_INTERVENCION]
+    Placa:
+      type: string
+      pattern: '^[0-9]{3,4}[A-Z]{3}$'
+      example: 4521KTR
+
+    Problema:
+      type: object
+      description: Problem Details (RFC 9457) con el código estable de 000 §5.
+      required: [type, title, status, codigo]
+      properties:
+        type:
+          type: string
+          example: https://transporte.local/errores/credito-insuficiente
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        codigo:
+          type: string
+          pattern: '^[A-Z][A-Z_]*[A-Z]$'
+          example: CREDITO_INSUFICIENTE
+        correlationId:
+          $ref: '#/components/schemas/Uuid'
+        errores:
+          type: array
+          description: Solo en validación (400).
+          items:
+            type: object
+            required: [campo, mensaje]
+            properties:
+              campo:
+                type: string
+              mensaje:
+                type: string
+    Salud:
+      type: object
+      required: [estado]
+      properties:
+        estado:
+          type: string
+          enum: [UP, DOWN]
+        dependencias:
+          type: object
+          additionalProperties:
+            type: string
+            enum: [UP, DOWN]
+
+  responses:
+    Salud:
+      description: Estado del servicio.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Salud'
+    NoDisponible:
+      description: Una dependencia no responde (incluye Keycloak sin configurar, P10).
+      headers:
+        Retry-After:
+          $ref: '#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+    Validacion:
+      description: Petición mal formada (`VALIDACION`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+    NoAutenticado:
+      description: Sin token o token inválido (`NO_AUTENTICADO`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+    SinPermiso:
+      description: Token válido sin permiso sobre el recurso (`SIN_PERMISO`, `COTIZACION_AJENA`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+    NoEncontrado:
+      description: No existe (`NO_ENCONTRADO`).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+    Conflicto:
+      description: Conflicto de estado o idempotencia en proceso (`CONFLICTO_ESTADO`, `IDEMPOTENCIA_EN_PROCESO` y otros de 000 §5).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
+    ReglaDeNegocio:
+      description: Regla de negocio violada o misma clave con otro cuerpo (`IDEMPOTENCIA_CUERPO_DISTINTO` y otros 422 de 000 §5).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problema'
