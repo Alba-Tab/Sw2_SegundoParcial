@@ -24,6 +24,9 @@ docs/
 *.key
 *.p12
 *.jks
+# Configuración de Firebase de la app: se genera en el build desde un secreto (D45)
+google-services.json
+GoogleService-Info.plist
 plataforma/vm/certs/
 plataforma/compose/certs/
 

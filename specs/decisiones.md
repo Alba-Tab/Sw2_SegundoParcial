@@ -16,7 +16,7 @@ Cambiar una decisión confirmada exige una rama `docs/specs/decision-dxx-<tema>`
 |---|---|---|
 | I1 | Fecha de la defensa | No dada: el usuario pide **plan completo, sin limitarse por fechas** |
 | I2 | Jornadas por semana | No dada (ver I1). No se aplica recorte desde el día 0 |
-| I3 | RAM de la Mac | **16 GB** → D36 usa `qwen3:4b` |
+| I3 | RAM de la Mac | **16 GB** → D36 usa `qwen3:4b-instruct` |
 | I4 | ¿Dominio propio? | No indicado → sslip.io (D32) |
 | I5 | Dispositivos | **iPhone** para la presentación (instalado 2 días antes) y **emulador de Android** en la Mac para probar las notificaciones push (D22, D45) |
 
@@ -77,7 +77,7 @@ La columna "#11" es el número de la decisión en la sección 11 de `docs/analis
 | D33 | — | Regiones | AWS `us-east-1`; GCP `us-central1`; Azure `eastus` o la más cercana con T4 | — | PoC (F3b) |
 | D34 | — | Registros | ECR, Artifact Registry, GHCR público (sin secretos en las imágenes) | — | — |
 | D35 | — | EC2 | t3.medium con 2 GB de swap; t3.large si se miden más de 3,5 GB | — | PoC (F3b) |
-| D36 | — | LLM | **La Mac tiene 16 GB (I3): `qwen3:4b` en Q4** (8b solo si PoC-3 muestra que cabe). Ollama, el emulador de Android y el stack completo no corren a la vez: se levanta por perfiles lo que pide cada demo. Nube: T4 en Azure → L4 en Cloud Run → la Mac con túnel autenticado | — | PoC-3 |
+| D36 | — | LLM | **La Mac tiene 16 GB (I3): `qwen3:4b-instruct` en Q4** (Qwen3 4B 2507 *Instruct*; cambiada el 29/10/2026 por la PoC-3: la etiqueta `qwen3:4b` apunta a la variante *Thinking*, que con herramientas razona sin parar y nunca llama una. 8b solo si una prueba muestra que cabe). Ollama, el emulador de Android y el stack completo no corren a la vez: se levanta por perfiles lo que pide cada demo. Nube: T4 en Azure → L4 en Cloud Run → la Mac con túnel autenticado | — | `cambiada` (PoC-3, 29/10/2026) |
 | D37 | — | SMTP en la nube | Brevo o Gmail con contraseña de aplicación | — | — |
 | D38 | — | Modelos de IA | Whisper `tiny` (web) y `base` (app), Tesseract `spa`, servidos desde el hosting propio. Detector de fatiga público en TFLite con su licencia | — | PoC-4 |
 | D39 | — | Tokens para scripts | Cliente `demo-cli` público. En local, *direct grant*. **En la nube, solo *device authorization grant*** (sin *direct grant*). Sus tokens tienen los permisos del mismo usuario; se puede limitar a los usuarios de semilla con una condición de rol en el flujo. El mismo realm lo resuelve con la variable `$(env:KC_DEMO_CLI_DIRECT_GRANT)` (`true` en local, `false` en la nube). Los scripts guardan el `refresh_token` de una sola sesión por rol, para no iniciar sesión por *device grant* en cada corrida | Marcar FS7 y FO3 "en la nube, desde el portal o la app" | — |
