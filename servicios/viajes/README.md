@@ -16,7 +16,7 @@ Clientes, cotizaciones confirmadas, servicios, viajes en ruta y la saga `Program
 | Interfaces REST y DTO generados desde `contratos/openapi/viajes.yaml` con openapi-generator 7.26 (`useSpringBoot4`, `useJackson3`); `SaludController` implementa `SaludApi` | `pom.xml`, `target/generated-sources/openapi` |
 
 ```bash
-./mvnw verify                                            # 41 pruebas (Testcontainers + Temporal en memoria)
+./mvnw verify                                            # 43 pruebas (Testcontainers + Temporal en memoria)
 docker compose -f ../../plataforma/compose/compose.yaml --profile core --profile plataforma up -d --build viajes   # contexto: raíz del repo
 curl localhost:8101/health/ready
 ```
@@ -64,3 +64,14 @@ curl localhost:8101/health/ready
 - **Idempotencia y auditoría** (`aplicacion/saga/SenalDeSaga`): la clave queda `COMPLETADA`, con la auditoría, recién cuando Temporal recibió la señal.
   - Un reenvío devuelve `202` sin volver a enviarla.
   - Si Temporal no responde, la API devuelve `503`, no se guarda nada y el reenvío con la misma clave vuelve a intentar.
+
+## Cancelar servicio (T4.7, spec 004)
+
+- `POST /api/v1/servicios/{servicioId}/cancelacion`: el cliente cancela solo los suyos; comercial y despachador, cualquiera.
+- **Reglas de D17:**
+  - se cancela solo con el viaje `CONFIRMADO` y `confirmacionCompleta`;
+  - antes de eso, `409 CONFIRMACION_EN_CURSO`;
+  - en ruta, `409 CANCELACION_NO_PERMITIDA`;
+  - en cualquier otro estado, `409 CONFLICTO_ESTADO`.
+- **En una transacción:** el viaje pasa a `CANCELADO`, se registra la auditoría y queda `ViajeCancelado` en el Outbox con `origen = USUARIO`, `canceladoPor`, `detalle` y `choferUsuarioSub`. Finanzas y Flota liberan por su cuenta (coreografía).
+- La respuesta `200` se guarda para los reenvíos con la misma clave.

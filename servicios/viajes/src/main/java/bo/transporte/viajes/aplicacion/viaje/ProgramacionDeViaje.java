@@ -81,7 +81,8 @@ public class ProgramacionDeViaje {
             EstadoViaje anterior = v.estado();
             if (!v.cancelar(motivo, detalle)) return null;
             viajes.actualizar(v);
-            eventos.registrar("ViajeCancelado", "viajes.viaje-cancelado.v1", cancelado(v, anterior));
+            eventos.registrar(
+                    "ViajeCancelado", "viajes.viaje-cancelado.v1", EventosDeViaje.cancelado(v, anterior, "SAGA", null));
             return null;
         });
     }
@@ -144,21 +145,6 @@ public class ProgramacionDeViaje {
         m.put("choferId", a.choferId().toString());
         m.put("choferNombre", a.choferNombre());
         m.put("choferUsuarioSub", a.choferUsuarioSub());
-        return m;
-    }
-
-    /** contratos/eventos/viajes/ViajeCancelado.v1.schema.json#/properties/datos */
-    static Map<String, Object> cancelado(Viaje v, EstadoViaje anterior) {
-        Map<String, Object> m = new LinkedHashMap<>();
-        m.put("servicioId", v.servicioId().toString());
-        m.put("viajeId", v.viajeId().toString());
-        m.put("clienteId", v.clienteId().toString());
-        m.put("motivo", v.motivo());
-        if (v.detalle() != null)
-            m.put("detalle", v.detalle().length() > 600 ? v.detalle().substring(0, 600) : v.detalle());
-        m.put("origen", "SAGA");
-        m.put("estadoAnterior", anterior.name());
-        if (v.asignacion() != null) m.put("choferUsuarioSub", v.asignacion().choferUsuarioSub());
         return m;
     }
 }

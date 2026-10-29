@@ -435,4 +435,89 @@ class ServiciosIT {
                                 "{\"opcion\":\"REINTENTAR_COMPENSACION\"}")
                         .estado());
     }
+
+    private String confirmado() throws Exception {
+        String servicioId = confirmar(cliente(CLIENTE), "{\"cotizacionId\":\"" + COTIZACION + "\"}")
+                .cuerpo()
+                .get("servicioId")
+                .asString();
+        esperar(servicioId, c -> c.get("confirmacionCompleta").asBoolean());
+        return servicioId;
+    }
+
+    private Respuesta cancelar(String token, String servicioId, UUID clave, String motivo) throws Exception {
+        return pedir(
+                "POST",
+                "/api/v1/servicios/" + servicioId + "/cancelacion",
+                token,
+                clave,
+                "{\"motivo\":\"" + motivo + "\"}");
+    }
+
+    @Test
+    void elClienteCancelaUnServicioConfirmadoYSePublicaViajeCancelado() throws Exception {
+        String servicioId = confirmado();
+        assertEquals(
+                403,
+                cancelar(cliente(OTRO_CLIENTE), servicioId, UUID.randomUUID(), "No es mío")
+                        .estado());
+        assertEquals(
+                403,
+                cancelar(TokensDePrueba.token("g", "gerente", null), servicioId, UUID.randomUUID(), "Gerencia")
+                        .estado());
+
+        UUID clave = UUID.randomUUID();
+        var r = cancelar(cliente(CLIENTE), servicioId, clave, "Cambio de fecha de cosecha");
+        assertEquals(200, r.estado(), String.valueOf(r.cuerpo()));
+        assertEquals("CANCELADO", r.cuerpo().get("estado").asString());
+        assertEquals("CANCELADO_POR_USUARIO", r.cuerpo().get("motivo").asString());
+        assertEquals("4521KTR", r.cuerpo().get("placa").asString());
+
+        JsonNode datos = sobre("ViajeCancelado").get("datos");
+        assertEquals("USUARIO", datos.get("origen").asString());
+        assertEquals("CONFIRMADO", datos.get("estadoAnterior").asString());
+        assertEquals("Cambio de fecha de cosecha", datos.get("detalle").asString());
+        assertEquals("sub-" + CLIENTE.substring(30), datos.get("canceladoPor").asString());
+        assertEquals(
+                "0193a000-0000-7000-8000-000000000005",
+                datos.get("choferUsuarioSub").asString());
+
+        var reenvio = cancelar(cliente(CLIENTE), servicioId, clave, "Cambio de fecha de cosecha");
+        assertEquals(200, reenvio.estado());
+        assertEquals(r.cuerpo(), reenvio.cuerpo());
+        var otraClave = cancelar(cliente(CLIENTE), servicioId, UUID.randomUUID(), "Otra vez");
+        assertEquals(409, otraClave.estado());
+        assertEquals("CONFLICTO_ESTADO", otraClave.cuerpo().get("codigo").asString());
+        assertEquals(
+                1,
+                jdbc.sql("SELECT count(*) FROM outbox_eventos WHERE tipo = 'ViajeCancelado'")
+                        .query(Integer.class)
+                        .single());
+    }
+
+    @Test
+    void sinConfirmacionCompletaOEnRutaNoSeCancela() throws Exception {
+        String servicioId = confirmado();
+        String despachador = TokensDePrueba.token("sub-desp", "despachador", null);
+        jdbc.sql("UPDATE servicio SET confirmacion_completa = false WHERE servicio_id = CAST(:id AS uuid)")
+                .param("id", servicioId)
+                .update();
+        var enCurso = cancelar(despachador, servicioId, UUID.randomUUID(), "Pedido del cliente");
+        assertEquals(409, enCurso.estado());
+        assertEquals("CONFIRMACION_EN_CURSO", enCurso.cuerpo().get("codigo").asString());
+
+        jdbc.sql("UPDATE servicio SET confirmacion_completa = true WHERE servicio_id = CAST(:id AS uuid)")
+                .param("id", servicioId)
+                .update();
+        jdbc.sql("UPDATE viaje SET estado = 'EN_RUTA' WHERE servicio_id = CAST(:id AS uuid)")
+                .param("id", servicioId)
+                .update();
+        var enRuta = cancelar(despachador, servicioId, UUID.randomUUID(), "Pedido del cliente");
+        assertEquals(409, enRuta.estado());
+        assertEquals("CANCELACION_NO_PERMITIDA", enRuta.cuerpo().get("codigo").asString());
+        assertEquals(
+                404,
+                cancelar(despachador, UUID.randomUUID().toString(), UUID.randomUUID(), "No existe")
+                        .estado());
+    }
 }

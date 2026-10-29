@@ -16,6 +16,7 @@ import bo.transporte.viajes.aplicacion.puerto.salida.VinculadorIdentidad;
 import bo.transporte.viajes.aplicacion.ruta.ConsultaDeRutas;
 import bo.transporte.viajes.aplicacion.saga.DecisionDeCredito;
 import bo.transporte.viajes.aplicacion.saga.ResolucionDeIntervencion;
+import bo.transporte.viajes.aplicacion.servicio.CancelacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ConfirmacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ConsultaDeServicios;
 import bo.transporte.viajes.aplicacion.servicio.ParametrosSaga;
@@ -118,5 +119,16 @@ class CasosDeUso {
             Transacciones tx,
             Orquestador orquestador) {
         return new ResolucionDeIntervencion(servicios, idempotencia, auditoria, tx, orquestador);
+    }
+
+    @Bean
+    CancelacionDeServicio cancelacionDeServicio(
+            ServicioRepositorio servicios,
+            ViajeRepositorio viajes,
+            RegistroDeEventos eventos,
+            RegistroIdempotente idempotencia,
+            Auditoria auditoria,
+            Transacciones tx) {
+        return new CancelacionDeServicio(servicios, viajes, eventos, idempotencia, auditoria, tx);
     }
 }
