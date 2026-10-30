@@ -5,6 +5,9 @@ import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.TransientDataAccessException;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.ProblemDetail;
@@ -16,6 +19,7 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
+import software.amazon.awssdk.core.exception.SdkException;
 
 /** Todo error sale como application/problem+json con su código; nunca trazas de pila ni mensajes de la base. */
 @RestControllerAdvice
@@ -36,12 +40,16 @@ class ManejadorDeProblemas extends ResponseEntityExceptionHandler {
             "VALIDACION",
             409,
             "CONFLICTO_ESTADO",
+            413,
+            "VALIDACION",
             415,
-            "VALIDACION");
+            "VALIDACION",
+            503,
+            "DEPENDENCIA_NO_DISPONIBLE");
 
     @ExceptionHandler(ErrorDeDominio.class)
     ResponseEntity<ProblemDetail> dominio(ErrorDeDominio e) {
-        ProblemDetail p = Problemas.de(e.codigo(), e.codigo(), e.getMessage());
+        ProblemDetail p = Problemas.de(e.codigo(), Problemas.titulo(e.codigo()), e.getMessage());
         e.datos().forEach((clave, valor) -> {
             if (!clave.equals("campo")) p.setProperty(clave, valor);
         });
@@ -63,6 +71,30 @@ class ManejadorDeProblemas extends ResponseEntityExceptionHandler {
                 })
                 .toList();
         return Problemas.validacion(errores);
+    }
+
+    /** PostgreSQL, DynamoDB o S3 caídos o saturados: 503 con Retry-After (spec 005), nunca un 500. */
+    @ExceptionHandler({TransientDataAccessException.class, DataAccessResourceFailureException.class, SdkException.class
+    })
+    ResponseEntity<ProblemDetail> noDisponible(Exception e) {
+        LOG.warn("Dependencia no disponible: {}", e.toString());
+        ProblemDetail p = Problemas.de(
+                "DEPENDENCIA_NO_DISPONIBLE",
+                Problemas.titulo("DEPENDENCIA_NO_DISPONIBLE"),
+                "Una dependencia no respondió; reintenta en unos segundos");
+        return ResponseEntity.status(p.getStatus())
+                .header(HttpHeaders.RETRY_AFTER, "10")
+                .body(p);
+    }
+
+    /** Carrera contra un índice único (NIT activo, un viaje en ruta por chofer): la otra petición ganó. */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ProblemDetail integridad(DataIntegrityViolationException e) {
+        LOG.info("Restricción de la base: {}", e.getMostSpecificCause().getMessage());
+        return Problemas.de(
+                "CONFLICTO_ESTADO",
+                Problemas.titulo("CONFLICTO_ESTADO"),
+                "Otra operación cambió el recurso al mismo tiempo; vuelve a consultarlo");
     }
 
     @ExceptionHandler(Exception.class)
@@ -99,7 +131,7 @@ class ManejadorDeProblemas extends ResponseEntityExceptionHandler {
             Exception e, @Nullable Object cuerpo, HttpHeaders h, HttpStatusCode s, WebRequest r) {
         String codigo = POR_ESTADO.getOrDefault(s.value(), "CONFLICTO_ESTADO");
         String detalle = cuerpo instanceof ProblemDetail pd && pd.getDetail() != null ? pd.getDetail() : e.getMessage();
-        ProblemDetail p = Problemas.de(codigo, codigo, detalle);
+        ProblemDetail p = Problemas.de(codigo, Problemas.titulo(codigo), detalle);
         p.setStatus(s.value());
         return ResponseEntity.status(s).headers(h).body(p);
     }
