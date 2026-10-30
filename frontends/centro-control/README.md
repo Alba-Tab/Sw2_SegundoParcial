@@ -4,7 +4,7 @@ Cuatro apps Angular 22 independientes y la librería `ui-comun`, en un solo work
 
 | App | Puerto local | Roles | Pantallas |
 |---|---|---|---|
-| `cc-tablero` | 4201 | Puerta de entrada; se queda el gerente | Tablero (Viajes, Flota, Finanzas y Analítica en una consulta), reportes con Excel |
+| `cc-tablero` | 4201 | Puerta de entrada; se queda el gerente | Tablero (Viajes, Flota, Finanzas y Analítica en una consulta), reportes con Excel, pregunta por voz y panel del agente |
 | `cc-operaciones` | 4202 | despachador, comercial (lectura), gerente | Viajes y detalle, mapa en vivo (Leaflet), entregas observadas, intervenciones, servicios (cancelar, "Ver como cliente") y acciones del agente |
 | `cc-flota` | 4203 | jefe_flota, gerente | Unidades, mantenimiento (programar y cerrar), combustible (anomalías y cargas), puntaje de conducción |
 | `cc-finanzas` | 4204 | administracion, gerente | Facturas y pagos (con OCR del recibo en el navegador), cuentas por cobrar, aprobación de crédito, cotizaciones |
@@ -16,6 +16,12 @@ Cuatro apps Angular 22 independientes y la librería `ui-comun`, en un solo work
 - **Marco:** barra con las apps que el rol permite, que pide `/salud.json` de cada una cada 60 s y deshabilita el enlace si falla (FR3). Campana con las alertas por rol: al conectar y al reconectar pide `alertasPendientes(desde)` y descarta las repetidas. Enlaces por URL a la app de cada alerta.
 - **Acceso:** `cliente` y `chofer` ven "Sin acceso" (con enlace al portal para el cliente). Cada app exige sus roles; el Gateway y los servicios vuelven a validar.
 - Respuesta parcial: `servicioCaido(error, campo)` muestra "Finanzas no disponible" solo en su tarjeta (FR1, FR2). `nuevaClave()` da una `claveIdempotencia` por intento. Los montos se muestran como texto con `BobPipe`; nunca se calculan en float.
+
+## Voz y agente en cc-tablero (T10.4)
+
+- **Pregunta por voz** (`/voz`, spec 015): se mantiene pulsado para hablar (como máximo 15 s, D94). Whisper `tiny` transcribe en un Web Worker con `transformers.js`, y el texto se puede corregir antes de enviar (D95). El modelo (`npm run modelos`, 43 MB, no se versiona) y el runtime de ONNX se sirven desde el hosting de la app (`/modelos`, `/ort`) con `allowRemoteModels = false`: la pestaña Red no muestra pedidos a un CDN ni el audio saliendo.
+- La respuesta trae el texto, la tabla, el gráfico y "Exportar a Excel". Una aclaración muestra botones que corren `reporte(id, params)` sin LLM. Con `LLM_NO_DISPONIBLE` o una pregunta fuera del catálogo quedan los 5 reportes como botones (FR4).
+- **Panel del agente** (`/agente`, spec 014): las misiones con cada paso (herramienta, argumentos, resumen y ms) y "Disparar misión". Si ya hay una en curso avisa (`409`), y sin LLM la misión queda saltada. Las acciones se deciden en cc-operaciones.
 
 ## GraphQL Code Generator (D49)
 
@@ -29,6 +35,7 @@ Cada app lee `/configuracion.json` del hosting antes de arrancar (issuer, client
 
 ```bash
 npm ci
+npm run modelos                 # Whisper tiny para la voz de cc-tablero (una vez)
 npm run verificar               # formato, pruebas de ui-comun y build de las 4 apps
 npx ng serve cc-tablero         # http://localhost:4201 (y cc-operaciones 4202, cc-flota 4203, cc-finanzas 4204)
 ```

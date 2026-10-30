@@ -90,6 +90,55 @@ export type ExportarReporteMutationVariables = Exact<{
 
 export type ExportarReporteMutation = { exportarReporte: { url: string; nombreArchivo: string; expiraEn: string } };
 
+export type PreguntarMutationVariables = Exact<{
+  texto: string;
+}>;
+
+export type PreguntarMutation = {
+  preguntar: {
+    tipo: string;
+    texto: string;
+    reporteId: ReporteId | null;
+    parametros: any;
+    exportable: boolean | null;
+    resultado: {
+      reporteId: ReporteId;
+      titulo: string;
+      parametros: any;
+      filas: Array<any>;
+      totales: any;
+      grafico: any;
+      datosAl: string | null;
+      columnas: Array<{ clave: string; titulo: string; tipo: string }>;
+    } | null;
+    opciones: Array<{ etiqueta: string; reporteId: ReporteId; parametros: any }> | null;
+  };
+};
+
+export type MisionesQueryVariables = Exact<{ [key: string]: never }>;
+
+export type MisionesQuery = {
+  misionesAgente: Array<{
+    misionId: string;
+    estado: string;
+    origen: string;
+    disparadaPor: string | null;
+    iniciadaEn: string;
+    terminadaEn: string | null;
+    codigo: string | null;
+    traceId: string | null;
+    accionesCreadas: number | null;
+    conclusion: string | null;
+    pasos: Array<{ numero: number; herramienta: string; argumentos: any; resumen: string | null; error: boolean | null; ms: number }>;
+  }> | null;
+};
+
+export type DispararMisionMutationVariables = Exact<{
+  clave: string | number;
+}>;
+
+export type DispararMisionMutation = { dispararMision: { misionId: string } };
+
 export const TableroDocument = gql`
   query Tablero($periodo: Periodo!) {
     tablero(periodo: $periodo) {
@@ -216,6 +265,100 @@ export const ExportarReporteDocument = gql`
 })
 export class ExportarReporteGQL extends Apollo.Mutation<ExportarReporteMutation, ExportarReporteMutationVariables> {
   override document = ExportarReporteDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const PreguntarDocument = gql`
+  mutation Preguntar($texto: String!) {
+    preguntar(texto: $texto) {
+      tipo
+      texto
+      reporteId
+      parametros
+      exportable
+      resultado {
+        reporteId
+        titulo
+        parametros
+        columnas {
+          clave
+          titulo
+          tipo
+        }
+        filas
+        totales
+        grafico
+        datosAl
+      }
+      opciones {
+        etiqueta
+        reporteId
+        parametros
+      }
+    }
+  }
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class PreguntarGQL extends Apollo.Mutation<PreguntarMutation, PreguntarMutationVariables> {
+  override document = PreguntarDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const MisionesDocument = gql`
+  query Misiones {
+    misionesAgente(limite: 20) {
+      misionId
+      estado
+      origen
+      disparadaPor
+      iniciadaEn
+      terminadaEn
+      codigo
+      traceId
+      accionesCreadas
+      conclusion
+      pasos {
+        numero
+        herramienta
+        argumentos
+        resumen
+        error
+        ms
+      }
+    }
+  }
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class MisionesGQL extends Apollo.Query<MisionesQuery, MisionesQueryVariables> {
+  override document = MisionesDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const DispararMisionDocument = gql`
+  mutation DispararMision($clave: ID!) {
+    dispararMision(claveIdempotencia: $clave) {
+      misionId
+    }
+  }
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class DispararMisionGQL extends Apollo.Mutation<DispararMisionMutation, DispararMisionMutationVariables> {
+  override document = DispararMisionDocument;
 
   constructor(apollo: Apollo.Apollo) {
     super(apollo);

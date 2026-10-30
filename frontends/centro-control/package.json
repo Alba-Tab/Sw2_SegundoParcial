@@ -12,7 +12,8 @@
     "formato": "prettier --check \"projects/**/*.{ts,html,css,graphql}\" codegen.ts",
     "construir": "ng build cc-tablero && ng build cc-operaciones && ng build cc-flota && ng build cc-finanzas",
     "probar": "ng test ui-comun --watch=false",
-    "verificar": "npm run formato && npm run probar && npm run construir"
+    "verificar": "npm run formato && npm run probar && npm run construir",
+    "modelos": "sh scripts/descargar-whisper.sh"
   },
   "private": true,
   "packageManager": "npm@11.19.1",
@@ -26,6 +27,7 @@
     "@angular/platform-browser": "^22.2.0",
     "@angular/router": "^22.2.0",
     "@apollo/client": "4.3.5",
+    "@huggingface/transformers": "4.3.2",
     "@transporte/design-tokens": "file:../../libs/design-tokens",
     "apollo-angular": "14.2.0",
     "graphql": "16.11.0",

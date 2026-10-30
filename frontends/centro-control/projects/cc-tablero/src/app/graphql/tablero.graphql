@@ -80,3 +80,61 @@ mutation ExportarReporte($id: ReporteId!, $params: ReporteParams, $clave: ID!) {
     expiraEn
   }
 }
+
+mutation Preguntar($texto: String!) {
+  preguntar(texto: $texto) {
+    tipo
+    texto
+    reporteId
+    parametros
+    exportable
+    resultado {
+      reporteId
+      titulo
+      parametros
+      columnas {
+        clave
+        titulo
+        tipo
+      }
+      filas
+      totales
+      grafico
+      datosAl
+    }
+    opciones {
+      etiqueta
+      reporteId
+      parametros
+    }
+  }
+}
+
+query Misiones {
+  misionesAgente(limite: 20) {
+    misionId
+    estado
+    origen
+    disparadaPor
+    iniciadaEn
+    terminadaEn
+    codigo
+    traceId
+    accionesCreadas
+    conclusion
+    pasos {
+      numero
+      herramienta
+      argumentos
+      resumen
+      error
+      ms
+    }
+  }
+}
+
+mutation DispararMision($clave: ID!) {
+  dispararMision(claveIdempotencia: $clave) {
+    misionId
+  }
+}
