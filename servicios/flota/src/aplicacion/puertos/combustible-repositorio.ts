@@ -26,6 +26,11 @@ export interface CombustibleRepositorio {
   insertarLectura(lectura: Lectura): Promise<boolean>;
   /** Lecturas de la placa desde ese instante, en orden de tiempo. */
   lecturasDesde(placa: string, desde: string, hasta?: string): Promise<Lectura[]>;
+  /**
+   * Inicio del episodio de parada que termina en `hasta`: la primera lectura posterior a la última lectura en marcha
+   * (velocidad > 0), sin límite de ventana. No cambia mientras el tracto siga detenido (spec 009: una detección por parada).
+   */
+  inicioDeParada(placa: string, hasta: string): Promise<string>;
 
   deteccionDeParada(placa: string, paradaDesde: string): Promise<boolean>;
   insertarDeteccion(d: Deteccion): Promise<void>;

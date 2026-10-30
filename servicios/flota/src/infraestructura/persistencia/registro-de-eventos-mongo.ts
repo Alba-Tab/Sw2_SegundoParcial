@@ -3,17 +3,28 @@ import { InjectConnection } from '@nestjs/mongoose';
 import type { Connection } from 'mongoose';
 import type { RegistroDeEventos } from '../../aplicacion/puertos/registro-de-eventos';
 import { uuid7 } from '../../dominio/comun/uuid7';
-import { randomBytes } from 'node:crypto';
 import { ValidadorEventos } from '../mensajeria/validador-eventos';
-import { contexto } from '../observabilidad/contexto';
+import { contexto, traceparentActual } from '../observabilidad/contexto';
 import { sesionActual } from './mongo-unidad-de-trabajo';
 
 export const OUTBOX = 'outboxEventos';
+const SIETE_DIAS_S = 7 * 86_400;
+
+/**
+ * Pendientes del relay (índice parcial: solo las filas sin publicar, en orden de creación) y TTL de 7 días sobre las
+ * publicadas; una fila sin publicar (publicadoEn null) nunca vence.
+ */
+export async function crearIndicesOutbox(conexion: Connection): Promise<void> {
+  await conexion
+    .collection(OUTBOX)
+    .createIndex({ publicadoEn: 1, creadoEn: 1 }, { name: 'pendientes', partialFilterExpression: { publicadoEn: null } });
+  await conexion.collection(OUTBOX).createIndex({ publicadoEn: 1 }, { name: 'publicadosVencen', expireAfterSeconds: SIETE_DIAS_S });
+}
 
 /**
  * Escribe el sobre común (000 §6) en outboxEventos con la sesión de la transacción en curso, después de validarlo
- * contra su esquema. correlationId y traceparent son obligatorios: si no hay petición en curso (un consumidor, una
- * actividad), se generan.
+ * contra su esquema. correlationId y traceparent salen de la petición HTTP o del evento consumido (contexto); si no hay
+ * ninguno (una actividad de Temporal, la revisión diaria), se generan.
  */
 @Injectable()
 export class RegistroDeEventosMongo implements RegistroDeEventos {
@@ -33,7 +44,7 @@ export class RegistroDeEventosMongo implements RegistroDeEventos {
       version: Number(claveEnrutamiento.slice(claveEnrutamiento.lastIndexOf('.v') + 2)),
       ocurridoEn: ahora.toISOString(),
       correlationId: contexto.getStore()?.correlationId ?? uuid7(),
-      traceparent: `00-${randomBytes(16).toString('hex')}-${randomBytes(8).toString('hex')}-01`,
+      traceparent: traceparentActual(),
       productor: 'flota',
       datos,
     };

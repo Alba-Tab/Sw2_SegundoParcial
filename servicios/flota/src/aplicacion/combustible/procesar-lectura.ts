@@ -1,5 +1,5 @@
 import { uuid7 } from '../../dominio/comun/uuid7';
-import { detectarCaida, inicioDeParada, type Lectura, VENTANA_MINUTOS } from '../../dominio/combustible/caida';
+import { detectarCaida, type Lectura, VENTANA_MINUTOS } from '../../dominio/combustible/caida';
 import type { CombustibleRepositorio } from '../puertos/combustible-repositorio';
 import type { RegistroDeEventos } from '../puertos/registro-de-eventos';
 import type { ReservaUnidadRepositorio } from '../puertos/reserva-unidad-repositorio';
@@ -11,7 +11,9 @@ export type ResultadoLectura = 'PLACA_DESCONOCIDA' | 'REPETIDA' | 'GUARDADA' | '
 /**
  * Lectura del sensor desde flota.sensor (spec 009, D30): la guarda (una por placa e instante) y aplica la regla de caída.
  * Con una caída, en una transacción, guarda la detección y deja CaidaCombustibleDetectada en el Outbox, con el viajeId si
- * el tracto está EN_VIAJE. Una detección por episodio de parada.
+ * el tracto está EN_VIAJE. Una detección por episodio de parada: el episodio empieza en la primera lectura después de la
+ * última en marcha, sin importar cuánto dure, así que no hay otra hasta que el tracto vuelva a moverse. El consumidor
+ * procesa flota.sensor en serie, porque cada lectura depende de las anteriores.
  */
 export class ProcesarLectura {
   constructor(
@@ -30,7 +32,7 @@ export class ProcesarLectura {
     const anteriores = (await this.combustible.lecturasDesde(l.placa, desde)).filter((x) => x.medidoEn !== l.medidoEn);
     const caida = detectarCaida(anteriores, l);
     if (!caida) return 'GUARDADA';
-    const paradaDesde = inicioDeParada(anteriores, l);
+    const paradaDesde = await this.combustible.inicioDeParada(l.placa, l.medidoEn);
     return this.tx.ejecutar(async () => {
       if (await this.combustible.deteccionDeParada(l.placa, paradaDesde)) return 'GUARDADA' as const;
       const reserva = tracto.estado === 'EN_VIAJE' ? await this.reservas.activaDeUnidad(tracto.unidadId) : null;

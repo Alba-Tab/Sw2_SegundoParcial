@@ -16,7 +16,9 @@ export interface SobreFinDeViaje {
 /**
  * Consumidor de EntregaConfirmada y EntregaRechazada (specs 006, 007 y 010, D07). En la transacción del Inbox: reserva
  * LIBERADA; tracto y remolque suman kmRecorridos y pasan a DISPONIBLE o MANTENIMIENTO_PENDIENTE (con
- * MantenimientoRequerido en el Outbox); el chofer queda disponible.
+ * MantenimientoRequerido en el Outbox); el chofer queda disponible. Las unidades y el chofer salen de la reserva del
+ * servicio, no del evento; si la reserva no existe o ya está LIBERADA no se toca nada: un fin de viaje repetido con otro
+ * eventId no suma los km dos veces ni libera unidades de otra reserva (D11).
  */
 export class LiberarPorEntrega {
   constructor(
@@ -32,13 +34,13 @@ export class LiberarPorEntrega {
   ejecutar(sobre: SobreFinDeViaje): Promise<boolean> {
     return this.tx.ejecutar(async () => {
       if (!(await this.inbox.registrar(sobre.id, sobre.tipo))) return false;
-      const d = sobre.datos;
-      const r = await this.reservas.porServicio(d.servicioId);
-      if (r && r.estado !== 'LIBERADA') await this.reservas.actualizar({ ...r, estado: 'LIBERADA' });
+      const r = await this.reservas.porServicio(sobre.datos.servicioId);
+      if (!r || r.estado === 'LIBERADA') return true;
+      await this.reservas.actualizar({ ...r, estado: 'LIBERADA' });
       const hoy = this.reloj.hoy();
-      for (const id of [d.tractoId, d.remolqueId]) {
-        const u = await this.unidades.porId(id);
-        const fin = u && liberarDespuesDelViaje(u, d.kmRecorridos, hoy);
+      for (const id of [r.tractoId, r.remolqueId]) {
+        const u = id ? await this.unidades.porId(id) : null;
+        const fin = u && liberarDespuesDelViaje(u, sobre.datos.kmRecorridos, hoy);
         if (!fin) continue;
         await this.unidades.guardar(fin.unidad);
         if (fin.revision.motivos.length) {
@@ -49,7 +51,7 @@ export class LiberarPorEntrega {
           );
         }
       }
-      await this.choferes.devolver(d.choferId);
+      if (r.choferId) await this.choferes.devolver(r.choferId);
       return true;
     });
   }

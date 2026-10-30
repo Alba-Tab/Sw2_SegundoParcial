@@ -37,6 +37,11 @@ describe('Alta, edición y baja de unidades (spec 010, A)', () => {
     expect(codigo(() => nuevaUnidad({ ...cisterna, atributos: { compartimentos: 2.5, capacidadLitros: 30000 } }, 'c', HOY))).toBe(
       'VALIDACION {"campo":"atributos.compartimentos"}',
     );
+    // Campos del prototipo de Object (D76): no son atributos de ningún tipo.
+    for (const campo of ['constructor', 'toString', '__proto__', 'hasOwnProperty']) {
+      const atributos = JSON.parse(`{"volumenM3": 85, "${campo}": {"$gt": ""}}`) as Record<string, unknown>;
+      expect(codigo(() => nuevaUnidad({ ...furgon, atributos }, 'f', HOY))).toBe(`VALIDACION {"campo":"atributos.${campo}"}`);
+    }
     const tracto: UnidadNueva = {
       tipoUnidad: 'TRACTO',
       placa: '9001TRA',

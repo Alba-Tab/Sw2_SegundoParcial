@@ -11,7 +11,8 @@ export interface SobreViajeIniciado {
 
 /**
  * Consumidor de ViajeIniciado (spec 005, D20): tracto y remolque RESERVADA → EN_VIAJE, solo si la reserva del servicio
- * sigue activa. Un ViajeIniciado que llega después de la entrega (reserva ya LIBERADA) se ignora (spec 010).
+ * sigue activa. Un ViajeIniciado que llega después de la entrega (reserva ya LIBERADA) se ignora (spec 010). Las unidades
+ * salen de la reserva del servicio, no del evento (D11).
  */
 export class PonerEnViaje {
   constructor(
@@ -26,8 +27,8 @@ export class PonerEnViaje {
       if (!(await this.inbox.registrar(sobre.id, sobre.tipo))) return false;
       const r = await this.reservas.porServicio(sobre.datos.servicioId);
       if (!r || r.estado === 'LIBERADA') return true;
-      await this.unidades.ponerEnViaje(sobre.datos.tractoId);
-      await this.unidades.ponerEnViaje(sobre.datos.remolqueId);
+      if (r.tractoId) await this.unidades.ponerEnViaje(r.tractoId);
+      if (r.remolqueId) await this.unidades.ponerEnViaje(r.remolqueId);
       return true;
     });
   }

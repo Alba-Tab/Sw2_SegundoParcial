@@ -16,7 +16,7 @@ import {
   type DarDeBajaUnidadResponse,
   type ProgramarMantenimientoResponse,
 } from './contrato/flota.zod';
-import { hashCuerpo } from './hash-cuerpo';
+import { hashPeticion, type PeticionHttp } from './hash-cuerpo';
 import { claveObligatoria, validar } from './validar';
 
 type ConUsuario = { usuario: Usuario };
@@ -37,18 +37,23 @@ export class GestionUnidadesController {
   @Post()
   @HttpCode(201)
   async crearUnidad(
-    @Req() req: ConUsuario,
+    @Req() req: PeticionHttp,
     @Headers('idempotency-key') clave: string | undefined,
     @Body() cuerpo: unknown,
   ): Promise<z.infer<typeof CrearUnidadResponse>> {
     const e = validar(CrearUnidadBody, cuerpo);
-    const u = await this.crear.ejecutar({ usuario: req.usuario, clave: claveObligatoria(clave), hashCuerpo: hashCuerpo(e), cuerpo: e });
+    const u = await this.crear.ejecutar({
+      usuario: req.usuario,
+      clave: claveObligatoria(clave),
+      hashCuerpo: hashPeticion(req, e),
+      cuerpo: e,
+    });
     return u as z.infer<typeof CrearUnidadResponse>;
   }
 
   @Put(':unidadId')
   async actualizarUnidad(
-    @Req() req: ConUsuario,
+    @Req() req: PeticionHttp,
     @Param('unidadId') unidadId: string,
     @Headers('idempotency-key') clave: string | undefined,
     @Body() cuerpo: unknown,
@@ -59,7 +64,7 @@ export class GestionUnidadesController {
     const u = await this.actualizar.ejecutar(unidadId, {
       usuario: req.usuario,
       clave: claveObligatoria(clave),
-      hashCuerpo: hashCuerpo(e),
+      hashCuerpo: hashPeticion(req, e),
       cuerpo: e,
     });
     return u as z.infer<typeof ActualizarUnidadResponse>;
@@ -68,7 +73,7 @@ export class GestionUnidadesController {
   @Post(':unidadId/baja')
   @HttpCode(200)
   async darDeBaja(
-    @Req() req: ConUsuario,
+    @Req() req: PeticionHttp,
     @Param('unidadId') unidadId: string,
     @Headers('idempotency-key') clave: string | undefined,
     @Body() cuerpo: unknown,
@@ -77,7 +82,7 @@ export class GestionUnidadesController {
     const u = await this.baja.ejecutar(unidadId, {
       usuario: req.usuario,
       clave: claveObligatoria(clave),
-      hashCuerpo: hashCuerpo(e),
+      hashCuerpo: hashPeticion(req, e),
       cuerpo: e,
     });
     return u as z.infer<typeof DarDeBajaUnidadResponse>;
@@ -86,7 +91,7 @@ export class GestionUnidadesController {
   @Post(':unidadId/mantenimientos')
   @HttpCode(201)
   async programarMantenimiento(
-    @Req() req: ConUsuario,
+    @Req() req: PeticionHttp,
     @Param('unidadId') unidadId: string,
     @Headers('idempotency-key') clave: string | undefined,
     @Body() cuerpo: unknown,
@@ -95,7 +100,7 @@ export class GestionUnidadesController {
     const m = await this.programar.ejecutar(unidadId, {
       usuario: req.usuario,
       clave: claveObligatoria(clave),
-      hashCuerpo: hashCuerpo(e),
+      hashCuerpo: hashPeticion(req, e),
       cuerpo: e,
     });
     return m as z.infer<typeof ProgramarMantenimientoResponse>;

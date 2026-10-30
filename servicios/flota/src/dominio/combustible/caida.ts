@@ -41,12 +41,3 @@ export function detectarCaida(anteriores: Lectura[], actual: Lectura): Caida | n
     ventanaMinutos: Math.max(Math.round(((t - Date.parse(referencia.medidoEn)) / 60_000) * 100) / 100, 0.01),
   };
 }
-
-/** Inicio del episodio de parada: la primera lectura detenida después de la última en marcha (una detección por parada). */
-export function inicioDeParada(anteriores: Lectura[], actual: Lectura): string {
-  const t = Date.parse(actual.medidoEn);
-  const previas = anteriores.filter((l) => Date.parse(l.medidoEn) < t).sort((a, b) => Date.parse(a.medidoEn) - Date.parse(b.medidoEn));
-  let inicio = actual.medidoEn;
-  for (let i = previas.length - 1; i >= 0 && previas[i].velocidadKmh === 0; i--) inicio = previas[i].medidoEn;
-  return inicio;
-}

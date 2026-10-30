@@ -11,7 +11,7 @@ import {
   type ListarLecturasCombustibleResponse,
   type RegistrarCargaCombustibleResponse,
 } from './contrato/flota.zod';
-import { hashCuerpo } from './hash-cuerpo';
+import { hashPeticion, type PeticionHttp } from './hash-cuerpo';
 import { claveObligatoria, validar } from './validar';
 
 type ConUsuario = { usuario: Usuario };
@@ -27,12 +27,12 @@ export class CombustibleController {
   @Post('cargas-combustible')
   @HttpCode(201)
   async registrarCarga(
-    @Req() req: ConUsuario,
+    @Req() req: PeticionHttp,
     @Headers('idempotency-key') clave: string | undefined,
     @Body() cuerpo: unknown,
   ): Promise<z.infer<typeof RegistrarCargaCombustibleResponse>> {
     const e = validar(RegistrarCargaCombustibleBody, cuerpo);
-    return (await this.registrar.ejecutar(req.usuario, claveObligatoria(clave), e, hashCuerpo(e))) as z.infer<
+    return (await this.registrar.ejecutar(req.usuario, claveObligatoria(clave), e, hashPeticion(req, e))) as z.infer<
       typeof RegistrarCargaCombustibleResponse
     >;
   }
