@@ -27,7 +27,7 @@
       "name": "¿Es nueva?",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [240, 0],
+      "position": [360, 0],
       "parameters": {
         "operation": "executeQuery",
         "query": "SELECT ($2 = 'FacturaEmitida' AND NOT EXISTS (SELECT 1 FROM n8n_inbox WHERE event_id = $1::uuid)) AS nuevo",
@@ -40,7 +40,7 @@
       "name": "Nueva",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [480, 0],
+      "position": [600, 0],
       "parameters": {
         "conditions": {
           "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
@@ -62,7 +62,7 @@
       "name": "Correo al cliente",
       "type": "n8n-nodes-base.emailSend",
       "typeVersion": 2.1,
-      "position": [720, -100],
+      "position": [840, -100],
       "parameters": {
         "fromEmail": "avisos@transporte.example",
         "toEmail": "={{ $('Cola n8n.eventos').item.json.datos.cliente.correo }}",
@@ -78,20 +78,66 @@
       "name": "Registrar en n8n_inbox",
       "type": "n8n-nodes-base.postgres",
       "typeVersion": 2.5,
-      "position": [960, -100],
+      "position": [1080, -100],
       "parameters": {
         "operation": "executeQuery",
         "query": "INSERT INTO n8n_inbox (event_id, tipo) VALUES ($1::uuid, $2) ON CONFLICT DO NOTHING",
         "options": { "queryReplacement": "={{ [$('Cola n8n.eventos').item.json.id, $('Cola n8n.eventos').item.json.tipo] }}" }
       },
       "credentials": { "postgres": { "id": "postgresN8nLoc01", "name": "PostgreSQL n8n" } }
+    },
+    {
+      "id": "8f3c1a10-0000-4000-8000-000000000006",
+      "name": "Por tipo",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [120, 0],
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "strict" },
+                "conditions": [
+                  {
+                    "id": "8f3c1a10-0000-4000-8000-0000000000d1",
+                    "leftValue": "={{ $json.tipo }}",
+                    "rightValue": "AvisoClienteAprobado",
+                    "operator": { "type": "string", "operation": "equals" }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "aviso"
+            }
+          ]
+        },
+        "options": { "fallbackOutput": "extra", "renameFallbackOutput": "factura" }
+      }
+    },
+    {
+      "id": "8f3c1a10-0000-4000-8000-000000000007",
+      "name": "Subflujo aviso-cliente",
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3,
+      "position": [360, 200],
+      "parameters": {
+        "source": "database",
+        "workflowId": { "__rl": true, "value": "AvisoCliente0001", "mode": "id" },
+        "mode": "once",
+        "options": { "waitForSubWorkflow": true }
+      }
     }
   ],
   "connections": {
-    "Cola n8n.eventos": { "main": [[{ "node": "¿Es nueva?", "type": "main", "index": 0 }]] },
+    "Cola n8n.eventos": { "main": [[{ "node": "Por tipo", "type": "main", "index": 0 }]] },
     "¿Es nueva?": { "main": [[{ "node": "Nueva", "type": "main", "index": 0 }]] },
     "Nueva": { "main": [[{ "node": "Correo al cliente", "type": "main", "index": 0 }], []] },
-    "Correo al cliente": { "main": [[{ "node": "Registrar en n8n_inbox", "type": "main", "index": 0 }]] }
+    "Correo al cliente": { "main": [[{ "node": "Registrar en n8n_inbox", "type": "main", "index": 0 }]] },
+    "Por tipo": {
+      "main": [[{ "node": "Subflujo aviso-cliente", "type": "main", "index": 0 }], [{ "node": "¿Es nueva?", "type": "main", "index": 0 }]]
+    }
   },
   "pinData": {}
 }

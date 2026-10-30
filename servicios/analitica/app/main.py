@@ -13,7 +13,9 @@ from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.api import errores
+from app.api.rutas_acciones import rutas as rutas_acciones
 from app.api.rutas_lectura import rutas as rutas_lectura
+from app.api.rutas_reportes import rutas as rutas_reportes
 from app.api.seguridad import usuario_actual
 from app.aplicacion.proyecciones import Proyecciones
 from app.configuracion import configuracion
@@ -22,6 +24,7 @@ from app.infraestructura import programador
 from app.infraestructura.bd import motor
 from app.infraestructura.mensajeria import ConsumidorEventos
 from app.infraestructura.ml import cargar_modelos
+from app.infraestructura.relay import RelayOutbox
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 # 000 §3: instantes en UTC con Z.
@@ -34,13 +37,17 @@ async def ciclo(app: FastAPI) -> AsyncIterator[None]:
     consumidor = ConsumidorEventos(Proyecciones(app.state.modelos))
     app.state.consumidor = consumidor
     tarea = asyncio.create_task(consumidor.iniciar()) if configuracion().consumir_eventos else None
+    relay = RelayOutbox()
+    tarea_relay = asyncio.create_task(relay.correr()) if configuracion().publicar_outbox else None
     tareas = programador.iniciar(app) if configuracion().programar_tareas else None
     yield
     if tareas:
         tareas.shutdown(wait=False)
-    if tarea:
-        tarea.cancel()
+    for t in (tarea, tarea_relay):
+        if t:
+            t.cancel()
     await consumidor.detener()
+    await relay.detener()
 
 
 app = FastAPI(title="Analítica", version="1.0.0", lifespan=ciclo)
@@ -92,3 +99,5 @@ def salud_lista(request: Request) -> JSONResponse:
 
 
 app.include_router(rutas_lectura)
+app.include_router(rutas_reportes)
+app.include_router(rutas_acciones)

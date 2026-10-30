@@ -30,6 +30,28 @@ consumidor de `analitica.eventos`. Es la única fuente de alertas del Centro de 
 - `GET /api/v1/alertas` filtra por los roles del token, en orden de `secuencia`, con cursor opaco y la cifra `abiertas` de la campana. Sin estado, las abiertas y las cerradas de las últimas 24 h (D83).
 - `POST /api/v1/alertas/{id}/atencion` con `Idempotency-Key` (`operacion_idempotente`): solo un rol de la alerta y nunca el gerente (403).
 
+## Reportes y Excel (T8.3)
+
+- Catálogo cerrado de 5 reportes (`app/dominio/reportes.py`): parámetros, roles, rango máximo (92 o 366 días) y columnas. `GET /api/v1/reportes` lo publica con el JSON Schema de cada uno (el MCP lo expone como `catalogo://reportes`).
+- `GET /api/v1/reportes/{id}` valida rol y rango en código y calcula todo desde el modelo de lectura: montos como texto con 2 decimales, `totales`, datos del gráfico y `datosAl`. Máximo 500 filas en pantalla y 10.000 en Excel (D93); más → `400 VALIDACION` en el rango.
+- `RENTABILIDAD` une Viajes (km, ruta), Finanzas (facturado) y Flota (combustible del viaje).
+- `POST /api/v1/exportaciones` (con `Idempotency-Key`) corre el mismo reporte y guarda el `.xlsx` (hojas "Datos" y "Parámetros", openpyxl) 10 minutos; hasta 5 MB (D96). Un job borra las vencidas cada 5 min.
+- `GET /api/v1/exportaciones/{id}/archivo` solo responde al token de servicio del `gateway` con `X-Solicitante-Sub` igual a quien la creó (D21); vencida → `404 EXPORTACION_VENCIDA`.
+
+## Machine learning (T8.4)
+
+- `ml/entrenar.py` entrena con la semilla fija desde `plataforma/datos-sinteticos` **en el build de la imagen** (los `.joblib` no se versionan) y falla si el recall de *retrasado* baja de 0,75 (D82). El notebook `notebooks/modelos.ipynb` corre el mismo código y muestra recall, matriz de confusión e importancias.
+- **Retraso:** `GradientBoostingClassifier(random_state=42)` con pesos balanceados sobre las variables de D79; se recalcula con `ViajeIniciado`, `PosicionActualizada` y `HitoRegistrado` como máximo una vez por minuto (D78), y un job cada 60 s alcanza a los que quedaron atrás. Con probabilidad ≥ 0,70 abre (o actualiza) una sola `RIESGO_RETRASO`. Los 3 factores son las variables que más bajan la probabilidad al volver a su mediana.
+- **Anomalías:** `IsolationForest(contamination=0.05, n_estimators=100, random_state=42)` sobre `[kmPorLitro, litros]`; la primera carga de un tracto queda `SIN_REFERENCIA`.
+- Sin modelos (por ejemplo, en `uv run` sin entrenar), `obtenerRiesgoRetraso` responde `503 MODELO_NO_DISPONIBLE` y no se crean alertas de ML. Para entrenar en local: `uv run python -m ml.entrenar --datos ../../plataforma/datos-sinteticos --salida modelos`.
+
+## Acciones propuestas y aviso al cliente (T8.6)
+
+- `POST /api/v1/acciones` (solo `agente_lectura`, por el MCP): una por `(tipo, viaje)` salvo `ARCHIVADA` (índice único parcial). La repetida devuelve la existente con `creada = false`. El destinatario tiene que ser el cliente del viaje. Hay como máximo 3 por misión (`X-Mision-Id`, D86). Abre la alerta `ACCION_PROPUESTA`.
+- Aprobar (solo `despachador`, con `Idempotency-Key`): en una transacción pasa a `APROBADA`, se audita y se escribe `AvisoClienteAprobado` en el `outbox`. El destinatario y el correo salen de la copia `cliente`; el asunto, de la plantilla; el enlace, de `PORTAL_URL`. Rechazar → `RECHAZADA`. El gerente recibe 403.
+- El relay del Outbox (Python, cada 2 s) reclama con `SKIP LOCKED` y publica con confirmación del broker. Recién después marca publicado y pasa la acción a `EJECUTADA`. n8n (`aviso-cliente`) envía el correo una sola vez por `eventId`.
+- Un job cada 5 min archiva las `PENDIENTE` de más de 24 h o cuyo viaje terminó (D87).
+
 ## Correr
 
 ```bash
