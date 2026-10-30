@@ -14,15 +14,17 @@ import { LiberarPorEntrega } from './aplicacion/reserva/liberar-por-entrega';
 import { LiberarReserva } from './aplicacion/reserva/liberar-reserva';
 import { PonerEnViaje } from './aplicacion/reserva/poner-en-viaje';
 import { ReservarUnidad } from './aplicacion/reserva/reservar-unidad';
+import { RevisarDocumentos } from './aplicacion/unidad/revisar-documentos';
 import { ComunModule } from './infraestructura/comun.module';
 import { ConsumidorEventos } from './infraestructura/mensajeria/consumidor-eventos';
 import { RelayOutbox } from './infraestructura/mensajeria/relay-outbox';
+import { RevisionDiaria } from './infraestructura/programacion/revision-diaria';
 import { ActividadesFlota } from './infraestructura/temporal/actividades-flota';
 import { TrabajadorTemporal } from './infraestructura/temporal/trabajador-temporal';
 
 const DEPENDENCIAS = [UNIDAD_DE_TRABAJO, UNIDAD_REPOSITORIO, CHOFER_REPOSITORIO, RESERVA_UNIDAD_REPOSITORIO];
 
-/** Worker de Flota (Cloud Run worker pool, siempre encendido): relay del Outbox, actividades Flota.* y consumidor de flota.eventos. */
+/** Worker de Flota (Cloud Run worker pool, siempre encendido): relay del Outbox, actividades Flota.*, consumidor de flota.eventos y flota.sensor, y la revisión diaria de documentos (D75). */
 @Module({
   imports: [ComunModule],
   providers: [
@@ -79,6 +81,12 @@ const DEPENDENCIAS = [UNIDAD_DE_TRABAJO, UNIDAD_REPOSITORIO, CHOFER_REPOSITORIO,
         e: RegistroDeEventos,
       ) => new ProcesarLectura(tx, k, u, r, e),
     },
+    {
+      provide: RevisarDocumentos,
+      inject: [UNIDAD_DE_TRABAJO, UNIDAD_REPOSITORIO, REGISTRO_DE_EVENTOS, RELOJ],
+      useFactory: (tx: UnidadDeTrabajo, u: UnidadRepositorio, e: RegistroDeEventos, reloj: Reloj) => new RevisarDocumentos(tx, u, e, reloj),
+    },
+    RevisionDiaria,
     ActividadesFlota,
     TrabajadorTemporal,
     ConsumidorEventos,

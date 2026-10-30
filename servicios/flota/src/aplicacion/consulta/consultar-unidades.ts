@@ -8,7 +8,7 @@ const PUEDEN_VER = ['jefe_flota', 'despachador', 'gerente', 'agente_lectura'];
 export class ConsultarUnidades {
   constructor(private readonly unidades: UnidadRepositorio) {}
 
-  async listar(roles: string[], filtro: { tipo?: string; estado?: string }, despuesDe: string | undefined, limite: number) {
+  async listar(roles: string[], filtro: { placa?: string; tipo?: string; estado?: string }, despuesDe: string | undefined, limite: number) {
     this.autorizar(roles);
     return this.unidades.listar(filtro, despuesDe, limite);
   }

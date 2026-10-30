@@ -8,6 +8,7 @@ import type { ReservaUnidad } from '../../dominio/reserva/reserva-unidad';
 import type { Chofer } from '../../dominio/unidad/chofer';
 import type { Unidad } from '../../dominio/unidad/unidad';
 import { crearIndicesCombustible } from './combustible-mongo';
+import { crearIndicesMantenimiento } from './mantenimiento-mongo';
 import { sesionActual } from './mongo-unidad-de-trabajo';
 
 /** Colecciones de Flota en camelCase plural (000 §9); el id de negocio va en `_id`. */
@@ -26,6 +27,7 @@ export async function crearIndicesFlota(conexion: Connection): Promise<void> {
   await conexion.collection(RESERVAS).createIndex({ servicioId: 1 }, { unique: true });
   await conexion.collection(RESERVAS).createIndex({ viajeId: 1 });
   await crearIndicesCombustible(conexion);
+  await crearIndicesMantenimiento(conexion);
 }
 
 @Injectable()
@@ -63,13 +65,23 @@ export class UnidadRepositorioMongo implements UnidadRepositorio {
     await this.col.updateOne({ _id: unidadId, estado: 'RESERVADA' }, { $set: { estado: 'EN_VIAJE' } }, opciones());
   }
 
+  async insertar(u: Unidad): Promise<void> {
+    const { unidadId, ...resto } = u;
+    await this.col.insertOne({ _id: unidadId, ...resto }, opciones());
+  }
+
   async guardar(u: Unidad): Promise<void> {
     const { unidadId, ...resto } = u;
     await this.col.replaceOne({ _id: unidadId }, resto, opciones());
   }
 
-  async listar(filtro: { tipo?: string; estado?: string }, despuesDe: string | undefined, limite: number): Promise<Unidad[]> {
+  async listar(
+    filtro: { placa?: string; tipo?: string; estado?: string },
+    despuesDe: string | undefined,
+    limite: number,
+  ): Promise<Unidad[]> {
     const q: Record<string, unknown> = {};
+    if (filtro.placa) q.placa = filtro.placa;
     if (filtro.tipo) q.tipoUnidad = filtro.tipo;
     if (filtro.estado) q.estado = filtro.estado;
     if (despuesDe) q._id = { $gt: despuesDe };

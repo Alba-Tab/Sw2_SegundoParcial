@@ -21,6 +21,8 @@ export interface Unidad {
   kmDesdeUltimoMantenimiento: number;
   documentos: Documento[];
   atributos: Record<string, unknown>;
+  /** Solo en INACTIVA (spec 010, paso 3). */
+  baja?: { motivo: string; dadaEn: string };
 }
 
 /** Spec 003: qué remolque lleva cada carga. */

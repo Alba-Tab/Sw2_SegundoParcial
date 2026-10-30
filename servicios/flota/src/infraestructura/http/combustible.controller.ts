@@ -2,7 +2,6 @@ import { Body, Controller, Get, Headers, HttpCode, Inject, Param, Post, Query, R
 import type { z } from 'zod';
 import { ConsultarCombustible } from '../../aplicacion/combustible/consultar-combustible';
 import { RegistrarCarga } from '../../aplicacion/combustible/registrar-carga';
-import { ErrorDeDominio } from '../../dominio/comun/error-de-dominio';
 import type { Usuario } from './autenticacion.middleware';
 import {
   ListarCargasCombustibleQueryParams,
@@ -13,17 +12,9 @@ import {
   type RegistrarCargaCombustibleResponse,
 } from './contrato/flota.zod';
 import { hashCuerpo } from './hash-cuerpo';
+import { claveObligatoria, validar } from './validar';
 
 type ConUsuario = { usuario: Usuario };
-
-function validar<S extends z.ZodTypeAny>(esquema: S, valor: unknown): z.infer<S> {
-  const r = esquema.safeParse(valor);
-  if (!r.success) {
-    const i = r.error.issues[0];
-    throw new ErrorDeDominio('VALIDACION', `${i.path.join('.')}: ${i.message}`, { campo: i.path.join('.') });
-  }
-  return r.data;
-}
 
 /** Combustible (spec 009): cargas del chofer y lecturas del sensor. */
 @Controller('api/v1')
@@ -40,9 +31,10 @@ export class CombustibleController {
     @Headers('idempotency-key') clave: string | undefined,
     @Body() cuerpo: unknown,
   ): Promise<z.infer<typeof RegistrarCargaCombustibleResponse>> {
-    if (!clave) throw new ErrorDeDominio('VALIDACION', 'Idempotency-Key: es obligatoria', { campo: 'Idempotency-Key' });
     const e = validar(RegistrarCargaCombustibleBody, cuerpo);
-    return (await this.registrar.ejecutar(req.usuario, clave, e, hashCuerpo(e))) as z.infer<typeof RegistrarCargaCombustibleResponse>;
+    return (await this.registrar.ejecutar(req.usuario, claveObligatoria(clave), e, hashCuerpo(e))) as z.infer<
+      typeof RegistrarCargaCombustibleResponse
+    >;
   }
 
   @Get('cargas-combustible')

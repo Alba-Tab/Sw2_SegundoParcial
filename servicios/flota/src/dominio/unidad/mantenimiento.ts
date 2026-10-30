@@ -47,3 +47,15 @@ export function liberarDespuesDelViaje(u: Unidad, kmRecorridos: number, hoy: str
     revision,
   };
 }
+
+/** Datos de MantenimientoRequerido.v1 para una unidad que quedó MANTENIMIENTO_PENDIENTE. */
+export function mantenimientoRequerido(u: Unidad, revision: Revision) {
+  return {
+    unidadId: u.unidadId,
+    tipoUnidad: u.tipoUnidad,
+    placa: u.placa,
+    motivos: revision.motivos,
+    kmDesdeUltimo: u.kmDesdeUltimoMantenimiento,
+    ...(revision.documentoVenceEl ? { documentoVenceEl: revision.documentoVenceEl } : {}),
+  };
+}

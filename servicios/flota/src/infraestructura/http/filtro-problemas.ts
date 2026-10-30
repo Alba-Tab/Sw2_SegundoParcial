@@ -10,6 +10,13 @@ const POR_ESTADO: Record<number, [string, string]> = {
   404: ['NO_ENCONTRADO', 'No encontrado'],
 };
 
+/** 000 §5: `campo` va como `errores`; el resto de `datos` (p. ej. `estadoActual`), como extensiones. */
+function conDatos(p: Problema, error: ErrorDeDominio): Problema {
+  const { campo, ...extensiones } = error.datos ?? {};
+  const mensaje = error.message.startsWith(`${String(campo)}: `) ? error.message.slice(String(campo).length + 2) : error.message;
+  return { ...extensiones, ...p, ...(typeof campo === 'string' ? { errores: [{ campo, mensaje }] } : {}) };
+}
+
 /** Todo error sale como application/problem+json con su código; nunca trazas de pila ni mensajes de la base. */
 @Catch()
 export class FiltroProblemas implements ExceptionFilter {
@@ -19,7 +26,7 @@ export class FiltroProblemas implements ExceptionFilter {
     const res = host.switchToHttp().getResponse<Response>();
     let p: Problema;
     if (error instanceof ErrorDeDominio) {
-      p = problema(error.codigo, error.codigo, error.message);
+      p = conDatos(problema(error.codigo, error.codigo, error.message), error);
     } else if (error instanceof HttpException) {
       const estado = error.getStatus();
       const [codigo, titulo] = POR_ESTADO[estado] ?? ['CONFLICTO_ESTADO', 'Error'];
