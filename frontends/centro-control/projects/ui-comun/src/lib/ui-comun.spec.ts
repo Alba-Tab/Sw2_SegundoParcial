@@ -1,5 +1,5 @@
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
-import { esperaReconexion } from './apollo';
+import { esperaReconexion } from './conexion';
 import { APPS_POR_ROL, DESTINO_POR_ROL } from './configuracion';
 import { codigoDe, mensajeDe, servicioCaido } from './errores';
 import { BobPipe, FechaPipe, pct } from './formato';

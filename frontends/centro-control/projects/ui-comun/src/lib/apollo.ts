@@ -8,7 +8,7 @@ import { HttpLink } from 'apollo-angular/http';
 import { createClient } from 'graphql-ws';
 import { Observable } from 'rxjs';
 import { CONFIG_CENTRO } from './configuracion';
-import { EstadoConexion } from './conexion';
+import { EstadoConexion, esperaReconexion } from './conexion';
 import { Sesion } from './sesion';
 
 // Respuesta parcial (spec 016): las consultas devuelven los datos que llegaron junto con los errores por campo.
@@ -24,9 +24,6 @@ declare module '@apollo/client' {
     }
   }
 }
-
-/** D99: reconexión con espera creciente 1, 2, 4… s, máximo 30 s. */
-export const esperaReconexion = (intento: number) => Math.min(30_000, 1000 * 2 ** intento);
 
 /**
  * Apollo hacia el Gateway (spec 016): el token va en `Authorization` (HTTP) y en `connection_init` (WebSocket), nunca
