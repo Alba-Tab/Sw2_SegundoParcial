@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { enOrden, type Operacion, siguiente } from './operacion';
 import { decidir, espera, ESPERA_MAXIMA_MS } from './reintento';
-import { estadoVisible, puedeIniciar, type ViajeLocal } from './viaje';
+import { estadoVisible, puedeIniciar, type ViajeLocal, viajesQueSobran } from './viaje';
 
 const op = (o: Partial<Operacion>): Operacion => ({
   opId: o.opId ?? 'x',
@@ -90,5 +90,13 @@ describe('viaje local', () => {
     expect(puedeIniciar(v({ viajeId: 'b' }), [a])).toBe(false);
     expect(puedeIniciar(v({ viajeId: 'b' }), [v({ viajeId: 'c', estado: 'CERRADO' })])).toBe(true);
     expect(estadoVisible(v({ canceladoAlSincronizar: true, iniciadoLocal: true }))).toBe('CANCELADO');
+  });
+});
+
+describe('viajes que sobran al bajar /viajes/mios (D50)', () => {
+  it('se borran los que el servidor ya no devuelve, salvo los que tienen operaciones por enviar', () => {
+    expect(viajesQueSobran(['a', 'b', 'c', 'd'], ['a'], ['c'])).toEqual(['b', 'd']);
+    expect(viajesQueSobran(['a'], [], [])).toEqual(['a']);
+    expect(viajesQueSobran([], ['a'], [])).toEqual([]);
   });
 });

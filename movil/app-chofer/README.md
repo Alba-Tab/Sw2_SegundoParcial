@@ -16,6 +16,8 @@ Dominio y aplicación son TypeScript puro y se prueban con Vitest y puertos fals
 ## Motor de sincronización (spec 005, CU-08)
 
 - Una tanda a la vez: renueva el access token con el refresh token *offline* (D27) y, si da `invalid_grant`, pide iniciar sesión **sin borrar la cola**.
+- **Cerrar sesión** es otra cosa: si quedan registros o puntos GPS sin enviar, la app avisa y pide confirmación; luego detiene el GPS y la tarea de fondo, quita el token push del registro (`PUT /dispositivos/mio` sin `tokenPush`), revoca el refresh token en Keycloak (`revoke`, 15 s como máximo) y borra del celular los viajes, la cola, las evidencias, los puntos GPS y la última posición. Quedan el `dispositivoId` y el `seq` de cada viaje (D55).
+- Al bajar `GET /viajes/mios`, los viajes que ya no vienen se borran del celular, salvo los que tienen operaciones pendientes.
 - Por viaje, una petición a la vez y en orden: `INICIO`, luego hitos, eventos y cargas por hora de creación, la entrega al final.
 - Red, 5xx, 429, `409 IDEMPOTENCIA_EN_PROCESO` y `409 CONFIRMACION_EN_CURSO` se reintentan con la misma clave. Otro 4xx deja la operación `FALLIDA` con su código. Un `409 CONFLICTO_ESTADO` con el viaje `CANCELADO` descarta la cola de ese viaje (7 días en Descartadas, D54) y avisa "Viaje cancelado; llama al despachador".
 - El GPS sale después del inicio confirmado, en lotes de hasta 100, uno a la vez; un 503 con `Retry-After` (FO4) solo hace crecer "Pendientes". Al abrir, el cursor del dispositivo (D55) borra lo que el servidor ya aceptó.

@@ -20,3 +20,8 @@ export async function registrarTareaFondo(): Promise<void> {
     await BackgroundTask.registerTaskAsync(TAREA_SINCRONIZAR, { minimumInterval: 15 });
   }
 }
+
+/** Al cerrar sesión: sin chofer no hay nada que sincronizar en segundo plano (se registra otra vez al entrar). */
+export async function quitarTareaFondo(): Promise<void> {
+  if (await TaskManager.isTaskRegisteredAsync(TAREA_SINCRONIZAR)) await BackgroundTask.unregisterTaskAsync(TAREA_SINCRONIZAR);
+}

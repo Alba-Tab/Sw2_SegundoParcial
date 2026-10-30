@@ -67,6 +67,12 @@ export class CasosDeUso {
     return this.ultima ? kmh(this.ultima.velocidadMs) : 0;
   }
 
+  /** Al cerrar sesión: nada de la posición ni del muestreo del chofer anterior queda en memoria. */
+  olvidar(): void {
+    this.ultima = null;
+    this.muestreos.clear();
+  }
+
   /** Spec 005, paso 8: la frenada detectada en el celular (D08) va a la cola con la última posición del GPS. */
   registrarFrenada(viajeId: string, magnitudG: number): string | null {
     const posicion = this.ultimaPosicion();
