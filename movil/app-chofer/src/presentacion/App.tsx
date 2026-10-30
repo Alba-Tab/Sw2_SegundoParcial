@@ -1,0 +1,92 @@
+import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
+import { StatusBar } from 'expo-status-bar';
+import { useCallback, useEffect, useState } from 'react';
+import { BackHandler, useColorScheme, View } from 'react-native';
+import { ActivityIndicator, Appbar, PaperProvider, Snackbar, Text } from 'react-native-paper';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import migraciones from '../../drizzle/migrations';
+import { bd } from '../datos/bd';
+import { casos, sesion } from '../datos/contenedor';
+import { registrarTareaFondo } from '../datos/tareaFondo';
+import { BarraSincronizacion } from './BarraSincronizacion';
+import { PantallaPendientes } from './pantallas/PantallaPendientes';
+import { PantallaSesion } from './pantallas/PantallaSesion';
+import { PantallaViaje } from './pantallas/PantallaViaje';
+import { PantallaViajes } from './pantallas/PantallaViajes';
+import { temaClaro, temaOscuro } from './tema';
+import { useSincronizacion } from './useSincronizacion';
+
+type Pantalla = { nombre: 'viajes' } | { nombre: 'viaje'; viajeId: string } | { nombre: 'pendientes' };
+
+export function App() {
+  const oscuro = useColorScheme() === 'dark';
+  const migracion = useMigrations(bd, migraciones);
+  return (
+    <SafeAreaProvider>
+      <PaperProvider theme={oscuro ? temaOscuro : temaClaro}>
+        <StatusBar style="auto" />
+        {migracion.error ? (
+          <Text style={{ padding: 24 }}>No se pudo preparar la base del celular: {migracion.error.message}</Text>
+        ) : !migracion.success ? (
+          <ActivityIndicator style={{ flex: 1 }} />
+        ) : (
+          <ConSesion />
+        )}
+      </PaperProvider>
+    </SafeAreaProvider>
+  );
+}
+
+function ConSesion() {
+  const [estado, setEstado] = useState<'cargando' | 'sin-sesion' | 'vencida' | 'activa'>('cargando');
+  useEffect(() => {
+    void sesion.haySesion().then((hay) => setEstado(hay ? 'activa' : 'sin-sesion'));
+  }, []);
+
+  const iniciar = async () => {
+    if (!(await sesion.iniciar())) return;
+    setEstado('activa');
+    // Con señal recién entrado: el celular se registra y baja sus viajes (spec 005, paso 1).
+    await Promise.allSettled([casos.registrarDispositivo(), casos.descargarViajes(), registrarTareaFondo()]);
+  };
+
+  if (estado === 'cargando') return <ActivityIndicator style={{ flex: 1 }} />;
+  if (estado !== 'activa') return <PantallaSesion iniciar={iniciar} vencida={estado === 'vencida'} />;
+  return <Principal alVencerSesion={() => setEstado('vencida')} salir={() => void sesion.cerrar().then(() => setEstado('sin-sesion'))} />;
+}
+
+function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; salir: () => void }) {
+  const [pantalla, setPantalla] = useState<Pantalla>({ nombre: 'viajes' });
+  const [aviso, setAviso] = useState<string | null>(null);
+  const alCancelarse = useCallback(() => setAviso('Viaje cancelado; llama al despachador'), []);
+  const sync = useSincronizacion(alCancelarse, alVencerSesion);
+
+  useEffect(() => {
+    const atras = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (pantalla.nombre === 'viajes') return false;
+      setPantalla({ nombre: 'viajes' });
+      return true;
+    });
+    return () => atras.remove();
+  }, [pantalla]);
+
+  return (
+    <View style={{ flex: 1 }}>
+      <Appbar.Header>
+        {pantalla.nombre !== 'viajes' && <Appbar.BackAction onPress={() => setPantalla({ nombre: 'viajes' })} />}
+        <Appbar.Content title={pantalla.nombre === 'pendientes' ? 'Pendientes' : 'Mis viajes'} />
+        <Appbar.Action icon="sync" accessibilityLabel="Sincronizar ahora" onPress={() => void sync.sincronizar()} />
+        <Appbar.Action icon="logout" accessibilityLabel="Cerrar sesión" onPress={salir} />
+      </Appbar.Header>
+      <BarraSincronizacion {...sync} verPendientes={() => setPantalla({ nombre: 'pendientes' })} />
+      {pantalla.nombre === 'viajes' && (
+        <PantallaViajes enLinea={sync.enLinea} abrir={(viajeId) => setPantalla({ nombre: 'viaje', viajeId })} />
+      )}
+      {pantalla.nombre === 'viaje' && <PantallaViaje viajeId={pantalla.viajeId} sincronizar={() => void sync.sincronizar()} />}
+      {pantalla.nombre === 'pendientes' && <PantallaPendientes />}
+      <Snackbar visible={aviso !== null} onDismiss={() => setAviso(null)} duration={8000}>
+        {aviso ?? ''}
+      </Snackbar>
+    </View>
+  );
+}
