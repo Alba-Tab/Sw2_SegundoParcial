@@ -10,7 +10,8 @@ module.exports = {
       client: 'zod',
       mode: 'single',
       target: 'src/infraestructura/http/contrato/flota.zod.ts',
-      override: { zod: { generate: { param: true, query: true, header: true, body: true, response: true } } },
+      // Los parámetros de consulta llegan como texto (?limite=100): se convierten a número antes de validar.
+      override: { zod: { generate: { param: true, query: true, header: true, body: true, response: true }, coerce: { query: ['number'] } } },
     },
   },
 };
