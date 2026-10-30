@@ -1,0 +1,133 @@
+openapi: 3.0.3
+info:
+  title: API del Gateway del Centro de Control
+  version: 1.0.0
+  description: |
+    BFF GraphQL de las 4 apps Angular (spec 016). El esquema vive en `contratos/graphql/centro-control.graphql`; aquí
+    solo están las rutas HTTP: `POST /graphql`, la suscripción por WebSocket (`graphql-transport-ws`, el token va en el
+    `payload` de `connection_init`) y la descarga de Excel con enlace HMAC sin estado (D21, spec 015).
+servers:
+  - url: http://localhost:8105
+    description: Local
+security:
+  - bearer: []
+tags:
+  - name: salud
+  - name: graphql
+  - name: exportaciones
+paths:
+  /health:
+    get:
+      tags: [salud]
+      operationId: salud
+      summary: El proceso está vivo.
+      security: []
+      responses:
+        '200':
+          $ref: './comun.yaml#/components/responses/Salud'
+  /health/ready:
+    get:
+      tags: [salud]
+      operationId: saludLista
+      summary: Listo para recibir consultas (el Gateway no tiene base; informa qué servicios responden).
+      security: []
+      responses:
+        '200':
+          $ref: './comun.yaml#/components/responses/Salud'
+  /graphql:
+    post:
+      tags: [graphql]
+      operationId: consultarGraphql
+      summary: Consultas y mutaciones del esquema centro-control.graphql. Respuesta parcial con errores por campo (200).
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query:
+                  type: string
+                operationName:
+                  type: string
+                variables:
+                  type: object
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Respuesta GraphQL; los campos de un servicio caído salen en null con su error en `errors[]`.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    nullable: true
+                    additionalProperties: true
+                  errors:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        message:
+                          type: string
+                        path:
+                          type: array
+                          items: {}
+                        extensions:
+                          type: object
+                          properties:
+                            codigo:
+                              type: string
+                            status:
+                              type: integer
+        '400':
+          description: Consulta inválida o demasiado compleja (`CONSULTA_DEMASIADO_COMPLEJA`).
+          content:
+            application/json:
+              schema:
+                type: object
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+  /exportaciones/{token}:
+    get:
+      tags: [exportaciones]
+      operationId: descargarExportacion
+      summary: Descarga el Excel sin Authorization; cualquier instancia valida el HMAC y el vencimiento (D21).
+      security: []
+      parameters:
+        - name: token
+          in: path
+          required: true
+          description: '`base64url(exportacionId.sub.exp) + "." + base64url(HMAC-SHA256(EXPORTACION_HMAC_SECRETO, payload))`'
+          schema:
+            type: string
+            maxLength: 400
+      responses:
+        '200':
+          description: 'Libro de Excel con Content-Disposition attachment y Cache-Control no-store.'
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          description: El enlace venció (`EXPORTACION_VENCIDA`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: './comun.yaml#/components/schemas/Problema'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+components:
+  securitySchemes:
+    bearer:
+      $ref: './comun.yaml#/components/securitySchemes/bearer'
