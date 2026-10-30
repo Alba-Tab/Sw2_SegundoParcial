@@ -21,7 +21,8 @@ export function validarAtributos(tipoUnidad: TipoUnidad, tipoRemolque: TipoRemol
   if (!clave) return;
   const reglas = REGLAS[clave];
   for (const campo of Object.keys(atributos)) {
-    if (!(campo in reglas)) invalido(campo, `no es un atributo de ${clave}`);
+    // Object.hasOwn y no `in`: `in` recorre el prototipo y aceptaría `constructor`, `toString` o `__proto__`.
+    if (!Object.hasOwn(reglas, campo)) invalido(campo, `no es un atributo de ${clave}`);
   }
   for (const [campo, r] of Object.entries(reglas)) {
     const v = atributos[campo];

@@ -10,6 +10,7 @@ import type { Unidad } from '../../dominio/unidad/unidad';
 import { crearIndicesCombustible } from './combustible-mongo';
 import { crearIndicesMantenimiento } from './mantenimiento-mongo';
 import { sesionActual } from './mongo-unidad-de-trabajo';
+import { crearIndicesOutbox } from './registro-de-eventos-mongo';
 
 /** Colecciones de Flota en camelCase plural (000 §9); el id de negocio va en `_id`. */
 export const UNIDADES = 'unidades';
@@ -20,7 +21,7 @@ type ConId<T, K extends keyof T> = Omit<T, K> & { _id: string };
 
 const opciones = () => ({ session: sesionActual.getStore() });
 
-/** Índices que hacen cumplir las reglas: placa única (spec 010) y una reserva por servicio (spec 003). */
+/** Índices que hacen cumplir las reglas: placa única (spec 010) y una reserva por servicio (spec 003); y los del Outbox. */
 export async function crearIndicesFlota(conexion: Connection): Promise<void> {
   await conexion.collection(UNIDADES).createIndex({ placa: 1 }, { unique: true });
   await conexion.collection(UNIDADES).createIndex({ estado: 1, tipoUnidad: 1 });
@@ -28,6 +29,7 @@ export async function crearIndicesFlota(conexion: Connection): Promise<void> {
   await conexion.collection(RESERVAS).createIndex({ viajeId: 1 });
   await crearIndicesCombustible(conexion);
   await crearIndicesMantenimiento(conexion);
+  await crearIndicesOutbox(conexion);
 }
 
 @Injectable()

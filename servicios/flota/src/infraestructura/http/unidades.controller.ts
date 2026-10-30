@@ -12,6 +12,7 @@ import {
   type ObtenerChoferResponse,
   type ObtenerUnidadResponse,
 } from './contrato/flota.zod';
+import { conBooleanos } from './validar';
 
 type ConUsuario = { usuario: Usuario };
 
@@ -58,15 +59,22 @@ export class UnidadesController {
 
   @Get('choferes')
   async listarChoferes(@Req() req: ConUsuario, @Query() q: unknown): Promise<z.infer<typeof ListarChoferesResponse>> {
-    const p = consulta(ListarChoferesQueryParams, q);
+    const p = consulta(ListarChoferesQueryParams, conBooleanos(q, ['activo']));
     const limite = p.limite ?? 20;
     const items = await this.choferes.listar(req.usuario.roles, { activo: p.activo }, desdeCursor(p.cursor), limite + 1);
-    return pagina(items as never[], limite, (c: { choferId: string }) => c.choferId) as z.infer<typeof ListarChoferesResponse>;
+    return pagina(items.map(sinVersion) as never[], limite, (c: { choferId: string }) => c.choferId) as z.infer<
+      typeof ListarChoferesResponse
+    >;
   }
 
   @Get('choferes/:choferId')
   async obtenerChofer(@Req() req: ConUsuario, @Param('choferId') id: string): Promise<z.infer<typeof ObtenerChoferResponse>> {
-    const { versionAgregado: _v, ...c } = (await this.choferes.porId(req.usuario, id)) as { versionAgregado?: number };
-    return c as z.infer<typeof ObtenerChoferResponse>;
+    return sinVersion(await this.choferes.porId(req.usuario, id)) as z.infer<typeof ObtenerChoferResponse>;
   }
+}
+
+/** `versionAgregado` es interno (ChoferActualizado, 000 §6): no está en el contrato del chofer. */
+function sinVersion<C extends object>(c: C): Omit<C, 'versionAgregado'> {
+  const { versionAgregado: _v, ...resto } = c as C & { versionAgregado?: number };
+  return resto;
 }

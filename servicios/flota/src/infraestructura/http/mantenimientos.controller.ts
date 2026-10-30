@@ -9,7 +9,7 @@ import {
   type CerrarMantenimientoResponse,
   type ListarMantenimientosResponse,
 } from './contrato/flota.zod';
-import { hashCuerpo } from './hash-cuerpo';
+import { hashPeticion, type PeticionHttp } from './hash-cuerpo';
 import { aCursor, claveObligatoria, desdeCursor, validar } from './validar';
 
 type ConUsuario = { usuario: Usuario };
@@ -42,7 +42,7 @@ export class MantenimientosController {
   @Post(':mantenimientoId/cierre')
   @HttpCode(200)
   async cerrarMantenimiento(
-    @Req() req: ConUsuario,
+    @Req() req: PeticionHttp,
     @Param('mantenimientoId') mantenimientoId: string,
     @Headers('idempotency-key') clave: string | undefined,
     @Body() cuerpo: unknown,
@@ -51,7 +51,7 @@ export class MantenimientosController {
     const m = await this.cerrar.ejecutar(mantenimientoId, {
       usuario: req.usuario,
       clave: claveObligatoria(clave),
-      hashCuerpo: hashCuerpo(e),
+      hashCuerpo: hashPeticion(req, e),
       cuerpo: e,
     });
     return m as z.infer<typeof CerrarMantenimientoResponse>;

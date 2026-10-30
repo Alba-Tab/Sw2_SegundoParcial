@@ -28,6 +28,7 @@ export class SaludController {
     const rabbitmq: 'UP' | 'DOWN' = (await this.amqp.disponible()) ? 'UP' : 'DOWN';
     const arriba = mongo === 'UP' && rabbitmq === 'UP';
     res.status(arriba ? 200 : 503);
+    if (!arriba) res.setHeader('Retry-After', '30');
     return { estado: arriba ? ('UP' as const) : ('DOWN' as const), dependencias: { mongo, rabbitmq } };
   }
 

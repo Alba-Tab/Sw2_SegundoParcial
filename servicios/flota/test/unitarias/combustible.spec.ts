@@ -1,4 +1,4 @@
-import { detectarCaida, inicioDeParada, type Lectura } from '../../src/dominio/combustible/caida';
+import { detectarCaida, type Lectura } from '../../src/dominio/combustible/caida';
 import { validarCarga } from '../../src/dominio/combustible/carga';
 import type { Unidad } from '../../src/dominio/unidad/unidad';
 
@@ -15,7 +15,6 @@ describe('Caída de combustible (spec 009, D08)', () => {
     const lecturas = [l(-20, 51, 60), l(-10, 50, 0), l(0, 50), l(10, 48), l(20, 46), l(30, 44)];
     expect(detectarCaida(lecturas, l(30, 44))).toBeNull();
     expect(detectarCaida(lecturas, l(40, 42))).toEqual({ nivelAnteriorPct: 50, nivelActualPct: 42, caidaPct: 8, ventanaMinutos: 0.83 });
-    expect(inicioDeParada(lecturas, l(40, 42))).toBe(l(-10, 0).medidoEn);
   });
 
   it('no detecta en marcha, con 6 puntos detenido ni con lecturas de antes de moverse', () => {

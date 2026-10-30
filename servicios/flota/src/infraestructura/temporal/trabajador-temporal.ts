@@ -1,10 +1,28 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
-import { NativeConnection, Worker } from '@temporalio/worker';
+import { DefaultLogger, NativeConnection, Runtime, Worker } from '@temporalio/worker';
 import type { Connection } from 'mongoose';
 import { entorno } from '../configuracion/entorno';
+import { loggerJson } from '../observabilidad/logger';
 import { crearIndicesFlota } from '../persistencia/colecciones-flota';
 import { ActividadesFlota } from './actividades-flota';
+
+const NIVELES = { TRACE: 'trace', DEBUG: 'debug', INFO: 'info', WARN: 'warn', ERROR: 'error' } as const;
+let runtimeInstalado = false;
+
+/**
+ * Los logs del SDK de Temporal (y los del core nativo, reenviados desde WARN) salen en el mismo JSON de 000 §10 que el
+ * resto del worker, no en texto por stderr. Se instala una sola vez, antes de crear la primera conexión.
+ */
+function instalarRuntime(): void {
+  if (runtimeInstalado) return;
+  runtimeInstalado = true;
+  const log = loggerJson('flota', { origen: 'temporal' });
+  Runtime.install({
+    logger: new DefaultLogger('INFO', ({ level, message, meta }) => log[NIVELES[level]]({ ...meta }, message)),
+    telemetryOptions: { logging: { filter: { core: 'WARN', other: 'ERROR' }, forward: {} } },
+  });
+}
 
 /**
  * Worker de la cola `flota` (namespace transporte, D14): solo actividades. Si Temporal no está, reintenta la conexión
@@ -24,6 +42,7 @@ export class TrabajadorTemporal implements OnApplicationBootstrap, OnApplication
   async onApplicationBootstrap(): Promise<void> {
     await crearIndicesFlota(this.conexion);
     if (!entorno().TEMPORAL_WORKER) return;
+    instalarRuntime();
     void this.correr();
   }
 

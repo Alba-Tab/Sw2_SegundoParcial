@@ -1,7 +1,8 @@
+import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getConnectionToken } from '@nestjs/mongoose';
 import { ApplicationFailure } from '@temporalio/common';
-import type { Connection } from 'mongoose';
+import { type Connection, mongo as driver } from 'mongoose';
 import type { StartedTestContainer } from 'testcontainers';
 import { uuid7 } from '../../src/dominio/comun/uuid7';
 import { ActividadesFlota } from '../../src/infraestructura/temporal/actividades-flota';
@@ -21,7 +22,7 @@ import { DarDeBajaUnidad } from '../../src/aplicacion/unidad/dar-de-baja-unidad'
 import { RevisarDocumentos } from '../../src/aplicacion/unidad/revisar-documentos';
 import { MANTENIMIENTOS, OPERACIONES } from '../../src/infraestructura/persistencia/mantenimiento-mongo';
 import { RegistrarCarga } from '../../src/aplicacion/combustible/registrar-carga';
-import { COMBUSTIBLE_REPOSITORIO } from '../../src/aplicacion/puertos/combustible-repositorio';
+import { COMBUSTIBLE_REPOSITORIO, type CombustibleRepositorio } from '../../src/aplicacion/puertos/combustible-repositorio';
 import { RELOJ } from '../../src/aplicacion/puertos/reloj';
 import { RESERVA_UNIDAD_REPOSITORIO } from '../../src/aplicacion/puertos/reserva-unidad-repositorio';
 import { UNIDAD_REPOSITORIO } from '../../src/aplicacion/puertos/unidad-repositorio';
@@ -105,6 +106,7 @@ describe('Reservas de la saga (Mongo rs0)', () => {
   let programar: ProgramarMantenimiento;
   let cerrarMantenimiento: CerrarMantenimiento;
   let revisarDocumentos: RevisarDocumentos;
+  let app: INestApplication;
 
   const reservar = (servicioId: string, tipoCarga = 'GRANOS', toneladas = 28) =>
     flota['Flota.reservarUnidad']({ servicioId, viajeId: uuid7(), tipoCarga: tipoCarga as never, toneladas, fechaViaje: '2026-11-10' });
@@ -127,7 +129,7 @@ describe('Reservas de la saga (Mongo rs0)', () => {
     process.env.CONSUMIR_EVENTOS = 'false';
     process.env.OIDC_ISSUER = '';
     const { WorkerModule } = await import('../../src/worker.module');
-    const app = (await Test.createTestingModule({ imports: [WorkerModule] }).compile()).createNestApplication();
+    app = (await Test.createTestingModule({ imports: [WorkerModule] }).compile()).createNestApplication();
     await app.init();
     conexion = app.get<Connection>(getConnectionToken());
     flota = app.get(ActividadesFlota).mapa();
@@ -325,6 +327,41 @@ describe('Reservas de la saga (Mongo rs0)', () => {
     expect(await estado(ID.t2)).toBe('DISPONIBLE');
   });
 
+  it('un fin de viaje repetido con otro eventId no suma km otra vez ni toca unidades que no son de la reserva (D11)', async () => {
+    const [a, b] = [uuid7(), uuid7()];
+    const ra = await reservar(a);
+    const rb = await reservar(b);
+    // ViajeIniciado con ids que no son de la reserva: se usan los de la reserva.
+    expect(
+      await enViaje.ejecutar({
+        id: uuid7(),
+        tipo: 'ViajeIniciado',
+        datos: { servicioId: a, tractoId: rb.tractoId, remolqueId: rb.remolqueId },
+      }),
+    ).toBe(true);
+    expect([await estado(ra.tractoId), await estado(ra.remolqueId), await estado(rb.tractoId)]).toEqual([
+      'EN_VIAJE',
+      'EN_VIAJE',
+      'RESERVADA',
+    ]);
+    const km = async (id: string) => (await conexion.collection(UNIDADES).findOne({ _id: id as never }))?.kmDesdeUltimoMantenimiento;
+    const kmAntes = await km(ra.tractoId);
+    // Los ids del evento apuntan a la reserva b: se ignoran y se usan los de a.
+    const fin = (id: string) => ({
+      id,
+      tipo: 'EntregaConfirmada' as const,
+      datos: { servicioId: a, tractoId: rb.tractoId, remolqueId: rb.remolqueId, choferId: rb.choferId, kmRecorridos: 120 },
+    });
+    expect(await finDeViaje.ejecutar(fin(uuid7()))).toBe(true);
+    expect(await finDeViaje.ejecutar(fin(uuid7()))).toBe(true);
+    expect(await km(ra.tractoId)).toBe(kmAntes + 120);
+    expect([await estado(ra.tractoId), await libre(ra.choferId)]).toEqual(['DISPONIBLE', true]);
+    expect([await estado(rb.tractoId), await estado(rb.remolqueId), await libre(rb.choferId)]).toEqual(['RESERVADA', 'RESERVADA', false]);
+    // Un fin de viaje de un servicio sin reserva no hace nada.
+    expect(await finDeViaje.ejecutar({ ...fin(uuid7()), datos: { ...fin('x').datos, servicioId: uuid7() } })).toBe(true);
+    expect(await estado(rb.tractoId)).toBe('RESERVADA');
+  });
+
   it('choferes:actualizar guarda el cambio, sube la versión y deja ChoferActualizado', async () => {
     expect(await actualizarChofer.ejecutar(ID.ch3, { licenciaVenceEl: '2028-06-30' })).toBe(2);
     expect((await conexion.collection(CHOFERES).findOne({ _id: ID.ch3 as never }))?.licenciaVenceEl).toBe('2028-06-30');
@@ -350,20 +387,39 @@ describe('Reservas de la saga (Mongo rs0)', () => {
       litros: 180.5,
       monto: { monto: '675.07', moneda: 'BOB' },
       kilometraje: 184320,
-      registradaEn: new Date().toISOString(),
+      registradaEn: new Date().toISOString().replace(/\.\d{3}Z$/, 'Z'),
     };
+    const codigo = (p: Promise<unknown>) =>
+      p.then(
+        () => 'OK',
+        (e: { codigo: string }) => e.codigo,
+      );
+    // Spec 009, paso 4: la reserva debe estar CONFIRMADA o LIBERADA; una PROVISIONAL todavía no es un viaje.
+    expect(await codigo(registrarCarga.ejecutar(chofer1, opId, cuerpo, 'h1'))).toBe('NO_ENCONTRADO');
+    await flota['Flota.confirmarReserva']({ reservaUnidadId: r.reservaUnidadId, servicioId: servicio });
+
     const c = await registrarCarga.ejecutar(chofer1, opId, cuerpo, 'h1');
     expect(c).toMatchObject({ tractoId: r.tractoId, placa: '4521KTR', choferId: ID.ch1, litros: 180.5 });
     expect(await registrarCarga.ejecutar(chofer1, opId, cuerpo, 'h1')).toEqual(c);
     expect(await conexion.collection(CARGAS).countDocuments()).toBe(1);
     expect((await conexion.collection(UNIDADES).findOne({ _id: ID.t2 as never }))?.kilometraje).toBe(184320);
     expect(await conexion.collection('outboxEventos').countDocuments({ tipo: 'CargaCombustibleRegistrada' })).toBe(1);
-
-    const codigo = (p: Promise<unknown>) =>
-      p.then(
-        () => 'OK',
-        (e: { codigo: string }) => e.codigo,
-      );
+    // En Mongo, el dinero es Decimal128 (000 §3) y el instante un Date (000 §2); hacia afuera, texto.
+    const guardada = await conexion.collection(CARGAS).findOne({ opId });
+    expect(guardada?.monto.monto).toBeInstanceOf(driver.Decimal128);
+    expect(guardada?.monto.monto.toString()).toBe('675.07');
+    expect(guardada?.registradaEn).toBeInstanceOf(Date);
+    expect(c.monto).toEqual({ monto: '675.07', moneda: 'BOB' });
+    const combustible = app.get<CombustibleRepositorio>(COMBUSTIBLE_REPOSITORIO);
+    const enRango = await combustible.listarCargas(
+      { desde: new Date(Date.now() - 60_000).toISOString(), hasta: new Date(Date.now() + 60_000).toISOString() },
+      undefined,
+      10,
+    );
+    expect(enRango).toEqual([{ ...c }]);
+    expect(await combustible.listarCargas({ hasta: new Date(Date.now() - 3_600_000).toISOString() }, undefined, 10)).toEqual([]);
+    // El reenvío solo devuelve la carga al chofer que la registró.
+    expect(await codigo(registrarCarga.ejecutar({ sub: 'otro', roles: ['chofer'] }, opId, cuerpo, 'h1'))).toBe('SIN_PERMISO');
     expect(await codigo(registrarCarga.ejecutar(chofer1, opId, { ...cuerpo, litros: 10 }, 'h2'))).toBe('IDEMPOTENCIA_CUERPO_DISTINTO');
     const otro = uuid7();
     expect(await codigo(registrarCarga.ejecutar(chofer1, otro, { ...cuerpo, opId: otro, kilometraje: 184100 }, 'h3'))).toBe(
@@ -423,6 +479,35 @@ describe('Reservas de la saga (Mongo rs0)', () => {
       velocidadKmh: 0,
     });
     expect(await conexion.collection('outboxEventos').countDocuments({ tipo: 'CaidaCombustibleDetectada' })).toBe(1);
+  });
+
+  it('una parada de 30 min con el nivel bajando deja una sola detección; al moverse y parar otra vez, otra (spec 009)', async () => {
+    const t0 = Date.now() - 3 * 3_600_000;
+    const lectura = (min: number, nivelPct: number, velocidadKmh = 0) => ({
+      placa: '1111AAA',
+      nivelPct,
+      velocidadKmh,
+      medidoEn: new Date(t0 + min * 60_000).toISOString(),
+    });
+    const caidas = async (desde: number, hasta: number, nivel0: number) => {
+      const r: string[] = [];
+      for (let m = desde; m <= hasta; m++) r.push(await lecturas.ejecutar(lectura(m, nivel0 - (m - desde))));
+      return r.filter((x) => x === 'CAIDA').length;
+    };
+    expect(await lecturas.ejecutar(lectura(0, 90, 60))).toBe('GUARDADA');
+    // Detenido de 1 a 31 min, 1 punto menos por minuto: cada lectura desde el minuto 9 cumple la regla de caída.
+    expect(await caidas(1, 31, 89)).toBe(1);
+    expect(await conexion.collection(DETECCIONES).countDocuments({ placa: '1111AAA' })).toBe(1);
+    expect(
+      await conexion.collection('outboxEventos').countDocuments({ tipo: 'CaidaCombustibleDetectada', 'sobre.datos.placa': '1111AAA' }),
+    ).toBe(1);
+    const [deteccion] = await conexion.collection(DETECCIONES).find({ placa: '1111AAA' }).toArray();
+    expect(deteccion.paradaDesde).toEqual(new Date(lectura(1, 0).medidoEn));
+    expect(deteccion.detectadaEn).toBeInstanceOf(Date);
+
+    expect(await lecturas.ejecutar(lectura(32, 58, 40))).toBe('GUARDADA');
+    expect(await caidas(33, 50, 58)).toBe(1);
+    expect(await conexion.collection(DETECCIONES).countDocuments({ placa: '1111AAA' })).toBe(2);
   });
 
   describe('unidades y mantenimiento (spec 010)', () => {
