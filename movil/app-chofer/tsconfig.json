@@ -3,7 +3,10 @@
   "compilerOptions": {
     "strict": true,
     "noUnusedLocals": true,
-    "noUnusedParameters": true
+    "noUnusedParameters": true,
+    "paths": {
+      "whisper.rn": ["./node_modules/whisper.rn/lib/typescript/index.d.ts"]
+    }
   },
   "include": ["**/*.ts", "**/*.tsx"],
   "exclude": ["node_modules"]

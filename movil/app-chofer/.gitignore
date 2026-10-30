@@ -42,3 +42,4 @@ yarn-error.*
 
 # Firebase: se agrega fuera del repo (D45)
 google-services.json
+

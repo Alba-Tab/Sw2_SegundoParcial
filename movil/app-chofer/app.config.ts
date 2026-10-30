@@ -66,6 +66,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         isAndroidForegroundServiceEnabled: true,
       },
     ],
+    ['expo-audio', { microphonePermission: 'Para dictar la bitácora del viaje; el audio no sale del celular.' }],
     ['expo-sensors', { motionPermission: 'Para detectar frenadas bruscas durante el viaje.' }],
     ['expo-build-properties', { android: { usesCleartextTraffic: entorno === 'local' } }],
   ],

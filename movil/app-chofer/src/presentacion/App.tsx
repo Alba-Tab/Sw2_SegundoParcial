@@ -12,6 +12,7 @@ import { estadoVisible } from '../dominio/viaje';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { registrarTareaFondo } from '../datos/tareaFondo';
 import { BarraSincronizacion } from './BarraSincronizacion';
+import { PantallaHito } from './pantallas/PantallaHito';
 import { PantallaPendientes } from './pantallas/PantallaPendientes';
 import { PantallaSesion } from './pantallas/PantallaSesion';
 import { PantallaViaje } from './pantallas/PantallaViaje';
@@ -20,7 +21,15 @@ import { temaClaro, temaOscuro } from './tema';
 import { useSincronizacion } from './useSincronizacion';
 import { useViajeEnRuta } from './useViajeEnRuta';
 
-type Pantalla = { nombre: 'viajes' } | { nombre: 'viaje'; viajeId: string } | { nombre: 'pendientes' };
+type Pantalla =
+  { nombre: 'viajes' } | { nombre: 'viaje'; viajeId: string } | { nombre: 'hito'; viajeId: string } | { nombre: 'pendientes' };
+
+const TITULOS: Record<Pantalla['nombre'], string> = {
+  viajes: 'Mis viajes',
+  viaje: 'Viaje',
+  hito: 'Bitácora',
+  pendientes: 'Pendientes',
+};
 
 export function App() {
   const oscuro = useColorScheme() === 'dark';
@@ -73,7 +82,7 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
   useEffect(() => {
     const atras = BackHandler.addEventListener('hardwareBackPress', () => {
       if (pantalla.nombre === 'viajes') return false;
-      setPantalla({ nombre: 'viajes' });
+      setPantalla(pantalla.nombre === 'hito' ? { nombre: 'viaje', viajeId: pantalla.viajeId } : { nombre: 'viajes' });
       return true;
     });
     return () => atras.remove();
@@ -82,8 +91,12 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
   return (
     <View style={{ flex: 1 }}>
       <Appbar.Header>
-        {pantalla.nombre !== 'viajes' && <Appbar.BackAction onPress={() => setPantalla({ nombre: 'viajes' })} />}
-        <Appbar.Content title={pantalla.nombre === 'pendientes' ? 'Pendientes' : 'Mis viajes'} />
+        {pantalla.nombre !== 'viajes' && (
+          <Appbar.BackAction
+            onPress={() => setPantalla(pantalla.nombre === 'hito' ? { nombre: 'viaje', viajeId: pantalla.viajeId } : { nombre: 'viajes' })}
+          />
+        )}
+        <Appbar.Content title={TITULOS[pantalla.nombre]} />
         <Appbar.Action icon="sync" accessibilityLabel="Sincronizar ahora" onPress={() => void sync.sincronizar()} />
         <Appbar.Action icon="logout" accessibilityLabel="Cerrar sesión" onPress={salir} />
       </Appbar.Header>
@@ -91,7 +104,24 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
       {pantalla.nombre === 'viajes' && (
         <PantallaViajes enLinea={sync.enLinea} abrir={(viajeId) => setPantalla({ nombre: 'viaje', viajeId })} />
       )}
-      {pantalla.nombre === 'viaje' && <PantallaViaje viajeId={pantalla.viajeId} gps={gps} sincronizar={() => void sync.sincronizar()} />}
+      {pantalla.nombre === 'viaje' && (
+        <PantallaViaje
+          viajeId={pantalla.viajeId}
+          gps={gps}
+          sincronizar={() => void sync.sincronizar()}
+          abrirHito={() => setPantalla({ nombre: 'hito', viajeId: pantalla.viajeId })}
+        />
+      )}
+      {pantalla.nombre === 'hito' && (
+        <PantallaHito
+          viajeId={pantalla.viajeId}
+          alGuardar={() => {
+            setAviso('Hito guardado; se envía con la señal');
+            setPantalla({ nombre: 'viaje', viajeId: pantalla.viajeId });
+            void sync.sincronizar();
+          }}
+        />
+      )}
       {pantalla.nombre === 'pendientes' && <PantallaPendientes />}
       <Snackbar visible={aviso !== null} onDismiss={() => setAviso(null)} duration={8000}>
         {aviso ?? ''}

@@ -245,6 +245,8 @@ jobs:
       - run: npm ci
       - run: npm run generar:contratos:verificar
       - run: npm run verificar
+      # Empaqueta iOS y Android: atrapa módulos que Metro no resuelve (versiones del SDK desalineadas).
+      - run: npm run empaquetar
 
   gitleaks:
     runs-on: ubuntu-latest
