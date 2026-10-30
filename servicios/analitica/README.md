@@ -38,6 +38,13 @@ consumidor de `analitica.eventos`. Es la única fuente de alertas del Centro de 
 - `POST /api/v1/exportaciones` (con `Idempotency-Key`) corre el mismo reporte y guarda el `.xlsx` (hojas "Datos" y "Parámetros", openpyxl) 10 minutos; hasta 5 MB (D96). Un job borra las vencidas cada 5 min.
 - `GET /api/v1/exportaciones/{id}/archivo` solo responde al token de servicio del `gateway` con `X-Solicitante-Sub` igual a quien la creó (D21); vencida → `404 EXPORTACION_VENCIDA`.
 
+## Machine learning (T8.4)
+
+- `ml/entrenar.py` entrena con la semilla fija desde `plataforma/datos-sinteticos` **en el build de la imagen** (los `.joblib` no se versionan) y falla si el recall de *retrasado* baja de 0,75 (D82). El notebook `notebooks/modelos.ipynb` corre el mismo código y muestra recall, matriz de confusión e importancias.
+- **Retraso:** `GradientBoostingClassifier(random_state=42)` con pesos balanceados sobre las variables de D79; se recalcula con `ViajeIniciado`, `PosicionActualizada` y `HitoRegistrado` como máximo una vez por minuto (D78), y un job cada 60 s alcanza a los que quedaron atrás. Con probabilidad ≥ 0,70 abre (o actualiza) una sola `RIESGO_RETRASO`. Los 3 factores son las variables que más bajan la probabilidad al volver a su mediana.
+- **Anomalías:** `IsolationForest(contamination=0.05, n_estimators=100, random_state=42)` sobre `[kmPorLitro, litros]`; la primera carga de un tracto queda `SIN_REFERENCIA`.
+- Sin modelos (por ejemplo, en `uv run` sin entrenar), `obtenerRiesgoRetraso` responde `503 MODELO_NO_DISPONIBLE` y no se crean alertas de ML. Para entrenar en local: `uv run python -m ml.entrenar --datos ../../plataforma/datos-sinteticos --salida modelos`.
+
 ## Correr
 
 ```bash
