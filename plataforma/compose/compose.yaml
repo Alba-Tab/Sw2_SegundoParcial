@@ -269,6 +269,7 @@ services:
       PORTAL_URL: ${PORTAL_URL:-http://localhost:5173}
       LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
       LLM_MODEL: ${LLM_MODEL:-qwen3:4b-instruct}
+      LLM_TURNO_S: ${LLM_TURNO_S:-20}
       MCP_URL: ${MCP_URL:-http://mcp-server:8106/mcp}
       OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_SERVICIOS_ENDPOINT:-}
     extra_hosts: ["${MAC_LOCAL:-mac.local}:host-gateway", "host.docker.internal:host-gateway"]

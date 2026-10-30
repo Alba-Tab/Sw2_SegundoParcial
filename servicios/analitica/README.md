@@ -52,6 +52,18 @@ consumidor de `analitica.eventos`. Es la única fuente de alertas del Centro de 
 - El relay del Outbox (Python, cada 2 s) reclama con `SKIP LOCKED` y publica con confirmación del broker. Recién después marca publicado y pasa la acción a `EJECUTADA`. n8n (`aviso-cliente`) envía el correo una sola vez por `eventId`.
 - Un job cada 5 min archiva las `PENDIENTE` de más de 24 h o cuyo viaje terminó (D87).
 
+## Agente "vigilar viajes" (T10.2, spec 014)
+
+- Cada 10 min (`MISION_CADA_MINUTOS`) o con `POST /api/v1/agente/misiones` (despachador o gerente, con `Idempotency-Key`), que responde `202` con `{misionId}`. Corre una misión a la vez (bloqueo consultivo; la manual recibe `409`). Sin LLM queda `SALTADA` y la manual recibe `503 LLM_NO_DISPONIBLE` (FR4).
+- El agente usa el token del cliente `agente` (*client credentials*) y consulta **solo** por el MCP (SDK `mcp` 2.x): `tools/list`, el prompt `mision_vigilar_viajes` y el recurso `vocabulario://negocio`. El LLM (Ollama, temperatura 0, `LLM_TURNO_S` por turno, 20 s según D85) elige herramientas hasta `FIN`, 8 pasos o 90 s (→ `AGOTADA`). A qwen3 también se le reconoce la llamada que escribe como JSON en el texto.
+- Cada paso queda en la misión: herramienta, argumentos (sin el texto al cliente), resumen y ms. Lo ve el panel del agente. `proponer_accion` viaja con `X-Mision-Id`, que limita a 3 acciones por misión.
+
+## Consulta por voz (T10.3, spec 015)
+
+- `POST /api/v1/voz/preguntas`: el LLM devuelve solo la intención en JSON (esquema completo en `format`). El código la valida en el orden de la spec: fuera del catálogo → `422 PREGUNTA_FUERA_DE_ALCANCE`; aclaración; rol → `403`; nombres a ids por coincidencia exacta o por prefijo de palabra ("agro" → 2 opciones); periodo a fechas y límites.
+- El reporte se corre por el MCP (`ejecutar_reporte`) con el token del usuario **intercambiado otra vez** hacia `mcp-server`: cc-tablero → gateway → analitica → mcp-server → analitica. La redacción usa el prompt `redactar_respuesta_reporte`. Si el texto trae un número que no está en las filas o los totales, o el LLM no responde, se usa la plantilla.
+- Plan B de K1 (`VOZ_CADENA=DOS_SALTOS`): `POST /voz/interpretaciones` y `POST /voz/redacciones`, y el Gateway llama al MCP.
+
 ## Correr
 
 ```bash
