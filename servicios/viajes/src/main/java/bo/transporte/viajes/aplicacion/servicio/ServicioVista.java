@@ -12,7 +12,10 @@ public record ServicioVista(
         String etapa,
         String motivo,
         Asignacion asignacion,
-        java.time.Instant iniciadoEn) {
+        java.time.Instant iniciadoEn,
+        java.time.Instant entregadoEn,
+        java.util.UUID facturaId,
+        String numeroFactura) {
     static ServicioVista de(ConViaje f, String etapa) {
         var v = f.viaje();
         return new ServicioVista(
@@ -21,6 +24,9 @@ public record ServicioVista(
                 etapa,
                 v == null ? null : v.motivo(),
                 v == null ? null : v.asignacion(),
-                v == null ? null : v.iniciadoEn());
+                v == null ? null : v.iniciadoEn(),
+                v == null ? null : v.entregadoEn(),
+                v == null ? null : v.facturaId(),
+                v == null ? null : v.numeroFactura());
     }
 }

@@ -22,7 +22,8 @@ import org.springframework.stereotype.Component;
 class ViajeRepositorioJdbc implements ViajeRepositorio {
     static final String COLUMNAS = "v.viaje_id, v.servicio_id, v.cliente_id, v.cotizacion_id, v.estado, v.motivo,"
             + " v.detalle, v.ruta_id, v.tipo_carga, v.toneladas, v.fecha_viaje, v.monto, v.reserva_unidad_id,"
-            + " v.tracto_id, v.remolque_id, v.placa, v.chofer_id, v.chofer_nombre, v.chofer_usuario_sub, v.creado_en, v.iniciado_en";
+            + " v.tracto_id, v.remolque_id, v.placa, v.chofer_id, v.chofer_nombre, v.chofer_usuario_sub, v.creado_en, v.iniciado_en,"
+            + " v.entregado_en, v.factura_id, v.numero_factura";
     private final JdbcClient jdbc;
 
     ViajeRepositorioJdbc(JdbcClient jdbc) {
@@ -61,7 +62,8 @@ class ViajeRepositorioJdbc implements ViajeRepositorio {
                                tipo_carga = :tipoCarga, toneladas = :toneladas, fecha_viaje = :fecha, monto = :monto,
                                reserva_unidad_id = :reserva, tracto_id = :tracto, remolque_id = :remolque, placa = :placa,
                                chofer_id = :chofer, chofer_nombre = :choferNombre, chofer_usuario_sub = :choferSub,
-                               iniciado_en = :iniciadoEn, actualizado_en = :ahora
+                               iniciado_en = :iniciadoEn, entregado_en = :entregadoEn,
+                               factura_id = :factura, numero_factura = :numeroFactura, actualizado_en = :ahora
                         WHERE viaje_id = :id""")
                 .param("id", v.viajeId())
                 .param("estado", v.estado().name())
@@ -80,6 +82,9 @@ class ViajeRepositorioJdbc implements ViajeRepositorio {
                 .param("choferNombre", a == null ? null : a.choferNombre())
                 .param("choferSub", a == null ? null : a.choferUsuarioSub())
                 .param("iniciadoEn", v.iniciadoEn() == null ? null : Timestamp.from(v.iniciadoEn()))
+                .param("entregadoEn", v.entregadoEn() == null ? null : Timestamp.from(v.entregadoEn()))
+                .param("factura", v.facturaId())
+                .param("numeroFactura", v.numeroFactura())
                 .param("ahora", Timestamp.from(Instant.now()))
                 .update();
     }
@@ -136,17 +141,24 @@ class ViajeRepositorioJdbc implements ViajeRepositorio {
                         rs.getString("chofer_nombre"),
                         rs.getString("chofer_usuario_sub"));
         return Viaje.reconstruir(
-                rs.getObject("viaje_id", UUID.class),
-                rs.getObject("servicio_id", UUID.class),
-                rs.getObject("cliente_id", UUID.class),
-                rs.getObject("cotizacion_id", UUID.class),
-                rs.getTimestamp("creado_en").toInstant(),
-                EstadoViaje.valueOf(rs.getString("estado")),
-                a,
-                rs.getString("motivo"),
-                rs.getString("detalle"),
-                rs.getTimestamp("iniciado_en") == null
-                        ? null
-                        : rs.getTimestamp("iniciado_en").toInstant());
+                        rs.getObject("viaje_id", UUID.class),
+                        rs.getObject("servicio_id", UUID.class),
+                        rs.getObject("cliente_id", UUID.class),
+                        rs.getObject("cotizacion_id", UUID.class),
+                        rs.getTimestamp("creado_en").toInstant(),
+                        EstadoViaje.valueOf(rs.getString("estado")),
+                        a,
+                        rs.getString("motivo"),
+                        rs.getString("detalle"),
+                        instante(rs, "iniciado_en"))
+                .conEntrega(
+                        instante(rs, "entregado_en"),
+                        rs.getObject("factura_id", UUID.class),
+                        rs.getString("numero_factura"));
+    }
+
+    private static Instant instante(ResultSet rs, String columna) throws SQLException {
+        Timestamp t = rs.getTimestamp(columna);
+        return t == null ? null : t.toInstant();
     }
 }

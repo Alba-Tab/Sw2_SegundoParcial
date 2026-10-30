@@ -54,6 +54,9 @@ class ServiciosIT {
     FinanzasFalsa finanzas;
 
     @Autowired
+    org.springframework.amqp.rabbit.core.RabbitTemplate rabbit;
+
+    @Autowired
     FlotaFalsa flota;
 
     private final HttpClient http = HttpClient.newHttpClient();
@@ -62,7 +65,8 @@ class ServiciosIT {
 
     @BeforeEach
     void preparar() {
-        jdbc.sql("TRUNCATE evidencia, viaje, servicio, cliente, ruta, operacion_idempotente, outbox_eventos, auditoria")
+        jdbc.sql(
+                        "TRUNCATE entrega, evidencia, viaje, servicio, cliente, ruta, operacion_idempotente, outbox_eventos, auditoria")
                 .update();
         for (String id : List.of(CLIENTE, OTRO_CLIENTE)) {
             jdbc.sql("""
@@ -754,5 +758,179 @@ class ServiciosIT {
                                 "RECIBO_COMBUSTIBLE",
                                 20 * 1024 * 1024)
                         .estado());
+    }
+
+    /** Sube una evidencia de 1 KB en una parte y la completa. */
+    private String evidencia(String viajeId, String tipo) throws Exception {
+        String id = UUID.randomUUID().toString();
+        var abierta = crearEvidencia(viajeId, id, tipo, 1024);
+        assertEquals(201, abierta.estado(), String.valueOf(abierta.cuerpo()));
+        String etag =
+                subirParte(abierta.cuerpo().get("partes").get(0).get("url").asString(), new byte[1024]);
+        var c = pedir(
+                "POST",
+                "/api/v1/viajes/" + viajeId + "/evidencias/" + id + "/completar",
+                CHOFER,
+                UUID.randomUUID(),
+                "{\"partes\":[{\"numero\":1,\"etag\":" + json.writeValueAsString(etag) + "}]}");
+        assertEquals(200, c.estado(), String.valueOf(c.cuerpo()));
+        return id;
+    }
+
+    private String cuerpoEntrega(double lat, double lng, String foto, String firma) {
+        String f = firma == null ? "null" : "{\"evidenciaId\":\"" + firma + "\",\"nombreReceptor\":\"Rosa Pérez\"}";
+        return "{\"entregaId\":\"" + UUID.randomUUID() + "\",\"entregadoEn\":\"" + java.time.Instant.now()
+                + "\",\"posicion\":{\"lat\":" + lat + ",\"lng\":" + lng + "},\"precisionMetros\":8,"
+                + "\"fotos\":[\"" + foto + "\"],\"firma\":" + f + "}";
+    }
+
+    private Respuesta entregar(String viajeId, String cuerpo, UUID clave) throws Exception {
+        return pedir("POST", "/api/v1/viajes/" + viajeId + "/entrega", CHOFER, clave, cuerpo);
+    }
+
+    private Respuesta entregar(String viajeId, double lat, double lng, String foto, String firma, UUID clave)
+            throws Exception {
+        return entregar(viajeId, cuerpoEntrega(lat, lng, foto, firma), clave);
+    }
+
+    private void publicarFactura(String eventId, String viajeId, String numero) {
+        rabbit.send(
+                "viajes.eventos",
+                new org.springframework.amqp.core.Message(("{\"id\":\"" + eventId
+                                + "\",\"tipo\":\"FacturaEmitida\",\"version\":1,\"datos\":{\"viajeId\":\"" + viajeId
+                                + "\",\"facturaId\":\"0193f000-0000-7000-8000-000000000123\",\"numero\":\"" + numero
+                                + "\"}}")
+                        .getBytes()));
+    }
+
+    @Test
+    void entregaDentroDeLaGeocercaConFirmaYCierreConFacturaEmitida() throws Exception {
+        String viajeId = enRuta();
+        String servicioId = jdbc.sql("SELECT servicio_id::text FROM viaje WHERE viaje_id = CAST(:v AS uuid)")
+                .param("v", viajeId)
+                .query(String.class)
+                .single();
+        String foto = evidencia(viajeId, "FOTO_ENTREGA"), firma = evidencia(viajeId, "FIRMA");
+        String incompleta = UUID.randomUUID().toString();
+        crearEvidencia(viajeId, incompleta, "FOTO_ENTREGA", 1024);
+        var sinTerminar = entregar(viajeId, -17.80, -63.20, incompleta, firma, UUID.randomUUID());
+        assertEquals(422, sinTerminar.estado());
+        assertEquals("EVIDENCIA_INCOMPLETA", sinTerminar.cuerpo().get("codigo").asString());
+        assertEquals(
+                400,
+                entregar(viajeId, -17.80, -63.20, firma, null, UUID.randomUUID())
+                        .estado(),
+                "una firma no es foto");
+
+        UUID clave = UUID.randomUUID();
+        String cuerpo = cuerpoEntrega(-17.801, -63.2005, foto, firma);
+        var r = entregar(viajeId, cuerpo, clave);
+        assertEquals(200, r.estado(), String.valueOf(r.cuerpo()));
+        assertEquals("ENTREGADO", r.cuerpo().get("estado").asString());
+        assertTrue(r.cuerpo().get("dentroGeocerca").asBoolean());
+        assertTrue(r.cuerpo().get("distanciaMetros").asDouble() < 150);
+        assertEquals(r.cuerpo(), entregar(viajeId, cuerpo, clave).cuerpo(), "reenvío");
+        assertEquals(
+                409,
+                entregar(viajeId, -17.801, -63.2005, foto, firma, UUID.randomUUID())
+                        .estado(),
+                "otra entrega con otra clave");
+        JsonNode datos = sobre("EntregaConfirmada").get("datos");
+        assertEquals(12, datos.get("kmRecorridos").asInt());
+        assertFalse(datos.has("aprobadaPor"));
+
+        assertEquals(
+                200,
+                pedir("GET", "/api/v1/viajes/" + viajeId + "/entrega", cliente(CLIENTE), null, null)
+                        .estado());
+        assertEquals(
+                403,
+                pedir("GET", "/api/v1/viajes/" + viajeId + "/entrega", cliente(OTRO_CLIENTE), null, null)
+                        .estado());
+
+        String eventId = UUID.randomUUID().toString();
+        publicarFactura(eventId, viajeId, "FAC-000123");
+        rabbit.send("viajes.eventos", new org.springframework.amqp.core.Message("no es json".getBytes()));
+        JsonNode s = esperar(servicioId, c -> c.get("estado").asString().equals("CERRADO"));
+        assertEquals("FAC-000123", s.get("numeroFactura").asString());
+        assertTrue(s.has("entregadoEn"));
+        publicarFactura(eventId, viajeId, "FAC-000999");
+        Thread.sleep(500);
+        assertEquals(
+                "FAC-000123",
+                pedir("GET", "/api/v1/servicios/" + servicioId, cliente(CLIENTE), null, null)
+                        .cuerpo()
+                        .get("numeroFactura")
+                        .asString());
+    }
+
+    @Test
+    void entregaObservadaQueElDespachadorAprueba() throws Exception {
+        String viajeId = enRuta();
+        String foto = evidencia(viajeId, "FOTO_ENTREGA");
+        var r = entregar(viajeId, -17.82, -63.20, foto, null, UUID.randomUUID());
+        assertEquals("ENTREGA_OBSERVADA", r.cuerpo().get("estado").asString());
+        assertEquals(2, r.cuerpo().get("razones").size());
+        JsonNode obs = sobre("EntregaObservada").get("datos");
+        assertEquals("FUERA_GEOCERCA", obs.get("razones").get(0).asString());
+        assertTrue(obs.get("distanciaMetros").asDouble() > 2000);
+
+        String ruta = "/api/v1/viajes/" + viajeId + "/entrega/aprobacion";
+        String desp = TokensDePrueba.token("sub-desp", "despachador", null);
+        assertEquals(
+                403,
+                pedir("POST", ruta, TokensDePrueba.token("g", "gerente", null), UUID.randomUUID(), "{}")
+                        .estado());
+        var ok = pedir("POST", ruta, desp, UUID.randomUUID(), "{\"nota\":\"El cliente confirmó por teléfono\"}");
+        assertEquals(200, ok.estado(), String.valueOf(ok.cuerpo()));
+        assertEquals("ENTREGADO", ok.cuerpo().get("estado").asString());
+        JsonNode conf = sobre("EntregaConfirmada").get("datos");
+        assertEquals("sub-desp", conf.get("aprobadaPor").asString());
+        assertFalse(conf.get("dentroGeocerca").asBoolean());
+        assertEquals(409, pedir("POST", ruta, desp, UUID.randomUUID(), "{}").estado());
+        assertEquals(
+                "APROBADA",
+                pedir("GET", "/api/v1/viajes/" + viajeId + "/entrega", desp, null, null)
+                        .cuerpo()
+                        .get("decision")
+                        .asString());
+    }
+
+    @Test
+    void elDespachadorRechazaLaObservadaYElReceptorRechazaOtra() throws Exception {
+        String desp = TokensDePrueba.token("sub-desp", "despachador", null);
+        String a = enRuta();
+        entregar(a, -17.80, -63.20, evidencia(a, "FOTO_ENTREGA"), null, UUID.randomUUID());
+        assertEquals(
+                400,
+                pedir("POST", "/api/v1/viajes/" + a + "/entrega/rechazo", desp, UUID.randomUUID(), "{}")
+                        .estado());
+        var rech = pedir(
+                "POST",
+                "/api/v1/viajes/" + a + "/entrega/rechazo",
+                desp,
+                UUID.randomUUID(),
+                "{\"motivo\":\"Sin firma ni confirmación\"}");
+        assertEquals("ENTREGA_RECHAZADA", rech.cuerpo().get("estado").asString());
+        assertEquals(
+                "DESPACHADOR",
+                sobre("EntregaRechazada").get("datos").get("origenRechazo").asString());
+
+        jdbc.sql("DELETE FROM outbox_eventos WHERE tipo = 'EntregaRechazada'").update();
+        String b = enRuta();
+        String fotoRechazo = evidencia(b, "FOTO_RECHAZO");
+        var r = pedir(
+                "POST",
+                "/api/v1/viajes/" + b + "/rechazo",
+                CHOFER,
+                UUID.randomUUID(),
+                "{\"entregaId\":\"" + UUID.randomUUID() + "\",\"rechazadaEn\":\"" + java.time.Instant.now()
+                        + "\",\"posicion\":{\"lat\":-17.80,\"lng\":-63.20},\"motivo\":\"Carga húmeda\",\"fotos\":[\""
+                        + fotoRechazo + "\"]}");
+        assertEquals(200, r.estado(), String.valueOf(r.cuerpo()));
+        assertEquals("ENTREGA_RECHAZADA", r.cuerpo().get("estado").asString());
+        JsonNode d = sobre("EntregaRechazada").get("datos");
+        assertEquals("RECEPTOR", d.get("origenRechazo").asString());
+        assertEquals("Carga húmeda", d.get("motivo").asString());
     }
 }

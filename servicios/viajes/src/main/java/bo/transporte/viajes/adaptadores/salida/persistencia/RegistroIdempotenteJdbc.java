@@ -7,7 +7,9 @@ import bo.transporte.viajes.aplicacion.servicio.CancelacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ConfirmacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ServicioAceptado;
 import bo.transporte.viajes.aplicacion.servicio.ServicioVista;
+import bo.transporte.viajes.aplicacion.viaje.EntregaDeViaje;
 import bo.transporte.viajes.aplicacion.viaje.InicioDeViaje;
+import bo.transporte.viajes.aplicacion.viaje.ResultadoEntrega;
 import bo.transporte.viajes.aplicacion.viaje.ViajeVista;
 import java.util.Map;
 import java.util.Optional;
@@ -23,15 +25,15 @@ import tools.jackson.databind.json.JsonMapper;
 @Component
 class RegistroIdempotenteJdbc implements RegistroIdempotente {
     /** Tipo de la respuesta guardada por operación. */
-    private static final Map<String, Class<?>> RESPUESTAS = Map.of(
-            AltaDeCliente.OPERACION,
-            ClienteVista.class,
-            ConfirmacionDeServicio.OPERACION,
-            ServicioAceptado.class,
-            CancelacionDeServicio.OPERACION,
-            ServicioVista.class,
-            InicioDeViaje.OPERACION,
-            ViajeVista.class);
+    private static final Map<String, Class<?>> RESPUESTAS = Map.ofEntries(
+            Map.entry(EntregaDeViaje.ENTREGAR, ResultadoEntrega.class),
+            Map.entry(EntregaDeViaje.RECHAZO_RECEPTOR, ResultadoEntrega.class),
+            Map.entry(EntregaDeViaje.APROBAR, ViajeVista.class),
+            Map.entry(EntregaDeViaje.RECHAZAR, ViajeVista.class),
+            Map.entry(AltaDeCliente.OPERACION, ClienteVista.class),
+            Map.entry(ConfirmacionDeServicio.OPERACION, ServicioAceptado.class),
+            Map.entry(CancelacionDeServicio.OPERACION, ServicioVista.class),
+            Map.entry(InicioDeViaje.OPERACION, ViajeVista.class));
 
     private final JdbcClient jdbc;
     private final JsonMapper json;

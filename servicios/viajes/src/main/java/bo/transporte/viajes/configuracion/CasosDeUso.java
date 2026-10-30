@@ -6,7 +6,9 @@ import bo.transporte.viajes.aplicacion.cliente.VinculacionDeCliente;
 import bo.transporte.viajes.aplicacion.puerto.salida.AlmacenEvidencias;
 import bo.transporte.viajes.aplicacion.puerto.salida.Auditoria;
 import bo.transporte.viajes.aplicacion.puerto.salida.ClienteRepositorio;
+import bo.transporte.viajes.aplicacion.puerto.salida.EntregaRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.EvidenciaRepositorio;
+import bo.transporte.viajes.aplicacion.puerto.salida.Inbox;
 import bo.transporte.viajes.aplicacion.puerto.salida.Orquestador;
 import bo.transporte.viajes.aplicacion.puerto.salida.RegistroDeEventos;
 import bo.transporte.viajes.aplicacion.puerto.salida.RegistroIdempotente;
@@ -22,7 +24,9 @@ import bo.transporte.viajes.aplicacion.servicio.CancelacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ConfirmacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ConsultaDeServicios;
 import bo.transporte.viajes.aplicacion.servicio.ParametrosSaga;
+import bo.transporte.viajes.aplicacion.viaje.CierreDeViaje;
 import bo.transporte.viajes.aplicacion.viaje.ConsultaDeViajes;
+import bo.transporte.viajes.aplicacion.viaje.EntregaDeViaje;
 import bo.transporte.viajes.aplicacion.viaje.InicioDeViaje;
 import bo.transporte.viajes.aplicacion.viaje.ProgramacionDeViaje;
 import bo.transporte.viajes.aplicacion.viaje.SubidaDeEvidencia;
@@ -160,5 +164,26 @@ class CasosDeUso {
     SubidaDeEvidencia subidaDeEvidencia(
             ViajeRepositorio viajes, EvidenciaRepositorio evidencias, AlmacenEvidencias almacen, Transacciones tx) {
         return new SubidaDeEvidencia(viajes, evidencias, almacen, tx);
+    }
+
+    @Bean
+    EntregaDeViaje entregaDeViaje(
+            ViajeRepositorio viajes,
+            EntregaRepositorio entregas,
+            EvidenciaRepositorio evidencias,
+            RutaRepositorio rutas,
+            ConsultaDeViajes consulta,
+            RegistroDeEventos eventos,
+            RegistroIdempotente idempotencia,
+            Auditoria auditoria,
+            Transacciones tx,
+            Clock reloj) {
+        return new EntregaDeViaje(
+                viajes, entregas, evidencias, rutas, consulta, eventos, idempotencia, auditoria, tx, reloj);
+    }
+
+    @Bean
+    CierreDeViaje cierreDeViaje(ViajeRepositorio viajes, Inbox inbox, Transacciones tx) {
+        return new CierreDeViaje(viajes, inbox, tx);
     }
 }

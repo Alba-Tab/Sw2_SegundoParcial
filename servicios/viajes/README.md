@@ -16,7 +16,7 @@ Clientes, cotizaciones confirmadas, servicios, viajes en ruta y la saga `Program
 | Interfaces REST y DTO generados desde `contratos/openapi/viajes.yaml` con openapi-generator 7.26 (`useSpringBoot4`, `useJackson3`); `SaludController` implementa `SaludApi` | `pom.xml`, `target/generated-sources/openapi` |
 
 ```bash
-./mvnw verify                                            # 50 pruebas (Testcontainers + Temporal en memoria)
+./mvnw verify                                            # 53 pruebas (Testcontainers + Temporal en memoria)
 docker compose -f ../../plataforma/compose/compose.yaml --profile core --profile plataforma up -d --build viajes   # contexto: raíz del repo
 curl localhost:8101/health/ready
 ```
@@ -90,3 +90,12 @@ curl localhost:8101/health/ready
 - `GET .../evidencias/{evidenciaId}`: URL `GET` de 5 min. Chofer propio, despachador, comercial y gerente; el cliente de ese viaje solo fotos de entrega o rechazo y firma; el jefe de flota solo recibos de combustible.
 - Fotos de entrega, firma y foto de rechazo solo con el viaje `EN_RUTA`; recibos de combustible desde `CONFIRMADO` hasta el cierre (spec 009).
 - Variables: `S3_ENDPOINT` (servidor), `S3_ENDPOINT_PUBLICO` (URL firmadas que alcanza el celular), `S3_BUCKET`, `AWS_REGION` y credenciales `AWS_*`. Sin `S3_ENDPOINT`, AWS con la cadena de credenciales por defecto.
+
+## Entrega, observada, rechazo y cierre (T5.1, specs 006 y 007)
+
+- `POST /api/v1/viajes/{viajeId}/entrega` (chofer asignado, viaje `EN_RUTA`): 1 a 3 `FOTO_ENTREGA` y la `FIRMA` opcional, todas `COMPLETA` (si no, `422 EVIDENCIA_INCOMPLETA`). Distancia haversine al destino (D06, sin sumar la precisión, D64): dentro de `radioMetros` y con firma, `ENTREGADO` y `EntregaConfirmada` con `kmRecorridos` = distancia de la ruta (D07); si no, `ENTREGA_OBSERVADA` con razones `FUERA_GEOCERCA` y/o `SIN_FIRMA` y `EntregaObservada`.
+- `POST .../entrega/aprobacion` y `.../entrega/rechazo` (despachador, sobre una observada): `ENTREGADO` con `EntregaConfirmada` y `aprobadaPor`, o `ENTREGA_RECHAZADA` con `EntregaRechazada` de origen `DESPACHADOR`.
+- `POST .../rechazo` (chofer, `EN_RUTA`): el receptor rechaza con 1 a 3 `FOTO_RECHAZO` y motivo; la distancia se guarda pero no se valida (D68). `EntregaRechazada` con origen `RECEPTOR`.
+- `GET .../entrega` (POD): chofer propio, cliente del viaje, despachador, comercial y gerente.
+- **Consumidor de `viajes.eventos`** (`adaptadores/entrada/mensajeria/ConsumidorEventos`): `FacturaEmitida` cierra el viaje (`ENTREGADO` → `CERRADO` con `facturaId` y número) en la misma transacción que el Inbox; un repetido no cambia nada; lo inválido o sin manejador va a la DLQ (FC3). `consumidor.habilitado=false` lo apaga.
+- `Servicio` suma `entregadoEn`, `facturaId` y `numeroFactura`.
