@@ -72,7 +72,7 @@ import { AprobarEntregaGQL, RechazarEntregaGQL, ResolverIntervencionGQL, ViajeGQ
               </p>
               <p>{{ e.conFirma ? 'Con firma de ' + e.nombreReceptor : 'Sin firma' }}</p>
               @if (e.razones?.length) {
-                <p>Razones: {{ e.razones?.join(', ') }}</p>
+                <p>Razones: {{ e.razones.join(', ') }}</p>
               }
               @if (e.motivo) {
                 <p>Motivo: {{ e.motivo }}</p>
