@@ -37,6 +37,17 @@ Cada uno imprime ✔ o ✘ por cada resultado esperado y termina con código 1 s
 | `saga-compensacion-agotada.sh [--resuelto]` | FS8 (spec 011) | `REQUIERE_INTERVENCION`. Después restaura la base y el despachador reintenta o marca como resuelto |
 | `saga-cancelar-en-curso.sh` | FS9 (D17) | `409 CONFIRMACION_EN_CURSO` |
 
+## `demo/` (coreografía, specs 004 y 006)
+
+| Script | Escenario | Qué verifica |
+|---|---|---|
+| `entrega-feliz.sh` | Pasos 3 a 6 (H5) | Confirma, chofer1 inicia (tracto `EN_VIAJE`), sube foto y firma por S3 firmado, entrega en el Aula y espera: factura, furgón en `MANTENIMIENTO_PENDIENTE` con 10.070 km (FF3), `CERRADO` y el correo en Mailpit |
+| `fc1-finanzas-detenida.sh` | FC1 | Con el worker de Finanzas detenido queda `ENTREGADO`; al encenderlo, factura, `CERRADO` y correo |
+| `fc2-evento-repetido.sh` | FC2 | Republicar el último `FacturaEmitida` no manda otro correo |
+| `fc3-mensaje-invalido.sh` | FC3 | Un `EntregaConfirmada` sin `viajeId` termina en `finanzas.eventos.dlq` |
+| `fc4-cancelacion.sh` | FC4 | Cancelar un `CONFIRMADO` devuelve el disponible y la unidad |
+| `fc5-broker-caido.sh` | FC5 | Sin RabbitMQ la entrega responde `200` y queda en el Outbox; al volver, `CERRADO` |
+
 ## `fallos/` (interruptores)
 
 | Script | Qué hace (local) |
@@ -46,3 +57,7 @@ Cada uno imprime ✔ o ✘ por cada resultado esperado y termina con código 1 s
 | `detener-viajes.sh` | `docker compose stop viajes` |
 | `detener-finanzas-worker.sh` | `docker compose stop finanzas-worker` |
 | `cortar-db-finanzas.sh off\|on` | Corta o restaura el proxy `finanzas-db` de Toxiproxy |
+| `caer-finanzas-api.sh`, `encender-finanzas-api.sh`, `encender-finanzas-worker.sh` | Detiene o enciende la API o el worker de Finanzas |
+| `caer-flota.sh`, `encender-flota.sh` | Detiene o enciende la API y el worker de Flota |
+| `detener-rabbitmq.sh`, `encender-rabbitmq.sh` | RabbitMQ. Al encenderlo, vuelve a publicar el flujo de n8n y reinicia n8n (su disparador no se reconecta) |
+| `republicar-evento.sh <eventId>` | Vuelve a publicar un evento tal cual quedó en el Outbox de Viajes, Finanzas o Flota |

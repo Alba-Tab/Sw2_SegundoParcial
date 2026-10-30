@@ -66,3 +66,63 @@ liberar() { # liberar <servicioId>: cancela como despachador un servicio de prue
     -H "Idempotency-Key: $(uuidgen)" -H 'Content-Type: application/json' -d '{"motivo":"Limpieza del script de prueba"}' \
     && echo "  (servicio $1 cancelado para liberar la unidad)"
 }
+
+subir_evidencia() { # subir_evidencia <token chofer> <viajeId> <tipo> <archivo> -> evidenciaId (una parte; la app sube por partes de 5 MB)
+  local id tamano r url etag
+  id=$(uuidgen | tr '[:upper:]' '[:lower:]'); tamano=$(wc -c < "$4" | tr -d ' ')
+  r=$(curl -sf -X POST "$VIAJES/api/v1/viajes/$2/evidencias" -H "Authorization: Bearer $1" -H "Idempotency-Key: $(uuidgen)" \
+    -H 'Content-Type: application/json' -d "{\"evidenciaId\":\"$id\",\"tipo\":\"$3\",\"contentType\":\"image/png\",\"tamanoBytes\":$tamano}")
+  url=$(echo "$r" | json "d['partes'][0]['url']")
+  etag=$(curl -sf -X PUT --data-binary @"$4" "$url" -D - -o /dev/null | tr -d '\r' | sed -n 's/^[Ee][Tt]ag: //p')
+  curl -sf -o /dev/null -X POST "$VIAJES/api/v1/viajes/$2/evidencias/$id/completar" -H "Authorization: Bearer $1" \
+    -H "Idempotency-Key: $(uuidgen)" -H 'Content-Type: application/json' -d "{\"partes\":[{\"numero\":1,\"etag\":$(printf '%s' "$etag" | python3 -c 'import sys,json;print(json.dumps(sys.stdin.read()))')}]}"
+  echo "$id"
+}
+
+FLOTA="${FLOTA_URL:-http://localhost:8102}"
+usuario_chofer() { # el usuario de Keycloak de cada chofer de la semilla
+  case "$1" in "Marco Quispe") echo chofer1 ;; "René Choque") echo chofer2 ;; "Luis Mamani") echo chofer3 ;; *) echo chofer4 ;; esac
+}
+
+viaje_en_ruta() { # viaje_en_ruta <tipoCarga> <toneladas> -> "servicioId viajeId usuarioChofer": confirma el Aula como Agroexport e inicia
+  local t s r v chofer
+  t=$(token agroexport)
+  s=$(confirmar "$t" "$(cotizar "$t" $AULA "$1" "$2")" | json "d['servicioId']")
+  r=$(esperar "$t" "$s" "d['confirmacionCompleta']" 30); v=$(echo "$r" | json "d['viajeId']")
+  chofer=$(usuario_chofer "$(echo "$r" | json "d['choferNombre']")")
+  local codigo
+  codigo=$(curl -s -o /tmp/inicio.json -w '%{http_code}' -X POST "$VIAJES/api/v1/viajes/$v/inicio" -H "Authorization: Bearer $(token "$chofer")" \
+    -H "Idempotency-Key: $(uuidgen)" -H 'Content-Type: application/json' -d "{\"dispositivoId\":\"$(uuidgen)\",\"iniciadoEn\":\"$(date -u +%FT%TZ)\"}")
+  [ "$codigo" = 200 ] || { echo "El inicio respondió $codigo: $(cat /tmp/inicio.json)" >&2; return 1; }
+  echo "$s $v $chofer"
+}
+
+registrar_entrega() { # registrar_entrega <token chofer> <viajeId> <fotoId> <firmaId> -> código HTTP (cuerpo en /tmp/entrega.json)
+  local cuerpo
+  cuerpo=$(printf '{"entregaId":"%s","entregadoEn":"%s","posicion":{"lat":-17.7770,"lng":-63.1945},"fotos":["%s"],"firma":{"evidenciaId":"%s","nombreReceptor":"Rosa Pérez"}}' \
+    "$(uuidgen | tr '[:upper:]' '[:lower:]')" "$(date -u +%FT%TZ)" "$3" "$4")
+  curl -s -o /tmp/entrega.json -w '%{http_code}' -X POST "$VIAJES/api/v1/viajes/$2/entrega" -H "Authorization: Bearer $1" \
+    -H "Idempotency-Key: $(uuidgen)" -H 'Content-Type: application/json' -d "$cuerpo"
+}
+
+png_de_prueba() { local f; f=$(mktemp); python3 -c "import sys; sys.stdout.buffer.write(b'\x89PNG\r\n\x1a\n' + bytes(2048))" > "$f"; echo "$f"; }
+
+entregar_en_aula() { # entregar_en_aula <usuarioChofer> <viajeId> -> estado del viaje tras la entrega (con foto y firma, dentro de la geocerca)
+  local c img
+  c=$(token "$1"); img=$(png_de_prueba)
+  registrar_entrega "$c" "$2" "$(subir_evidencia "$c" "$2" FOTO_ENTREGA "$img")" "$(subir_evidencia "$c" "$2" FIRMA "$img")" >/dev/null
+  json "d['estado']" < /tmp/entrega.json
+}
+
+cola() { # cola <nombre> -> mensajes en la cola (las estadísticas de la consola se actualizan cada 5 s)
+  curl -sf -u "$RABBITMQ_ADMIN:$RABBITMQ_ADMIN_CLAVE" "http://localhost:15672/api/queues/%2F/$1" | json "str(d.get('messages', 0))"
+}
+
+publicar() { # publicar <claveEnrutamiento> <sobre JSON>: en transporte.events por la API de administración
+  curl -sf -u "$RABBITMQ_ADMIN:$RABBITMQ_ADMIN_CLAVE" -H 'content-type: application/json' -X POST \
+    "http://localhost:15672/api/exchanges/%2F/transporte.events/publish" \
+    -d "{\"routing_key\":\"$1\",\"properties\":{\"content_type\":\"application/json\"},\"payload_encoding\":\"string\",\"payload\":$(printf '%s' "$2" | python3 -c 'import sys,json;print(json.dumps(sys.stdin.read()))')}" \
+    | json "str(d['routed'])"
+}
+
+correos() { curl -sf "http://localhost:8025/api/v1/search?query=$1" | json "str(d['messages_count'])"; }
