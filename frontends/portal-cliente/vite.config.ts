@@ -7,5 +7,5 @@ export default defineConfig({
   plugins: [react({ babel: { plugins: ['babel-plugin-react-compiler'] } })],
   server: { port: 5173, strictPort: true },
   preview: { port: 5173, strictPort: true },
-  test: { environment: 'jsdom', include: ['src/**/*.test.{ts,tsx}'] },
+  test: { environment: 'jsdom', include: ['src/**/*.test.{ts,tsx}'], setupFiles: ['src/pruebas/configuracion.ts'] },
 });
