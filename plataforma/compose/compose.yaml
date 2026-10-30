@@ -99,6 +99,8 @@ services:
     build: { context: ../.., dockerfile: servicios/viajes/Dockerfile }
     image: transporte/viajes:local
     profiles: [core]
+    # La cuenta de servicio de Firebase (D45) se monta desde fuera del repo; sin ella, /dev/null y el push se omite.
+    volumes: ["${FIREBASE_CREDENCIAL:-/dev/null}:/secretos/firebase.json:ro"]
     depends_on:
       postgres-aws: { condition: service_healthy }
       rabbitmq-usuarios: { condition: service_completed_successfully, required: false }
@@ -117,6 +119,9 @@ services:
       # Evidencias (spec 006): el servidor habla con s3-local; las URL firmadas usan el nombre que alcanza el celular.
       S3_ENDPOINT: http://s3-local:9000
       GPS_DYNAMODB_ENDPOINT: http://dynamodb-local:8000
+      # Push al chofer (D45): sin FCM_PROYECTO se omite. La cuenta de servicio de Firebase vive fuera del repo.
+      FCM_PROYECTO: ${FCM_PROYECTO:-}
+      GOOGLE_APPLICATION_CREDENTIALS: /secretos/firebase.json
       S3_ENDPOINT_PUBLICO: http://${MAC_LOCAL}:9000
       S3_BUCKET: ${S3_BUCKET}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}

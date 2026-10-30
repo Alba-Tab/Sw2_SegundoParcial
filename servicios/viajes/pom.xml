@@ -171,6 +171,12 @@
 			<groupId>software.amazon.awssdk</groupId>
 			<artifactId>dynamodb</artifactId>
 		</dependency>
+		<!-- Push al chofer por FCM HTTP v1 (D45): credencial de Google sin clave guardada (WIF en la nube). -->
+		<dependency>
+			<groupId>com.google.auth</groupId>
+			<artifactId>google-auth-library-oauth2-http</artifactId>
+			<version>1.48.0</version>
+		</dependency>
 		<dependency>
 			<groupId>io.temporal</groupId>
 			<artifactId>temporal-sdk</artifactId>

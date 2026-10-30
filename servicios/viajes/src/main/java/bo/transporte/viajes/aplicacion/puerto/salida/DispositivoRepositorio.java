@@ -1,6 +1,7 @@
 package bo.transporte.viajes.aplicacion.puerto.salida;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -18,4 +19,14 @@ public interface DispositivoRepositorio {
     void guardar(Dispositivo dispositivo);
 
     Optional<Dispositivo> porId(UUID dispositivoId);
+
+    /** Los tokens push de Android del chofer (uno por celular). */
+    List<String> tokensPush(String usuarioSub);
+
+    void olvidarToken(String tokenPush);
+
+    /** Marca el evento como avisado; false si otra instancia ya lo tomó (idempotente por eventId, D45). */
+    boolean registrarAviso(UUID eventoId, String tipo, String resultado);
+
+    void actualizarAviso(UUID eventoId, String resultado);
 }

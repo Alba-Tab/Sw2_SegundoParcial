@@ -107,3 +107,9 @@ curl localhost:8101/health/ready
 - **Hitos y eventos de conducción** con `operacion_idempotente`, `HitoRegistrado` y `EventoConduccionRegistrado`; frenada desde 0,4 g (D08); en ruta o después de la entrega. `GET .../hitos?texto=` busca con `ILIKE` escapado.
 - **`PUT /api/v1/dispositivos/mio`** (token push solo en Android, D45) y **`GET /api/v1/dispositivos/{id}/cursor?viajeId=`** (solo el dueño).
 - Local: `GPS_DYNAMODB_ENDPOINT` (DynamoDB Local del compose, tablas de `plataforma/compose/iniciar/aws-local.sh`). Pruebas: `AlmacenGpsDynamoIT` simula el *throttling* con `UnprocessedItems`.
+
+## Notificaciones push al chofer (T7.8, D45)
+
+- `AvisosPush`: viaje asignado (`ViajeConfirmado`), viaje cancelado solo con `origen = USUARIO`, y entrega observada aprobada o rechazada por el despachador. Va a los tokens de Android del chofer (`PUT /dispositivos/mio`); un token que FCM ya no reconoce se borra.
+- Consumidor interno del Outbox (`ConsumidorOutboxPush`, cada 2 s): solo eventos ya publicados, después del commit; `notificacion_push` (V8) lo hace idempotente por `eventId`.
+- `NotificadorFcm`: FCM HTTP v1, canal `viajes`, `collapse_key = viajeId`. Credencial por la cadena por defecto de Google (en local, `FIREBASE_CREDENCIAL` fuera del repo; en la nube, WIF). Sin `FCM_PROYECTO`, cada aviso queda `OMITIDO`.
