@@ -32,7 +32,7 @@ import tools.jackson.databind.json.JsonMapper;
 
 /** Sin OIDC_ISSUER (P10): salud, 503 en negocio, Problem Details con correlación, Flyway y el relay del Outbox. */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "seguridad.issuer=")
-@Import(TestcontainersConfiguration.class)
+@Import({TestcontainersConfiguration.class, TemporalDePrueba.class})
 class AplicacionIT {
     @LocalServerPort
     int puerto;
@@ -74,6 +74,7 @@ class AplicacionIT {
         JsonNode cuerpo = json.readTree(listo.body());
         assertEquals("UP", cuerpo.get("dependencias").get("postgres").asString());
         assertEquals("UP", cuerpo.get("dependencias").get("rabbitmq").asString());
+        assertEquals("UP", cuerpo.get("dependencias").get("temporal").asString());
     }
 
     @Test

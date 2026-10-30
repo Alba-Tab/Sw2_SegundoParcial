@@ -1,6 +1,7 @@
 package bo.transporte.viajes.configuracion;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Instant;
@@ -30,6 +31,20 @@ class SeguridadConfigTest {
                 .toList();
         assertEquals(List.of("ROLE_comercial", "ROLE_gerente"), roles);
         assertTrue(SeguridadConfig.Seguridad.rolesDelRealm(token(Map.of("sub", "x")))
+                .isEmpty());
+    }
+
+    @Test
+    void unTokenDeOtraAudienciaNoSirve() {
+        var validador = SeguridadConfig.audiencia("viajes");
+        assertFalse(validador
+                .validate(token(Map.of("aud", List.of("flota"))))
+                .getErrors()
+                .isEmpty());
+        assertFalse(validador.validate(token(Map.of("sub", "x"))).getErrors().isEmpty());
+        assertTrue(validador
+                .validate(token(Map.of("aud", List.of("flota", "viajes"))))
+                .getErrors()
                 .isEmpty());
     }
 }

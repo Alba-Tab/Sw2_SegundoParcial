@@ -21,6 +21,7 @@ import tools.jackson.databind.json.JsonMapper;
  * FCM HTTP v1 (D45). La credencial sale de la cadena por defecto de Google: en local una cuenta de servicio fuera del
  * repo ({@code GOOGLE_APPLICATION_CREDENTIALS}); en la nube, Workload Identity Federation con el rol de la EC2, sin
  * clave guardada. Sin {@code FCM_PROYECTO}, cada envío se omite sin error. Canal de Android {@code viajes} (PoC-4).
+ * D69: hasta 5 intentos con espera exponencial ante 429, 5xx o una falla de red; un token inválido no se reintenta.
  */
 @Component
 class NotificadorFcm implements NotificadorPush {
@@ -31,6 +32,8 @@ class NotificadorFcm implements NotificadorPush {
     private final String base;
     private final Supplier<String> tokenDeAcceso;
     private final JsonMapper json;
+    private final Duration esperaInicial;
+    static final int INTENTOS = 5;
     private final HttpClient http =
             HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(5)).build();
 
@@ -39,14 +42,16 @@ class NotificadorFcm implements NotificadorPush {
             @Value("${push.fcm-proyecto:}") String proyecto,
             @Value("${push.fcm-url:https://fcm.googleapis.com}") String base,
             JsonMapper json) {
-        this(proyecto, base, credencialDeGoogle(proyecto), json);
+        this(proyecto, base, credencialDeGoogle(proyecto), json, Duration.ofMillis(500));
     }
 
-    NotificadorFcm(String proyecto, String base, Supplier<String> tokenDeAcceso, JsonMapper json) {
+    NotificadorFcm(
+            String proyecto, String base, Supplier<String> tokenDeAcceso, JsonMapper json, Duration esperaInicial) {
         this.proyecto = proyecto;
         this.base = base;
         this.tokenDeAcceso = tokenDeAcceso;
         this.json = json;
+        this.esperaInicial = esperaInicial;
     }
 
     private static Supplier<String> credencialDeGoogle(String proyecto) {
@@ -85,6 +90,22 @@ class NotificadorFcm implements NotificadorPush {
                                 "collapse_key", m.agrupar(),
                                 "priority", "high",
                                 "notification", Map.of("channel_id", "viajes"))));
+        for (int intento = 1; ; intento++) {
+            Intento r = intentar(cuerpo);
+            if (!r.reintentar() || intento == INTENTOS) return r.resultado();
+            try {
+                Thread.sleep(esperaInicial.multipliedBy(1L << (intento - 1)));
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return Resultado.ERROR;
+            }
+        }
+    }
+
+    private record Intento(Resultado resultado, boolean reintentar) {}
+
+    /** Un envío; se reintenta solo ante 429, 5xx o una falla de red (D69). */
+    private Intento intentar(Map<String, ?> cuerpo) {
         try {
             var pedido = HttpRequest.newBuilder(URI.create(base + "/v1/projects/" + proyecto + "/messages:send"))
                     .timeout(Duration.ofSeconds(10))
@@ -93,19 +114,19 @@ class NotificadorFcm implements NotificadorPush {
                     .POST(HttpRequest.BodyPublishers.ofString(json.writeValueAsString(cuerpo)))
                     .build();
             var r = http.send(pedido, HttpResponse.BodyHandlers.ofString());
-            if (r.statusCode() == 200) return Resultado.ENVIADO;
+            if (r.statusCode() == 200) return new Intento(Resultado.ENVIADO, false);
             // 404 UNREGISTERED o 400 con el token mal formado: el celular ya no recibe con ese token.
             if (r.statusCode() == 404 || (r.statusCode() == 400 && r.body().contains("registration"))) {
-                return Resultado.TOKEN_INVALIDO;
+                return new Intento(Resultado.TOKEN_INVALIDO, false);
             }
             LOG.warn("FCM respondió {}: {}", r.statusCode(), r.body());
-            return Resultado.ERROR;
+            return new Intento(Resultado.ERROR, r.statusCode() == 429 || r.statusCode() >= 500);
         } catch (IOException | RuntimeException e) {
             LOG.warn("No se pudo enviar el push: {}", e.getMessage());
-            return Resultado.ERROR;
+            return new Intento(Resultado.ERROR, true);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            return Resultado.ERROR;
+            return new Intento(Resultado.ERROR, false);
         }
     }
 }

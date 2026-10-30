@@ -1191,6 +1191,11 @@ export type crearServicioResponse403 = {
   status: 403;
 };
 
+export type crearServicioResponse404 = {
+  data: Problema;
+  status: 404;
+};
+
 export type crearServicioResponse422 = {
   data: Problema;
   status: 422;
@@ -1205,7 +1210,12 @@ export type crearServicioResponseSuccess = crearServicioResponse202 & {
   headers: Headers;
 };
 export type crearServicioResponseError = (
-  crearServicioResponse400 | crearServicioResponse401 | crearServicioResponse403 | crearServicioResponse422 | crearServicioResponse503
+  | crearServicioResponse400
+  | crearServicioResponse401
+  | crearServicioResponse403
+  | crearServicioResponse404
+  | crearServicioResponse422
+  | crearServicioResponse503
 ) & {
   headers: Headers;
 };

@@ -233,6 +233,8 @@ paths:
           $ref: './comun.yaml#/components/responses/NoAutenticado'
         '403':
           $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
         '422':
           $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
         '503':

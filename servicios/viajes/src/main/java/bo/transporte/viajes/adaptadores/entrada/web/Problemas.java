@@ -36,6 +36,19 @@ public final class Problemas {
             Map.entry("DEPENDENCIA_NO_DISPONIBLE", HttpStatus.SERVICE_UNAVAILABLE),
             Map.entry("VINCULACION_PENDIENTE", HttpStatus.SERVICE_UNAVAILABLE));
 
+    /** Título legible (000 §5); el código va en {@code codigo}. */
+    public static String titulo(String codigo) {
+        return switch (estado(codigo)) {
+            case BAD_REQUEST -> "Petición inválida";
+            case UNAUTHORIZED -> "No autenticado";
+            case FORBIDDEN -> "Sin permiso";
+            case NOT_FOUND -> "No encontrado";
+            case CONFLICT -> "Conflicto con el estado actual";
+            case SERVICE_UNAVAILABLE -> "Dependencia no disponible";
+            default -> "Regla de negocio no cumplida";
+        };
+    }
+
     public static HttpStatus estado(String codigo) {
         return ESTADOS.getOrDefault(codigo, HttpStatus.UNPROCESSABLE_CONTENT);
     }

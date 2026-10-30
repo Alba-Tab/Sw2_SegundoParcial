@@ -1,6 +1,7 @@
 package bo.transporte.viajes.adaptadores.salida.gps;
 
 import bo.transporte.viajes.aplicacion.puerto.salida.AlmacenGps;
+import bo.transporte.viajes.dominio.comun.ErrorDeDominio;
 import bo.transporte.viajes.dominio.viaje.PuntoGps;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -14,6 +15,7 @@ import java.util.Map;
 import java.util.OptionalLong;
 import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -39,6 +41,7 @@ class AlmacenGpsDynamo implements AlmacenGps {
     private static final int POR_LLAMADA = 25;
     private static final int REINTENTOS = 5;
     private static final long ESPERA_BASE_MS = 100;
+    private static final Pattern TS_SEQ = Pattern.compile("\\d{4}-\\d{2}-\\d{2}T[0-9:]{8}Z#\\d{6,}");
 
     private final DynamoDbClient dynamo;
 
@@ -186,8 +189,15 @@ class AlmacenGpsDynamo implements AlmacenGps {
         return Base64.getUrlEncoder().withoutPadding().encodeToString(tsSeq.getBytes(StandardCharsets.UTF_8));
     }
 
-    private static String desdeCursor(String cursor) {
-        return new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+    /** El cursor es opaco para el cliente; uno alterado es un 400 VALIDACION, no un 500 (spec 005). */
+    static String desdeCursor(String cursor) {
+        try {
+            String tsSeq = new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8);
+            if (TS_SEQ.matcher(tsSeq).matches()) return tsSeq;
+        } catch (IllegalArgumentException e) {
+            // Base64 inválido: cae al error de abajo.
+        }
+        throw new ErrorDeDominio("VALIDACION", "cursor: valor inválido", Map.of("campo", "cursor"));
     }
 
     private static AttributeValue s(String v) {
