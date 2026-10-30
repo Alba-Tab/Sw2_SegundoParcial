@@ -1,3 +1,4 @@
+import { esPositivo, normalizarMonto } from '../dominio/dinero';
 import type { TipoEvidencia } from '../dominio/evidencia';
 import { descripcionValida, type OrigenHito, type TipoHito } from '../dominio/hito';
 import { kmh, type Lectura, MuestreoGps } from '../dominio/muestreo';
@@ -167,10 +168,13 @@ export class CasosDeUso {
 
   /**
    * Spec 009: la carga de diésel va a Flota con su `opId` como Idempotency-Key (Flota exige que sean iguales). La
-   * foto del recibo se sube antes como evidencia RECIBO_COMBUSTIBLE.
+   * foto del recibo se sube antes como evidencia RECIBO_COMBUSTIBLE. El monto llega como lo escribió el chofer y se
+   * normaliza como texto (000 §3), nunca como `number`.
    */
   cargarCombustible(viajeId: string, datos: { litros: number; monto: string; kilometraje: number; foto: string | null }): string {
-    if (!(datos.litros > 0) || !(Number(datos.monto) > 0) || !(datos.kilometraje > 0)) {
+    const monto = normalizarMonto(datos.monto);
+    if (monto === null) throw new Error('Escribe el monto en Bs con hasta 2 decimales, por ejemplo 675,50');
+    if (!(datos.litros > 0) || !esPositivo(monto) || !(datos.kilometraje > 0)) {
       throw new Error('Litros, monto y kilometraje deben ser mayores que 0');
     }
     const foto = datos.foto ? this.evidencia(viajeId, 'RECIBO_COMBUSTIBLE', datos.foto) : null;
@@ -181,7 +185,7 @@ export class CasosDeUso {
         opId,
         viajeId,
         litros: datos.litros,
-        monto: { monto: Number(datos.monto).toFixed(2), moneda: 'BOB' },
+        monto: { monto, moneda: 'BOB' },
         kilometraje: datos.kilometraje,
         registradaEn: this.reloj.ahora().toISOString(),
         ...(posicion ? { posicion } : {}),

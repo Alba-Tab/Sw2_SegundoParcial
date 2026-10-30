@@ -17,7 +17,8 @@ export function PantallaCarga({ viajeId, alGuardar }: { viajeId: string; alGuard
     try {
       casos.cargarCombustible(viajeId, {
         litros: numero(litros),
-        monto: String(numero(monto)),
+        // El monto va como texto (000 §3): el caso de uso lo valida y normaliza sin pasar por float.
+        monto,
         kilometraje: Math.round(numero(kilometraje)),
         foto: fotos[0] ?? null,
       });

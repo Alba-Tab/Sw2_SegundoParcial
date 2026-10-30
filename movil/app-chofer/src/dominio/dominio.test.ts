@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { enOrden, type Operacion, siguiente } from './operacion';
 import { decidir, espera, ESPERA_MAXIMA_MS } from './reintento';
+import { esPositivo, normalizarMonto } from './dinero';
 import { estadoVisible, puedeIniciar, type ViajeLocal, viajesQueSobran } from './viaje';
 
 const op = (o: Partial<Operacion>): Operacion => ({
@@ -90,6 +91,28 @@ describe('viaje local', () => {
     expect(puedeIniciar(v({ viajeId: 'b' }), [a])).toBe(false);
     expect(puedeIniciar(v({ viajeId: 'b' }), [v({ viajeId: 'c', estado: 'CERRADO' })])).toBe(true);
     expect(estadoVisible(v({ canceladoAlSincronizar: true, iniciadoLocal: true }))).toBe('CANCELADO');
+  });
+});
+
+describe('monto escrito por el chofer (000 §3, sin float)', () => {
+  it('acepta punto o coma y hasta 2 decimales, y lo deja como el contrato lo pide', () => {
+    expect(normalizarMonto('675.07')).toBe('675.07');
+    expect(normalizarMonto('675,5')).toBe('675.50');
+    expect(normalizarMonto(' 1200 ')).toBe('1200.00');
+    expect(normalizarMonto('007,10')).toBe('7.10');
+    expect(normalizarMonto('0')).toBe('0.00');
+    expect(normalizarMonto('999999999999,99')).toBe('999999999999.99');
+  });
+
+  it('rechaza lo que no es un monto', () => {
+    for (const t of ['', '1.234', '1,2,3', '-5', '+5', '1e3', '.5', '5.', '1 200', '1234567890123', 'NaN']) {
+      expect(normalizarMonto(t)).toBeNull();
+    }
+  });
+
+  it('mayor que cero sin convertirlo a número', () => {
+    expect(esPositivo('0.00')).toBe(false);
+    expect(esPositivo('0.01')).toBe(true);
   });
 });
 

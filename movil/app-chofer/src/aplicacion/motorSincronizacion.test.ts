@@ -431,4 +431,14 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     await expect(motor.recuperarCursor()).resolves.toBeUndefined();
     expect(puntos.contar()).toBe(1);
   });
+
+  it('T7.6: el monto escrito con coma o sin decimales se normaliza como texto; uno inválido no entra a la cola', () => {
+    const cargar = (monto: string) => casos.cargarCombustible('v1', { litros: 100, monto, kilometraje: 1, foto: null });
+    const montoDe = (opId: string) => cola.ops.find((o) => o.opId === opId)?.cuerpo.monto;
+    expect(montoDe(cargar('675,5'))).toEqual({ monto: '675.50', moneda: 'BOB' });
+    expect(montoDe(cargar(' 0675 '))).toEqual({ monto: '675.00', moneda: 'BOB' });
+    expect(montoDe(cargar('999999999999.99'))).toEqual({ monto: '999999999999.99', moneda: 'BOB' });
+    for (const malo of ['1.234', '1,2,3', '-5', '1e3', '', '0,00', '1234567890123', 'Infinity']) expect(() => cargar(malo)).toThrow();
+    expect(cola.ops.filter((o) => o.tipo === 'CARGA_COMBUSTIBLE')).toHaveLength(3);
+  });
 });
