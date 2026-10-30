@@ -102,6 +102,12 @@
           "options": {
             "port": 4201
           }
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "projects/cc-tablero/tsconfig.spec.json"
+          }
         }
       }
     },
