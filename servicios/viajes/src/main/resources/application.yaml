@@ -16,6 +16,10 @@ spring:
     username: ${AMQP_USUARIO:viajes}
     password: ${AMQP_CLAVE:viajes}
     publisher-confirm-type: simple
+    # viajes.eventos la declara la topología del compose (o la nube); si todavía no existe, el consumidor reintenta.
+    listener.simple:
+      missing-queues-fatal: false
+      prefetch: 10
   jackson:
     default-property-inclusion: non_null
 

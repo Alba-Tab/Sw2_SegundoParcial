@@ -1,5 +1,6 @@
 package bo.transporte.viajes;
 
+import org.springframework.amqp.core.Queue;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
@@ -17,6 +18,12 @@ class TestcontainersConfiguration {
     @ServiceConnection
     PostgreSQLContainer postgresContainer() {
         return new PostgreSQLContainer(DockerImageName.parse("postgres:17"));
+    }
+
+    /** La cola del consumidor; en el compose la crea la topología de plataforma/compose/rabbitmq. */
+    @Bean
+    Queue colaViajes() {
+        return new Queue("viajes.eventos");
     }
 
     @Bean

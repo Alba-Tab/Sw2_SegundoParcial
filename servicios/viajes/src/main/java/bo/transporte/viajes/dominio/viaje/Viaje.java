@@ -22,6 +22,9 @@ public final class Viaje {
     private String motivo;
     private String detalle;
     private Instant iniciadoEn;
+    private Instant entregadoEn;
+    private UUID facturaId;
+    private String numeroFactura;
 
     private Viaje(
             UUID viajeId,
@@ -89,6 +92,45 @@ public final class Viaje {
     public void iniciar(Instant iniciadoEn) {
         pasarA(EstadoViaje.EN_RUTA);
         this.iniciadoEn = Objects.requireNonNull(iniciadoEn);
+    }
+
+    /** Lo que el viaje acumula desde la entrega (specs 006 y 007); solo lo usa el repositorio al leer. */
+    public Viaje conEntrega(Instant entregadoEn, UUID facturaId, String numeroFactura) {
+        this.entregadoEn = entregadoEn;
+        this.facturaId = facturaId;
+        this.numeroFactura = numeroFactura;
+        return this;
+    }
+
+    /** Spec 006: dentro de la geocerca y con firma queda ENTREGADO; si no, ENTREGA_OBSERVADA (spec 007). */
+    public void entregar(Instant entregadoEn, boolean observada) {
+        pasarA(observada ? EstadoViaje.ENTREGA_OBSERVADA : EstadoViaje.ENTREGADO);
+        this.entregadoEn = Objects.requireNonNull(entregadoEn);
+    }
+
+    /** Spec 007: el despachador aprueba la entrega observada. */
+    public void aprobarEntrega() {
+        if (estado != EstadoViaje.ENTREGA_OBSERVADA) {
+            throw new ErrorDeDominio("CONFLICTO_ESTADO", "El viaje está " + estado + "; no hay entrega por revisar");
+        }
+        pasarA(EstadoViaje.ENTREGADO);
+    }
+
+    /** Spec 007: rechaza el receptor (desde EN_RUTA) o el despachador (desde ENTREGA_OBSERVADA). */
+    public void rechazarEntrega(EstadoViaje desde) {
+        if (estado != desde) {
+            throw new ErrorDeDominio("CONFLICTO_ESTADO", "El viaje está " + estado + " y no se puede rechazar así");
+        }
+        pasarA(EstadoViaje.ENTREGA_RECHAZADA);
+    }
+
+    /** Spec 006, paso 9: llega FacturaEmitida. false si ya estaba cerrado (evento repetido). */
+    public boolean cerrar(UUID facturaId, String numeroFactura) {
+        if (estado == EstadoViaje.CERRADO) return false;
+        pasarA(EstadoViaje.CERRADO);
+        this.facturaId = Objects.requireNonNull(facturaId);
+        this.numeroFactura = Objects.requireNonNull(numeroFactura);
+        return true;
     }
 
     /** El chofer asignado en el pivote; null antes de confirmar. */
@@ -168,5 +210,17 @@ public final class Viaje {
 
     public Instant iniciadoEn() {
         return iniciadoEn;
+    }
+
+    public Instant entregadoEn() {
+        return entregadoEn;
+    }
+
+    public UUID facturaId() {
+        return facturaId;
+    }
+
+    public String numeroFactura() {
+        return numeroFactura;
     }
 }

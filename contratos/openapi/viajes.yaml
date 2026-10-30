@@ -20,6 +20,7 @@ tags:
   - name: saga
   - name: viajes
   - name: evidencias
+  - name: entregas
 paths:
   /health:
     get:
@@ -550,6 +551,173 @@ paths:
           $ref: './comun.yaml#/components/responses/Conflicto'
         '503':
           $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/viajes/{viajeId}/entrega:
+    parameters:
+      - $ref: '#/components/parameters/ViajeId'
+    get:
+      tags: [entregas]
+      operationId: obtenerEntrega
+      summary: La entrega o el rechazo del viaje, con razones, distancia y evidencias (POD).
+      description: |
+        Chofer propio, cliente de ese viaje, despachador, comercial y gerente. Las fotos y la firma se piden con
+        obtenerEvidencia (URL firmadas de 5 min).
+      responses:
+        '200':
+          description: Entrega.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Entrega'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+    post:
+      tags: [entregas]
+      operationId: registrarEntrega
+      summary: El chofer registra la entrega (spec 006); dentro de la geocerca y con firma queda ENTREGADO, si no ENTREGA_OBSERVADA (spec 007).
+      description: |
+        Geocerca: distancia haversine al destino ≤ radioMetros (D06), sin sumar la precisión (D64). Fotos: 1 a 3
+        FOTO_ENTREGA COMPLETA; una evidencia sin completar responde 422 EVIDENCIA_INCOMPLETA.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EntregaNueva'
+      responses:
+        '200':
+          description: Resultado de la entrega.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultadoEntrega'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/viajes/{viajeId}/entrega/aprobacion:
+    parameters:
+      - $ref: '#/components/parameters/ViajeId'
+    post:
+      tags: [entregas]
+      operationId: aprobarEntregaObservada
+      summary: El despachador aprueba una entrega observada (spec 007); ENTREGADO y EntregaConfirmada con aprobadaPor.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecisionEntrega'
+      responses:
+        '200':
+          description: Resultado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Viaje'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/viajes/{viajeId}/entrega/rechazo:
+    parameters:
+      - $ref: '#/components/parameters/ViajeId'
+    post:
+      tags: [entregas]
+      operationId: rechazarEntregaObservada
+      summary: El despachador rechaza una entrega observada (spec 007); ENTREGA_RECHAZADA y EntregaRechazada (DESPACHADOR).
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RechazoDespachador'
+      responses:
+        '200':
+          description: Resultado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Viaje'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/viajes/{viajeId}/rechazo:
+    parameters:
+      - $ref: '#/components/parameters/ViajeId'
+    post:
+      tags: [entregas]
+      operationId: registrarRechazoReceptor
+      summary: El chofer registra que el receptor rechazó la carga (spec 007); ENTREGA_RECHAZADA y EntregaRechazada (RECEPTOR).
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RechazoReceptor'
+      responses:
+        '200':
+          description: Resultado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultadoEntrega'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
   /api/v1/viajes/{viajeId}/intervencion:
     parameters:
       - name: viajeId
@@ -864,6 +1032,152 @@ components:
           description: URL `GET` firmada de 5 min; solo si está COMPLETA.
         expiraEn:
           $ref: './comun.yaml#/components/schemas/Instante'
+    EntregaNueva:
+      type: object
+      required: [entregaId, entregadoEn, posicion, fotos]
+      additionalProperties: false
+      properties:
+        entregaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        entregadoEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        posicion:
+          $ref: './comun.yaml#/components/schemas/Coordenadas'
+        precisionMetros:
+          type: number
+          minimum: 0
+        fotos:
+          type: array
+          minItems: 1
+          maxItems: 3
+          uniqueItems: true
+          items:
+            $ref: './comun.yaml#/components/schemas/Uuid'
+        firma:
+          type: object
+          nullable: true
+          required: [evidenciaId, nombreReceptor]
+          additionalProperties: false
+          properties:
+            evidenciaId:
+              $ref: './comun.yaml#/components/schemas/Uuid'
+            nombreReceptor:
+              type: string
+              minLength: 3
+              maxLength: 120
+        observacion:
+          type: string
+          maxLength: 500
+    RechazoReceptor:
+      type: object
+      required: [entregaId, rechazadaEn, posicion, motivo, fotos]
+      additionalProperties: false
+      properties:
+        entregaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        rechazadaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        posicion:
+          $ref: './comun.yaml#/components/schemas/Coordenadas'
+        motivo:
+          type: string
+          minLength: 3
+          maxLength: 300
+        fotos:
+          type: array
+          minItems: 1
+          maxItems: 3
+          uniqueItems: true
+          items:
+            $ref: './comun.yaml#/components/schemas/Uuid'
+    DecisionEntrega:
+      type: object
+      additionalProperties: false
+      properties:
+        nota:
+          type: string
+          minLength: 3
+          maxLength: 300
+    RechazoDespachador:
+      type: object
+      required: [motivo]
+      additionalProperties: false
+      properties:
+        motivo:
+          type: string
+          minLength: 3
+          maxLength: 300
+    RazonObservacion:
+      type: string
+      enum: [FUERA_GEOCERCA, SIN_FIRMA]
+    ResultadoEntrega:
+      type: object
+      required: [viajeId, entregaId, estado, dentroGeocerca, distanciaMetros, conFirma]
+      properties:
+        viajeId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        entregaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        estado:
+          type: string
+          enum: [ENTREGADO, ENTREGA_OBSERVADA, ENTREGA_RECHAZADA]
+        dentroGeocerca:
+          type: boolean
+        distanciaMetros:
+          type: number
+          minimum: 0
+        conFirma:
+          type: boolean
+        razones:
+          type: array
+          items:
+            $ref: '#/components/schemas/RazonObservacion'
+    Entrega:
+      type: object
+      required: [entregaId, viajeId, tipo, registradaEn, posicion, distanciaMetros, dentroGeocerca, conFirma, fotos]
+      properties:
+        entregaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        viajeId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        tipo:
+          type: string
+          enum: [ENTREGA, RECHAZO_RECEPTOR]
+        registradaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        posicion:
+          $ref: './comun.yaml#/components/schemas/Coordenadas'
+        precisionMetros:
+          type: number
+        distanciaMetros:
+          type: number
+        dentroGeocerca:
+          type: boolean
+        conFirma:
+          type: boolean
+        razones:
+          type: array
+          items:
+            $ref: '#/components/schemas/RazonObservacion'
+        nombreReceptor:
+          type: string
+        firmaEvidenciaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        fotos:
+          type: array
+          items:
+            $ref: './comun.yaml#/components/schemas/Uuid'
+        observacion:
+          type: string
+        motivo:
+          type: string
+          description: Motivo del rechazo (receptor o despachador).
+        decision:
+          type: string
+          enum: [APROBADA, RECHAZADA]
+          description: Decisión del despachador sobre una entrega observada.
+        decididaPor:
+          $ref: './comun.yaml#/components/schemas/Sub'
     ServicioNuevo:
       type: object
       required: [cotizacionId]
@@ -930,6 +1244,13 @@ components:
           $ref: './comun.yaml#/components/schemas/Coordenadas'
         iniciadoEn:
           $ref: './comun.yaml#/components/schemas/Instante'
+        entregadoEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        facturaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        numeroFactura:
+          type: string
+          pattern: '^FAC-[0-9]{6}$'
         creadoEn:
           $ref: './comun.yaml#/components/schemas/Instante'
     PaginaServicios:
