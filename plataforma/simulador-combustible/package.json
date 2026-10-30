@@ -6,7 +6,7 @@
   "engines": { "node": ">=24" },
   "scripts": {
     "simular": "node simulador.mjs",
-    "test": "node --test test/"
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "mqtt": "5.16.0"
