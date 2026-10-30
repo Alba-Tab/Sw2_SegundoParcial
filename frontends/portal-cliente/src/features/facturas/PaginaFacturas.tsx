@@ -24,7 +24,7 @@ import {
 } from '@tanstack/react-table';
 import { useMemo, useState } from 'react';
 import { type EstadoFactura, type Factura, getListarFacturasQueryKey, listarFacturas } from '../../api/generado/finanzas';
-import { dinero, fecha } from '../../compartido/formato/formato';
+import { compararMontos, dinero, fecha } from '../../compartido/formato/formato';
 import { Antiguedad } from '../../compartido/offline/Antiguedad';
 import { useClienteActivo } from '../../compartido/sesion/ClienteActivo';
 import { Problema } from '../../compartido/ui/Problema';
@@ -37,7 +37,6 @@ const ESTADOS: Record<EstadoFactura, { texto: string; color: 'default' | 'succes
 };
 
 const col = createColumnHelper<Factura>();
-const porMonto = (a: { monto: string }, b: { monto: string }) => Number(a.monto) - Number(b.monto);
 
 /** Specs 006 y 008: facturas con su saldo (TanStack Table con orden) y la línea de crédito. */
 export function PaginaFacturas() {
@@ -71,12 +70,12 @@ export function PaginaFacturas() {
       col.accessor('monto', {
         header: 'Monto',
         cell: (c) => dinero(c.getValue()),
-        sortingFn: (a, b) => porMonto(a.original.monto, b.original.monto),
+        sortingFn: (a, b) => compararMontos(a.original.monto, b.original.monto),
       }),
       col.accessor('saldo', {
         header: 'Saldo',
         cell: (c) => dinero(c.getValue()),
-        sortingFn: (a, b) => porMonto(a.original.saldo, b.original.saldo),
+        sortingFn: (a, b) => compararMontos(a.original.saldo, b.original.saldo),
       }),
       col.accessor('estado', {
         header: 'Estado',

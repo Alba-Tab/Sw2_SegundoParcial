@@ -7,28 +7,39 @@ interface Elegido {
 }
 const CLAVE = 'portal-cliente-activo';
 
-function leer(): Elegido {
-  // "Ver como cliente" (propuesta 7.7) abre el portal con ?clienteId=…; si no, el último elegido en esta pestaña.
-  const deUrl = new URLSearchParams(window.location.search).get('clienteId');
-  if (deUrl) return { clienteId: deUrl };
+function guardar(e: Elegido) {
   try {
-    return JSON.parse(sessionStorage.getItem(CLAVE) ?? '{}') as Elegido;
+    sessionStorage.setItem(CLAVE, JSON.stringify(e));
   } catch {
-    return {};
+    // Sin sessionStorage (modo privado estricto): la elección dura hasta recargar.
   }
+}
+
+/**
+ * "Ver como cliente" (propuesta 7.7) abre el portal con ?clienteId=…; se guarda en la pestaña porque el inicio de
+ * sesión pasa por Keycloak y la vuelta recarga la página sin ese parámetro. Sin parámetro, el último elegido aquí.
+ */
+export function leerClienteActivo(): Elegido {
+  let guardado: Elegido = {};
+  try {
+    guardado = JSON.parse(sessionStorage.getItem(CLAVE) ?? '{}') as Elegido;
+  } catch {
+    // Sin sessionStorage o con un valor ilegible: nada elegido.
+  }
+  const deUrl = new URLSearchParams(window.location.search).get('clienteId');
+  if (!deUrl || deUrl === guardado.clienteId) return guardado;
+  const elegido = { clienteId: deUrl };
+  guardar(elegido);
+  return elegido;
 }
 
 const Contexto = createContext<{ elegido: Elegido; elegir: (e: Elegido) => void } | null>(null);
 
 export function ProveedorClienteActivo({ children }: { children: ReactNode }) {
-  const [elegido, setElegido] = useState<Elegido>(leer);
+  const [elegido, setElegido] = useState<Elegido>(leerClienteActivo);
   const elegir = (e: Elegido) => {
     setElegido(e);
-    try {
-      sessionStorage.setItem(CLAVE, JSON.stringify(e));
-    } catch {
-      // Sin sessionStorage (modo privado estricto): la elección dura hasta recargar.
-    }
+    guardar(e);
   };
   return <Contexto.Provider value={{ elegido, elegir }}>{children}</Contexto.Provider>;
 }

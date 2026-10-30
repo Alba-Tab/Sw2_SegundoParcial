@@ -4,7 +4,7 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useObtenerLineaCredito, useObtenerMiLineaCredito } from '../../api/generado/finanzas';
-import { dinero } from '../../compartido/formato/formato';
+import { aCentavos, dinero, porcentaje } from '../../compartido/formato/formato';
 import { Antiguedad } from '../../compartido/offline/Antiguedad';
 import { useClienteActivo } from '../../compartido/sesion/ClienteActivo';
 import { Problema } from '../../compartido/ui/Problema';
@@ -19,7 +19,7 @@ export function Credito() {
   if (linea.isPending) return null;
   if (!linea.data) return <Problema error={linea.error} />;
   const l = linea.data;
-  const usado = Number(l.limite.monto) > 0 ? ((Number(l.utilizado.monto) + Number(l.reservado.monto)) / Number(l.limite.monto)) * 100 : 0;
+  const usado = porcentaje(aCentavos(l.utilizado.monto) + aCentavos(l.reservado.monto), aCentavos(l.limite.monto));
   return (
     <Paper variant="outlined" sx={{ p: 3 }}>
       <Stack spacing={1.5}>
