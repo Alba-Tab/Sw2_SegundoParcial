@@ -1,0 +1,13 @@
+{
+  "app": "cc-tablero",
+  "oidcIssuer": "http://localhost:8080/realms/transporte",
+  "clienteOidc": "cc-tablero",
+  "gatewayUrl": "http://localhost:8105",
+  "urls": {
+    "cc-tablero": "http://localhost:4201",
+    "cc-operaciones": "http://localhost:4202",
+    "cc-flota": "http://localhost:4203",
+    "cc-finanzas": "http://localhost:4204",
+    "portal-cliente": "http://localhost:5173"
+  }
+}

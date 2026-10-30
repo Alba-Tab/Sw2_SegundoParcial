@@ -1,0 +1,49 @@
+/* To learn more about Typescript configuration file: https://www.typescriptlang.org/docs/handbook/tsconfig-json.html. */
+/* To learn more about Angular compiler options: https://angular.dev/reference/configs/angular-compiler-options. */
+{
+  "compileOnSave": false,
+  "compilerOptions": {
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "experimentalDecorators": true,
+    "importHelpers": true,
+    "target": "ES2022",
+    "module": "preserve",
+    "paths": {
+      "ui-comun": [
+        "./projects/ui-comun/src/public-api.ts"
+      ]
+    },
+    "strict": true
+  },
+  "angularCompilerOptions": {
+    "enableI18nLegacyMessageIdFormat": false,
+    "strictInjectionParameters": true,
+    "strictInputAccessModifiers": true
+  },
+  "files": [],
+  "references": [
+    {
+      "path": "./projects/cc-tablero/tsconfig.app.json"
+    },
+    {
+      "path": "./projects/cc-operaciones/tsconfig.app.json"
+    },
+    {
+      "path": "./projects/cc-flota/tsconfig.app.json"
+    },
+    {
+      "path": "./projects/cc-finanzas/tsconfig.app.json"
+    },
+    {
+      "path": "./projects/ui-comun/tsconfig.lib.json"
+    },
+    {
+      "path": "./projects/ui-comun/tsconfig.spec.json"
+    }
+  ]
+}

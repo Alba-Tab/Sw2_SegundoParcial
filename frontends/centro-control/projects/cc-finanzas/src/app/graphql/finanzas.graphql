@@ -1,0 +1,129 @@
+fragment FacturaFila on Factura {
+  facturaId
+  numero
+  clienteId
+  razonSocial
+  monto
+  saldo
+  estado
+  emitidaEl
+  venceEl
+  vencida
+  diasVencida
+}
+
+query Facturas($estado: EstadoFactura, $conSaldo: Boolean) {
+  facturas(estado: $estado, conSaldo: $conSaldo, limite: 100) {
+    ...FacturaFila
+  }
+}
+
+query Factura($id: ID!) {
+  factura(id: $id) {
+    ...FacturaFila
+    viajeId
+    servicioId
+    pagos {
+      pagoId
+      monto
+      fecha
+      medio
+      referencia
+      nota
+      registradoPor
+      registradoEn
+    }
+  }
+}
+
+query Cotizaciones {
+  cotizaciones(limite: 100) {
+    cotizacionId
+    clienteId
+    rutaId
+    tipoCarga
+    toneladas
+    fechaViaje
+    monto
+    estado
+    vencida
+    venceEn
+    canal
+    creadaEn
+  }
+  clientes {
+    clienteId
+    razonSocial
+  }
+  rutas {
+    rutaId
+    nombre
+  }
+}
+
+query Solicitudes($estado: String) {
+  solicitudesAprobacion(estado: $estado) {
+    servicioId
+    clienteId
+    razonSocial
+    monto
+    motivos
+    estado
+    creadaEn
+    venceEn
+    decididaPor
+    motivoDecision
+    facturasVencidas {
+      facturaId
+      numero
+      saldo
+      venceEl
+      diasVencida
+    }
+  }
+}
+
+query LineaCredito($clienteId: ID!) {
+  lineaCredito(clienteId: $clienteId) {
+    limite
+    reservado
+    utilizado
+    disponible
+    enMora
+  }
+}
+
+query Cobranza($params: ReporteParams) {
+  reporte(id: CUENTAS_POR_COBRAR, params: $params) {
+    reporteId
+    titulo
+    parametros
+    columnas {
+      clave
+      titulo
+      tipo
+    }
+    filas
+    totales
+    grafico
+    datosAl
+  }
+}
+
+mutation RegistrarPago($input: PagoInput!) {
+  registrarPago(input: $input) {
+    facturaId
+    saldo
+    estado
+  }
+}
+
+mutation AprobarCredito($servicioId: ID!, $aprobado: Boolean!, $motivo: String, $clave: ID!) {
+  aprobarCredito(servicioId: $servicioId, aprobado: $aprobado, motivo: $motivo, claveIdempotencia: $clave) {
+    servicioId
+    aprobado
+    servicio {
+      estado
+    }
+  }
+}

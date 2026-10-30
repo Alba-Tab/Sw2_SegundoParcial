@@ -30,6 +30,7 @@ jobs:
       tokens: ${{ steps.f.outputs.tokens }}
       intercambio: ${{ steps.f.outputs.intercambio }}
       portal: ${{ steps.f.outputs.portal }}
+      centro-control: ${{ steps.f.outputs.centro-control }}
       app-chofer: ${{ steps.f.outputs.app-chofer }}
     steps:
       - uses: actions/checkout@v7
@@ -101,6 +102,10 @@ jobs:
               - *tokens
               - contratos/openapi/**
               - frontends/portal-cliente/**
+            centro-control:
+              - *tokens
+              - contratos/graphql/**
+              - frontends/centro-control/**
             app-chofer:
               - *tokens
               - contratos/openapi/**
@@ -328,9 +333,24 @@ jobs:
         with: { node-version: 24 }
       - run: npm test
 
+  centro-control:
+    needs: cambios
+    if: needs.cambios.outputs.centro-control == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: frontends/centro-control } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm, cache-dependency-path: frontends/centro-control/package-lock.json }
+      - run: npm ci
+      - name: El código generado coincide con contratos/graphql (D49)
+        run: npm run generar:verificar
+      - name: Formato, pruebas de ui-comun y build de las 4 apps
+        run: npm run verificar
+
   ci-ok:
     if: always()
-    needs: [cambios, contratos, viajes, flota, finanzas, analitica, gateway, keycloak, compose, simulador, tokens, intercambio, portal, app-chofer, gitleaks, commitlint]
+    needs: [cambios, contratos, viajes, flota, finanzas, analitica, gateway, keycloak, compose, simulador, tokens, intercambio, portal, centro-control, app-chofer, gitleaks, commitlint]
     runs-on: ubuntu-latest
     steps:
       - name: Todo en verde u omitido por no tener cambios

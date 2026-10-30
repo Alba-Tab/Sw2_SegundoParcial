@@ -1,0 +1,198 @@
+fragment ViajeFila on Viaje {
+  viajeId
+  servicioId
+  estado
+  motivo
+  placa
+  choferNombre
+  tipoCarga
+  toneladas
+  fechaViaje
+  iniciadoEn
+  ultimaPosicion {
+    lat
+    lng
+  }
+  ultimaPosicionEn
+  cliente {
+    clienteId
+    razonSocial
+  }
+  ruta {
+    rutaId
+    nombre
+    destino
+    distanciaKm
+  }
+}
+
+query Viajes($estado: EstadoViaje) {
+  viajes(estado: $estado, limite: 100) {
+    ...ViajeFila
+  }
+}
+
+query Mapa {
+  viajesEnCurso(limite: 100) {
+    ...ViajeFila
+    riesgo {
+      probabilidad
+      enRiesgo
+    }
+  }
+}
+
+query Viaje($id: ID!) {
+  viaje(id: $id) {
+    ...ViajeFila
+    monto
+    riesgo {
+      probabilidad
+      umbral
+      enRiesgo
+      calculadaEn
+      factores {
+        nombre
+        aporte
+      }
+    }
+    unidad {
+      unidadId
+      placa
+      estado
+    }
+    hitos(limite: 20) {
+      hitoId
+      tipo
+      descripcion
+      origen
+      registradoEn
+    }
+    entrega {
+      entregaId
+      tipo
+      registradaEn
+      distanciaMetros
+      dentroGeocerca
+      conFirma
+      razones
+      nombreReceptor
+      motivo
+      decision
+      decididaPor
+    }
+  }
+}
+
+query EntregasObservadas {
+  entregasObservadas {
+    ...ViajeFila
+    entrega {
+      registradaEn
+      distanciaMetros
+      razones
+      conFirma
+      nombreReceptor
+    }
+  }
+}
+
+query Intervenciones {
+  intervenciones {
+    ...ViajeFila
+  }
+}
+
+query Servicios($estado: EstadoServicio) {
+  servicios(estado: $estado, limite: 100) {
+    servicioId
+    viajeId
+    clienteId
+    estado
+    etapa
+    motivo
+    tipoCarga
+    toneladas
+    fechaViaje
+    monto
+    placa
+    choferNombre
+    confirmacionCompleta
+    creadoEn
+  }
+  clientes {
+    clienteId
+    razonSocial
+  }
+}
+
+query Acciones($estado: EstadoAccion) {
+  accionesPropuestas(estado: $estado) {
+    accionId
+    tipo
+    viajeId
+    razonSocial
+    mensaje
+    estado
+    misionId
+    creadaEn
+    decididaPor
+    decididaEn
+    motivoRechazo
+    evidencia {
+      fuente
+      referencia
+      resumen
+    }
+    viaje {
+      placa
+      estado
+      ruta {
+        nombre
+        destino
+      }
+    }
+  }
+}
+
+mutation AprobarEntrega($viajeId: ID!, $nota: String, $clave: ID!) {
+  aprobarEntregaObservada(viajeId: $viajeId, nota: $nota, claveIdempotencia: $clave) {
+    viajeId
+    estado
+  }
+}
+
+mutation RechazarEntrega($viajeId: ID!, $motivo: String!, $clave: ID!) {
+  rechazarEntregaObservada(viajeId: $viajeId, motivo: $motivo, claveIdempotencia: $clave) {
+    viajeId
+    estado
+  }
+}
+
+mutation ResolverIntervencion($viajeId: ID!, $opcion: OpcionIntervencion!, $nota: String, $clave: ID!) {
+  resolverIntervencion(viajeId: $viajeId, opcion: $opcion, nota: $nota, claveIdempotencia: $clave) {
+    viajeId
+    estado
+  }
+}
+
+mutation CancelarServicio($servicioId: ID!, $motivo: String!, $clave: ID!) {
+  cancelarServicio(servicioId: $servicioId, motivo: $motivo, claveIdempotencia: $clave) {
+    servicioId
+    estado
+  }
+}
+
+mutation AprobarAccion($id: ID!, $mensaje: String!, $clave: ID!) {
+  aprobarAccion(id: $id, mensaje: $mensaje, claveIdempotencia: $clave) {
+    accionId
+    estado
+  }
+}
+
+mutation RechazarAccion($id: ID!, $motivo: String, $clave: ID!) {
+  rechazarAccion(id: $id, motivo: $motivo, claveIdempotencia: $clave) {
+    accionId
+    estado
+  }
+}
