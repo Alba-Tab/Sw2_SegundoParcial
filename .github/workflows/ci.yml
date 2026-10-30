@@ -25,6 +25,8 @@ jobs:
       keycloak: ${{ steps.f.outputs.keycloak }}
       compose: ${{ steps.f.outputs.compose }}
       simulador: ${{ steps.f.outputs.simulador }}
+      tokens: ${{ steps.f.outputs.tokens }}
+      portal: ${{ steps.f.outputs.portal }}
     steps:
       - uses: actions/checkout@v7
       - id: f
@@ -72,6 +74,13 @@ jobs:
               - contratos/eventos/flota/LecturaSensorCombustible.v1.schema.json
               - contratos/comun/**
               - plataforma/simulador-combustible/**
+            tokens: &tokens
+              - *ci
+              - libs/design-tokens/**
+            portal:
+              - *tokens
+              - contratos/openapi/**
+              - frontends/portal-cliente/**
 
   contratos:
     needs: cambios
@@ -192,6 +201,32 @@ jobs:
       - run: npm test
       - run: docker build -q .
 
+  tokens:
+    needs: cambios
+    if: needs.cambios.outputs.tokens == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: libs/design-tokens } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm, cache-dependency-path: libs/design-tokens/package-lock.json }
+      - run: npm ci
+      - run: npm run construir:verificar
+
+  portal:
+    needs: cambios
+    if: needs.cambios.outputs.portal == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: frontends/portal-cliente } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm, cache-dependency-path: frontends/portal-cliente/package-lock.json }
+      - run: npm ci
+      - run: npm run verificar
+      - run: npm run build
+      - run: npm run storybook:build
+
   gitleaks:
     runs-on: ubuntu-latest
     steps:
@@ -214,7 +249,7 @@ jobs:
 
   ci-ok:
     if: always()
-    needs: [cambios, contratos, viajes, flota, finanzas, keycloak, compose, simulador, gitleaks, commitlint]
+    needs: [cambios, contratos, viajes, flota, finanzas, keycloak, compose, simulador, tokens, portal, gitleaks, commitlint]
     runs-on: ubuntu-latest
     steps:
       - name: Todo en verde u omitido por no tener cambios

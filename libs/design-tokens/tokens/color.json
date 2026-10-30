@@ -1,0 +1,361 @@
+{
+  "$description": "Material 3, tonal spot, semilla #1D5FA6. Generado por scripts/paleta.mjs; no se edita a mano.",
+  "color": {
+    "claro": {
+      "primary": {
+        "$value": "#3c6090",
+        "$type": "color"
+      },
+      "onPrimary": {
+        "$value": "#ffffff",
+        "$type": "color"
+      },
+      "primaryContainer": {
+        "$value": "#d4e3ff",
+        "$type": "color"
+      },
+      "onPrimaryContainer": {
+        "$value": "#224876",
+        "$type": "color"
+      },
+      "secondary": {
+        "$value": "#545f71",
+        "$type": "color"
+      },
+      "onSecondary": {
+        "$value": "#ffffff",
+        "$type": "color"
+      },
+      "secondaryContainer": {
+        "$value": "#d8e3f8",
+        "$type": "color"
+      },
+      "onSecondaryContainer": {
+        "$value": "#3d4758",
+        "$type": "color"
+      },
+      "tertiary": {
+        "$value": "#6e5676",
+        "$type": "color"
+      },
+      "onTertiary": {
+        "$value": "#ffffff",
+        "$type": "color"
+      },
+      "tertiaryContainer": {
+        "$value": "#f7d8ff",
+        "$type": "color"
+      },
+      "onTertiaryContainer": {
+        "$value": "#553f5d",
+        "$type": "color"
+      },
+      "error": {
+        "$value": "#ba1a1a",
+        "$type": "color"
+      },
+      "onError": {
+        "$value": "#ffffff",
+        "$type": "color"
+      },
+      "errorContainer": {
+        "$value": "#ffdad6",
+        "$type": "color"
+      },
+      "onErrorContainer": {
+        "$value": "#93000a",
+        "$type": "color"
+      },
+      "background": {
+        "$value": "#f9f9ff",
+        "$type": "color"
+      },
+      "onBackground": {
+        "$value": "#191c20",
+        "$type": "color"
+      },
+      "surface": {
+        "$value": "#f9f9ff",
+        "$type": "color"
+      },
+      "onSurface": {
+        "$value": "#191c20",
+        "$type": "color"
+      },
+      "surfaceVariant": {
+        "$value": "#e0e2ec",
+        "$type": "color"
+      },
+      "onSurfaceVariant": {
+        "$value": "#43474e",
+        "$type": "color"
+      },
+      "surfaceDim": {
+        "$value": "#d9dae0",
+        "$type": "color"
+      },
+      "surfaceBright": {
+        "$value": "#f9f9ff",
+        "$type": "color"
+      },
+      "surfaceContainerLowest": {
+        "$value": "#ffffff",
+        "$type": "color"
+      },
+      "surfaceContainerLow": {
+        "$value": "#f3f3fa",
+        "$type": "color"
+      },
+      "surfaceContainer": {
+        "$value": "#ededf4",
+        "$type": "color"
+      },
+      "surfaceContainerHigh": {
+        "$value": "#e7e8ee",
+        "$type": "color"
+      },
+      "surfaceContainerHighest": {
+        "$value": "#e1e2e9",
+        "$type": "color"
+      },
+      "outline": {
+        "$value": "#74777f",
+        "$type": "color"
+      },
+      "outlineVariant": {
+        "$value": "#c3c6cf",
+        "$type": "color"
+      },
+      "shadow": {
+        "$value": "#000000",
+        "$type": "color"
+      },
+      "scrim": {
+        "$value": "#000000",
+        "$type": "color"
+      },
+      "inverseSurface": {
+        "$value": "#2e3035",
+        "$type": "color"
+      },
+      "inverseOnSurface": {
+        "$value": "#f0f0f7",
+        "$type": "color"
+      },
+      "inversePrimary": {
+        "$value": "#a6c8ff",
+        "$type": "color"
+      },
+      "exito": {
+        "$value": "#1b6d24",
+        "$type": "color"
+      },
+      "onExito": {
+        "$value": "#ffffff",
+        "$type": "color"
+      },
+      "exitoContainer": {
+        "$value": "#a3f69c",
+        "$type": "color"
+      },
+      "onExitoContainer": {
+        "$value": "#002204",
+        "$type": "color"
+      },
+      "advertencia": {
+        "$value": "#8a5100",
+        "$type": "color"
+      },
+      "onAdvertencia": {
+        "$value": "#ffffff",
+        "$type": "color"
+      },
+      "advertenciaContainer": {
+        "$value": "#ffdcbd",
+        "$type": "color"
+      },
+      "onAdvertenciaContainer": {
+        "$value": "#2c1600",
+        "$type": "color"
+      }
+    },
+    "oscuro": {
+      "primary": {
+        "$value": "#a6c8ff",
+        "$type": "color"
+      },
+      "onPrimary": {
+        "$value": "#00315e",
+        "$type": "color"
+      },
+      "primaryContainer": {
+        "$value": "#224876",
+        "$type": "color"
+      },
+      "onPrimaryContainer": {
+        "$value": "#d4e3ff",
+        "$type": "color"
+      },
+      "secondary": {
+        "$value": "#bcc7dc",
+        "$type": "color"
+      },
+      "onSecondary": {
+        "$value": "#273141",
+        "$type": "color"
+      },
+      "secondaryContainer": {
+        "$value": "#3d4758",
+        "$type": "color"
+      },
+      "onSecondaryContainer": {
+        "$value": "#d8e3f8",
+        "$type": "color"
+      },
+      "tertiary": {
+        "$value": "#dabde2",
+        "$type": "color"
+      },
+      "onTertiary": {
+        "$value": "#3d2946",
+        "$type": "color"
+      },
+      "tertiaryContainer": {
+        "$value": "#553f5d",
+        "$type": "color"
+      },
+      "onTertiaryContainer": {
+        "$value": "#f7d8ff",
+        "$type": "color"
+      },
+      "error": {
+        "$value": "#ffb4ab",
+        "$type": "color"
+      },
+      "onError": {
+        "$value": "#690005",
+        "$type": "color"
+      },
+      "errorContainer": {
+        "$value": "#93000a",
+        "$type": "color"
+      },
+      "onErrorContainer": {
+        "$value": "#ffdad6",
+        "$type": "color"
+      },
+      "background": {
+        "$value": "#111318",
+        "$type": "color"
+      },
+      "onBackground": {
+        "$value": "#e1e2e9",
+        "$type": "color"
+      },
+      "surface": {
+        "$value": "#111318",
+        "$type": "color"
+      },
+      "onSurface": {
+        "$value": "#e1e2e9",
+        "$type": "color"
+      },
+      "surfaceVariant": {
+        "$value": "#43474e",
+        "$type": "color"
+      },
+      "onSurfaceVariant": {
+        "$value": "#c3c6cf",
+        "$type": "color"
+      },
+      "surfaceDim": {
+        "$value": "#111318",
+        "$type": "color"
+      },
+      "surfaceBright": {
+        "$value": "#37393e",
+        "$type": "color"
+      },
+      "surfaceContainerLowest": {
+        "$value": "#0c0e13",
+        "$type": "color"
+      },
+      "surfaceContainerLow": {
+        "$value": "#191c20",
+        "$type": "color"
+      },
+      "surfaceContainer": {
+        "$value": "#1d2024",
+        "$type": "color"
+      },
+      "surfaceContainerHigh": {
+        "$value": "#282a2f",
+        "$type": "color"
+      },
+      "surfaceContainerHighest": {
+        "$value": "#32353a",
+        "$type": "color"
+      },
+      "outline": {
+        "$value": "#8d9199",
+        "$type": "color"
+      },
+      "outlineVariant": {
+        "$value": "#43474e",
+        "$type": "color"
+      },
+      "shadow": {
+        "$value": "#000000",
+        "$type": "color"
+      },
+      "scrim": {
+        "$value": "#000000",
+        "$type": "color"
+      },
+      "inverseSurface": {
+        "$value": "#e1e2e9",
+        "$type": "color"
+      },
+      "inverseOnSurface": {
+        "$value": "#2e3035",
+        "$type": "color"
+      },
+      "inversePrimary": {
+        "$value": "#3c6090",
+        "$type": "color"
+      },
+      "exito": {
+        "$value": "#88d982",
+        "$type": "color"
+      },
+      "onExito": {
+        "$value": "#003909",
+        "$type": "color"
+      },
+      "exitoContainer": {
+        "$value": "#005312",
+        "$type": "color"
+      },
+      "onExitoContainer": {
+        "$value": "#a3f69c",
+        "$type": "color"
+      },
+      "advertencia": {
+        "$value": "#ffb86e",
+        "$type": "color"
+      },
+      "onAdvertencia": {
+        "$value": "#492900",
+        "$type": "color"
+      },
+      "advertenciaContainer": {
+        "$value": "#693c00",
+        "$type": "color"
+      },
+      "onAdvertenciaContainer": {
+        "$value": "#ffdcbd",
+        "$type": "color"
+      }
+    }
+  }
+}

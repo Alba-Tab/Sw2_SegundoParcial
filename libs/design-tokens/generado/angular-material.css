@@ -1,0 +1,150 @@
+/* Generado por libs/design-tokens (Style Dictionary). No se edita a mano: cambia tokens/ y corre npm run construir. */
+
+:root,
+[data-tema="light"] {
+  --mat-sys-primary: #3c6090;
+  --mat-sys-on-primary: #ffffff;
+  --mat-sys-primary-container: #d4e3ff;
+  --mat-sys-on-primary-container: #224876;
+  --mat-sys-secondary: #545f71;
+  --mat-sys-on-secondary: #ffffff;
+  --mat-sys-secondary-container: #d8e3f8;
+  --mat-sys-on-secondary-container: #3d4758;
+  --mat-sys-tertiary: #6e5676;
+  --mat-sys-on-tertiary: #ffffff;
+  --mat-sys-tertiary-container: #f7d8ff;
+  --mat-sys-on-tertiary-container: #553f5d;
+  --mat-sys-error: #ba1a1a;
+  --mat-sys-on-error: #ffffff;
+  --mat-sys-error-container: #ffdad6;
+  --mat-sys-on-error-container: #93000a;
+  --mat-sys-background: #f9f9ff;
+  --mat-sys-on-background: #191c20;
+  --mat-sys-surface: #f9f9ff;
+  --mat-sys-on-surface: #191c20;
+  --mat-sys-surface-variant: #e0e2ec;
+  --mat-sys-on-surface-variant: #43474e;
+  --mat-sys-surface-dim: #d9dae0;
+  --mat-sys-surface-bright: #f9f9ff;
+  --mat-sys-surface-container-lowest: #ffffff;
+  --mat-sys-surface-container-low: #f3f3fa;
+  --mat-sys-surface-container: #ededf4;
+  --mat-sys-surface-container-high: #e7e8ee;
+  --mat-sys-surface-container-highest: #e1e2e9;
+  --mat-sys-outline: #74777f;
+  --mat-sys-outline-variant: #c3c6cf;
+  --mat-sys-shadow: #000000;
+  --mat-sys-scrim: #000000;
+  --mat-sys-inverse-surface: #2e3035;
+  --mat-sys-inverse-on-surface: #f0f0f7;
+  --mat-sys-inverse-primary: #a6c8ff;
+  --mat-sys-exito: #1b6d24;
+  --mat-sys-on-exito: #ffffff;
+  --mat-sys-exito-container: #a3f69c;
+  --mat-sys-on-exito-container: #002204;
+  --mat-sys-advertencia: #8a5100;
+  --mat-sys-on-advertencia: #ffffff;
+  --mat-sys-advertencia-container: #ffdcbd;
+  --mat-sys-on-advertencia-container: #2c1600;
+  --mat-sys-corner-small: 8px;
+  --mat-sys-corner-medium: 12px;
+  --mat-sys-corner-large: 16px;
+  --mat-sys-body-large-font: Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+
+[data-tema="dark"] {
+  --mat-sys-primary: #a6c8ff;
+  --mat-sys-on-primary: #00315e;
+  --mat-sys-primary-container: #224876;
+  --mat-sys-on-primary-container: #d4e3ff;
+  --mat-sys-secondary: #bcc7dc;
+  --mat-sys-on-secondary: #273141;
+  --mat-sys-secondary-container: #3d4758;
+  --mat-sys-on-secondary-container: #d8e3f8;
+  --mat-sys-tertiary: #dabde2;
+  --mat-sys-on-tertiary: #3d2946;
+  --mat-sys-tertiary-container: #553f5d;
+  --mat-sys-on-tertiary-container: #f7d8ff;
+  --mat-sys-error: #ffb4ab;
+  --mat-sys-on-error: #690005;
+  --mat-sys-error-container: #93000a;
+  --mat-sys-on-error-container: #ffdad6;
+  --mat-sys-background: #111318;
+  --mat-sys-on-background: #e1e2e9;
+  --mat-sys-surface: #111318;
+  --mat-sys-on-surface: #e1e2e9;
+  --mat-sys-surface-variant: #43474e;
+  --mat-sys-on-surface-variant: #c3c6cf;
+  --mat-sys-surface-dim: #111318;
+  --mat-sys-surface-bright: #37393e;
+  --mat-sys-surface-container-lowest: #0c0e13;
+  --mat-sys-surface-container-low: #191c20;
+  --mat-sys-surface-container: #1d2024;
+  --mat-sys-surface-container-high: #282a2f;
+  --mat-sys-surface-container-highest: #32353a;
+  --mat-sys-outline: #8d9199;
+  --mat-sys-outline-variant: #43474e;
+  --mat-sys-shadow: #000000;
+  --mat-sys-scrim: #000000;
+  --mat-sys-inverse-surface: #e1e2e9;
+  --mat-sys-inverse-on-surface: #2e3035;
+  --mat-sys-inverse-primary: #3c6090;
+  --mat-sys-exito: #88d982;
+  --mat-sys-on-exito: #003909;
+  --mat-sys-exito-container: #005312;
+  --mat-sys-on-exito-container: #a3f69c;
+  --mat-sys-advertencia: #ffb86e;
+  --mat-sys-on-advertencia: #492900;
+  --mat-sys-advertencia-container: #693c00;
+  --mat-sys-on-advertencia-container: #ffdcbd;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema]) {
+    --mat-sys-primary: #a6c8ff;
+    --mat-sys-on-primary: #00315e;
+    --mat-sys-primary-container: #224876;
+    --mat-sys-on-primary-container: #d4e3ff;
+    --mat-sys-secondary: #bcc7dc;
+    --mat-sys-on-secondary: #273141;
+    --mat-sys-secondary-container: #3d4758;
+    --mat-sys-on-secondary-container: #d8e3f8;
+    --mat-sys-tertiary: #dabde2;
+    --mat-sys-on-tertiary: #3d2946;
+    --mat-sys-tertiary-container: #553f5d;
+    --mat-sys-on-tertiary-container: #f7d8ff;
+    --mat-sys-error: #ffb4ab;
+    --mat-sys-on-error: #690005;
+    --mat-sys-error-container: #93000a;
+    --mat-sys-on-error-container: #ffdad6;
+    --mat-sys-background: #111318;
+    --mat-sys-on-background: #e1e2e9;
+    --mat-sys-surface: #111318;
+    --mat-sys-on-surface: #e1e2e9;
+    --mat-sys-surface-variant: #43474e;
+    --mat-sys-on-surface-variant: #c3c6cf;
+    --mat-sys-surface-dim: #111318;
+    --mat-sys-surface-bright: #37393e;
+    --mat-sys-surface-container-lowest: #0c0e13;
+    --mat-sys-surface-container-low: #191c20;
+    --mat-sys-surface-container: #1d2024;
+    --mat-sys-surface-container-high: #282a2f;
+    --mat-sys-surface-container-highest: #32353a;
+    --mat-sys-outline: #8d9199;
+    --mat-sys-outline-variant: #43474e;
+    --mat-sys-shadow: #000000;
+    --mat-sys-scrim: #000000;
+    --mat-sys-inverse-surface: #e1e2e9;
+    --mat-sys-inverse-on-surface: #2e3035;
+    --mat-sys-inverse-primary: #3c6090;
+    --mat-sys-exito: #88d982;
+    --mat-sys-on-exito: #003909;
+    --mat-sys-exito-container: #005312;
+    --mat-sys-on-exito-container: #a3f69c;
+    --mat-sys-advertencia: #ffb86e;
+    --mat-sys-on-advertencia: #492900;
+    --mat-sys-advertencia-container: #693c00;
+    --mat-sys-on-advertencia-container: #ffdcbd;
+  }
+}
+
