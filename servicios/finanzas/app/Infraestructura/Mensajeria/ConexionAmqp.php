@@ -28,6 +28,22 @@ final class ConexionAmqp
         return $this->canal;
     }
 
+    /**
+     * php-amqplib solo manda heartbeats cuando lee o escribe: un relay sin nada que publicar perdería la conexión a los
+     * 30 s. Se llama en cada vuelta; si la conexión ya no sirve, se descarta y la siguiente publicación abre otra.
+     */
+    public function latido(): void
+    {
+        if ($this->conexion === null) {
+            return;
+        }
+        try {
+            $this->conexion->checkHeartBeat();
+        } catch (\Throwable) {
+            $this->cerrar();
+        }
+    }
+
     public function disponible(): bool
     {
         try {

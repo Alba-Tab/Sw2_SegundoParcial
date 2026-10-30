@@ -52,6 +52,8 @@ it('EntregaConfirmada emite una sola factura, consume la reserva y publica Factu
         ->and(DB::table('reserva_credito')->value('estado'))->toBe('CONSUMIDA')
         ->and(linea())->toMatchObject(['reservado' => '0.00', 'utilizado' => '2800.00']);
     $sobre = json_decode(DB::table('outbox_eventos')->where('tipo', 'FacturaEmitida')->value('sobre'), true);
+    // El sobre sigue la traza y la correlación del evento consumido.
+    expect($sobre)->toMatchArray(['traceparent' => $e['traceparent'], 'correlationId' => $e['correlationId']]);
     expect($sobre['datos'])->toMatchArray(['numero' => $f->numero, 'monto' => ['monto' => '2800.00', 'moneda' => 'BOB'],
         'cliente' => ['razonSocial' => 'Agroexport SRL', 'correo' => 'cobranzas@agroexport.example'],
         'enlacePortal' => 'http://localhost:5173/facturas/'.$f->factura_id]);
@@ -94,6 +96,23 @@ it('cobro parcial y total: saldo, estado, línea abonada y PagoRegistrado', func
     expect(linea()->utilizado)->toBe('0.00')
         ->and(DB::table('pago')->count())->toBe(2)
         ->and(DB::table('outbox_eventos')->where('tipo', 'PagoRegistrado')->count())->toBe(2);
+});
+
+it('PagoRegistrado lleva el traceparent y el X-Correlation-Id de la petición', function () {
+    consumidor()->aplicar(entregaConfirmada(reservaActiva($this)['servicio'], (string) Str::uuid7()));
+    $id = DB::table('factura')->value('factura_id');
+    $traza = '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01';
+    $correlacion = '0193a000-0000-7000-8000-00000000cafe';
+    $this->withHeaders(['traceparent' => $traza, 'X-Correlation-Id' => $correlacion]);
+    pagar($this, $id, '100.00', 'BNB-700001')->assertStatus(201)->assertHeader('X-Correlation-Id', $correlacion);
+    $sobre = json_decode(DB::table('outbox_eventos')->where('tipo', 'PagoRegistrado')->value('sobre'), true);
+    expect($sobre)->toMatchArray(['traceparent' => $traza, 'correlationId' => $correlacion]);
+
+    // Sin traceparent (o con uno inválido) se genera uno nuevo por petición.
+    $this->withHeaders(['traceparent' => '00-00000000000000000000000000000000-b7ad6b7169203331-01']);
+    pagar($this, $id, '100.00', 'BNB-700002')->assertStatus(201);
+    $otro = json_decode(DB::table('outbox_eventos')->where('tipo', 'PagoRegistrado')->where('id', '<>', $sobre['id'])->value('sobre'), true);
+    expect($otro['traceparent'])->not->toBe($traza)->toMatch('/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/');
 });
 
 it('la misma clave y el mismo cuerpo en otra factura no devuelven el pago de la primera', function () {

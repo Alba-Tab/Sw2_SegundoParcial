@@ -1,9 +1,14 @@
 <?php
 
 use App\Aplicacion\Puertos\RegistroDeEventos;
+use App\Infraestructura\Log\FormatoJson;
+use App\Infraestructura\Log\Traza;
 use App\Infraestructura\Mensajeria\ConexionAmqp;
 use App\Infraestructura\Mensajeria\RelayOutbox;
+use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
+use Monolog\Level;
+use Monolog\LogRecord;
 use PhpAmqpLib\Connection\AMQPStreamConnection;
 
 it('salud no depende de Keycloak', function () {
@@ -83,4 +88,20 @@ it('el relay publica el sobre con confirmación y marca publicado_en', function 
         ->and(DB::table('outbox_eventos')->whereNull('publicado_en')->count())->toBe(0);
     $conexion->close();
     app(ConexionAmqp::class)->cerrar();
+});
+
+it('con PostgreSQL caído el negocio responde 503 DEPENDENCIA_NO_DISPONIBLE con Retry-After', function () {
+    autenticacionDePrueba();
+    config(['database.connections.pgsql.host' => '127.0.0.1', 'database.connections.pgsql.port' => 1]);
+    DB::purge('pgsql');
+    $this->withHeaders(['X-Prueba' => 'sub-1~cliente~01933b5a-1f00-7a20-8b11-0c2d3e4f5a01'])->withToken('p')
+        ->getJson('/api/v1/lineas-credito/mia')
+        ->assertStatus(503)->assertHeader('Retry-After', '5')->assertJson(['codigo' => 'DEPENDENCIA_NO_DISPONIBLE']);
+});
+
+it('los logs llevan el traceId del traceparent en curso', function () {
+    Traza::iniciar('0193a000-0000-7000-8000-00000000abcd', '00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01');
+    $registro = new LogRecord(new DateTimeImmutable, 'finanzas', Level::Info, 'hola', [], Context::all());
+    expect(json_decode((new FormatoJson)->format($registro), true))->toMatchArray([
+        'correlationId' => '0193a000-0000-7000-8000-00000000abcd', 'traceId' => '4bf92f3577b34da6a3ce929d0e0e4736']);
 });

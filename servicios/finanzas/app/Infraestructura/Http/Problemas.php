@@ -4,6 +4,7 @@ namespace App\Infraestructura\Http;
 
 use App\Aplicacion\Puertos\VersionDesactualizada;
 use App\Dominio\Comun\ErrorDeDominio;
+use App\Infraestructura\Persistencia\FallaTransitoria;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Context;
@@ -56,6 +57,10 @@ final class Problemas
                 'Otro cambio modificó los mismos datos; vuelve a intentarlo', 409),
             $e instanceof HttpExceptionInterface => self::respuesta(self::POR_ESTADO[$e->getStatusCode()] ?? 'CONFLICTO_ESTADO',
                 'Error', $e->getMessage() ?: 'Error', $e->getStatusCode(), [], $e->getHeaders()),
+            // PostgreSQL caído, reiniciándose o en interbloqueo: la petición se puede repetir.
+            FallaTransitoria::es($e) => self::respuesta('DEPENDENCIA_NO_DISPONIBLE', 'Dependencia no disponible',
+                'La base de datos no responde; intenta de nuevo en unos segundos', 503, [], ['Retry-After' => '5']),
+            // 000 §5 no tiene un código para un error inesperado: sale 500 con DEPENDENCIA_NO_DISPONIBLE, como en Viajes.
             default => self::respuesta('DEPENDENCIA_NO_DISPONIBLE', 'Error interno', 'Ocurrió un error inesperado', 500),
         };
     }
