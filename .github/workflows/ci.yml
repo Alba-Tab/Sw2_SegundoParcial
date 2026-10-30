@@ -27,6 +27,7 @@ jobs:
       compose: ${{ steps.f.outputs.compose }}
       simulador: ${{ steps.f.outputs.simulador }}
       tokens: ${{ steps.f.outputs.tokens }}
+      intercambio: ${{ steps.f.outputs.intercambio }}
       portal: ${{ steps.f.outputs.portal }}
       app-chofer: ${{ steps.f.outputs.app-chofer }}
     steps:
@@ -87,6 +88,9 @@ jobs:
             tokens: &tokens
               - *ci
               - libs/design-tokens/**
+            intercambio: &intercambio
+              - *ci
+              - libs/intercambio-token/**
             portal:
               - *tokens
               - contratos/openapi/**
@@ -294,9 +298,20 @@ jobs:
       - name: Conventional Commits y sin coautoría en los commits del PR
         run: npx --no -- commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
 
+  intercambio:
+    needs: cambios
+    if: needs.cambios.outputs.intercambio == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: libs/intercambio-token } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24 }
+      - run: npm test
+
   ci-ok:
     if: always()
-    needs: [cambios, contratos, viajes, flota, finanzas, analitica, keycloak, compose, simulador, tokens, portal, app-chofer, gitleaks, commitlint]
+    needs: [cambios, contratos, viajes, flota, finanzas, analitica, keycloak, compose, simulador, tokens, intercambio, portal, app-chofer, gitleaks, commitlint]
     runs-on: ubuntu-latest
     steps:
       - name: Todo en verde u omitido por no tener cambios

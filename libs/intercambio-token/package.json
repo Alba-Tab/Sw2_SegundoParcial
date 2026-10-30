@@ -1,0 +1,13 @@
+{
+  "name": "@transporte/intercambio-token",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Intercambio de tokens RFC 8693 con Keycloak, con caché por sub y audiencia (T9.2). Lo usan el Gateway y el servidor MCP",
+  "engines": { "node": ">=24" },
+  "main": "index.js",
+  "types": "index.d.ts",
+  "files": ["index.js", "index.d.ts"],
+  "scripts": {
+    "test": "node --test test/"
+  }
+}
