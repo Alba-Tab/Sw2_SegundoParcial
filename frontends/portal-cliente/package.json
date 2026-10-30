@@ -29,6 +29,7 @@
     "@mui/material": "7.3.11",
     "@tanstack/react-query": "5.104.3",
     "@tanstack/react-router": "1.170.44",
+    "@tanstack/react-table": "8.21.3",
     "@transporte/design-tokens": "file:../../libs/design-tokens",
     "oidc-client-ts": "3.5.0",
     "react": "19.3.1",

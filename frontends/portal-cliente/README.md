@@ -19,6 +19,9 @@ React 19 + Vite, PWA. Material 3 con **MUI v7** y el tema de `libs/design-tokens
 - Spec 001: sin cliente en el token, el portal solo deja completar los datos de la empresa; si Keycloak no vinculó, "Reintentar vinculación"; al vincular, renueva el token.
 - Spec 002: cotizar con las reglas del contrato más las de la spec (≤ 30 t, fecha de hoy a 60 días); un 503 `CLIENTE_NO_REPLICADO` se reintenta solo con la misma clave.
 
+- Spec 003: "Confirmar servicio" con una clave por intento (un corte de red reintenta con la misma, FS7); el servicio se consulta cada 2 s mientras está `PROGRAMANDO`, con su etapa y "En aprobación".
+- Specs 004 a 006: cancelar con motivo (mensajes de `CONFIRMACION_EN_CURSO` y `CANCELACION_NO_PERMITIDA`), seguimiento con la última posición y el POD con las URL firmadas de la foto y la firma.
+
 ## Estructura
 
 - `src/compartido/`: tema, componentes comunes (con su historia de Storybook y su prueba).

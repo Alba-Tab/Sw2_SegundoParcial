@@ -10,7 +10,8 @@ export interface Llamada {
   cuerpo: unknown;
 }
 
-type Respuesta = { estado: number; cuerpo?: unknown; encabezados?: Record<string, string> };
+/** `sinRed` simula que la petición no llegó (fetch lanza TypeError, como en el navegador). */
+type Respuesta = { estado: number; cuerpo?: unknown; encabezados?: Record<string, string>; sinRed?: boolean };
 
 /**
  * Reemplaza fetch: cada petición se resuelve con la primera respuesta en cola para `MÉTODO ruta` (o la última, si
@@ -33,6 +34,7 @@ export function simularApi(rutas: Record<string, Respuesta | Respuesta[]>) {
       const cola = colas[`${metodo} ${url.pathname}`];
       if (!cola) throw new Error(`Sin respuesta simulada para ${metodo} ${url.pathname}`);
       const r = cola.length > 1 ? cola.shift()! : cola[0];
+      if (r.sinRed) throw new TypeError('Failed to fetch');
       return new Response(r.cuerpo === undefined ? null : JSON.stringify(r.cuerpo), {
         status: r.estado,
         headers: { 'content-type': r.estado < 300 ? 'application/json' : 'application/problem+json', ...r.encabezados },
