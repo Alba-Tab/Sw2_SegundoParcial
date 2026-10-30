@@ -123,7 +123,7 @@ services:
 
   flota-api:
     <<: *comun
-    build: ../../servicios/flota
+    build: { context: ../.., dockerfile: servicios/flota/Dockerfile }
     image: transporte/flota:local
     profiles: [core]
     depends_on:

@@ -5,11 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import bo.transporte.viajes.adaptadores.salida.persistencia.SemillaJdbc;
 import bo.transporte.viajes.aplicacion.puerto.salida.RegistroDeEventos;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
@@ -43,6 +45,9 @@ class AplicacionIT {
 
     @Autowired
     TransactionTemplate tx;
+
+    @Autowired
+    SemillaJdbc semilla;
 
     @Autowired
     RabbitTemplate rabbit;
@@ -133,6 +138,34 @@ class AplicacionIT {
                 0L,
                 jdbc.sql("SELECT count(*) FROM outbox_eventos WHERE publicado_en IS NULL")
                         .query(Long.class)
+                        .single());
+    }
+
+    @Test
+    void laSemillaCargaClientesYRutasSinEventosYEsIdempotente() throws Exception {
+        semilla.cargar(Path.of("../../plataforma/semilla"));
+        int[] n = semilla.cargar(Path.of("../../plataforma/semilla"));
+        assertEquals(3, n[0]);
+        assertEquals(4, n[1]);
+        assertEquals(
+                "Agro Moroso",
+                jdbc.sql("SELECT razon_social FROM cliente WHERE cliente_id = '0193a000-0000-7000-8000-0000000c0002'")
+                        .query(String.class)
+                        .single());
+        assertEquals(
+                false,
+                jdbc.sql("SELECT vinculado FROM cliente WHERE cliente_id = '0193a000-0000-7000-8000-0000000c0003'")
+                        .query(Boolean.class)
+                        .single());
+        assertEquals(
+                120,
+                jdbc.sql("SELECT distancia_km FROM ruta WHERE ruta_id = '01933a00-0000-7000-8000-000000000004'")
+                        .query(Integer.class)
+                        .single());
+        assertEquals(
+                0,
+                jdbc.sql("SELECT count(*) FROM outbox_eventos WHERE tipo IN ('ClienteActualizado', 'RutaActualizada')")
+                        .query(Integer.class)
                         .single());
     }
 }

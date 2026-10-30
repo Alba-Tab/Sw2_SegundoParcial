@@ -21,6 +21,7 @@ COPY servicios/finanzas/composer.json servicios/finanzas/composer.lock ./
 RUN composer install --no-interaction --no-scripts --no-autoloader
 COPY servicios/finanzas .
 COPY contratos/openapi/finanzas.yaml contratos/openapi/comun.yaml contrato/
+COPY plataforma/semilla semilla/
 RUN composer dump-autoload --optimize && cp -n .env.example .env
 
 FROM base AS app
@@ -29,6 +30,7 @@ COPY servicios/finanzas/composer.json servicios/finanzas/composer.lock ./
 RUN composer install --no-interaction --no-dev --no-scripts --no-autoloader
 COPY servicios/finanzas .
 COPY contratos/openapi/finanzas.yaml contratos/openapi/comun.yaml contrato/
+COPY plataforma/semilla semilla/
 COPY --from=rr-octane /usr/bin/rr /app/rr
 RUN composer dump-autoload --optimize --classmap-authoritative \
   && useradd --system --uid 10001 finanzas && chown -R finanzas storage bootstrap/cache
