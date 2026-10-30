@@ -1,6 +1,7 @@
 import { PUNTOS_POR_LOTE } from '../dominio/gps';
 import { inicioConfirmado, type Operacion, RETENCION_DESCARTADAS_MS, siguiente } from '../dominio/operacion';
 import { decidir } from '../dominio/reintento';
+import type { SubidaEvidencias } from './subidaEvidencias';
 import {
   type Api,
   type Cola,
@@ -44,6 +45,7 @@ export class MotorSincronizacion {
     private readonly reloj: Reloj,
     private readonly ids: Ids,
     private readonly dispositivo: Dispositivo,
+    private readonly subida: SubidaEvidencias | null = null,
     private readonly azar: () => number = Math.random,
   ) {}
 
@@ -85,7 +87,10 @@ export class MotorSincronizacion {
       const ahora = this.reloj.ahora();
       const op = siguiente(ops, ahora);
       if (!op) return;
-      const d = decidir(await this.api.enviar(op, token), op.intentos + 1, this.azar);
+      // Entrega, rechazo y carga con foto salen solo con sus evidencias completas en S3 (spec 006).
+      const evidencias = op.evidencias.length && this.subida ? await this.subida.asegurar(op.evidencias, token) : { listo: true as const };
+      const respuesta = evidencias.listo ? await this.api.enviar(op, token) : evidencias.respuesta;
+      const d = decidir(respuesta, op.intentos + 1, this.azar);
       if (d.tipo === 'SESION') return 'SESION';
       if (d.tipo === 'CONFIRMADA') {
         this.cerrar(op, 'CONFIRMADA', null);

@@ -67,6 +67,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
       },
     ],
     ['expo-audio', { microphonePermission: 'Para dictar la bitácora del viaje; el audio no sale del celular.' }],
+    [
+      'expo-image-picker',
+      {
+        cameraPermission: 'Para fotografiar la entrega y los recibos de combustible.',
+        photosPermission: 'Para elegir la foto de la entrega o del recibo.',
+      },
+    ],
     ['expo-sensors', { motionPermission: 'Para detectar frenadas bruscas durante el viaje.' }],
     ['expo-build-properties', { android: { usesCleartextTraffic: entorno === 'local' } }],
   ],

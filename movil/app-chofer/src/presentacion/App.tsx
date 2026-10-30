@@ -12,6 +12,8 @@ import { estadoVisible } from '../dominio/viaje';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { registrarTareaFondo } from '../datos/tareaFondo';
 import { BarraSincronizacion } from './BarraSincronizacion';
+import { PantallaCarga } from './pantallas/PantallaCarga';
+import { PantallaEntrega } from './pantallas/PantallaEntrega';
 import { PantallaHito } from './pantallas/PantallaHito';
 import { PantallaPendientes } from './pantallas/PantallaPendientes';
 import { PantallaSesion } from './pantallas/PantallaSesion';
@@ -21,13 +23,14 @@ import { temaClaro, temaOscuro } from './tema';
 import { useSincronizacion } from './useSincronizacion';
 import { useViajeEnRuta } from './useViajeEnRuta';
 
-type Pantalla =
-  { nombre: 'viajes' } | { nombre: 'viaje'; viajeId: string } | { nombre: 'hito'; viajeId: string } | { nombre: 'pendientes' };
+type Pantalla = { nombre: 'viajes' } | { nombre: 'pendientes' } | { nombre: 'viaje' | 'hito' | 'entrega' | 'carga'; viajeId: string };
 
 const TITULOS: Record<Pantalla['nombre'], string> = {
   viajes: 'Mis viajes',
   viaje: 'Viaje',
   hito: 'Bitácora',
+  entrega: 'Entrega',
+  carga: 'Carga de combustible',
   pendientes: 'Pendientes',
 };
 
@@ -82,7 +85,9 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
   useEffect(() => {
     const atras = BackHandler.addEventListener('hardwareBackPress', () => {
       if (pantalla.nombre === 'viajes') return false;
-      setPantalla(pantalla.nombre === 'hito' ? { nombre: 'viaje', viajeId: pantalla.viajeId } : { nombre: 'viajes' });
+      setPantalla(
+        'viajeId' in pantalla && pantalla.nombre !== 'viaje' ? { nombre: 'viaje', viajeId: pantalla.viajeId } : { nombre: 'viajes' },
+      );
       return true;
     });
     return () => atras.remove();
@@ -109,7 +114,7 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
           viajeId={pantalla.viajeId}
           gps={gps}
           sincronizar={() => void sync.sincronizar()}
-          abrirHito={() => setPantalla({ nombre: 'hito', viajeId: pantalla.viajeId })}
+          abrir={(nombre) => setPantalla({ nombre, viajeId: pantalla.viajeId })}
         />
       )}
       {pantalla.nombre === 'hito' && (
@@ -117,6 +122,26 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
           viajeId={pantalla.viajeId}
           alGuardar={() => {
             setAviso('Hito guardado; se envía con la señal');
+            setPantalla({ nombre: 'viaje', viajeId: pantalla.viajeId });
+            void sync.sincronizar();
+          }}
+        />
+      )}
+      {pantalla.nombre === 'entrega' && (
+        <PantallaEntrega
+          viajeId={pantalla.viajeId}
+          alGuardar={(mensaje) => {
+            setAviso(mensaje);
+            setPantalla({ nombre: 'viaje', viajeId: pantalla.viajeId });
+            void sync.sincronizar();
+          }}
+        />
+      )}
+      {pantalla.nombre === 'carga' && (
+        <PantallaCarga
+          viajeId={pantalla.viajeId}
+          alGuardar={() => {
+            setAviso('Carga registrada; se envía con la señal');
             setPantalla({ nombre: 'viaje', viajeId: pantalla.viajeId });
             void sync.sincronizar();
           }}

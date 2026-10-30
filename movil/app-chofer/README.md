@@ -34,6 +34,13 @@ Dominio y aplicación son TypeScript puro y se prueban con Vitest y puertos fals
 - A más de 5 km/h el texto no se puede escribir, solo dictar (D58).
 - Android no graba WAV con `MediaRecorder` (PoC-4): ahí el dictado queda pendiente de un adaptador PCM y el chofer escribe con el camión detenido.
 
+## Entrega, rechazo y combustible (T7.5 y T7.6)
+
+- Fotos con la cámara (la galería si no hay cámara, como en el simulador) en JPEG comprimido y firma del receptor dibujada con el dedo (PNG). Se copian al almacenamiento de la app y se registran en SQLite como evidencias.
+- La entrega (1 a 3 fotos, firma opcional con el nombre de quien recibe), el rechazo en destino (motivo y fotos) y la carga de combustible (litros, monto, kilometraje y foto del recibo) van a la cola. El viaje deja de estar en ruta en el celular y el GPS se detiene.
+- Antes de enviar, el motor sube sus evidencias por partes de 5 MB con URL firmadas de S3, de a 2 (D61), 60 s por parte (D62). Abrir la subida es idempotente por `evidenciaId` y devuelve las partes que S3 ya tiene: un corte retoma solo las que faltan.
+- La carga va a Flota con `Idempotency-Key` igual al `opId` del cuerpo (spec 009).
+
 ## Correr
 
 ```bash

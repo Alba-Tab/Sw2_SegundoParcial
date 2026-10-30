@@ -3,9 +3,20 @@ import type { PuntoGps } from '../dominio/gps';
 import type { Operacion } from '../dominio/operacion';
 import type { Respuesta } from '../dominio/reintento';
 import type { ViajeLocal } from '../dominio/viaje';
+import type { EvidenciaLocal, Parte } from '../dominio/evidencia';
 import { CasosDeUso } from './casosDeUso';
 import { MotorSincronizacion } from './motorSincronizacion';
-import { type Api, type Cola, type PuntosGps, SesionVencida, type Viajes } from './puertos';
+import {
+  type Api,
+  type ApiEvidencias,
+  type Cola,
+  type Evidencias,
+  type PuntosGps,
+  SesionVencida,
+  type Subida,
+  type Viajes,
+} from './puertos';
+import { SubidaEvidencias } from './subidaEvidencias';
 
 class ColaEnMemoria implements Cola {
   ops: Operacion[] = [];
@@ -41,6 +52,7 @@ class ViajesEnMemoria implements Viajes {
   guardarDelServidor = (vs: ViajeLocal[]) => vs.forEach((x) => this.v.set(x.viajeId, x));
   marcarIniciado = (id: string) => void (this.v.get(id)!.iniciadoLocal = true);
   marcarCanceladoAlSincronizar = (id: string) => void (this.v.get(id)!.canceladoAlSincronizar = true);
+  marcarEntregaLocal = (id: string, t: 'ENTREGA' | 'RECHAZO') => void (this.v.get(id)!.entregaLocal = t);
 }
 
 /** Responde con lo que haya en la cola de respuestas de cada clave (`TIPO:opId` o `GPS`), y registra cada envío. */
@@ -71,11 +83,50 @@ class ApiFalsa implements Api {
   registrarDispositivo = async () => ({ estado: 200 });
 }
 
+class EvidenciasEnMemoria implements Evidencias {
+  e = new Map<string, EvidenciaLocal>();
+  agregar = (x: EvidenciaLocal) => void this.e.set(x.evidenciaId, x);
+  porId = (id: string) => this.e.get(id) ?? null;
+  marcarCompleta = (id: string) => void (this.e.get(id)!.estado = 'COMPLETA');
+}
+
+/** S3 en memoria: recuerda qué partes llegaron; `cortarEn` hace fallar una subida de parte (corte de red). */
+class ApiEvidenciasFalsa implements ApiEvidencias {
+  enS3 = new Map<string, Parte[]>();
+  completadas: { id: string; partes: Parte[] }[] = [];
+  subidasDeParte: string[] = [];
+  cortarEn = -1;
+  abrir = async (e: EvidenciaLocal) => {
+    const subidas = this.enS3.get(e.evidenciaId) ?? [];
+    const total = Math.ceil(e.tamanoBytes / (5 * 1024 * 1024));
+    const faltan = Array.from({ length: total }, (_, i) => i + 1).filter((n) => !subidas.some((s) => s.numero === n));
+    const subida: Subida = {
+      estado: this.completadas.some((c) => c.id === e.evidenciaId) ? 'COMPLETA' : 'SUBIENDO',
+      tamanoParteBytes: 5 * 1024 * 1024,
+      partes: faltan.map((n) => ({ numero: n, url: `s3://${e.evidenciaId}/${n}` })),
+      subidas,
+    };
+    return { respuesta: { estado: 200 }, subida };
+  };
+  subirParte = async (url: string) => {
+    this.subidasDeParte.push(url);
+    if (this.subidasDeParte.length === this.cortarEn) return null;
+    const [, id, n] = url.match(/s3:\/\/(.+)\/(\d+)/)!;
+    this.enS3.set(id, [...(this.enS3.get(id) ?? []), { numero: Number(n), etag: `etag-${n}` }]);
+    return `etag-${n}`;
+  };
+  completar = async (e: EvidenciaLocal, partes: Parte[]) => {
+    this.completadas.push({ id: e.evidenciaId, partes });
+    return { estado: 200 };
+  };
+}
+
 const viaje = (viajeId: string): ViajeLocal => ({
   viajeId,
   estado: 'CONFIRMADO',
   iniciadoLocal: false,
   canceladoAlSincronizar: false,
+  entregaLocal: null,
   cliente: 'Agroexport',
   ruta: 'Santa Cruz – Aula',
   destino: { lat: -17.8, lng: -63.2, radioMetros: 300 },
@@ -88,6 +139,7 @@ const viaje = (viajeId: string): ViajeLocal => ({
 describe('motor de sincronización (spec 005, CU-08)', () => {
   let cola: ColaEnMemoria, puntos: PuntosEnMemoria, viajes: ViajesEnMemoria, api: ApiFalsa;
   let ahora: Date, conRed: boolean, sesionVencida: boolean, n: number;
+  let evidencias: EvidenciasEnMemoria, apiEvidencias: ApiEvidenciasFalsa;
   let motor: MotorSincronizacion, casos: CasosDeUso;
 
   beforeEach(() => {
@@ -109,8 +161,15 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     };
     const red = { hayConexion: async () => conRed };
     const dispositivo = { id: () => 'celular', plataforma: () => 'IOS' as const };
-    motor = new MotorSincronizacion(cola, puntos, viajes, api, sesion, red, reloj, ids, dispositivo, () => 0.5);
-    casos = new CasosDeUso(cola, puntos, viajes, api, sesion, reloj, ids, dispositivo);
+    evidencias = new EvidenciasEnMemoria();
+    apiEvidencias = new ApiEvidenciasFalsa();
+    const archivos = {
+      guardar: (o: string, n: string) => ({ archivo: `doc/${n}`, tamanoBytes: o.includes('grande') ? 12 * 1024 * 1024 : 2048 }),
+      leer: (_a: string, d: number, h: number) => new Uint8Array(h - d),
+    };
+    const subida = new SubidaEvidencias(evidencias, apiEvidencias, archivos);
+    motor = new MotorSincronizacion(cola, puntos, viajes, api, sesion, red, reloj, ids, dispositivo, subida, () => 0.5);
+    casos = new CasosDeUso(cola, puntos, viajes, api, sesion, reloj, ids, dispositivo, evidencias, archivos);
     viajes.guardarDelServidor([viaje('v1')]);
   });
 
@@ -246,5 +305,45 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
       origen: 'VOZ',
       posicion: { lat: -17.7, lng: -63.18 },
     });
+  });
+
+  it('T7.5: la entrega sale solo con sus fotos y su firma completas en S3; una foto cortada retoma las partes que faltan', async () => {
+    casos.iniciarViaje('v1', null);
+    casos.registrarLectura('v1', { lat: -17.8, lng: -63.2, velocidadMs: 0, precisionMetros: 4, en: ahora.getTime() });
+    const op = casos.entregar('v1', ['camara/foto-grande.jpg'], { archivo: 'tmp/firma.png', nombreReceptor: ' María Rojas ' }, null, 4);
+    expect(viajes.porId('v1')?.entregaLocal).toBe('ENTREGA');
+    const entrega = cola.ops.find((o) => o.opId === op)!;
+    expect(entrega.evidencias).toHaveLength(2);
+    expect(entrega.cuerpo).toMatchObject({ firma: { nombreReceptor: 'María Rojas' }, posicion: { lat: -17.8 }, precisionMetros: 4 });
+
+    // La foto de 12 MB va en 3 partes de 5 MB; la segunda tanda se corta.
+    apiEvidencias.cortarEn = 3;
+    await motor.sincronizar();
+    expect(api.enviadas.filter((x) => x.startsWith('ENTREGA'))).toEqual([]);
+    expect(entrega.intentos).toBe(1);
+    ahora = new Date(Date.parse(entrega.proximoIntentoEn!));
+    await motor.sincronizar();
+    const [foto] = entrega.evidencias;
+    const partesDeLaFoto = apiEvidencias.subidasDeParte.filter((u) => u.includes(foto));
+    expect(partesDeLaFoto.filter((u) => u.endsWith('/3'))).toHaveLength(2);
+    expect(partesDeLaFoto.filter((u) => u.endsWith('/1'))).toHaveLength(1);
+    expect(apiEvidencias.completadas.map((c) => c.partes.map((p) => p.numero))).toEqual([[1, 2, 3], [1]]);
+    expect(api.enviadas.filter((x) => x.startsWith('ENTREGA'))).toEqual([`ENTREGA:${op}`]);
+  });
+
+  it('T7.6: la carga de combustible usa su opId como clave y en el cuerpo, con el recibo subido antes', async () => {
+    casos.iniciarViaje('v1', null);
+    const op = casos.cargarCombustible('v1', { litros: 180.5, monto: '675.07', kilometraje: 184320, foto: 'camara/recibo.jpg' });
+    const carga = cola.ops.find((o) => o.opId === op)!;
+    expect(carga.cuerpo).toMatchObject({
+      opId: op,
+      litros: 180.5,
+      monto: { monto: '675.07', moneda: 'BOB' },
+      fotoReciboEvidenciaId: carga.evidencias[0],
+    });
+    await motor.sincronizar();
+    expect(apiEvidencias.completadas.map((c) => c.id)).toEqual(carga.evidencias);
+    expect(api.enviadas).toContain(`CARGA_COMBUSTIBLE:${op}`);
+    expect(() => casos.cargarCombustible('v1', { litros: 0, monto: '10', kilometraje: 1, foto: null })).toThrow();
   });
 });

@@ -1,3 +1,4 @@
+import type { EvidenciaLocal, Parte } from '../dominio/evidencia';
 import type { PuntoGps } from '../dominio/gps';
 import type { Operacion, TipoOperacion } from '../dominio/operacion';
 import type { Respuesta } from '../dominio/reintento';
@@ -33,6 +34,8 @@ export interface Viajes {
   guardarDelServidor(viajes: ViajeLocal[]): void;
   marcarIniciado(viajeId: string): void;
   marcarCanceladoAlSincronizar(viajeId: string): void;
+  /** La entrega o el rechazo ya está en la cola: el viaje deja de estar en ruta en el celular. */
+  marcarEntregaLocal(viajeId: string, tipo: 'ENTREGA' | 'RECHAZO'): void;
 }
 
 export interface Api {
@@ -80,6 +83,33 @@ export interface Ids {
 export interface Dispositivo {
   id(): string;
   plataforma(): 'ANDROID' | 'IOS';
+}
+
+export interface Evidencias {
+  agregar(e: EvidenciaLocal): void;
+  porId(evidenciaId: string): EvidenciaLocal | null;
+  marcarCompleta(evidenciaId: string): void;
+}
+
+/** La subida abierta en Viajes: URL firmadas de las partes que faltan y las que S3 ya tiene (ListParts). */
+export interface Subida {
+  estado: 'SUBIENDO' | 'COMPLETA';
+  tamanoParteBytes: number;
+  partes: { numero: number; url: string }[];
+  subidas: Parte[];
+}
+
+export interface ApiEvidencias {
+  abrir(e: EvidenciaLocal, token: string): Promise<{ respuesta: Respuesta; subida: Subida | null }>;
+  /** PUT de los bytes a la URL firmada de S3; devuelve el ETag o null si no llegó. */
+  subirParte(url: string, bytes: Uint8Array): Promise<string | null>;
+  completar(e: EvidenciaLocal, partes: Parte[], token: string): Promise<Respuesta>;
+}
+
+export interface Archivos {
+  /** Copia el archivo al almacenamiento de la app y devuelve su ruta y tamaño. */
+  guardar(origen: string, nombre: string): { archivo: string; tamanoBytes: number };
+  leer(archivo: string, desde: number, hasta: number): Uint8Array;
 }
 
 export type NuevaOperacion = { viajeId: string; tipo: TipoOperacion; cuerpo: Record<string, unknown> };

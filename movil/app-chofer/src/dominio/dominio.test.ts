@@ -14,6 +14,7 @@ const op = (o: Partial<Operacion>): Operacion => ({
   estado: 'PENDIENTE',
   codigoError: null,
   cerradaEn: null,
+  evidencias: [],
   ...o,
 });
 
@@ -72,6 +73,7 @@ describe('viaje local', () => {
     estado: 'CONFIRMADO',
     iniciadoLocal: false,
     canceladoAlSincronizar: false,
+    entregaLocal: null,
     cliente: 'Agroexport',
     ruta: 'Aula',
     destino: { lat: 0, lng: 0, radioMetros: 300 },

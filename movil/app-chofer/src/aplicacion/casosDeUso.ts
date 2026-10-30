@@ -1,8 +1,9 @@
+import type { TipoEvidencia } from '../dominio/evidencia';
 import { descripcionValida, type OrigenHito, type TipoHito } from '../dominio/hito';
 import { kmh, type Lectura, MuestreoGps } from '../dominio/muestreo';
 import type { TipoOperacion } from '../dominio/operacion';
 import { puedeIniciar } from '../dominio/viaje';
-import type { Api, Cola, Dispositivo, Ids, PuntosGps, Reloj, Sesion, Viajes } from './puertos';
+import type { Api, Archivos, Cola, Dispositivo, Evidencias, Ids, PuntosGps, Reloj, Sesion, Viajes } from './puertos';
 
 /** Lo que hace el chofer. Las escrituras van primero a la cola local; el motor las envía cuando hay señal. */
 export class CasosDeUso {
@@ -18,6 +19,8 @@ export class CasosDeUso {
     private readonly reloj: Reloj,
     private readonly ids: Ids,
     private readonly dispositivo: Dispositivo,
+    private readonly evidencias: Evidencias,
+    private readonly archivos: Archivos,
   ) {}
 
   /** Paso 1 (con señal): `GET /viajes/mios` a SQLite para operar sin red. */
@@ -95,10 +98,113 @@ export class CasosDeUso {
     });
   }
 
-  /** Hitos, eventos de conducción, cargas y entregas usan la misma cola (T7.3 a T7.6). */
-  encolar(viajeId: string, tipo: TipoOperacion, cuerpo: Record<string, unknown>): string {
+  /**
+   * Spec 006: fotos (y firma si hay receptor) con la posición del GPS. Viajes decide si queda ENTREGADO o
+   * ENTREGA_OBSERVADA (geocerca y firma); aquí el viaje deja de estar en ruta y el GPS se detiene.
+   */
+  entregar(
+    viajeId: string,
+    fotos: string[],
+    firma: { archivo: string; nombreReceptor: string } | null,
+    observacion: string | null,
+    precisionMetros: number | null,
+  ): string {
+    const posicion = this.exigirPosicion();
+    if (fotos.length < 1 || fotos.length > 3) throw new Error('Toma de 1 a 3 fotos de la entrega');
+    const idsFotos = fotos.map((f) => this.evidencia(viajeId, 'FOTO_ENTREGA', f));
+    const idFirma = firma ? this.evidencia(viajeId, 'FIRMA', firma.archivo) : null;
+    const opId = this.encolar(
+      viajeId,
+      'ENTREGA',
+      {
+        entregaId: this.ids.nuevo(),
+        entregadoEn: this.reloj.ahora().toISOString(),
+        posicion,
+        ...(precisionMetros !== null ? { precisionMetros } : {}),
+        fotos: idsFotos,
+        firma: idFirma && firma ? { evidenciaId: idFirma, nombreReceptor: firma.nombreReceptor.trim() } : null,
+        ...(observacion?.trim() ? { observacion: observacion.trim() } : {}),
+      },
+      idFirma ? [...idsFotos, idFirma] : idsFotos,
+    );
+    this.viajes.marcarEntregaLocal(viajeId, 'ENTREGA');
+    return opId;
+  }
+
+  /** Spec 007: el receptor no acepta la carga; el motivo y de 1 a 3 fotos. */
+  rechazar(viajeId: string, motivo: string, fotos: string[]): string {
+    const posicion = this.exigirPosicion();
+    if (motivo.trim().length < 3) throw new Error('Escribe el motivo del rechazo');
+    if (fotos.length < 1 || fotos.length > 3) throw new Error('Toma de 1 a 3 fotos');
+    const ids = fotos.map((f) => this.evidencia(viajeId, 'FOTO_RECHAZO', f));
+    const opId = this.encolar(
+      viajeId,
+      'RECHAZO',
+      { entregaId: this.ids.nuevo(), rechazadaEn: this.reloj.ahora().toISOString(), posicion, motivo: motivo.trim(), fotos: ids },
+      ids,
+    );
+    this.viajes.marcarEntregaLocal(viajeId, 'RECHAZO');
+    return opId;
+  }
+
+  /**
+   * Spec 009: la carga de diésel va a Flota con su `opId` como Idempotency-Key (Flota exige que sean iguales). La
+   * foto del recibo se sube antes como evidencia RECIBO_COMBUSTIBLE.
+   */
+  cargarCombustible(viajeId: string, datos: { litros: number; monto: string; kilometraje: number; foto: string | null }): string {
+    if (!(datos.litros > 0) || !(Number(datos.monto) > 0) || !(datos.kilometraje > 0)) {
+      throw new Error('Litros, monto y kilometraje deben ser mayores que 0');
+    }
+    const foto = datos.foto ? this.evidencia(viajeId, 'RECIBO_COMBUSTIBLE', datos.foto) : null;
     const opId = this.ids.nuevo();
+    const posicion = this.ultimaPosicion();
     this.cola.agregar({
+      ...this.nueva(opId, viajeId, 'CARGA_COMBUSTIBLE', {
+        opId,
+        viajeId,
+        litros: datos.litros,
+        monto: { monto: Number(datos.monto).toFixed(2), moneda: 'BOB' },
+        kilometraje: datos.kilometraje,
+        registradaEn: this.reloj.ahora().toISOString(),
+        ...(posicion ? { posicion } : {}),
+        ...(foto ? { fotoReciboEvidenciaId: foto } : {}),
+      }),
+      evidencias: foto ? [foto] : [],
+    });
+    return opId;
+  }
+
+  private evidencia(viajeId: string, tipo: TipoEvidencia, origen: string): string {
+    const evidenciaId = this.ids.nuevo();
+    const png = origen.toLowerCase().endsWith('.png');
+    const { archivo, tamanoBytes } = this.archivos.guardar(origen, `${evidenciaId}.${png ? 'png' : 'jpg'}`);
+    this.evidencias.agregar({
+      evidenciaId,
+      viajeId,
+      tipo,
+      archivo,
+      contentType: png ? 'image/png' : 'image/jpeg',
+      tamanoBytes,
+      estado: 'PENDIENTE',
+    });
+    return evidenciaId;
+  }
+
+  private exigirPosicion(): { lat: number; lng: number } {
+    const p = this.ultimaPosicion();
+    if (!p) throw new Error('Esperando la posición del GPS; intenta en unos segundos');
+    return p;
+  }
+
+  /** Hitos, eventos de conducción, cargas y entregas usan la misma cola (T7.3 a T7.6). */
+  encolar(viajeId: string, tipo: TipoOperacion, cuerpo: Record<string, unknown>, evidencias: string[] = []): string {
+    const opId = this.ids.nuevo();
+    this.cola.agregar({ ...this.nueva(opId, viajeId, tipo, cuerpo), evidencias });
+    return opId;
+  }
+
+  private nueva(opId: string, viajeId: string, tipo: TipoOperacion, cuerpo: Record<string, unknown>) {
+    return {
       opId,
       viajeId,
       tipo,
@@ -106,11 +212,11 @@ export class CasosDeUso {
       creadaEn: this.reloj.ahora().toISOString(),
       intentos: 0,
       proximoIntentoEn: null,
-      estado: 'PENDIENTE',
+      estado: 'PENDIENTE' as const,
       codigoError: null,
       cerradaEn: null,
-    });
-    return opId;
+      evidencias: [],
+    };
   }
 
   /** `PUT /dispositivos/mio` después de iniciar sesión (spec 005); el token push lo agrega T7.8. */
