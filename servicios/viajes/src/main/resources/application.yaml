@@ -60,6 +60,11 @@ almacen:
 gps:
   endpoint: ${GPS_DYNAMODB_ENDPOINT:}
 
+# Push al chofer por FCM (D45). Sin proyecto, se omite sin error. Credencial: cadena por defecto de Google.
+push:
+  fcm-proyecto: ${FCM_PROYECTO:}
+  intervalo: PT2S
+
 # plataforma/semilla copiada en la imagen; --semilla.cargar=true la carga y termina (D102).
 semilla:
   dir: ${SEMILLA_DIR:/app/semilla}

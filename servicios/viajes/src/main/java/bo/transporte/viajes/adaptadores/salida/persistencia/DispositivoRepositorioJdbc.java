@@ -2,6 +2,7 @@ package bo.transporte.viajes.adaptadores.salida.persistencia;
 
 import bo.transporte.viajes.aplicacion.puerto.salida.DispositivoRepositorio;
 import java.sql.Timestamp;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -42,5 +43,40 @@ class DispositivoRepositorioJdbc implements DispositivoRepositorio {
                         rs.getString("token_push"),
                         rs.getTimestamp("actualizado_en").toInstant()))
                 .optional();
+    }
+
+    @Override
+    public List<String> tokensPush(String usuarioSub) {
+        return jdbc.sql("SELECT token_push FROM dispositivo WHERE usuario_sub = :sub AND plataforma = 'ANDROID'"
+                        + " AND token_push IS NOT NULL")
+                .param("sub", usuarioSub)
+                .query(String.class)
+                .list();
+    }
+
+    @Override
+    public void olvidarToken(String tokenPush) {
+        jdbc.sql("UPDATE dispositivo SET token_push = NULL WHERE token_push = :token")
+                .param("token", tokenPush)
+                .update();
+    }
+
+    @Override
+    public boolean registrarAviso(UUID eventoId, String tipo, String resultado) {
+        return jdbc.sql("INSERT INTO notificacion_push (evento_id, tipo, resultado) VALUES (:id, :tipo, :resultado)"
+                                + " ON CONFLICT (evento_id) DO NOTHING")
+                        .param("id", eventoId)
+                        .param("tipo", tipo)
+                        .param("resultado", resultado)
+                        .update()
+                == 1;
+    }
+
+    @Override
+    public void actualizarAviso(UUID eventoId, String resultado) {
+        jdbc.sql("UPDATE notificacion_push SET resultado = :resultado WHERE evento_id = :id")
+                .param("id", eventoId)
+                .param("resultado", resultado)
+                .update();
     }
 }

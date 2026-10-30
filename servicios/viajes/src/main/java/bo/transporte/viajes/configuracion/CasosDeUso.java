@@ -3,6 +3,7 @@ package bo.transporte.viajes.configuracion;
 import bo.transporte.viajes.aplicacion.cliente.AltaDeCliente;
 import bo.transporte.viajes.aplicacion.cliente.ConsultaDeClientes;
 import bo.transporte.viajes.aplicacion.cliente.VinculacionDeCliente;
+import bo.transporte.viajes.aplicacion.dispositivo.AvisosPush;
 import bo.transporte.viajes.aplicacion.dispositivo.DispositivosDelChofer;
 import bo.transporte.viajes.aplicacion.puerto.salida.AlmacenEvidencias;
 import bo.transporte.viajes.aplicacion.puerto.salida.AlmacenGps;
@@ -13,6 +14,7 @@ import bo.transporte.viajes.aplicacion.puerto.salida.DispositivoRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.EntregaRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.EvidenciaRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.Inbox;
+import bo.transporte.viajes.aplicacion.puerto.salida.NotificadorPush;
 import bo.transporte.viajes.aplicacion.puerto.salida.Orquestador;
 import bo.transporte.viajes.aplicacion.puerto.salida.RegistroDeEventos;
 import bo.transporte.viajes.aplicacion.puerto.salida.RegistroIdempotente;
@@ -186,6 +188,11 @@ class CasosDeUso {
     @Bean
     RecorridoDeViaje recorridoDeViaje(ConsultaDeViajes consulta, AlmacenGps almacen) {
         return new RecorridoDeViaje(consulta, almacen);
+    }
+
+    @Bean
+    AvisosPush avisosPush(ViajeRepositorio viajes, DispositivoRepositorio dispositivos, NotificadorPush notificador) {
+        return new AvisosPush(viajes, dispositivos, notificador);
     }
 
     @Bean

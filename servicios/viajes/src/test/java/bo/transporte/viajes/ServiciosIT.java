@@ -66,7 +66,7 @@ class ServiciosIT {
     @BeforeEach
     void preparar() {
         jdbc.sql(
-                        "TRUNCATE hito, evento_conduccion, ultima_posicion, dispositivo, entrega, evidencia, viaje, servicio, cliente, ruta, operacion_idempotente, outbox_eventos, auditoria")
+                        "TRUNCATE notificacion_push, hito, evento_conduccion, ultima_posicion, dispositivo, entrega, evidencia, viaje, servicio, cliente, ruta, operacion_idempotente, outbox_eventos, auditoria")
                 .update();
         for (String id : List.of(CLIENTE, OTRO_CLIENTE)) {
             jdbc.sql("""
@@ -1117,5 +1117,50 @@ class ServiciosIT {
                 409,
                 pedir("POST", "/api/v1/viajes/" + viajeId + "/hitos", CHOFER, UUID.randomUUID(), hito)
                         .estado());
+    }
+
+    @Test
+    void alConfirmarElChoferRecibeElPushViajeAsignadoUnaVez() throws Exception {
+        assertEquals(
+                200,
+                pedir(
+                                "PUT",
+                                "/api/v1/dispositivos/mio",
+                                CHOFER,
+                                null,
+                                "{\"dispositivoId\":\"" + UUID.randomUUID()
+                                        + "\",\"plataforma\":\"ANDROID\",\"tokenPush\":\"token-fcm-de-prueba\"}")
+                        .estado());
+        String viajeId = viajeDe(confirmado());
+        // En esta clase el relay está apagado: se marca publicado como lo haría él; el push solo lee lo ya publicado.
+        assertEquals(
+                0,
+                jdbc.sql("SELECT count(*) FROM notificacion_push")
+                        .query(Long.class)
+                        .single());
+        jdbc.sql("UPDATE outbox_eventos SET publicado_en = now() WHERE tipo = 'ViajeConfirmado'")
+                .update();
+        String resultado = null;
+        for (int i = 0; i < 100 && resultado == null; i++) {
+            resultado = jdbc.sql(
+                            "SELECT n.resultado FROM notificacion_push n JOIN outbox_eventos o ON o.id = n.evento_id"
+                                    + " WHERE o.tipo = 'ViajeConfirmado' AND o.sobre->'datos'->>'viajeId' = :v")
+                    .param("v", viajeId)
+                    .query(String.class)
+                    .optional()
+                    .orElse(null);
+            Thread.sleep(100);
+        }
+        // Sin FCM_PROYECTO en las pruebas el adaptador omite el envío sin error; lo importante es que se procesó una
+        // vez.
+        assertEquals("OMITIDO", resultado);
+        Thread.sleep(2500);
+        assertEquals(
+                1,
+                jdbc.sql("SELECT count(*) FROM notificacion_push n JOIN outbox_eventos o ON o.id = n.evento_id"
+                                + " WHERE o.tipo = 'ViajeConfirmado' AND o.sobre->'datos'->>'viajeId' = :v")
+                        .param("v", viajeId)
+                        .query(Long.class)
+                        .single());
     }
 }
