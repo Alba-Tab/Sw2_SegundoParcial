@@ -294,6 +294,16 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     expect((frenada.cuerpo.posicion as { lat: number }).lat).toBeCloseTo(-17.70003, 8);
   });
 
+  it('T7.7: la alerta de fatiga va a la cola como evento de conducción, sin magnitud', () => {
+    expect(casos.registrarFatiga('v1')).toBeNull();
+    casos.registrarLectura('v1', { lat: -17.7, lng: -63.18, velocidadMs: 20, precisionMetros: 5, en: ahora.getTime() });
+    const op = casos.registrarFatiga('v1')!;
+    const fatiga = cola.ops.find((o) => o.opId === op)!;
+    expect(fatiga.tipo).toBe('EVENTO_CONDUCCION');
+    expect(fatiga.cuerpo).toMatchObject({ tipo: 'ALERTA_FATIGA', posicion: { lat: -17.7, lng: -63.18 } });
+    expect(fatiga.cuerpo).not.toHaveProperty('magnitudG');
+  });
+
   it('T7.4: el hito va a la cola con el texto revisado y la posición; sin GPS o con texto corto, no', () => {
     expect(() => casos.registrarHito('v1', 'BLOQUEO', 'Bloqueo en el puente', 'VOZ')).toThrow(/GPS/);
     casos.registrarLectura('v1', { lat: -17.7, lng: -63.18, velocidadMs: 0, precisionMetros: 5, en: ahora.getTime() });

@@ -26,7 +26,7 @@ export function PantallaViaje({
   viajeId: string;
   gps: EstadoGps;
   sincronizar: () => void;
-  abrir: (pantalla: 'hito' | 'entrega' | 'carga') => void;
+  abrir: (pantalla: 'hito' | 'entrega' | 'carga' | 'fatiga') => void;
 }) {
   useLiveQuery(bd.select().from(viaje));
   useLiveQuery(bd.select().from(puntoGps));
@@ -81,6 +81,9 @@ export function PantallaViaje({
           </Button>
           <Button mode="contained-tonal" icon="gas-station" onPress={() => abrir('carga')} contentStyle={{ paddingVertical: 8 }}>
             Carga de combustible
+          </Button>
+          <Button mode="contained-tonal" icon="eye-check" onPress={() => abrir('fatiga')} contentStyle={{ paddingVertical: 8 }}>
+            Detector de fatiga
           </Button>
           <Button
             mode="contained"

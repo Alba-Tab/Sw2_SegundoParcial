@@ -80,6 +80,18 @@ export class CasosDeUso {
     });
   }
 
+  /** D60 (FO6): ojos cerrados o bostezos; la alarma ya sonó en el celular, esto solo deja el evento en la cola. */
+  registrarFatiga(viajeId: string): string | null {
+    const posicion = this.ultimaPosicion();
+    if (!posicion) return null;
+    return this.encolar(viajeId, 'EVENTO_CONDUCCION', {
+      eventoId: this.ids.nuevo(),
+      tipo: 'ALERTA_FATIGA',
+      posicion,
+      registradoEn: this.reloj.ahora().toISOString(),
+    });
+  }
+
   /**
    * Spec 005, paso 7: el chofer revisó el texto (dictado o escrito) y eligió el tipo. Solo el texto va a la cola; el
    * audio se queda en el celular (D53).
