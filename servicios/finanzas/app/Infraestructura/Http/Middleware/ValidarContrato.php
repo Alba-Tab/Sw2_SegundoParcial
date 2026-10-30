@@ -56,6 +56,8 @@ final class ValidarContrato
             }
             $mensaje = $x->getMessage();
         }
+        // Un Monto ({monto, moneda}) es un solo campo para el cliente: "monto.monto" es "monto" (spec 008, FF4).
+        $campo = preg_replace('/\.(monto|moneda)$/', '', $campo) ?? $campo;
 
         return ['campo' => $campo, 'mensaje' => $mensaje];
     }

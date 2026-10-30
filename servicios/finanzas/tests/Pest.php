@@ -34,6 +34,20 @@ function autenticacionDePrueba(): void
     });
 }
 
+/**
+ * Un puerto local que acepta conexiones TCP hace de Temporal para /health/ready (ni CI ni probar.sh levantan
+ * Temporal para las pruebas). Devuelve el socket: mientras viva, el puerto escucha.
+ *
+ * @return resource
+ */
+function temporalDePrueba()
+{
+    $servidor = stream_socket_server('tcp://127.0.0.1:0');
+    config(['servicio.temporal' => stream_socket_get_name($servidor, false)]);
+
+    return $servidor;
+}
+
 // Datos de las pruebas de negocio: los mismos ids que la semilla (T4.8) y los ejemplos de los contratos.
 const CLIENTE = '01933b5a-1f00-7a20-8b11-0c2d3e4f5a01';
 const OTRO_CLIENTE = '01933b5a-1f00-7a20-8b11-0c2d3e4f5a02';

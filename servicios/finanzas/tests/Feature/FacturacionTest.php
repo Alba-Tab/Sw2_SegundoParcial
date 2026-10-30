@@ -82,8 +82,8 @@ it('cobro parcial y total: saldo, estado, línea abonada y PagoRegistrado', func
     expect($p1->headers->get('Location'))->toStartWith("/api/v1/facturas/$id/pagos/");
     cumpleContrato($p1, '/api/v1/facturas/{facturaId}/pagos', 'post');
     pagar($this, $id, '2000.00', 'BNB-778812')->assertStatus(422)->assertJsonPath('codigo', 'PAGO_EXCEDE_SALDO');
-    // FF4: el negativo lo rechaza ya el contrato (patrón de Monto); el cero, el value object.
-    pagar($this, $id, '-100.00', 'BNB-778813')->assertStatus(400)->assertJsonPath('errores.0.campo', 'monto.monto');
+    // FF4: el negativo lo rechaza ya el contrato (patrón de Monto); el cero, el value object. En los dos, el campo es monto.
+    pagar($this, $id, '-100.00', 'BNB-778813')->assertStatus(400)->assertJsonPath('errores.0.campo', 'monto');
     pagar($this, $id, '0.00', 'BNB-778813')->assertStatus(400)->assertJsonPath('errores.0.campo', 'monto');
     $dup = pagar($this, $id, '100.00', 'BNB-778811')->assertStatus(409)->assertJsonPath('codigo', 'PAGO_DUPLICADO');
     expect($dup->json('pagoId'))->toBe($p1->json('pagos.0.pagoId'));

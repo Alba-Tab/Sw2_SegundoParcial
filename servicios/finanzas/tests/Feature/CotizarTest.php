@@ -1,7 +1,9 @@
 <?php
 
 use App\Infraestructura\Http\Idempotencia;
+use Illuminate\Log\Events\MessageLogged;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 /** Spec 002 (cotizar) y la parte de Finanzas de la spec 001 (copia del cliente y línea por defecto). */
@@ -36,8 +38,13 @@ it('cotiza La Paz con 20 t de granos: 7.600,00 BOB, vigente 24 h', function () u
     cumpleContrato($r, '/api/v1/cotizaciones', 'post');
 });
 
-it('rechaza más de 30 t con 422 TONELAJE_EXCEDIDO', function () use ($laPaz20) {
+it('rechaza más de 30 t con 422 TONELAJE_EXCEDIDO y lo registra como INFO, no como ERROR', function () use ($laPaz20) {
+    $niveles = [];
+    Log::listen(function (MessageLogged $m) use (&$niveles) {
+        $niveles[$m->message] = $m->level;
+    });
     cotizar($this, 'sub-1~cliente~'.CLIENTE, ['toneladas' => 31] + $laPaz20)->assertStatus(422)->assertJsonPath('codigo', 'TONELAJE_EXCEDIDO');
+    expect($niveles)->toMatchArray(['El máximo por servicio es 30 t' => 'info']);
 });
 
 it('toneladas: como máximo 2 decimales, sin exponente y el tope de 30 t con escala 2', function () use ($laPaz20) {
@@ -146,6 +153,9 @@ it('un cliente no ve cotizaciones ajenas; administración ve y lista todas', fun
     $adm->getJson("/api/v1/cotizaciones/$id")->assertOk();
     $lista = $adm->getJson('/api/v1/cotizaciones?clienteId='.CLIENTE)->assertOk()->assertJsonCount(1, 'items')->assertJsonPath('siguienteCursor', null);
     cumpleContrato($lista, '/api/v1/cotizaciones');
+    $despachador = $this->withHeaders(['X-Prueba' => 'sub-d~despachador~'])->withToken('p');
+    $despachador->getJson("/api/v1/cotizaciones/$id")->assertStatus(403);
+    $despachador->getJson('/api/v1/cotizaciones')->assertStatus(403);
 });
 
 it('línea de crédito propia y de un cliente según el rol', function () {

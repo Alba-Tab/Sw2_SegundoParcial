@@ -35,10 +35,7 @@ final class ValidarYReservarCredito
     {
         $previa = $this->reservas->paraActualizar($servicioId);
         if ($previa !== null) {
-            $cotizacion = $this->cotizaciones->porId($previa->cotizacionId);
-            $solicitud = $this->solicitudes->porServicio($servicioId);
-
-            return new ResultadoReserva($previa, $cotizacion ?? throw new \LogicException('Reserva sin cotización'), $solicitud->motivos ?? []);
+            return $this->repetido($previa, $clienteId, $cotizacionId);
         }
 
         if (! $this->catalogo->clienteReplicado($clienteId)) {
@@ -47,6 +44,12 @@ final class ValidarYReservarCredito
         $ahora = $this->reloj->ahora();
         $cotizacion = $this->cotizaciones->paraActualizar($cotizacionId)
             ?? throw new ErrorDeDominio('COTIZACION_AJENA', 'La cotización no existe');
+        // Un intento simultáneo de la misma actividad pudo reservar mientras se esperaba el bloqueo de la cotización:
+        // se vuelve a buscar la reserva con el bloqueo ya tomado.
+        $previa = $this->reservas->paraActualizar($servicioId);
+        if ($previa !== null) {
+            return $this->repetido($previa, $clienteId, $cotizacionId);
+        }
         $cotizacion->aceptar($clienteId, $ahora);
 
         $linea = $this->lineas->paraActualizar($clienteId)
@@ -64,5 +67,22 @@ final class ValidarYReservarCredito
         }
 
         return new ResultadoReserva($reserva, $cotizacion, $motivos);
+    }
+
+    /**
+     * Reintento de la actividad: devuelve la reserva ya hecha si es de la misma petición. Otro cliente u otra cotización
+     * con el mismo servicioId, o una reserva ya LIBERADA, es CONFLICTO_ESTADO (no reintentable).
+     */
+    private function repetido(ReservaCredito $previa, string $clienteId, string $cotizacionId): ResultadoReserva
+    {
+        if ($previa->clienteId !== $clienteId || $previa->cotizacionId !== $cotizacionId) {
+            throw new ErrorDeDominio('CONFLICTO_ESTADO', 'El servicio ya tiene una reserva con otro cliente o cotización');
+        }
+        if ($previa->estado() === 'LIBERADA') {
+            throw new ErrorDeDominio('CONFLICTO_ESTADO', 'La reserva del servicio ya se liberó');
+        }
+        $cotizacion = $this->cotizaciones->porId($previa->cotizacionId) ?? throw new \LogicException('Reserva sin cotización');
+
+        return new ResultadoReserva($previa, $cotizacion, $this->solicitudes->porServicio($previa->servicioId)->motivos ?? []);
     }
 }

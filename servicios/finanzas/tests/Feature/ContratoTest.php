@@ -19,8 +19,10 @@ function cumpleContrato(TestResponse $r, string $ruta, string $metodo = 'get'): 
 }
 
 it('las respuestas de salud cumplen el contrato', function () {
+    $temporal = temporalDePrueba();
     cumpleContrato($this->getJson('/health'), '/health');
-    cumpleContrato($this->getJson('/health/ready'), '/health/ready');
+    cumpleContrato($this->getJson('/health/ready')->assertOk(), '/health/ready');
+    fclose($temporal);
 });
 
 describe('validación de peticiones contra el contrato', function () {

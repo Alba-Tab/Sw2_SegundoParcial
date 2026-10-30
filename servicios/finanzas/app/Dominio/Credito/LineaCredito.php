@@ -48,17 +48,29 @@ final class LineaCredito
     /** Compensación del paso 2. */
     public function liberar(Monto $monto): self
     {
-        $reservado = $monto->esMayorQue($this->reservado) ? Monto::bob('0') : $this->reservado->menos($monto);
-
-        return new self($this->clienteId, $this->limite, $reservado, $this->utilizado, $this->version + 1);
+        return new self($this->clienteId, $this->limite, $this->sinReserva($monto, 'liberar'), $this->utilizado, $this->version + 1);
     }
 
     /** Spec 006: la factura consume la reserva; reservado baja y utilizado sube. */
     public function consumir(Monto $monto): self
     {
-        $reservado = $monto->esMayorQue($this->reservado) ? Monto::bob('0') : $this->reservado->menos($monto);
+        return new self($this->clienteId, $this->limite, $this->sinReserva($monto, 'consumir'), $this->utilizado->mas($monto),
+            $this->version + 1);
+    }
 
-        return new self($this->clienteId, $this->limite, $reservado, $this->utilizado->mas($monto), $this->version + 1);
+    /**
+     * reservado − monto. Invariante: lo que se libera o consume estaba reservado; si no, la línea y las reservas ya no
+     * cuadran y se detiene en vez de dejar `reservado` en 0 sin avisar.
+     */
+    private function sinReserva(Monto $monto, string $operacion): Monto
+    {
+        if ($monto->esMayorQue($this->reservado)) {
+            throw new ErrorDeDominio('CONFLICTO_ESTADO', sprintf('No se puede %s %s BOB: la línea de %s solo tiene %s BOB reservados',
+                $operacion, $monto->aContrato()['monto'], $this->clienteId, $this->reservado->aContrato()['monto']),
+                ['reservado' => $this->reservado->aContrato(), 'monto' => $monto->aContrato()]);
+        }
+
+        return $this->reservado->menos($monto);
     }
 
     /** Spec 008: un pago abona la línea; utilizado baja (nunca menos de 0) y el disponible sube. */
