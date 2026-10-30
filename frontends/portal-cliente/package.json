@@ -27,7 +27,9 @@
     "@hookform/resolvers": "5.9.1",
     "@mui/icons-material": "7.3.11",
     "@mui/material": "7.3.11",
+    "@tanstack/query-sync-storage-persister": "5.104.3",
     "@tanstack/react-query": "5.104.3",
+    "@tanstack/react-query-persist-client": "5.104.3",
     "@tanstack/react-router": "1.170.44",
     "@tanstack/react-table": "8.21.3",
     "@transporte/design-tokens": "file:../../libs/design-tokens",
@@ -58,6 +60,8 @@
     "typescript": "5.9.3",
     "typescript-eslint": "8.71.2",
     "vite": "7.3.7",
-    "vitest": "4.1.12"
+    "vite-plugin-pwa": "2.0.0",
+    "vitest": "4.1.12",
+    "workbox-window": "7.4.1"
   }
 }

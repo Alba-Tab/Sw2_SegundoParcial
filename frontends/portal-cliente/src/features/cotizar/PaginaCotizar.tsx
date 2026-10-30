@@ -14,6 +14,7 @@ import { CrearCotizacionBody } from '../../api/generado/finanzas.zod';
 import { useListarRutas } from '../../api/generado/viajes';
 import { marcarCampos } from '../../compartido/formato/errores';
 import { diaDesdeHoy, TIPOS_CARGA } from '../../compartido/formato/formato';
+import { useClienteActivo } from '../../compartido/sesion/ClienteActivo';
 import { CampoTexto } from '../../compartido/ui/CampoTexto';
 import { Problema } from '../../compartido/ui/Problema';
 
@@ -34,6 +35,7 @@ const esperaReplicacion = (e: unknown) => e instanceof ErrorApi && e.estado === 
 /** Spec 002: elige ruta, carga, toneladas y fecha; Finanzas responde la cotización VIGENTE por 24 h. */
 export function PaginaCotizar() {
   const rutas = useListarRutas();
+  const activo = useClienteActivo();
   const consultas = useQueryClient();
   const navegar = useNavigate();
   const { control, handleSubmit, setError } = useForm<Entrada, unknown, Datos>({
@@ -42,7 +44,9 @@ export function PaginaCotizar() {
   });
   const cotizar = useMutation({
     // La misma clave en los reintentos de este envío: si el primero llegó, Finanzas devuelve la misma cotización.
-    mutationFn: ({ datos, clave }: { datos: Datos; clave: string }) => crearCotizacion(datos, conClave(clave)),
+    mutationFn: ({ datos, clave }: { datos: Datos; clave: string }) =>
+      // Con rol comercial, el clienteId del cliente que se atiende (spec 002); con rol cliente sale del token.
+      crearCotizacion(activo.modoComercial ? { ...datos, clienteId: activo.clienteId } : datos, conClave(clave)),
     // Un cliente recién registrado puede no estar todavía en Finanzas: 503 con Retry-After; se reintenta solo.
     retry: (n, e) => esperaReplicacion(e) && n < 10,
     retryDelay: (_n, e) => ((e instanceof ErrorApi && e.reintentarEnSegundos) || 2) * 1000,

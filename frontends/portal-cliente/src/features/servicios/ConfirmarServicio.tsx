@@ -5,6 +5,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
 import { conClave } from '../../api/cliente';
 import { crearServicio, getListarServiciosQueryKey } from '../../api/generado/viajes';
+import { useClienteActivo } from '../../compartido/sesion/ClienteActivo';
 import { Problema } from '../../compartido/ui/Problema';
 
 /**
@@ -14,9 +15,11 @@ import { Problema } from '../../compartido/ui/Problema';
 export function ConfirmarServicio({ cotizacionId, deshabilitado }: { cotizacionId: string; deshabilitado?: boolean }) {
   const consultas = useQueryClient();
   const navegar = useNavigate();
+  const activo = useClienteActivo();
   const [clave, setClave] = useState(() => crypto.randomUUID());
   const confirmar = useMutation({
-    mutationFn: () => crearServicio({ cotizacionId }, conClave(clave)),
+    mutationFn: () =>
+      crearServicio(activo.modoComercial ? { cotizacionId, clienteId: activo.clienteId } : { cotizacionId }, conClave(clave)),
     retry: (n, e) => e instanceof TypeError && n < 2,
     onSuccess: (s) => {
       void consultas.invalidateQueries({ queryKey: getListarServiciosQueryKey() });

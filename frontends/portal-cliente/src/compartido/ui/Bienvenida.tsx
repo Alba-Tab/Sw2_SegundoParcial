@@ -5,8 +5,9 @@ import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useMutation } from '@tanstack/react-query';
 import { useSesion } from '../sesion/useSesion';
+import { BotonEnlace } from './BotonEnlace';
 
-export function Bienvenida() {
+export function Bienvenida({ sinConexion = false }: { sinConexion?: boolean }) {
   const s = useSesion();
   // Antes de redirigir, oidc-client-ts lee la configuración de Keycloak; si no responde, se avisa en vez de quedar esperando.
   const ir = useMutation({ mutationFn: (destino: 'iniciar' | 'crearCuenta') => s[destino]() });
@@ -18,7 +19,21 @@ export function Bienvenida() {
           Transporte de carga por carretera
         </Typography>
         <Typography color="text.secondary">Cotiza, confirma y sigue tus servicios; revisa tus facturas y tu crédito.</Typography>
-        {error && <Alert severity="error">No pudimos contactar al servicio de inicio de sesión. Intenta de nuevo en un momento.</Alert>}
+        {sinConexion && (
+          <Alert
+            severity="info"
+            action={
+              <BotonEnlace to="/servicios" color="inherit" size="small">
+                Ver lo guardado
+              </BotonEnlace>
+            }
+          >
+            Sin conexión. Puedes ver tus servicios y facturas guardados en este equipo.
+          </Alert>
+        )}
+        {error && !sinConexion && (
+          <Alert severity="error">No pudimos contactar al servicio de inicio de sesión. Intenta de nuevo en un momento.</Alert>
+        )}
         <Stack direction="row" spacing={1}>
           <Button variant="contained" onClick={() => ir.mutate('iniciar')} loading={ir.isPending && ir.variables === 'iniciar'}>
             Iniciar sesión

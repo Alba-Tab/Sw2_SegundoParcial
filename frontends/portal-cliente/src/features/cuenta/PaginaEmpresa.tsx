@@ -1,4 +1,3 @@
-import { zodResolver } from '@hookform/resolvers/zod';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -8,24 +7,11 @@ import Typography from '@mui/material/Typography';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from '@tanstack/react-router';
 import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import type { z } from 'zod';
 import { conClave, ErrorApi } from '../../api/cliente';
-import {
-  type Cliente,
-  crearCliente,
-  getObtenerMiClienteQueryKey,
-  reintentarVinculacion,
-  useObtenerMiCliente,
-} from '../../api/generado/viajes';
-import { CrearClienteBody } from '../../api/generado/viajes.zod';
-import { marcarCampos } from '../../compartido/formato/errores';
+import { type Cliente, getObtenerMiClienteQueryKey, reintentarVinculacion, useObtenerMiCliente } from '../../api/generado/viajes';
 import { useSesion } from '../../compartido/sesion/useSesion';
-import { CampoTexto } from '../../compartido/ui/CampoTexto';
 import { Problema } from '../../compartido/ui/Problema';
-
-type DatosEmpresa = z.infer<typeof CrearClienteBody>;
-const CAMPOS = ['razonSocial', 'nit', 'correo', 'telefono', 'direccion'] as const;
+import { FormularioEmpresa } from './FormularioEmpresa';
 
 /**
  * Spec 001: el usuario nuevo completa los datos de su empresa; si Keycloak no vinculó, ofrece reintentar; ya vinculado,
@@ -33,51 +19,24 @@ const CAMPOS = ['razonSocial', 'nit', 'correo', 'telefono', 'direccion'] as cons
  */
 export function PaginaEmpresa() {
   const sesion = useSesion();
+  const consultas = useQueryClient();
   const mio = useObtenerMiCliente({ query: { retry: false } });
   const sinEmpresa = mio.error instanceof ErrorApi && mio.error.estado === 404;
 
   if (mio.isPending) return <CircularProgress aria-label="Cargando" />;
-  if (sinEmpresa) return <FormularioEmpresa />;
+  if (sinEmpresa) {
+    return (
+      <FormularioEmpresa
+        titulo="Completa los datos de tu empresa"
+        alCrear={(c) => consultas.setQueryData(getObtenerMiClienteQueryKey(), c)}
+        alExistir={() => void consultas.invalidateQueries({ queryKey: getObtenerMiClienteQueryKey() })}
+      />
+    );
+  }
   if (mio.error) return <Problema error={mio.error} />;
   if (!mio.data.vinculado) return <Vinculacion />;
   if (sesion.necesitaEmpresa) return <Renovando />;
   return <DatosDeLaEmpresa cliente={mio.data} />;
-}
-
-function FormularioEmpresa() {
-  const consultas = useQueryClient();
-  const { control, handleSubmit, setError } = useForm<DatosEmpresa>({ resolver: zodResolver(CrearClienteBody), mode: 'onTouched' });
-  const enviar = useMutation({
-    // Una clave nueva por envío; si ya existe un cliente para este usuario, Viajes responde 409 y se relee.
-    mutationFn: (datos: DatosEmpresa) => crearCliente(datos, conClave(crypto.randomUUID())),
-    onSuccess: (cliente) => consultas.setQueryData(getObtenerMiClienteQueryKey(), cliente),
-    onError: (e) => {
-      if (e instanceof ErrorApi && e.estado === 409) void consultas.invalidateQueries({ queryKey: getObtenerMiClienteQueryKey() });
-      else marcarCampos(e, setError, CAMPOS);
-    },
-  });
-
-  return (
-    <Paper variant="outlined" sx={{ p: 3, maxWidth: 560 }}>
-      <form onSubmit={handleSubmit((d) => enviar.mutate(d))} noValidate>
-        <Stack spacing={2}>
-          <Typography variant="h5" component="h2">
-            Completa los datos de tu empresa
-          </Typography>
-          <Typography color="text.secondary">Con ellos emitimos tus facturas y te avisamos por correo.</Typography>
-          <CampoTexto control={control} nombre="razonSocial" label="Razón social" required />
-          <CampoTexto control={control} nombre="nit" label="NIT" required inputMode="numeric" />
-          <CampoTexto control={control} nombre="correo" label="Correo de facturación" type="email" required />
-          <CampoTexto control={control} nombre="telefono" label="Teléfono" required />
-          <CampoTexto control={control} nombre="direccion" label="Dirección" required />
-          {enviar.isError && !(enviar.error instanceof ErrorApi && enviar.error.estado === 400) && <Problema error={enviar.error} />}
-          <Button type="submit" variant="contained" loading={enviar.isPending} sx={{ alignSelf: 'flex-start' }}>
-            Guardar
-          </Button>
-        </Stack>
-      </form>
-    </Paper>
-  );
 }
 
 function Vinculacion() {

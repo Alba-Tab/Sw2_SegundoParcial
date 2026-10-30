@@ -4,6 +4,8 @@ import { conConsultas, problema, simularApi } from '../../pruebas/utilidades';
 import { PaginaCotizar } from './PaginaCotizar';
 
 const navegar = vi.fn();
+const clienteActivo = vi.hoisted(() => ({ actual: { modoComercial: false, clienteId: undefined as string | undefined } }));
+vi.mock('../../compartido/sesion/ClienteActivo', () => ({ useClienteActivo: () => ({ ...clienteActivo.actual, elegir: () => {} }) }));
 vi.mock('@tanstack/react-router', () => ({ useNavigate: () => navegar }));
 
 const AULA = '01933a00-0000-7000-8000-000000000004';
@@ -47,6 +49,27 @@ describe('Cotizar (spec 002)', () => {
     expect(envios).toHaveLength(2);
     expect(envios[0].encabezados.get('Idempotency-Key')).toBe(envios[1].encabezados.get('Idempotency-Key'));
     expect(envios[0].cuerpo).toMatchObject({ rutaId: AULA, tipoCarga: 'GRANOS', toneladas: 28 });
+  });
+
+  it('modo comercial: la cotización lleva el clienteId del cliente que se atiende', async () => {
+    clienteActivo.actual = { modoComercial: true, clienteId: '0193a000-0000-7000-8000-0000000c0001' };
+    const llamadas = simularApi({
+      'GET /api/v1/rutas': { estado: 200, cuerpo: rutas },
+      'POST /api/v1/cotizaciones': { estado: 201, cuerpo: { cotizacionId: 'k' } },
+    });
+    conConsultas(<PaginaCotizar />);
+    const ruta = await screen.findByRole('combobox', { name: /Ruta/ });
+    await waitFor(() => expect(ruta.getAttribute('aria-disabled')).toBeNull());
+    fireEvent.mouseDown(ruta);
+    fireEvent.click(within(await screen.findByRole('listbox')).getByText(/Santa Cruz – Aula/));
+    fireEvent.change(screen.getByLabelText(/Toneladas/), { target: { value: '20' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cotizar' }));
+    await waitFor(() => expect(llamadas.some((l) => l.metodo === 'POST')).toBe(true));
+    expect(llamadas.find((l) => l.metodo === 'POST')!.cuerpo).toMatchObject({
+      clienteId: '0193a000-0000-7000-8000-0000000c0001',
+      toneladas: 20,
+    });
+    clienteActivo.actual = { modoComercial: false, clienteId: undefined };
   });
 
   it('avisa más de 30 toneladas sin llamar a Finanzas', async () => {
