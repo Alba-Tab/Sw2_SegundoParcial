@@ -23,3 +23,17 @@ it('carga clientes, tarifas, facturas y líneas con las fechas relativas a hoy',
     expect(app(EvaluadorMora::class)->enMora('0193a000-0000-7000-8000-0000000c0002', new DateTimeImmutable))->toBeTrue()
         ->and(app(EvaluadorMora::class)->enMora('0193a000-0000-7000-8000-0000000c0001', new DateTimeImmutable))->toBeFalse();
 });
+
+/** T8.8: demo:reiniciar vacía Outbox, Inbox y datos de prueba y deja solo la semilla. */
+it('reinicia la demo sin dejar eventos ni datos viejos', function () {
+    $this->artisan('semilla:cargar')->assertSuccessful();
+    DB::table('outbox_eventos')->insert([
+        'id' => '01933f00-0000-7000-8000-00000000ffff', 'tipo' => 'FacturaEmitida', 'clave_enrutamiento' => 'finanzas.factura-emitida.v1',
+        'sobre' => '{}', 'creado_en' => now(),
+    ]);
+    $this->artisan('demo:reiniciar')->assertSuccessful();
+
+    expect(DB::table('outbox_eventos')->count())->toBe(0)
+        ->and(DB::table('factura')->count())->toBe(3)
+        ->and(DB::table('linea_credito')->where('cliente_id', '0193a000-0000-7000-8000-0000000c0001')->value('utilizado'))->toBe('10400.00');
+});

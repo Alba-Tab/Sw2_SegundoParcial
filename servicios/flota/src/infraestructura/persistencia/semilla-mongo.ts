@@ -43,3 +43,15 @@ export async function cargarSemilla(conexion: Connection, dir: string): Promise<
   }
   return { unidades: unidades.length, choferes: choferes.length };
 }
+
+/**
+ * `demo:reiniciar` (T8.8, D102): vacía todas las colecciones de Flota (Outbox, Inbox, idempotencia, cargas, lecturas,
+ * mantenimientos…) conservando sus índices, y vuelve a cargar la semilla.
+ */
+export async function reiniciarDemo(conexion: Connection, dir: string): Promise<{ unidades: number; choferes: number }> {
+  const colecciones = await conexion.db!.listCollections({}, { nameOnly: true }).toArray();
+  for (const { name } of colecciones) {
+    if (!name.startsWith('system.')) await conexion.collection(name).deleteMany({});
+  }
+  return cargarSemilla(conexion, dir);
+}
