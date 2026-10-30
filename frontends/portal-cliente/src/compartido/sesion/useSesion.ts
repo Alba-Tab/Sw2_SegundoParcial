@@ -1,4 +1,5 @@
-import { useAuth } from 'react-oidc-context';
+import { ErrorResponse } from 'oidc-client-ts';
+import { hasAuthParams, useAuth } from 'react-oidc-context';
 
 export interface Sesion {
   autenticado: boolean;
@@ -40,6 +41,25 @@ export function reclamosDe(token?: string): Reclamos {
   }
 }
 
+/**
+ * La página a la que hay que volver después de pasar por Keycloak (enlace del correo, "Ver como cliente"). Viaja como
+ * `state` del pedido de autorización; en la vuelta misma (con `code` en la URL) no hay a dónde volver más que al inicio.
+ */
+export function destinoActual(): string {
+  if (hasAuthParams()) return '/';
+  return window.location.pathname + window.location.search;
+}
+
+/** Solo una ruta de este mismo origen: un `state` raro (o `//otro-sitio`) lleva al inicio. */
+export function destinoSeguro(state: unknown): string {
+  return typeof state === 'string' && state.startsWith('/') && !state.startsWith('//') && !state.includes('\\') ? state : '/';
+}
+
+/** Keycloak rechazó el refresh token: la sesión se cerró (en otra app, D27) o venció. Un corte de red no lo es. */
+export function sesionPerdida(error: unknown): boolean {
+  return error instanceof ErrorResponse && error.error === 'invalid_grant';
+}
+
 export function useSesion(): Sesion {
   const auth = useAuth();
   const r = reclamosDe(auth.user?.access_token);
@@ -57,9 +77,9 @@ export function useSesion(): Sesion {
     esCliente,
     esComercial,
     necesitaEmpresa: auth.isAuthenticated && !esComercial && !(esCliente && r.clienteId),
-    iniciar: () => auth.signinRedirect(),
+    iniciar: () => auth.signinRedirect({ state: destinoActual() }),
     // Keycloak abre su formulario de registro con prompt=create (spec 001, paso 1).
-    crearCuenta: () => auth.signinRedirect({ prompt: 'create' }),
+    crearCuenta: () => auth.signinRedirect({ prompt: 'create', state: destinoActual() }),
     cerrar: () => auth.signoutRedirect(),
     renovar: async () => {
       await auth.signinSilent();

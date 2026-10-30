@@ -30,7 +30,7 @@ createRoot(document.getElementById('raiz')!).render(
   <StrictMode>
     <ThemeProvider theme={tema}>
       <CssBaseline />
-      <ProveedorSesion>
+      <ProveedorSesion navegar={(destino) => router.history.replace(destino)}>
         <PersistQueryClientProvider client={consultas} persistOptions={opcionesPersistencia}>
           <ProveedorClienteActivo>
             <RouterProvider router={router} />

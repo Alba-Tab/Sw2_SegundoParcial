@@ -23,11 +23,19 @@ export function usarToken(token: string | undefined) {
   tokenActual = token;
 }
 
+let al401: (() => void) | undefined;
+/** La sesión registra qué hacer cuando un servicio rechaza el token (401): volver a pedir la sesión. */
+export function alRecibir401(fn: (() => void) | undefined) {
+  al401 = fn;
+}
+
 async function pedir<T>(base: string, url: string, init?: RequestInit): Promise<T> {
   const encabezados = new Headers(init?.headers);
   if (tokenActual) encabezados.set('Authorization', `Bearer ${tokenActual}`);
   const r = await fetch(`${base}${url}`, { ...init, headers: encabezados });
   const cuerpo = r.status === 204 ? null : r.headers.get('content-type')?.includes('json') ? await r.json() : null;
+  // Con token y 401: la sesión venció o se cerró en Keycloak (sin token, el 401 es lo esperado).
+  if (r.status === 401 && encabezados.has('Authorization')) al401?.();
   if (!r.ok) throw new ErrorApi(r.status, cuerpo, Number(r.headers.get('Retry-After')) || undefined);
   return cuerpo as T;
 }
