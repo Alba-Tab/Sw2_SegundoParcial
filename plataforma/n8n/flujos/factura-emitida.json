@@ -1,0 +1,96 @@
+{
+  "id": "FacturaEmitida01",
+  "name": "factura-emitida",
+  "active": false,
+  "settings": { "executionOrder": "v1", "timezone": "America/La_Paz" },
+  "nodes": [
+    {
+      "id": "8f3c1a10-0000-4000-8000-000000000001",
+      "name": "Cola n8n.eventos",
+      "type": "n8n-nodes-base.rabbitmqTrigger",
+      "typeVersion": 1,
+      "position": [0, 0],
+      "parameters": {
+        "queue": "n8n.eventos",
+        "options": {
+          "acknowledge": "executionFinishesSuccessfully",
+          "assertQueue": false,
+          "jsonParseBody": true,
+          "onlyContent": true
+        }
+      },
+      "credentials": { "rabbitmq": { "id": "rabbitN8nLocal01", "name": "RabbitMQ n8n" } }
+    },
+    {
+      "id": "8f3c1a10-0000-4000-8000-000000000002",
+      "name": "¿Es nueva?",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [240, 0],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT ($2 = 'FacturaEmitida' AND NOT EXISTS (SELECT 1 FROM n8n_inbox WHERE event_id = $1::uuid)) AS nuevo",
+        "options": { "queryReplacement": "={{ [$json.id, $json.tipo] }}" }
+      },
+      "credentials": { "postgres": { "id": "postgresN8nLoc01", "name": "PostgreSQL n8n" } }
+    },
+    {
+      "id": "8f3c1a10-0000-4000-8000-000000000003",
+      "name": "Nueva",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [480, 0],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "8f3c1a10-0000-4000-8000-0000000000c1",
+              "leftValue": "={{ $json.nuevo }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "8f3c1a10-0000-4000-8000-000000000004",
+      "name": "Correo al cliente",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [720, -100],
+      "parameters": {
+        "fromEmail": "avisos@transporte.example",
+        "toEmail": "={{ $('Cola n8n.eventos').item.json.datos.cliente.correo }}",
+        "subject": "={{ 'Factura ' + $('Cola n8n.eventos').item.json.datos.numero + ' por ' + Number($('Cola n8n.eventos').item.json.datos.monto.monto).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + $('Cola n8n.eventos').item.json.datos.monto.moneda }}",
+        "emailFormat": "text",
+        "text": "={{ 'Estimado cliente ' + $('Cola n8n.eventos').item.json.datos.cliente.razonSocial + ':\\n\\nEmitimos la factura ' + $('Cola n8n.eventos').item.json.datos.numero + ' por ' + Number($('Cola n8n.eventos').item.json.datos.monto.monto).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + $('Cola n8n.eventos').item.json.datos.monto.moneda + ', con vencimiento el ' + $('Cola n8n.eventos').item.json.datos.venceEl + '.\\n\\nPuede verla en el portal: ' + $('Cola n8n.eventos').item.json.datos.enlacePortal + '\\n\\nTransporte de Carga' }}",
+        "options": { "appendAttribution": false }
+      },
+      "credentials": { "smtp": { "id": "smtpMailpitLoc01", "name": "SMTP" } }
+    },
+    {
+      "id": "8f3c1a10-0000-4000-8000-000000000005",
+      "name": "Registrar en n8n_inbox",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [960, -100],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO n8n_inbox (event_id, tipo) VALUES ($1::uuid, $2) ON CONFLICT DO NOTHING",
+        "options": { "queryReplacement": "={{ [$('Cola n8n.eventos').item.json.id, $('Cola n8n.eventos').item.json.tipo] }}" }
+      },
+      "credentials": { "postgres": { "id": "postgresN8nLoc01", "name": "PostgreSQL n8n" } }
+    }
+  ],
+  "connections": {
+    "Cola n8n.eventos": { "main": [[{ "node": "¿Es nueva?", "type": "main", "index": 0 }]] },
+    "¿Es nueva?": { "main": [[{ "node": "Nueva", "type": "main", "index": 0 }]] },
+    "Nueva": { "main": [[{ "node": "Correo al cliente", "type": "main", "index": 0 }], []] },
+    "Correo al cliente": { "main": [[{ "node": "Registrar en n8n_inbox", "type": "main", "index": 0 }]] }
+  },
+  "pinData": {}
+}

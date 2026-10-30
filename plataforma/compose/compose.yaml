@@ -336,25 +336,51 @@ services:
     volumes: ["./iniciar:/iniciar:ro", "../keycloak:/realm:ro"]
     restart: "no"
 
-  n8n:
-    <<: *comun
-    image: n8nio/n8n:2.46.2
+  # n8n (spec 006, D63): antes de arrancar, la tabla n8n_inbox y la importación de credenciales y flujos.
+  n8n-inbox:
+    image: postgres:17
     profiles: [plataforma]
     depends_on: { postgres-azure: { condition: service_healthy } }
-    environment:
+    environment: { PGPASSWORD: "${CLAVE_N8N}" }
+    entrypoint: ["psql", "-h", "postgres-azure", "-U", "n8n", "-d", "n8n", "-v", "ON_ERROR_STOP=1", "-c",
+      "CREATE TABLE IF NOT EXISTS n8n_inbox (event_id uuid PRIMARY KEY, tipo varchar(60) NOT NULL, procesado_en timestamptz NOT NULL DEFAULT now())"]
+    restart: "no"
+
+  n8n-importar:
+    image: n8nio/n8n:2.46.2
+    profiles: [plataforma]
+    depends_on:
+      n8n-inbox: { condition: service_completed_successfully }
+      rabbitmq-usuarios: { condition: service_completed_successfully, required: false }
+    environment: &n8n-env
       DB_TYPE: postgresdb
       DB_POSTGRESDB_HOST: postgres-azure
       DB_POSTGRESDB_DATABASE: n8n
       DB_POSTGRESDB_USER: n8n
       DB_POSTGRESDB_PASSWORD: ${CLAVE_N8N}
       N8N_ENCRYPTION_KEY: ${N8N_CLAVE_CIFRADO}
-      N8N_EMAIL_MODE: smtp
       N8N_SMTP_HOST: mailpit
       N8N_SMTP_PORT: "1025"
-      N8N_SMTP_SSL: "false"
-      N8N_SMTP_SENDER: avisos@transporte.example
+      AMQP_HOST: rabbitmq
+      AMQP_PORT: "5672"
+      RABBITMQ_CLAVE_N8N: ${RABBITMQ_CLAVE_N8N}
       GENERIC_TIMEZONE: America/La_Paz
       N8N_DIAGNOSTICS_ENABLED: "false"
+    entrypoint: ["sh", "/n8n/importar.sh"]
+    volumes: ["../n8n/importar.sh:/n8n/importar.sh:ro", "../n8n/flujos:/flujos:ro", "n8n:/home/node/.n8n"]
+    restart: "no"
+
+  n8n:
+    <<: *comun
+    image: n8nio/n8n:2.46.2
+    profiles: [plataforma]
+    depends_on:
+      n8n-importar: { condition: service_completed_successfully }
+    environment:
+      <<: *n8n-env
+      N8N_EMAIL_MODE: smtp
+      N8N_SMTP_SSL: "false"
+      N8N_SMTP_SENDER: avisos@transporte.example
     volumes: [n8n:/home/node/.n8n]
     ports: ["5678:5678"]
 
