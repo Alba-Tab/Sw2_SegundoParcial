@@ -1,0 +1,52 @@
+import DataLoader from 'dataloader';
+import { GraphQLError } from 'graphql';
+import type { Contexto } from '../autenticacion';
+import type { ClienteServicios } from '../servicios';
+import * as m from './mapeos';
+
+/** D97: sin filtro por ids en el servicio, las claves de un tipo se piden en paralelo, como máximo 10 a la vez. */
+export const PARALELO = 10;
+
+export async function enParalelo<K, V>(claves: readonly K[], pedir: (k: K) => Promise<V>, maximo = PARALELO): Promise<(V | Error)[]> {
+  const resultados: (V | Error)[] = new Array(claves.length);
+  let siguiente = 0;
+  const trabajador = async () => {
+    while (siguiente < claves.length) {
+      const i = siguiente++;
+      try {
+        resultados[i] = await pedir(claves[i]);
+      } catch (e) {
+        resultados[i] = e instanceof Error ? e : new Error(String(e));
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(maximo, claves.length) }, trabajador));
+  return resultados;
+}
+
+const status = (e: unknown) => (e instanceof GraphQLError ? e.extensions['status'] : undefined);
+/** Un 404 del servicio es "no hay" (null), no un error del campo. */
+const nuloSi404 = async <T>(p: Promise<T>): Promise<T | null> => p.catch((e) => (status(e) === 404 ? null : Promise.reject(e)));
+
+/**
+ * DataLoader por petición (spec 016, paso 8): junta las claves iguales de un mismo tipo, por ejemplo el `servicioId`
+ * de 20 viajes, y pide cada una una sola vez.
+ */
+export function crearCargadores(servicios: ClienteServicios, ctx: Contexto) {
+  const cargador = <V>(pedir: (k: string) => Promise<V>) => new DataLoader<string, V>((claves) => enParalelo(claves, pedir));
+  return {
+    servicio: cargador((id) => servicios.get<Record<string, unknown>>(ctx, 'viajes', `/api/v1/servicios/${id}`).then(m.servicio)),
+    viaje: cargador((id) => nuloSi404(servicios.get<Record<string, unknown>>(ctx, 'viajes', `/api/v1/viajes/${id}`).then(m.viaje))),
+    riesgo: cargador((id) => nuloSi404(servicios.get<Record<string, unknown>>(ctx, 'analitica', `/api/v1/predicciones/retraso/${id}`))),
+    unidadPorPlaca: cargador((placa) =>
+      servicios
+        .get<Record<string, unknown>>(ctx, 'flota', '/api/v1/unidades', { query: { placa, limite: 1 } })
+        .then((r) => m.items(r).map(m.unidad)[0] ?? null),
+    ),
+    lineaCredito: cargador((id) =>
+      nuloSi404(servicios.get<Record<string, unknown>>(ctx, 'finanzas', `/api/v1/lineas-credito/${id}`).then(m.lineaCredito)),
+    ),
+  };
+}
+
+export type Cargadores = ReturnType<typeof crearCargadores>;

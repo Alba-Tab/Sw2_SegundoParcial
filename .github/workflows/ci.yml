@@ -23,6 +23,7 @@ jobs:
       flota: ${{ steps.f.outputs.flota }}
       finanzas: ${{ steps.f.outputs.finanzas }}
       analitica: ${{ steps.f.outputs.analitica }}
+      gateway: ${{ steps.f.outputs.gateway }}
       keycloak: ${{ steps.f.outputs.keycloak }}
       compose: ${{ steps.f.outputs.compose }}
       simulador: ${{ steps.f.outputs.simulador }}
@@ -74,6 +75,11 @@ jobs:
               - plataforma/datos-sinteticos/**
               - contratos/openapi/analitica.yaml
               - contratos/openapi/comun.yaml
+            gateway:
+              - *ci
+              - servicios/gateway/**
+              - libs/intercambio-token/**
+              - contratos/graphql/**
             keycloak:
               - *ci
               - plataforma/keycloak/**
@@ -160,6 +166,19 @@ jobs:
         run: uv run lint-imports
       - name: Pruebas e integración (Testcontainers)
         run: uv run pytest -q
+
+  gateway:
+    needs: cambios
+    if: needs.cambios.outputs.gateway == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: servicios/gateway } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm, cache-dependency-path: servicios/gateway/package-lock.json }
+      - run: npm ci
+      - name: Tipos, formato y pruebas (permisos, respuesta parcial, límites, HMAC y suscripción)
+        run: npm run verificar
 
   finanzas:
     needs: cambios
@@ -311,7 +330,7 @@ jobs:
 
   ci-ok:
     if: always()
-    needs: [cambios, contratos, viajes, flota, finanzas, analitica, keycloak, compose, simulador, tokens, intercambio, portal, app-chofer, gitleaks, commitlint]
+    needs: [cambios, contratos, viajes, flota, finanzas, analitica, gateway, keycloak, compose, simulador, tokens, intercambio, portal, app-chofer, gitleaks, commitlint]
     runs-on: ubuntu-latest
     steps:
       - name: Todo en verde u omitido por no tener cambios

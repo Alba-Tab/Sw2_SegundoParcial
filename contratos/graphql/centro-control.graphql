@@ -6,7 +6,8 @@ Reglas:
 - `@roles`: permisos por campo (propuesta 7.2). Un campo que el rol no puede ver sale en `null` con un error
   `SIN_PERMISO` en su `path`; el resto de la respuesta sale igual. Sin la directiva, cualquier rol interno.
 - Respuesta parcial: si un servicio no responde en 3 s (D98) o devuelve 5xx, sus campos salen en `null` con
-  `extensions.codigo = DEPENDENCIA_NO_DISPONIBLE`.
+  `extensions.codigo = DEPENDENCIA_NO_DISPONIBLE`. Por eso los campos raíz de Query y los que dependen de otro servicio
+  son anulables: un servicio caído deja en null solo lo suyo.
 - Mutaciones de negocio: `claveIdempotencia: ID!` (un UUID por intento) que el Gateway reenvía como `Idempotency-Key`.
 - Profundidad máxima 8 y complejidad máxima 1.000 (D101) → `CONSULTA_DEMASIADO_COMPLEJA`.
 """
@@ -133,7 +134,7 @@ type Viaje {
   "Del servicio (Viajes); despachador y jefe de flota no ven montos (propuesta 7.2)."
   monto: Dinero @roles(permitidos: [gerente, administracion, comercial])
   "Bitácora (Viajes), la más nueva primero."
-  hitos(texto: String, limite: Int = 20): [Hito!]!
+  hitos(texto: String, limite: Int = 20): [Hito!]
   "Entrega o rechazo con su POD (Viajes)."
   entrega: Entrega
   "Probabilidad de retraso (Analítica); null si el viaje no está en ruta."
@@ -384,11 +385,19 @@ type SolicitudAprobacion {
   monto: Dinero!
   motivos: [String!]!
   estado: String!
-  facturasVencidas: [Factura!]
+  facturasVencidas: [FacturaVencida!]
   creadaEn: Instante!
   venceEn: Instante!
   decididaPor: String
   motivoDecision: String
+}
+
+type FacturaVencida {
+  facturaId: ID!
+  numero: String!
+  saldo: Dinero!
+  venceEl: Fecha!
+  diasVencida: Int!
 }
 
 type ResultadoAprobacion {
@@ -593,35 +602,35 @@ type Query {
   yo: Usuario!
   tablero(periodo: Periodo!): Tablero!
 
-  viajesEnCurso(limite: Int = 50): [Viaje!]!
-  viajes(estado: EstadoViaje, limite: Int = 50): [Viaje!]!
+  viajesEnCurso(limite: Int = 50): [Viaje!]
+  viajes(estado: EstadoViaje, limite: Int = 50): [Viaje!]
   viaje(id: ID!): Viaje
-  entregasObservadas: [Viaje!]!
-  intervenciones: [Viaje!]!
-  servicios(estado: EstadoServicio, clienteId: ID, limite: Int = 50): [Servicio!]!
-  clientes: [Cliente!]!
-  rutas: [Ruta!]!
+  entregasObservadas: [Viaje!]
+  intervenciones: [Viaje!]
+  servicios(estado: EstadoServicio, clienteId: ID, limite: Int = 50): [Servicio!]
+  clientes: [Cliente!]
+  rutas: [Ruta!]
 
-  unidades(tipo: TipoUnidad, estado: EstadoUnidad, placa: String): [Unidad!]! @roles(permitidos: [gerente, despachador, jefe_flota])
+  unidades(tipo: TipoUnidad, estado: EstadoUnidad, placa: String): [Unidad!] @roles(permitidos: [gerente, despachador, jefe_flota])
   unidad(id: ID!): Unidad @roles(permitidos: [gerente, despachador, jefe_flota])
-  mantenimientos(estado: String, unidadId: ID): [Mantenimiento!]! @roles(permitidos: [gerente, despachador, jefe_flota])
-  choferes: [Chofer!]! @roles(permitidos: [gerente, despachador, jefe_flota])
-  cargasCombustible(placa: String, limite: Int = 50): [CargaCombustible!]! @roles(permitidos: [gerente, despachador, jefe_flota])
-  anomaliasCombustible(desde: Fecha!, hasta: Fecha): [AnomaliaCombustible!]! @roles(permitidos: [gerente, jefe_flota])
-  puntajesConduccion(desde: Fecha, choferId: ID): PuntajesConduccion! @roles(permitidos: [gerente, jefe_flota])
+  mantenimientos(estado: String, unidadId: ID): [Mantenimiento!] @roles(permitidos: [gerente, despachador, jefe_flota])
+  choferes: [Chofer!] @roles(permitidos: [gerente, despachador, jefe_flota])
+  cargasCombustible(placa: String, limite: Int = 50): [CargaCombustible!] @roles(permitidos: [gerente, despachador, jefe_flota])
+  anomaliasCombustible(desde: Fecha!, hasta: Fecha): [AnomaliaCombustible!] @roles(permitidos: [gerente, jefe_flota])
+  puntajesConduccion(desde: Fecha, choferId: ID): PuntajesConduccion @roles(permitidos: [gerente, jefe_flota])
 
-  facturas(clienteId: ID, estado: EstadoFactura, conSaldo: Boolean, limite: Int = 50): [Factura!]! @roles(permitidos: [gerente, administracion, comercial])
+  facturas(clienteId: ID, estado: EstadoFactura, conSaldo: Boolean, limite: Int = 50): [Factura!] @roles(permitidos: [gerente, administracion, comercial])
   factura(id: ID!): Factura @roles(permitidos: [gerente, administracion, comercial])
   lineaCredito(clienteId: ID!): LineaCredito @roles(permitidos: [gerente, administracion, comercial])
-  cotizaciones(clienteId: ID, limite: Int = 50): [Cotizacion!]! @roles(permitidos: [gerente, administracion, comercial])
-  solicitudesAprobacion(estado: String): [SolicitudAprobacion!]! @roles(permitidos: [gerente, administracion])
+  cotizaciones(clienteId: ID, limite: Int = 50): [Cotizacion!] @roles(permitidos: [gerente, administracion, comercial])
+  solicitudesAprobacion(estado: String): [SolicitudAprobacion!] @roles(permitidos: [gerente, administracion])
 
-  catalogoReportes: [DescripcionReporte!]!
-  reporte(id: ReporteId!, params: ReporteParams): ReporteResultado!
-  alertasPendientes(desde: Cursor, limite: Int = 50): PaginaAlertas! @roles(permitidos: [gerente, despachador, jefe_flota, administracion])
-  misionesAgente(limite: Int = 20): [Mision!]! @roles(permitidos: [gerente, despachador])
+  catalogoReportes: [DescripcionReporte!]
+  reporte(id: ReporteId!, params: ReporteParams): ReporteResultado
+  alertasPendientes(desde: Cursor, limite: Int = 50): PaginaAlertas @roles(permitidos: [gerente, despachador, jefe_flota, administracion])
+  misionesAgente(limite: Int = 20): [Mision!] @roles(permitidos: [gerente, despachador])
   mision(id: ID!): Mision @roles(permitidos: [gerente, despachador])
-  accionesPropuestas(estado: EstadoAccion): [AccionPropuesta!]! @roles(permitidos: [gerente, despachador])
+  accionesPropuestas(estado: EstadoAccion): [AccionPropuesta!] @roles(permitidos: [gerente, despachador])
 }
 
 input MantenimientoInput {

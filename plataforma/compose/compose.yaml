@@ -216,6 +216,24 @@ services:
       <<: *finanzas-env
       OTEL_SERVICE_NAME: finanzas-worker
 
+  # Gateway GraphQL del Centro de Control (spec 016): sin base; compone los 4 servicios con el token intercambiado.
+  gateway:
+    <<: *comun
+    build: { context: ../.., dockerfile: servicios/gateway/Dockerfile }
+    image: transporte/gateway:local
+    profiles: [core]
+    environment:
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENTE_SECRETO: ${KC_SECRETO_GATEWAY}
+      VIAJES_URL: http://viajes:8101
+      FLOTA_URL: http://flota-api:8102
+      FINANZAS_URL: ${GATEWAY_FINANZAS_URL:-http://finanzas-api:8103}
+      ANALITICA_URL: http://analitica:8104
+      GATEWAY_URL: ${GATEWAY_URL:-http://localhost:8105}
+      EXPORTACION_HMAC_SECRETO: ${EXPORTACION_HMAC_SECRETO}
+      CORS_ORIGENES: ${CORS_ORIGENES:-}
+    ports: ["8105:8105"]
+
   # Analítica (spec 013): modelo de lectura, alertas, ML, reportes y agente. Perfil ia (propuesta 11).
   analitica:
     <<: *comun
