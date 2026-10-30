@@ -1,0 +1,693 @@
+"""
+Esquema del Gateway del Centro de Control (spec 016, T9.1). Lo consumen las 4 apps Angular; el Gateway compone las APIs
+REST de Viajes, Flota, Finanzas y Analítica con el token del usuario intercambiado por servicio (RFC 8693).
+
+Reglas:
+- `@roles`: permisos por campo (propuesta 7.2). Un campo que el rol no puede ver sale en `null` con un error
+  `SIN_PERMISO` en su `path`; el resto de la respuesta sale igual. Sin la directiva, cualquier rol interno.
+- Respuesta parcial: si un servicio no responde en 3 s (D98) o devuelve 5xx, sus campos salen en `null` con
+  `extensions.codigo = DEPENDENCIA_NO_DISPONIBLE`.
+- Mutaciones de negocio: `claveIdempotencia: ID!` (un UUID por intento) que el Gateway reenvía como `Idempotency-Key`.
+- Profundidad máxima 8 y complejidad máxima 1.000 (D101) → `CONSULTA_DEMASIADO_COMPLEJA`.
+"""
+directive @roles(permitidos: [Rol!]!) on FIELD_DEFINITION
+
+enum Rol {
+  gerente
+  despachador
+  jefe_flota
+  administracion
+  comercial
+}
+
+"Fecha sin hora (YYYY-MM-DD), en America/La_Paz."
+scalar Fecha
+"Instante ISO-8601 en UTC con Z."
+scalar Instante
+"Monto en BOB como texto con 2 decimales ('2800.00'); nunca float (000 §3)."
+scalar Dinero
+"Cursor opaco de paginación."
+scalar Cursor
+"Objeto JSON libre (filas de reportes, argumentos de un paso del agente)."
+scalar JSON
+
+type Coordenadas {
+  lat: Float!
+  lng: Float!
+}
+
+# ---------------------------------------------------------------- sesión y tablero
+
+type Usuario {
+  sub: ID!
+  nombre: String
+  roles: [Rol!]!
+}
+
+enum Periodo {
+  HOY
+  ESTA_SEMANA
+  ESTE_MES
+}
+
+type ConteoEstado {
+  estado: String!
+  cantidad: Int!
+}
+
+"Composición de 4 servicios (spec 016, paso 10). Cada bloque puede salir en null con su error si su servicio cae."
+type Tablero {
+  periodo: Periodo!
+  "Viajes"
+  viajesEnCurso: [Viaje!]
+  "Flota"
+  unidadesPorEstado: [ConteoEstado!]
+  "Finanzas"
+  cuentasPorCobrar: ResumenCobranza @roles(permitidos: [gerente, administracion, comercial])
+  "Analítica"
+  alertasAbiertas: Int
+  datosAl: Instante
+}
+
+type ResumenCobranza {
+  saldoTotal: Dinero!
+  facturasPorVencer: Int!
+  facturasVencidas: Int!
+  proximas: [Factura!]!
+}
+
+# ---------------------------------------------------------------- Viajes
+
+enum EstadoViaje {
+  PROGRAMANDO
+  CONFIRMADO
+  EN_RUTA
+  ENTREGADO
+  CERRADO
+  CANCELADO
+  ENTREGA_OBSERVADA
+  ENTREGA_RECHAZADA
+  REQUIERE_INTERVENCION
+}
+
+enum TipoCarga {
+  GRANOS
+  INSUMOS
+  INSUMOS_LIQUIDOS
+  CONTENEDOR
+}
+
+type Ruta {
+  rutaId: ID!
+  nombre: String!
+  origen: String!
+  destino: String!
+  distanciaKm: Float!
+}
+
+type Cliente {
+  clienteId: ID!
+  razonSocial: String!
+  nit: String
+  correo: String
+  canal: String
+  "Línea de crédito (Finanzas)."
+  lineaCredito: LineaCredito @roles(permitidos: [gerente, administracion, comercial])
+}
+
+type Viaje {
+  viajeId: ID!
+  servicioId: ID!
+  estado: EstadoViaje!
+  motivo: String
+  cliente: Cliente!
+  ruta: Ruta!
+  tipoCarga: TipoCarga!
+  toneladas: Float!
+  fechaViaje: Fecha!
+  placa: String
+  choferNombre: String
+  iniciadoEn: Instante
+  ultimaPosicion: Coordenadas
+  ultimaPosicionEn: Instante
+  "Del servicio (Viajes); despachador y jefe de flota no ven montos (propuesta 7.2)."
+  monto: Dinero @roles(permitidos: [gerente, administracion, comercial])
+  "Bitácora (Viajes), la más nueva primero."
+  hitos(texto: String, limite: Int = 20): [Hito!]!
+  "Entrega o rechazo con su POD (Viajes)."
+  entrega: Entrega
+  "Probabilidad de retraso (Analítica); null si el viaje no está en ruta."
+  riesgo: RiesgoRetraso @roles(permitidos: [gerente, despachador])
+  "La unidad tractora (Flota)."
+  unidad: Unidad @roles(permitidos: [gerente, despachador, jefe_flota])
+}
+
+type Hito {
+  hitoId: ID!
+  tipo: String!
+  descripcion: String!
+  origen: String
+  posicion: Coordenadas
+  registradoEn: Instante!
+}
+
+type Entrega {
+  entregaId: ID!
+  tipo: String!
+  registradaEn: Instante!
+  distanciaMetros: Float
+  dentroGeocerca: Boolean
+  conFirma: Boolean
+  razones: [String!]
+  nombreReceptor: String
+  motivo: String
+  decision: String
+  decididaPor: String
+}
+
+enum EstadoServicio {
+  PROGRAMANDO
+  CONFIRMADO
+  EN_RUTA
+  ENTREGADO
+  CERRADO
+  CANCELADO
+  ENTREGA_OBSERVADA
+  ENTREGA_RECHAZADA
+  REQUIERE_INTERVENCION
+}
+
+type Servicio {
+  servicioId: ID!
+  viajeId: ID
+  clienteId: ID!
+  estado: EstadoServicio!
+  etapa: String
+  motivo: String
+  canal: String
+  rutaId: ID
+  tipoCarga: TipoCarga
+  toneladas: Float
+  fechaViaje: Fecha
+  monto: Dinero @roles(permitidos: [gerente, administracion, comercial])
+  placa: String
+  choferNombre: String
+  confirmacionCompleta: Boolean!
+  creadoEn: Instante
+}
+
+enum OpcionIntervencion {
+  REINTENTAR_COMPENSACION
+  MARCAR_RESUELTO
+}
+
+# ---------------------------------------------------------------- Flota
+
+enum TipoUnidad {
+  TRACTO
+  REMOLQUE
+}
+
+enum EstadoUnidad {
+  DISPONIBLE
+  RESERVADA
+  EN_VIAJE
+  MANTENIMIENTO_PENDIENTE
+  EN_MANTENIMIENTO
+  INACTIVA
+}
+
+type DocumentoUnidad {
+  tipo: String!
+  venceEl: Fecha!
+}
+
+type Unidad {
+  unidadId: ID!
+  tipoUnidad: TipoUnidad!
+  placa: String!
+  tipoRemolque: String
+  capacidadToneladas: Float
+  estado: EstadoUnidad!
+  kilometraje: Float
+  kmDesdeUltimoMantenimiento: Float!
+  documentos: [DocumentoUnidad!]!
+  atributos: JSON
+}
+
+enum TipoMantenimiento {
+  PREVENTIVO
+  CORRECTIVO
+  DOCUMENTOS
+}
+
+type ItemChecklist {
+  item: String!
+  ok: Boolean
+  nota: String
+}
+
+type Mantenimiento {
+  mantenimientoId: ID!
+  unidadId: ID!
+  placa: String!
+  tipo: TipoMantenimiento!
+  estado: String!
+  fechaProgramada: Fecha!
+  taller: String!
+  descripcion: String!
+  checklist: [ItemChecklist!]!
+  programadoEn: Instante
+  cerradoEn: Instante
+  observaciones: String
+}
+
+type Chofer {
+  choferId: ID!
+  nombre: String!
+  licenciaCategoria: String!
+  licenciaVenceEl: Fecha!
+  activo: Boolean!
+  disponible: Boolean!
+}
+
+type CargaCombustible {
+  cargaId: ID!
+  viajeId: ID!
+  placa: String!
+  choferId: ID!
+  litros: Float!
+  monto: Dinero!
+  kilometraje: Float!
+  registradaEn: Instante!
+}
+
+type AnomaliaCombustible {
+  cargaId: ID!
+  placa: String!
+  viajeId: ID
+  litros: Float!
+  kmPorLitro: Float!
+  puntaje: Float!
+  registradaEn: Instante!
+}
+
+type PuntajeConduccion {
+  choferId: ID!
+  viajeId: ID
+  nombre: String
+  frenadas: Int!
+  fatigas: Int!
+  km: Float!
+  puntaje: Float!
+}
+
+type PuntajesConduccion {
+  desde: Fecha!
+  hasta: Fecha!
+  choferes: [PuntajeConduccion!]!
+  viajes: [PuntajeConduccion!]!
+  datosAl: Instante
+}
+
+# ---------------------------------------------------------------- Finanzas
+
+enum EstadoFactura {
+  EMITIDA
+  PAGADA_PARCIAL
+  PAGADA
+}
+
+enum MedioPago {
+  TRANSFERENCIA
+  DEPOSITO
+  EFECTIVO
+  CHEQUE
+}
+
+type Pago {
+  pagoId: ID!
+  monto: Dinero!
+  fecha: Fecha!
+  medio: MedioPago!
+  referencia: String!
+  nota: String
+  registradoPor: String
+  registradoEn: Instante
+}
+
+type Factura {
+  facturaId: ID!
+  numero: String!
+  viajeId: ID!
+  servicioId: ID!
+  clienteId: ID!
+  razonSocial: String!
+  monto: Dinero!
+  saldo: Dinero!
+  estado: EstadoFactura!
+  emitidaEl: Fecha!
+  venceEl: Fecha!
+  vencida: Boolean!
+  diasVencida: Int
+  pagos: [Pago!]
+}
+
+type LineaCredito {
+  clienteId: ID!
+  limite: Dinero!
+  reservado: Dinero!
+  utilizado: Dinero!
+  disponible: Dinero!
+  enMora: Boolean!
+}
+
+type Cotizacion {
+  cotizacionId: ID!
+  clienteId: ID!
+  rutaId: ID!
+  tipoCarga: TipoCarga!
+  toneladas: Float!
+  fechaViaje: Fecha!
+  monto: Dinero!
+  estado: String!
+  vencida: Boolean!
+  venceEn: Instante
+  canal: String
+  creadaEn: Instante
+}
+
+type SolicitudAprobacion {
+  servicioId: ID!
+  clienteId: ID!
+  razonSocial: String!
+  monto: Dinero!
+  motivos: [String!]!
+  estado: String!
+  facturasVencidas: [Factura!]
+  creadaEn: Instante!
+  venceEn: Instante!
+  decididaPor: String
+  motivoDecision: String
+}
+
+type ResultadoAprobacion {
+  servicioId: ID!
+  aprobado: Boolean!
+  servicio: Servicio
+}
+
+# ---------------------------------------------------------------- Analítica: alertas, ML, reportes, agente
+
+enum TipoAlerta {
+  ENTREGA_OBSERVADA
+  ENTREGA_RECHAZADA
+  VIAJE_REQUIERE_INTERVENCION
+  MANTENIMIENTO_REQUERIDO
+  CAIDA_COMBUSTIBLE
+  ANOMALIA_COMBUSTIBLE
+  RIESGO_RETRASO
+  ACCION_PROPUESTA
+}
+
+enum EstadoAlerta {
+  ABIERTA
+  ATENDIDA
+  RESUELTA
+}
+
+type EntidadAlerta {
+  tipo: String!
+  id: ID!
+}
+
+type Alerta {
+  alertaId: ID!
+  secuencia: Int!
+  tipo: TipoAlerta!
+  severidad: String!
+  titulo: String!
+  detalle: String!
+  entidad: EntidadAlerta!
+  "Ruta en la app que corresponde (las apps se enlazan solo por URL)."
+  enlace: String!
+  estado: EstadoAlerta!
+  creadaEn: Instante!
+  origen: String!
+  atendidaPor: String
+  nota: String
+}
+
+type PaginaAlertas {
+  alertas: [Alerta!]!
+  siguienteCursor: Cursor
+  abiertas: Int!
+  datosAl: Instante
+}
+
+type FactorRiesgo {
+  nombre: String!
+  aporte: Float!
+}
+
+type RiesgoRetraso {
+  probabilidad: Float!
+  umbral: Float!
+  enRiesgo: Boolean!
+  calculadaEn: Instante!
+  modeloVersion: String!
+  factores: [FactorRiesgo!]!
+}
+
+enum ReporteId {
+  CUENTAS_POR_COBRAR
+  VIAJES_EN_RIESGO
+  FACTURACION_POR_CLIENTE
+  CONSUMO_COMBUSTIBLE
+  RENTABILIDAD
+}
+
+input ReporteParams {
+  desde: Fecha
+  hasta: Fecha
+  clienteId: ID
+  rutaId: ID
+  placa: String
+  umbral: Float
+  agrupar: String
+  incluirVencidas: Boolean
+}
+
+type DescripcionReporte {
+  reporteId: ReporteId!
+  titulo: String!
+  descripcion: String!
+  roles: [Rol!]!
+  maxDias: Int
+  parametros: JSON!
+}
+
+type ColumnaReporte {
+  clave: String!
+  titulo: String!
+  tipo: String!
+}
+
+type ReporteResultado {
+  reporteId: ReporteId!
+  titulo: String!
+  parametros: JSON!
+  columnas: [ColumnaReporte!]!
+  filas: [JSON!]!
+  totales: JSON!
+  grafico: JSON!
+  datosAl: Instante
+}
+
+type UrlDescarga {
+  "URL del Gateway con un token HMAC sin estado (D21); vence a los 10 min."
+  url: String!
+  nombreArchivo: String!
+  expiraEn: Instante!
+}
+
+type OpcionVoz {
+  etiqueta: String!
+  reporteId: ReporteId!
+  parametros: JSON!
+}
+
+type RespuestaVoz {
+  tipo: String!
+  texto: String!
+  reporteId: ReporteId
+  parametros: JSON
+  resultado: ReporteResultado
+  opciones: [OpcionVoz!]
+  exportable: Boolean
+}
+
+enum EstadoAccion {
+  PENDIENTE
+  APROBADA
+  EJECUTADA
+  RECHAZADA
+  ARCHIVADA
+}
+
+type Evidencia {
+  fuente: String!
+  referencia: String!
+  resumen: String!
+}
+
+type AccionPropuesta {
+  accionId: ID!
+  tipo: String!
+  viajeId: ID!
+  servicioId: ID
+  clienteId: ID!
+  razonSocial: String
+  mensaje: String!
+  evidencia: [Evidencia!]!
+  estado: EstadoAccion!
+  misionId: ID
+  creadaEn: Instante!
+  decididaPor: String
+  decididaEn: Instante
+  motivoRechazo: String
+  "El viaje de la acción (Viajes)."
+  viaje: Viaje
+}
+
+type PasoMision {
+  numero: Int!
+  herramienta: String!
+  argumentos: JSON
+  resumen: String
+  error: Boolean
+  ms: Int!
+}
+
+type Mision {
+  misionId: ID!
+  estado: String!
+  origen: String!
+  disparadaPor: String
+  iniciadaEn: Instante!
+  terminadaEn: Instante
+  codigo: String
+  traceId: String
+  accionesCreadas: Int
+  pasos: [PasoMision!]!
+  conclusion: String
+}
+
+type MisionDisparada {
+  misionId: ID!
+}
+
+# ---------------------------------------------------------------- operaciones
+
+type Query {
+  yo: Usuario!
+  tablero(periodo: Periodo!): Tablero!
+
+  viajesEnCurso(limite: Int = 50): [Viaje!]!
+  viajes(estado: EstadoViaje, limite: Int = 50): [Viaje!]!
+  viaje(id: ID!): Viaje
+  entregasObservadas: [Viaje!]!
+  intervenciones: [Viaje!]!
+  servicios(estado: EstadoServicio, clienteId: ID, limite: Int = 50): [Servicio!]!
+  clientes: [Cliente!]!
+  rutas: [Ruta!]!
+
+  unidades(tipo: TipoUnidad, estado: EstadoUnidad, placa: String): [Unidad!]! @roles(permitidos: [gerente, despachador, jefe_flota])
+  unidad(id: ID!): Unidad @roles(permitidos: [gerente, despachador, jefe_flota])
+  mantenimientos(estado: String, unidadId: ID): [Mantenimiento!]! @roles(permitidos: [gerente, despachador, jefe_flota])
+  choferes: [Chofer!]! @roles(permitidos: [gerente, despachador, jefe_flota])
+  cargasCombustible(placa: String, limite: Int = 50): [CargaCombustible!]! @roles(permitidos: [gerente, despachador, jefe_flota])
+  anomaliasCombustible(desde: Fecha!, hasta: Fecha): [AnomaliaCombustible!]! @roles(permitidos: [gerente, jefe_flota])
+  puntajesConduccion(desde: Fecha, choferId: ID): PuntajesConduccion! @roles(permitidos: [gerente, jefe_flota])
+
+  facturas(clienteId: ID, estado: EstadoFactura, conSaldo: Boolean, limite: Int = 50): [Factura!]! @roles(permitidos: [gerente, administracion, comercial])
+  factura(id: ID!): Factura @roles(permitidos: [gerente, administracion, comercial])
+  lineaCredito(clienteId: ID!): LineaCredito @roles(permitidos: [gerente, administracion, comercial])
+  cotizaciones(clienteId: ID, limite: Int = 50): [Cotizacion!]! @roles(permitidos: [gerente, administracion, comercial])
+  solicitudesAprobacion(estado: String): [SolicitudAprobacion!]! @roles(permitidos: [gerente, administracion])
+
+  catalogoReportes: [DescripcionReporte!]!
+  reporte(id: ReporteId!, params: ReporteParams): ReporteResultado!
+  alertasPendientes(desde: Cursor, limite: Int = 50): PaginaAlertas! @roles(permitidos: [gerente, despachador, jefe_flota, administracion])
+  misionesAgente(limite: Int = 20): [Mision!]! @roles(permitidos: [gerente, despachador])
+  mision(id: ID!): Mision @roles(permitidos: [gerente, despachador])
+  accionesPropuestas(estado: EstadoAccion): [AccionPropuesta!]! @roles(permitidos: [gerente, despachador])
+}
+
+input MantenimientoInput {
+  unidadId: ID!
+  tipo: TipoMantenimiento!
+  fechaProgramada: Fecha!
+  taller: String!
+  descripcion: String!
+  checklist: [String!]!
+  claveIdempotencia: ID!
+}
+
+input ItemChecklistInput {
+  item: String!
+  ok: Boolean!
+  nota: String
+}
+
+input DocumentoInput {
+  tipo: String!
+  venceEl: Fecha!
+}
+
+input CierreMantenimientoInput {
+  mantenimientoId: ID!
+  kilometraje: Float
+  checklist: [ItemChecklistInput!]!
+  observaciones: String
+  documentosRenovados: [DocumentoInput!]
+  claveIdempotencia: ID!
+}
+
+input PagoInput {
+  facturaId: ID!
+  monto: Dinero!
+  fecha: Fecha!
+  medio: MedioPago!
+  referencia: String!
+  nota: String
+  claveIdempotencia: ID!
+}
+
+type Mutation {
+  cancelarServicio(servicioId: ID!, motivo: String!, claveIdempotencia: ID!): Servicio!
+    @roles(permitidos: [despachador, comercial])
+  aprobarCredito(servicioId: ID!, aprobado: Boolean!, motivo: String, claveIdempotencia: ID!): ResultadoAprobacion!
+    @roles(permitidos: [administracion])
+  resolverIntervencion(viajeId: ID!, opcion: OpcionIntervencion!, nota: String, claveIdempotencia: ID!): Viaje!
+    @roles(permitidos: [despachador])
+  aprobarEntregaObservada(viajeId: ID!, nota: String, claveIdempotencia: ID!): Viaje! @roles(permitidos: [despachador])
+  rechazarEntregaObservada(viajeId: ID!, motivo: String!, claveIdempotencia: ID!): Viaje!
+    @roles(permitidos: [despachador])
+  programarMantenimiento(input: MantenimientoInput!): Mantenimiento! @roles(permitidos: [jefe_flota])
+  cerrarMantenimiento(input: CierreMantenimientoInput!): Mantenimiento! @roles(permitidos: [jefe_flota])
+  registrarPago(input: PagoInput!): Factura! @roles(permitidos: [administracion])
+  atenderAlerta(alertaId: ID!, nota: String, claveIdempotencia: ID!): Alerta!
+    @roles(permitidos: [despachador, jefe_flota, administracion])
+  dispararMision(claveIdempotencia: ID!): MisionDisparada! @roles(permitidos: [gerente, despachador])
+  aprobarAccion(id: ID!, mensaje: String!, claveIdempotencia: ID!): AccionPropuesta! @roles(permitidos: [despachador])
+  rechazarAccion(id: ID!, motivo: String, claveIdempotencia: ID!): AccionPropuesta! @roles(permitidos: [despachador])
+  exportarReporte(id: ReporteId!, params: ReporteParams, claveIdempotencia: ID!): UrlDescarga!
+  "No cambia estado: sin claveIdempotencia (spec 015)."
+  preguntar(texto: String!): RespuestaVoz! @roles(permitidos: [gerente, despachador, jefe_flota, administracion])
+}
+
+type Subscription {
+  "Alertas nuevas para los roles del token (spec 013). Cierra con 4401 al vencer el token y a los 3.600 s."
+  alertas: Alerta!
+}
