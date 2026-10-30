@@ -4,6 +4,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import bo.transporte.viajes.TemporalDePrueba;
 import bo.transporte.viajes.TemporalDePrueba.FinanzasFalsa;
 import bo.transporte.viajes.TemporalDePrueba.FlotaFalsa;
 import bo.transporte.viajes.adaptadores.temporal.ContratoSaga.*;
@@ -22,6 +23,7 @@ import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Predicate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -315,5 +317,34 @@ class ProgramarViajeTest {
         assertEquals(
                 List.of("Finanzas.liberarCredito:SIN_UNIDAD_COMPATIBLE", "Viajes.cancelarViaje:SIN_UNIDAD_COMPATIBLE"),
                 llamadas.subList(llamadas.size() - 2, llamadas.size()));
+    }
+
+    @Test
+    void cotizacionVencidaSoloCancelaElViaje() {
+        finanzas.respuesta = e -> {
+            throw negocio("COTIZACION_VENCIDA");
+        };
+        var r = resultado(iniciar(UUID.randomUUID()));
+        assertEquals("COTIZACION_VENCIDA", r.motivo());
+        assertEquals(
+                List.of(
+                        "Viajes.crearViaje",
+                        "Finanzas.validarYReservarCredito",
+                        "Viajes.cancelarViaje:COTIZACION_VENCIDA"),
+                llamadas);
+    }
+
+    @Test
+    void elWorkerDeFlotaCaidoSeReintentaYLaSagaConfirmaSinCompensar() {
+        var intentos = new AtomicInteger();
+        flota.respuesta = e -> {
+            if (intentos.incrementAndGet() < 3) throw new IllegalStateException("worker de Flota apagado");
+            return TemporalDePrueba.FlotaFalsa.reservada(e);
+        };
+        var r = resultado(iniciar(UUID.randomUUID()));
+        assertEquals("CONFIRMADO", r.resultado());
+        assertEquals(3, intentos.get());
+        assertTrue(llamadas.stream()
+                .noneMatch(l -> l.startsWith("Flota.liberarReserva") || l.startsWith("Finanzas.liberar")));
     }
 }
