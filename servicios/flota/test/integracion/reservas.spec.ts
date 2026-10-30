@@ -30,7 +30,7 @@ import { CHOFER_REPOSITORIO } from '../../src/aplicacion/puertos/chofer-reposito
 import { REGISTRO_DE_EVENTOS } from '../../src/aplicacion/puertos/registro-de-eventos';
 import { UNIDAD_DE_TRABAJO } from '../../src/aplicacion/puertos/unidad-de-trabajo';
 import { INBOX_EVENTOS } from '../../src/infraestructura/persistencia/inbox-mongo';
-import { cargarSemilla, diaDesdeHoy } from '../../src/infraestructura/persistencia/semilla-mongo';
+import { cargarSemilla, diaDesdeHoy, reiniciarDemo } from '../../src/infraestructura/persistencia/semilla-mongo';
 import { iniciarMongoRs0 } from './contenedores';
 
 /** Actividades Flota.* (spec 003, paso 3, 5 y compensación) contra Mongo rs0, como las llama el worker de Temporal. */
@@ -266,8 +266,10 @@ describe('Reservas de la saga (Mongo rs0)', () => {
   });
 
   it('la semilla deja 5 tractos, 6 remolques y 4 choferes, y la reserva del Aula toma 4521KTR, el furgón de 9.950 km y a chofer1', async () => {
-    await Promise.all([UNIDADES, CHOFERES].map((c) => conexion.collection(c).deleteMany({})));
-    await cargarSemilla(conexion, '../../plataforma/semilla');
+    // demo:reiniciar (T8.8) vacía todo, Outbox incluido, y deja la semilla; cargarla otra vez es idempotente.
+    await conexion.collection('outboxEventos').insertOne({ _id: uuid7() as never, sobre: {} });
+    await reiniciarDemo(conexion, '../../plataforma/semilla');
+    expect(await conexion.collection('outboxEventos').countDocuments()).toBe(0);
     expect(await cargarSemilla(conexion, '../../plataforma/semilla')).toEqual({ unidades: 11, choferes: 4 });
     expect(await conexion.collection(UNIDADES).countDocuments({ tipoUnidad: 'TRACTO' })).toBe(5);
     expect((await conexion.collection(CHOFERES).findOne({ usuarioSub: '0193a000-0000-7000-8000-000000000011' }))?.licenciaVenceEl).toBe(
