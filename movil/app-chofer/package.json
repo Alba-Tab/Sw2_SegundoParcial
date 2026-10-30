@@ -15,20 +15,28 @@
     "verificar": "npm run tipos && npm run lint && npm run formato && npm test",
     "generar:contratos": "orval --config orval.config.ts && prettier --write src/datos/api/generado --log-level warn",
     "generar:contratos:verificar": "npm run generar:contratos && test -z \"$(git status --porcelain -- src/datos/api/generado)\" || (echo 'src/datos/api/generado no coincide con contratos/openapi: corre npm run generar:contratos' && git status --porcelain -- src/datos/api/generado && exit 1)",
-    "generar:migraciones": "drizzle-kit generate"
+    "generar:migraciones": "drizzle-kit generate",
+    "prestart": "sh scripts/descargar-modelo.sh",
+    "preios": "sh scripts/descargar-modelo.sh",
+    "preandroid": "sh scripts/descargar-modelo.sh",
+    "empaquetar": "sh scripts/descargar-modelo.sh && expo export --platform ios --platform android --output-dir .expo/exportado --no-minify"
   },
   "dependencies": {
     "@tanstack/react-query": "5.104.3",
     "@transporte/design-tokens": "file:../../libs/design-tokens",
     "babel-preset-expo": "~57.0.0",
+    "buffer": "6.0.3",
     "drizzle-orm": "0.45.4",
     "expo": "57.0.31",
+    "expo-asset": "~57.0.20",
+    "expo-audio": "~57.0.5",
     "expo-auth-session": "~57.0.16",
     "expo-background-task": "~57.0.21",
     "expo-build-properties": "~57.0.22",
     "expo-constants": "~57.0.22",
     "expo-crypto": "~57.0.4",
     "expo-dev-client": "~57.0.20",
+    "expo-file-system": "~57.0.7",
     "expo-location": "~57.0.22",
     "expo-network": "~57.0.3",
     "expo-secure-store": "~57.0.4",
@@ -40,7 +48,8 @@
     "react": "19.2.3",
     "react-native": "0.86.3",
     "react-native-paper": "5.15.3",
-    "react-native-safe-area-context": "~5.7.0"
+    "react-native-safe-area-context": "~5.7.0",
+    "whisper.rn": "0.7.4"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",

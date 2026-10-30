@@ -1,3 +1,4 @@
+import { descripcionValida, type OrigenHito, type TipoHito } from '../dominio/hito';
 import { kmh, type Lectura, MuestreoGps } from '../dominio/muestreo';
 import type { TipoOperacion } from '../dominio/operacion';
 import { puedeIniciar } from '../dominio/viaje';
@@ -73,6 +74,24 @@ export class CasosDeUso {
       magnitudG,
       posicion,
       registradoEn: this.reloj.ahora().toISOString(),
+    });
+  }
+
+  /**
+   * Spec 005, paso 7: el chofer revisó el texto (dictado o escrito) y eligió el tipo. Solo el texto va a la cola; el
+   * audio se queda en el celular (D53).
+   */
+  registrarHito(viajeId: string, tipo: TipoHito, descripcion: string, origen: OrigenHito): string {
+    if (!descripcionValida(descripcion)) throw new Error('La descripción debe tener de 3 a 500 caracteres');
+    const posicion = this.ultimaPosicion();
+    if (!posicion) throw new Error('Esperando la posición del GPS; intenta en unos segundos');
+    return this.encolar(viajeId, 'HITO', {
+      hitoId: this.ids.nuevo(),
+      tipo,
+      descripcion: descripcion.trim(),
+      posicion,
+      registradoEn: this.reloj.ahora().toISOString(),
+      origen,
     });
   }
 

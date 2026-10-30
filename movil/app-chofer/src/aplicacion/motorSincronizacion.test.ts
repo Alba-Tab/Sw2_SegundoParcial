@@ -234,4 +234,17 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     expect(frenada.cuerpo).toMatchObject({ tipo: 'FRENADA_BRUSCA', magnitudG: 0.55, posicion: { lng: -63.18 } });
     expect((frenada.cuerpo.posicion as { lat: number }).lat).toBeCloseTo(-17.70003, 8);
   });
+
+  it('T7.4: el hito va a la cola con el texto revisado y la posición; sin GPS o con texto corto, no', () => {
+    expect(() => casos.registrarHito('v1', 'BLOQUEO', 'Bloqueo en el puente', 'VOZ')).toThrow(/GPS/);
+    casos.registrarLectura('v1', { lat: -17.7, lng: -63.18, velocidadMs: 0, precisionMetros: 5, en: ahora.getTime() });
+    expect(() => casos.registrarHito('v1', 'BLOQUEO', ' ab ', 'TEXTO')).toThrow(/3 a 500/);
+    const op = casos.registrarHito('v1', 'BLOQUEO', '  Bloqueo en el puente  ', 'VOZ');
+    expect(cola.ops.find((o) => o.opId === op)?.cuerpo).toMatchObject({
+      tipo: 'BLOQUEO',
+      descripcion: 'Bloqueo en el puente',
+      origen: 'VOZ',
+      posicion: { lat: -17.7, lng: -63.18 },
+    });
+  });
 });

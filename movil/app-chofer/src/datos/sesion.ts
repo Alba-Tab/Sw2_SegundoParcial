@@ -73,7 +73,9 @@ export class SesionKeycloak implements Sesion {
   nombre(): string | null {
     if (!this.acceso) return null;
     try {
-      const datos = JSON.parse(atob(this.acceso.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))) as {
+      const b64 = this.acceso.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+      // Hermes exige el relleno en atob (PoC-4).
+      const datos = JSON.parse(atob(b64 + '='.repeat((4 - (b64.length % 4)) % 4))) as {
         name?: string;
         preferred_username?: string;
       };

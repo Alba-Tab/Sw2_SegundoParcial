@@ -27,6 +27,13 @@ Dominio y aplicación son TypeScript puro y se prueban con Vitest y puertos fals
 - `expo-sensors` (DeviceMotion a 10 Hz, con la app al frente): una frenada es brusca desde 0,4 g sostenida 300 ms a más de 20 km/h, como mucho una cada 10 s (D08, D59). Va a la cola como `EVENTO_CONDUCCION` con la última posición del GPS.
 - El inicio del viaje lleva la última posición conocida.
 
+## Bitácora por voz (T7.4)
+
+- Whisper `base` (`ggml-base-q5_1.bin`, 60 MB, D38) en el celular con `whisper.rn`: `scripts/descargar-modelo.sh` lo baja antes del build (`prestart`, `preios`, `preandroid`; no se versiona) y viaja como asset.
+- El chofer dicta (WAV PCM 16 kHz mono con `expo-audio`), revisa el texto, elige el tipo y guarda: el hito va a la cola con la última posición. El audio se borra al transcribir y nunca sale del celular (D53).
+- A más de 5 km/h el texto no se puede escribir, solo dictar (D58).
+- Android no graba WAV con `MediaRecorder` (PoC-4): ahí el dictado queda pendiente de un adaptador PCM y el chofer escribe con el camión detenido.
+
 ## Correr
 
 ```bash
@@ -46,4 +53,5 @@ LANG=en_US.UTF-8 APP_MAC_LOCAL=<tu-mac>.local npx expo run:ios
 |---|---|
 | `npm run verificar` | Tipos, ESLint, Prettier y Vitest |
 | `npm run generar:contratos` | Regenera el cliente de `contratos/openapi` (CI falla si no coincide) |
+| `npm run empaquetar` | Baja el modelo y empaqueta iOS y Android con `expo export` (CI: atrapa módulos que Metro no resuelve) |
 | `npm run generar:migraciones` | Crea la migración de Drizzle al cambiar `src/datos/esquema.ts` |

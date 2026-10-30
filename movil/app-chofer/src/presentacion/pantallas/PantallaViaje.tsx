@@ -17,7 +17,17 @@ const GPS: Record<EstadoGps, string> = {
   detenido: 'GPS detenido',
 };
 
-export function PantallaViaje({ viajeId, gps, sincronizar }: { viajeId: string; gps: EstadoGps; sincronizar: () => void }) {
+export function PantallaViaje({
+  viajeId,
+  gps,
+  sincronizar,
+  abrirHito,
+}: {
+  viajeId: string;
+  gps: EstadoGps;
+  sincronizar: () => void;
+  abrirHito: () => void;
+}) {
   useLiveQuery(bd.select().from(viaje));
   useLiveQuery(bd.select().from(puntoGps));
   const v = viajes.porId(viajeId);
@@ -57,6 +67,11 @@ export function PantallaViaje({ viajeId, gps, sincronizar }: { viajeId: string; 
         <Text variant="bodyMedium">
           {GPS[gps]} · {puntos.pendientes(viajeId, 10_000).length} puntos por enviar
         </Text>
+      )}
+      {estado === 'EN_RUTA' && (
+        <Button mode="contained-tonal" icon="notebook-edit" onPress={abrirHito} contentStyle={{ paddingVertical: 8 }}>
+          Registrar hito
+        </Button>
       )}
       {error && <Text variant="bodyMedium">{error}</Text>}
       {puedeIniciar(v, viajes.todos()) && (
