@@ -22,6 +22,7 @@ jobs:
       viajes: ${{ steps.f.outputs.viajes }}
       flota: ${{ steps.f.outputs.flota }}
       finanzas: ${{ steps.f.outputs.finanzas }}
+      analitica: ${{ steps.f.outputs.analitica }}
       keycloak: ${{ steps.f.outputs.keycloak }}
       compose: ${{ steps.f.outputs.compose }}
       simulador: ${{ steps.f.outputs.simulador }}
@@ -63,6 +64,14 @@ jobs:
               - servicios/finanzas/**
               - plataforma/semilla/**
               - contratos/openapi/finanzas.yaml
+              - contratos/openapi/comun.yaml
+            analitica:
+              - *ci
+              - *eventos
+              - servicios/analitica/**
+              - plataforma/semilla/**
+              - plataforma/datos-sinteticos/**
+              - contratos/openapi/analitica.yaml
               - contratos/openapi/comun.yaml
             keycloak:
               - *ci
@@ -130,6 +139,23 @@ jobs:
         env:
           # MongoDB 8.0 aborta en el kernel 6.19+ del runner (SERVER-121912); 7.0 usa el tcmalloc anterior.
           MONGO_IMAGEN_PRUEBA: mongo:7.0.45
+
+  analitica:
+    needs: cambios
+    if: needs.cambios.outputs.analitica == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: servicios/analitica } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with: { enable-cache: true, cache-dependency-glob: servicios/analitica/uv.lock }
+      - run: uv sync --locked
+      - name: Lint y formato (ruff)
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Capas (import-linter)
+        run: uv run lint-imports
+      - name: Pruebas e integración (Testcontainers)
+        run: uv run pytest -q
 
   finanzas:
     needs: cambios
@@ -270,7 +296,7 @@ jobs:
 
   ci-ok:
     if: always()
-    needs: [cambios, contratos, viajes, flota, finanzas, keycloak, compose, simulador, tokens, portal, app-chofer, gitleaks, commitlint]
+    needs: [cambios, contratos, viajes, flota, finanzas, analitica, keycloak, compose, simulador, tokens, portal, app-chofer, gitleaks, commitlint]
     runs-on: ubuntu-latest
     steps:
       - name: Todo en verde u omitido por no tener cambios

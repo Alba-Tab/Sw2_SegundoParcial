@@ -1,0 +1,68 @@
+[project]
+name = "analitica"
+version = "0.1.0"
+description = "Analítica: modelo de lectura (CQRS), alertas, ML, reportes, acciones del agente y voz (specs 013, 014 y 015)"
+requires-python = ">=3.13,<3.14"
+dependencies = [
+  "fastapi==0.162.0",
+  "uvicorn[standard]==0.54.0",
+  "pydantic==2.14.2",
+  "pydantic-settings==2.16.2",
+  "sqlalchemy==2.1.6",
+  "alembic==1.20.1",
+  "psycopg[binary]==3.3.6",
+  "aio-pika==10.2.1",
+  "pandas==3.1.0",
+  "numpy==2.5.4",
+  "scikit-learn==1.9.1",
+  "joblib==1.6.0",
+  "openpyxl==3.1.5",
+  "httpx==0.28.1",
+  "pyjwt[crypto]==2.15.1",
+  "apscheduler==3.11.3",
+  "jsonschema[format]==4.26.0",
+]
+
+[dependency-groups]
+dev = [
+  "pytest==9.2.0",
+  "pytest-asyncio==1.4.1",
+  "testcontainers[postgres]==4.15.0",
+  "ruff==0.17.3",
+  "import-linter==2.15",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+line-length = 120
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
+ignore = ["RUF001", "RUF002", "RUF003"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "session"
+asyncio_default_test_loop_scope = "session"
+
+# dominio/ no conoce FastAPI, SQLAlchemy ni la mensajería; aplicacion/ no conoce la API.
+[tool.importlinter]
+root_package = "app"
+include_external_packages = true
+
+[[tool.importlinter.contracts]]
+name = "Capas"
+type = "layers"
+layers = ["app.api", "app.aplicacion", "app.dominio"]
+containers = []
+
+[[tool.importlinter.contracts]]
+name = "El dominio es puro"
+type = "forbidden"
+source_modules = ["app.dominio"]
+forbidden_modules = ["fastapi", "sqlalchemy", "aio_pika", "httpx", "app.infraestructura", "app.aplicacion", "app.api"]
+allow_indirect_imports = true

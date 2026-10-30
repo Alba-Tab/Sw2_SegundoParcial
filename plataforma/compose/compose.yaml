@@ -1,7 +1,7 @@
 # Entorno local (plan-desarrollo.md §8). Uso:
 #   cp .env.example .env
 #   docker compose --profile core --profile plataforma up -d
-# Perfiles: core (bases y servicios), plataforma (Temporal, RabbitMQ, Keycloak, n8n, Mailpit), trazas (OTel + Jaeger),
+# Perfiles: core (bases y servicios), ia (Analítica), plataforma (Temporal, RabbitMQ, Keycloak, n8n, Mailpit), trazas (OTel + Jaeger),
 # demo (Toxiproxy, con --env-file .env.demo), simulador (sensor de combustible, con docker compose run).
 
 x-comun: &comun
@@ -215,6 +215,30 @@ services:
     environment:
       <<: *finanzas-env
       OTEL_SERVICE_NAME: finanzas-worker
+
+  # Analítica (spec 013): modelo de lectura, alertas, ML, reportes y agente. Perfil ia (propuesta 11).
+  analitica:
+    <<: *comun
+    build: { context: ../.., dockerfile: servicios/analitica/Dockerfile }
+    image: transporte/analitica:local
+    profiles: [ia]
+    depends_on:
+      postgres-azure: { condition: service_healthy }
+      rabbitmq-usuarios: { condition: service_completed_successfully, required: false }
+    environment:
+      DATABASE_URL: postgresql+psycopg://analitica:${CLAVE_ANALITICA}@postgres-azure:5432/analitica
+      AMQP_URL: amqp://analitica:${RABBITMQ_CLAVE_ANALITICA}@rabbitmq:5672/
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENTE_SECRETO: ${KC_SECRETO_ANALITICA}
+      AGENTE_CLIENTE_SECRETO: ${KC_SECRETO_AGENTE}
+      CORS_ORIGENES: ${CORS_ORIGENES:-}
+      PORTAL_URL: ${PORTAL_URL:-http://localhost:5173}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://host.docker.internal:11434}
+      LLM_MODEL: ${LLM_MODEL:-qwen3:4b-instruct}
+      MCP_URL: ${MCP_URL:-http://mcp-server:8106/mcp}
+      OTEL_EXPORTER_OTLP_ENDPOINT: ${OTEL_SERVICIOS_ENDPOINT:-}
+    extra_hosts: ["${MAC_LOCAL:-mac.local}:host-gateway", "host.docker.internal:host-gateway"]
+    ports: ["8104:8104"]
 
   # ---------------------------------------------------------------- plataforma
   temporal-esquema:
