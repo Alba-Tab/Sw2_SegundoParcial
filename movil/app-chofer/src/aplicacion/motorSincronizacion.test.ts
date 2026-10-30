@@ -1,0 +1,213 @@
+import { beforeEach, describe, expect, it } from 'vitest';
+import type { PuntoGps } from '../dominio/gps';
+import type { Operacion } from '../dominio/operacion';
+import type { Respuesta } from '../dominio/reintento';
+import type { ViajeLocal } from '../dominio/viaje';
+import { CasosDeUso } from './casosDeUso';
+import { MotorSincronizacion } from './motorSincronizacion';
+import { type Api, type Cola, type PuntosGps, SesionVencida, type Viajes } from './puertos';
+
+class ColaEnMemoria implements Cola {
+  ops: Operacion[] = [];
+  todas = () => this.ops.filter((o) => o.estado === 'PENDIENTE');
+  agregar = (o: Operacion) => void this.ops.push(o);
+  actualizar = () => {};
+  descartarViaje = (viajeId: string) => {
+    for (const o of this.ops) if (o.viajeId === viajeId && o.estado === 'PENDIENTE') o.estado = 'DESCARTADA';
+  };
+  purgar = () => {};
+}
+
+class PuntosEnMemoria implements PuntosGps {
+  p: PuntoGps[] = [];
+  agregar = (x: PuntoGps) => void this.p.push(x);
+  pendientes = (v: string, n: number) => this.p.filter((x) => x.viajeId === v).slice(0, n);
+  viajes = () => [...new Set(this.p.map((x) => x.viajeId))];
+  borrar = (v: string, seqs: number[]) => void (this.p = this.p.filter((x) => x.viajeId !== v || !seqs.includes(x.seq)));
+  borrarHasta = (v: string, s: number) => void (this.p = this.p.filter((x) => x.viajeId !== v || x.seq > s));
+  contar = () => this.p.length;
+}
+
+class ViajesEnMemoria implements Viajes {
+  v = new Map<string, ViajeLocal>();
+  todos = () => [...this.v.values()];
+  porId = (id: string) => this.v.get(id) ?? null;
+  guardarDelServidor = (vs: ViajeLocal[]) => vs.forEach((x) => this.v.set(x.viajeId, x));
+  marcarIniciado = (id: string) => void (this.v.get(id)!.iniciadoLocal = true);
+  marcarCanceladoAlSincronizar = (id: string) => void (this.v.get(id)!.canceladoAlSincronizar = true);
+}
+
+/** Responde con lo que haya en la cola de respuestas de cada clave (`TIPO:opId` o `GPS`), y registra cada envío. */
+class ApiFalsa implements Api {
+  respuestas = new Map<string, Respuesta[]>();
+  enviadas: string[] = [];
+  lotes: { puntos: number[]; loteId: string }[] = [];
+  estado = 'EN_RUTA';
+  cursorServidor: number | null = null;
+  responder(clave: string, ...r: Respuesta[]) {
+    this.respuestas.set(clave, r);
+  }
+  private siguiente(clave: string): Respuesta {
+    const cola = this.respuestas.get(clave);
+    return (cola && cola.length > 1 ? cola.shift() : cola?.[0]) ?? { estado: 200 };
+  }
+  enviar = async (op: Operacion) => {
+    this.enviadas.push(`${op.tipo}:${op.opId}`);
+    return this.siguiente(`${op.tipo}:${op.opId}`);
+  };
+  enviarLoteGps = async (_v: string, _d: string, puntos: PuntoGps[], loteId: string) => {
+    this.lotes.push({ puntos: puntos.map((p) => p.seq), loteId });
+    return this.siguiente('GPS');
+  };
+  estadoDelViaje = async () => this.estado;
+  misViajes = async () => [];
+  cursor = async () => this.cursorServidor;
+  registrarDispositivo = async () => ({ estado: 200 });
+}
+
+const viaje = (viajeId: string): ViajeLocal => ({
+  viajeId,
+  estado: 'CONFIRMADO',
+  iniciadoLocal: false,
+  canceladoAlSincronizar: false,
+  cliente: 'Agroexport',
+  ruta: 'Santa Cruz – Aula',
+  destino: { lat: -17.8, lng: -63.2, radioMetros: 300 },
+  tipoCarga: 'GRANOS',
+  toneladas: 28,
+  fechaViaje: '2026-11-03',
+  placa: '4521KTR',
+});
+
+describe('motor de sincronización (spec 005, CU-08)', () => {
+  let cola: ColaEnMemoria, puntos: PuntosEnMemoria, viajes: ViajesEnMemoria, api: ApiFalsa;
+  let ahora: Date, conRed: boolean, sesionVencida: boolean, n: number;
+  let motor: MotorSincronizacion, casos: CasosDeUso;
+
+  beforeEach(() => {
+    cola = new ColaEnMemoria();
+    puntos = new PuntosEnMemoria();
+    viajes = new ViajesEnMemoria();
+    api = new ApiFalsa();
+    ahora = new Date('2026-11-03T12:00:00Z');
+    conRed = true;
+    sesionVencida = false;
+    n = 0;
+    const reloj = { ahora: () => ahora };
+    const ids = { nuevo: () => `id-${++n}` };
+    const sesion = {
+      tokenVigente: async () => {
+        if (sesionVencida) throw new SesionVencida();
+        return 'token';
+      },
+    };
+    const red = { hayConexion: async () => conRed };
+    const dispositivo = { id: () => 'celular', plataforma: () => 'IOS' as const };
+    motor = new MotorSincronizacion(cola, puntos, viajes, api, sesion, red, reloj, ids, dispositivo, () => 0.5);
+    casos = new CasosDeUso(cola, viajes, api, sesion, reloj, ids, dispositivo);
+    viajes.guardarDelServidor([viaje('v1')]);
+  });
+
+  const gps = (seq: number) =>
+    puntos.agregar({ viajeId: 'v1', seq, registradaEn: ahora.toISOString(), lat: -17.7, lng: -63.1, velocidadKmh: 50, precisionMetros: 5 });
+
+  it('FO1: sin red no envía nada; al volver, el inicio primero, luego la bitácora y el GPS, una sola vez', async () => {
+    conRed = false;
+    const inicio = casos.iniciarViaje('v1', null);
+    gps(0);
+    const hito = casos.encolar('v1', 'HITO', { tipo: 'BLOQUEO' });
+    const frenada = casos.encolar('v1', 'EVENTO_CONDUCCION', { tipo: 'FRENADA_BRUSCA' });
+    expect((await motor.sincronizar()).sinConexion).toBe(true);
+    expect(api.enviadas).toEqual([]);
+    expect(viajes.porId('v1')?.iniciadoLocal).toBe(true);
+
+    conRed = true;
+    const r = await motor.sincronizar();
+    expect(api.enviadas).toEqual([`INICIO:${inicio}`, `HITO:${hito}`, `EVENTO_CONDUCCION:${frenada}`]);
+    expect(r.confirmadas).toBe(3);
+    expect(api.lotes.map((l) => l.puntos)).toEqual([[0]]);
+    expect(puntos.contar()).toBe(0);
+    await motor.sincronizar();
+    expect(api.enviadas).toHaveLength(3);
+  });
+
+  it('FO2: con cortes reintenta con esperas crecientes y la misma clave hasta confirmar', async () => {
+    const inicio = casos.iniciarViaje('v1', null);
+    api.responder(`INICIO:${inicio}`, { estado: 'SIN_RED' }, { estado: 'SIN_RED' }, { estado: 503 }, { estado: 200 });
+    const esperas: number[] = [];
+    for (let i = 0; i < 3; i++) {
+      await motor.sincronizar();
+      const op = cola.ops[0];
+      esperas.push(Date.parse(op.proximoIntentoEn!) - ahora.getTime());
+      ahora = new Date(Date.parse(op.proximoIntentoEn!));
+    }
+    expect(esperas).toEqual([500, 1000, 2000]);
+    await motor.sincronizar();
+    expect(cola.ops[0].estado).toBe('CONFIRMADA');
+    expect(new Set(api.enviadas)).toEqual(new Set([`INICIO:${inicio}`]));
+  });
+
+  it('el GPS no sale hasta que el inicio está confirmado y respeta Retry-After (FO4)', async () => {
+    const inicio = casos.iniciarViaje('v1', null);
+    for (let s = 0; s < 150; s++) gps(s);
+    api.responder(`INICIO:${inicio}`, { estado: 409, codigo: 'CONFIRMACION_EN_CURSO' }, { estado: 200 });
+    await motor.sincronizar();
+    expect(api.lotes).toEqual([]);
+
+    ahora = new Date(ahora.getTime() + 1000);
+    api.responder('GPS', { estado: 503, reintentarEnSegundos: 10 }, { estado: 200 });
+    await motor.sincronizar();
+    expect(api.lotes.map((l) => l.puntos.length)).toEqual([100]);
+    expect(puntos.contar()).toBe(150);
+
+    ahora = new Date(ahora.getTime() + 5000);
+    await motor.sincronizar();
+    expect(api.lotes).toHaveLength(1);
+    ahora = new Date(ahora.getTime() + 6000);
+    await motor.sincronizar();
+    expect(api.lotes.map((l) => l.puntos.length)).toEqual([100, 100, 50]);
+    expect(puntos.contar()).toBe(0);
+  });
+
+  it('plan F7: el viaje se canceló mientras el inicio esperaba sin señal; se descarta su cola y se avisa', async () => {
+    const inicio = casos.iniciarViaje('v1', null);
+    const hito = casos.encolar('v1', 'HITO', { tipo: 'PARADA' });
+    api.responder(`INICIO:${inicio}`, { estado: 409, codigo: 'CONFLICTO_ESTADO' });
+    api.estado = 'CANCELADO';
+    const r = await motor.sincronizar();
+    expect(r.cancelados).toEqual(['v1']);
+    expect(api.enviadas).toEqual([`INICIO:${inicio}`]);
+    expect(cola.ops.find((o) => o.opId === hito)?.estado).toBe('DESCARTADA');
+    expect(viajes.porId('v1')?.canceladoAlSincronizar).toBe(true);
+  });
+
+  it('un 4xx definitivo deja la operación FALLIDA con su código y sigue con la siguiente', async () => {
+    casos.iniciarViaje('v1', null);
+    const malo = casos.encolar('v1', 'HITO', { tipo: 'OTRO' });
+    const bueno = casos.encolar('v1', 'HITO', { tipo: 'PARADA' });
+    api.responder(`HITO:${malo}`, { estado: 422, codigo: 'IDEMPOTENCIA_CUERPO_DISTINTO' });
+    await motor.sincronizar();
+    expect(cola.ops.find((o) => o.opId === malo)).toMatchObject({ estado: 'FALLIDA', codigoError: 'IDEMPOTENCIA_CUERPO_DISTINTO' });
+    expect(cola.ops.find((o) => o.opId === bueno)?.estado).toBe('CONFIRMADA');
+  });
+
+  it('con la sesión vencida pide iniciar sesión sin borrar la cola', async () => {
+    casos.iniciarViaje('v1', null);
+    sesionVencida = true;
+    expect((await motor.sincronizar()).requiereSesion).toBe(true);
+    expect(cola.todas()).toHaveLength(1);
+  });
+
+  it('al abrir, borra los puntos que el servidor ya aceptó según el cursor del celular', async () => {
+    for (let s = 0; s < 10; s++) gps(s);
+    api.cursorServidor = 6;
+    await motor.recuperarCursor();
+    expect(puntos.pendientes('v1', 100).map((p) => p.seq)).toEqual([7, 8, 9]);
+  });
+
+  it('dos disparadores a la vez comparten la misma tanda', async () => {
+    casos.iniciarViaje('v1', null);
+    await Promise.all([motor.sincronizar(), motor.sincronizar()]);
+    expect(api.enviadas).toHaveLength(1);
+  });
+});
