@@ -103,6 +103,7 @@ services:
       postgres-aws: { condition: service_healthy }
       rabbitmq-usuarios: { condition: service_completed_successfully, required: false }
       temporal-namespace: { condition: service_completed_successfully, required: false }
+      aws-local-iniciar: { condition: service_completed_successfully, required: false }
     environment:
       DB_URL: jdbc:postgresql://postgres-aws:5432/viajes
       DB_USUARIO: viajes
@@ -113,6 +114,13 @@ services:
       OIDC_ISSUER: ${OIDC_ISSUER:-}
       KC_SECRETO_VIAJES: ${KC_SECRETO_VIAJES}
       TEMPORAL_ADDRESS: temporal:7233
+      # Evidencias (spec 006): el servidor habla con s3-local; las URL firmadas usan el nombre que alcanza el celular.
+      S3_ENDPOINT: http://s3-local:9000
+      S3_ENDPOINT_PUBLICO: http://${MAC_LOCAL}:9000
+      S3_BUCKET: ${S3_BUCKET}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      AWS_REGION: ${AWS_REGION}
       # parametrosSaga (spec 003): .env.demo los acorta para la defensa.
       SAGA_ESPERA_APROBACION: ${SAGA_ESPERA_APROBACION:-PT24H}
       SAGA_COMPENSACION_SCHEDULE_TO_CLOSE: ${SAGA_COMPENSACION_SCHEDULE_TO_CLOSE:-PT10M}

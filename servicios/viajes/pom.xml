@@ -30,7 +30,19 @@
 		<java.version>25</java.version>
 		<!-- PoC-2: el SDK 1.40 funciona con Jackson 3 usando un conversor propio (ConversorTemporal). -->
 		<temporal.version>1.40.0</temporal.version>
+		<awssdk.version>2.56.0</awssdk.version>
 	</properties>
+	<dependencyManagement>
+		<dependencies>
+			<dependency>
+				<groupId>software.amazon.awssdk</groupId>
+				<artifactId>bom</artifactId>
+				<version>${awssdk.version}</version>
+				<type>pom</type>
+				<scope>import</scope>
+			</dependency>
+		</dependencies>
+	</dependencyManagement>
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -148,6 +160,11 @@
 			<groupId>com.networknt</groupId>
 			<artifactId>json-schema-validator</artifactId>
 			<version>3.0.8</version>
+		</dependency>
+		<!-- Evidencias por partes en S3 (spec 006, D40a); RustFS en local. -->
+		<dependency>
+			<groupId>software.amazon.awssdk</groupId>
+			<artifactId>s3</artifactId>
 		</dependency>
 		<dependency>
 			<groupId>io.temporal</groupId>

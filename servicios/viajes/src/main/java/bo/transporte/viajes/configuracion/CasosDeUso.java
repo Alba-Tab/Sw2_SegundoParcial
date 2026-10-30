@@ -3,8 +3,10 @@ package bo.transporte.viajes.configuracion;
 import bo.transporte.viajes.aplicacion.cliente.AltaDeCliente;
 import bo.transporte.viajes.aplicacion.cliente.ConsultaDeClientes;
 import bo.transporte.viajes.aplicacion.cliente.VinculacionDeCliente;
+import bo.transporte.viajes.aplicacion.puerto.salida.AlmacenEvidencias;
 import bo.transporte.viajes.aplicacion.puerto.salida.Auditoria;
 import bo.transporte.viajes.aplicacion.puerto.salida.ClienteRepositorio;
+import bo.transporte.viajes.aplicacion.puerto.salida.EvidenciaRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.Orquestador;
 import bo.transporte.viajes.aplicacion.puerto.salida.RegistroDeEventos;
 import bo.transporte.viajes.aplicacion.puerto.salida.RegistroIdempotente;
@@ -23,6 +25,7 @@ import bo.transporte.viajes.aplicacion.servicio.ParametrosSaga;
 import bo.transporte.viajes.aplicacion.viaje.ConsultaDeViajes;
 import bo.transporte.viajes.aplicacion.viaje.InicioDeViaje;
 import bo.transporte.viajes.aplicacion.viaje.ProgramacionDeViaje;
+import bo.transporte.viajes.aplicacion.viaje.SubidaDeEvidencia;
 import java.time.Clock;
 import java.time.Duration;
 import org.springframework.beans.factory.annotation.Value;
@@ -151,5 +154,11 @@ class CasosDeUso {
             Transacciones tx,
             Clock reloj) {
         return new InicioDeViaje(viajes, servicios, consulta, eventos, idempotencia, auditoria, tx, reloj);
+    }
+
+    @Bean
+    SubidaDeEvidencia subidaDeEvidencia(
+            ViajeRepositorio viajes, EvidenciaRepositorio evidencias, AlmacenEvidencias almacen, Transacciones tx) {
+        return new SubidaDeEvidencia(viajes, evidencias, almacen, tx);
     }
 }

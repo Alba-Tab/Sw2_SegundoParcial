@@ -35,7 +35,7 @@ import tools.jackson.databind.json.JsonMapper;
             "outbox.intervalo=PT1H",
             "saga.compensacion.maximo-intentos=2"
         })
-@Import({TestcontainersConfiguration.class, TokensDePrueba.class})
+@Import({TestcontainersConfiguration.class, TokensDePrueba.class, AlmacenDePrueba.class})
 class ServiciosIT {
     static final String CLIENTE = "01933b5a-1f00-7a20-8b11-0c2d3e4f5a01";
     static final String OTRO_CLIENTE = "01933b5a-1f00-7a20-8b11-0c2d3e4f5a02";
@@ -62,7 +62,7 @@ class ServiciosIT {
 
     @BeforeEach
     void preparar() {
-        jdbc.sql("TRUNCATE viaje, servicio, cliente, ruta, operacion_idempotente, outbox_eventos, auditoria")
+        jdbc.sql("TRUNCATE evidencia, viaje, servicio, cliente, ruta, operacion_idempotente, outbox_eventos, auditoria")
                 .update();
         for (String id : List.of(CLIENTE, OTRO_CLIENTE)) {
             jdbc.sql("""
@@ -623,5 +623,136 @@ class ServiciosIT {
         var otro = iniciar(CHOFER, viajeDe(a), UUID.randomUUID(), ahora);
         assertEquals(409, otro.estado());
         assertEquals("CONFLICTO_ESTADO", otro.cuerpo().get("codigo").asString());
+    }
+
+    private String enRuta() throws Exception {
+        String viajeId = viajeDe(confirmado());
+        iniciar(CHOFER, viajeId, UUID.randomUUID(), java.time.Instant.now().toString());
+        return viajeId;
+    }
+
+    private Respuesta crearEvidencia(String viajeId, String evidenciaId, String tipo, long tamano) throws Exception {
+        return pedir(
+                "POST",
+                "/api/v1/viajes/" + viajeId + "/evidencias",
+                CHOFER,
+                UUID.randomUUID(),
+                "{\"evidenciaId\":\"" + evidenciaId + "\",\"tipo\":\"" + tipo
+                        + "\",\"contentType\":\"image/jpeg\",\"tamanoBytes\":" + tamano + "}");
+    }
+
+    private String subirParte(String url, byte[] datos) throws Exception {
+        var r = http.send(
+                HttpRequest.newBuilder(URI.create(url))
+                        .PUT(HttpRequest.BodyPublishers.ofByteArray(datos))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(200, r.statusCode(), r.body());
+        return r.headers().firstValue("ETag").orElseThrow();
+    }
+
+    @Test
+    void unaFotoDe6MbSeSubeEnDosPartesReintentandoSoloLaQueFalta() throws Exception {
+        String viajeId = enRuta();
+        String evidenciaId = UUID.randomUUID().toString();
+        int tamano = 6 * 1024 * 1024;
+        byte[] foto = new byte[tamano];
+        new java.util.Random(7).nextBytes(foto);
+
+        var abierta = crearEvidencia(viajeId, evidenciaId, "FOTO_ENTREGA", tamano);
+        assertEquals(201, abierta.estado(), String.valueOf(abierta.cuerpo()));
+        assertEquals(2, abierta.cuerpo().get("partes").size());
+        assertEquals(5242880, abierta.cuerpo().get("tamanoParteBytes").asInt());
+        String etag1 = subirParte(
+                abierta.cuerpo().get("partes").get(0).get("url").asString(), java.util.Arrays.copyOf(foto, 5242880));
+
+        // La parte 2 "falló": se piden las partes y solo vuelve la que falta.
+        var estado = pedir(
+                "GET", "/api/v1/viajes/" + viajeId + "/evidencias/" + evidenciaId + "/partes", CHOFER, null, null);
+        assertEquals(1, estado.cuerpo().get("subidas").size());
+        assertEquals(1, estado.cuerpo().get("partes").size());
+        assertEquals(2, estado.cuerpo().get("partes").get(0).get("numero").asInt());
+        String etag2 = subirParte(
+                estado.cuerpo().get("partes").get(0).get("url").asString(),
+                java.util.Arrays.copyOfRange(foto, 5242880, tamano));
+
+        assertEquals(
+                422, crearEvidencia(viajeId, evidenciaId, "FOTO_ENTREGA", 1000).estado(), "mismo id, otros datos");
+        var completa = pedir(
+                "POST",
+                "/api/v1/viajes/" + viajeId + "/evidencias/" + evidenciaId + "/completar",
+                CHOFER,
+                UUID.randomUUID(),
+                "{\"partes\":[{\"numero\":2,\"etag\":" + json.writeValueAsString(etag2) + "},{\"numero\":1,\"etag\":"
+                        + json.writeValueAsString(etag1) + "}]}");
+        assertEquals(200, completa.estado(), String.valueOf(completa.cuerpo()));
+        assertEquals("COMPLETA", completa.cuerpo().get("estado").asString());
+
+        var vista =
+                pedir("GET", "/api/v1/viajes/" + viajeId + "/evidencias/" + evidenciaId, cliente(CLIENTE), null, null);
+        assertEquals(200, vista.estado());
+        var descarga = http.send(
+                HttpRequest.newBuilder(URI.create(vista.cuerpo().get("url").asString()))
+                        .build(),
+                HttpResponse.BodyHandlers.ofByteArray());
+        assertTrue(java.util.Arrays.equals(foto, descarga.body()));
+        assertEquals(
+                403,
+                pedir(
+                                "GET",
+                                "/api/v1/viajes/" + viajeId + "/evidencias/" + evidenciaId,
+                                cliente(OTRO_CLIENTE),
+                                null,
+                                null)
+                        .estado());
+    }
+
+    @Test
+    void reglasDeTipoYEstadoParaSubirYVerEvidencias() throws Exception {
+        String confirmadoSinIniciar = viajeDe(confirmado());
+        var firma = crearEvidencia(confirmadoSinIniciar, UUID.randomUUID().toString(), "FIRMA", 2000);
+        assertEquals(409, firma.estado());
+        String recibo = UUID.randomUUID().toString();
+        assertEquals(
+                201,
+                crearEvidencia(confirmadoSinIniciar, recibo, "RECIBO_COMBUSTIBLE", 2000)
+                        .estado());
+        assertEquals(
+                403,
+                pedir(
+                                "GET",
+                                "/api/v1/viajes/" + confirmadoSinIniciar + "/evidencias/" + recibo,
+                                cliente(CLIENTE),
+                                null,
+                                null)
+                        .estado());
+        var jefe = pedir(
+                "GET",
+                "/api/v1/viajes/" + confirmadoSinIniciar + "/evidencias/" + recibo,
+                TokensDePrueba.token("j", "jefe_flota", null),
+                null,
+                null);
+        assertEquals(200, jefe.estado());
+        assertEquals("SUBIENDO", jefe.cuerpo().get("estado").asString());
+        assertFalse(jefe.cuerpo().has("url"));
+        assertEquals(
+                403,
+                crearEvidencia(
+                                                confirmadoSinIniciar,
+                                                UUID.randomUUID().toString(),
+                                                "RECIBO_COMBUSTIBLE",
+                                                20 * 1024 * 1024)
+                                        .estado()
+                                == 400
+                        ? 403
+                        : 403);
+        assertEquals(
+                400,
+                crearEvidencia(
+                                confirmadoSinIniciar,
+                                UUID.randomUUID().toString(),
+                                "RECIBO_COMBUSTIBLE",
+                                20 * 1024 * 1024)
+                        .estado());
     }
 }

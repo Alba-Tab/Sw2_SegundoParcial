@@ -19,6 +19,7 @@ tags:
   - name: servicios
   - name: saga
   - name: viajes
+  - name: evidencias
 paths:
   /health:
     get:
@@ -427,6 +428,128 @@ paths:
           $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
         '503':
           $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/viajes/{viajeId}/evidencias:
+    parameters:
+      - $ref: '#/components/parameters/ViajeId'
+    post:
+      tags: [evidencias]
+      operationId: crearSubidaEvidencia
+      summary: Abre la subida por partes de una foto o firma en S3 y devuelve las URL firmadas (spec 006, D40a).
+      description: |
+        Partes de 5 MB (la última puede ser menor), URL `PUT` firmadas de 15 min. La autoridad de idempotencia es el
+        `evidenciaId` (como la llave de DynamoDB en los lotes de GPS): repetir con el mismo id y los mismos datos devuelve
+        la subida con URL nuevas; con otros datos, 422 IDEMPOTENCIA_CUERPO_DISTINTO.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EvidenciaNueva'
+      responses:
+        '201':
+          description: Subida abierta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubidaEvidencia'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/viajes/{viajeId}/evidencias/{evidenciaId}:
+    parameters:
+      - $ref: '#/components/parameters/ViajeId'
+      - $ref: '#/components/parameters/EvidenciaId'
+    get:
+      tags: [evidencias]
+      operationId: obtenerEvidencia
+      summary: La evidencia con una URL `GET` firmada de 5 min si está COMPLETA.
+      description: |
+        Chofer propio, despachador, comercial y gerente; el cliente de ese viaje solo FOTO_ENTREGA, FIRMA y FOTO_RECHAZO;
+        jefe_flota solo RECIBO_COMBUSTIBLE.
+      responses:
+        '200':
+          description: Evidencia.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Evidencia'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+  /api/v1/viajes/{viajeId}/evidencias/{evidenciaId}/partes:
+    parameters:
+      - $ref: '#/components/parameters/ViajeId'
+      - $ref: '#/components/parameters/EvidenciaId'
+    get:
+      tags: [evidencias]
+      operationId: listarPartesEvidencia
+      summary: Las partes ya subidas (ListParts) y URL nuevas para las que faltan.
+      responses:
+        '200':
+          description: Estado de la subida.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubidaEvidencia'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/viajes/{viajeId}/evidencias/{evidenciaId}/completar:
+    parameters:
+      - $ref: '#/components/parameters/ViajeId'
+      - $ref: '#/components/parameters/EvidenciaId'
+    post:
+      tags: [evidencias]
+      operationId: completarSubidaEvidencia
+      summary: Completa la subida por partes, verifica el tamaño y deja la evidencia COMPLETA.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CompletarEvidencia'
+      responses:
+        '200':
+          description: Evidencia completa.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Evidencia'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
   /api/v1/viajes/{viajeId}/intervencion:
     parameters:
       - name: viajeId
@@ -484,6 +607,12 @@ components:
         $ref: './comun.yaml#/components/schemas/Uuid'
     ViajeId:
       name: viajeId
+      in: path
+      required: true
+      schema:
+        $ref: './comun.yaml#/components/schemas/Uuid'
+    EvidenciaId:
+      name: evidenciaId
       in: path
       required: true
       schema:
@@ -635,6 +764,106 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Viaje'
+    TipoEvidencia:
+      type: string
+      enum: [FOTO_ENTREGA, FIRMA, FOTO_RECHAZO, RECIBO_COMBUSTIBLE]
+    EvidenciaNueva:
+      type: object
+      required: [evidenciaId, tipo, contentType, tamanoBytes]
+      additionalProperties: false
+      properties:
+        evidenciaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        tipo:
+          $ref: '#/components/schemas/TipoEvidencia'
+        contentType:
+          type: string
+          enum: [image/jpeg, image/png]
+        tamanoBytes:
+          type: integer
+          minimum: 1
+          maximum: 15728640
+          description: Máximo 15 MB (D66).
+    ParteFirmada:
+      type: object
+      required: [numero, url, expiraEn]
+      properties:
+        numero:
+          type: integer
+          minimum: 1
+        url:
+          type: string
+          format: uri
+        expiraEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+    ParteSubida:
+      type: object
+      required: [numero, etag]
+      additionalProperties: false
+      properties:
+        numero:
+          type: integer
+          minimum: 1
+        etag:
+          type: string
+          minLength: 1
+          maxLength: 200
+    SubidaEvidencia:
+      type: object
+      required: [evidenciaId, estado, tamanoParteBytes, partes, subidas]
+      properties:
+        evidenciaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        estado:
+          type: string
+          enum: [SUBIENDO, COMPLETA]
+        tamanoParteBytes:
+          type: integer
+          example: 5242880
+        partes:
+          type: array
+          description: URL firmadas para las partes que faltan.
+          items:
+            $ref: '#/components/schemas/ParteFirmada'
+        subidas:
+          type: array
+          description: Partes que S3 ya tiene (ListParts).
+          items:
+            $ref: '#/components/schemas/ParteSubida'
+    CompletarEvidencia:
+      type: object
+      required: [partes]
+      additionalProperties: false
+      properties:
+        partes:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/ParteSubida'
+    Evidencia:
+      type: object
+      required: [evidenciaId, viajeId, tipo, estado, contentType, tamanoBytes]
+      properties:
+        evidenciaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        viajeId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        tipo:
+          $ref: '#/components/schemas/TipoEvidencia'
+        estado:
+          type: string
+          enum: [SUBIENDO, COMPLETA]
+        contentType:
+          type: string
+        tamanoBytes:
+          type: integer
+        url:
+          type: string
+          format: uri
+          description: URL `GET` firmada de 5 min; solo si está COMPLETA.
+        expiraEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
     ServicioNuevo:
       type: object
       required: [cotizacionId]
