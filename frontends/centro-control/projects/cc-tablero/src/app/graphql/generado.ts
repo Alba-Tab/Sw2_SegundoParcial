@@ -44,13 +44,7 @@ export type TableroQuery = {
       saldoTotal: string;
       facturasPorVencer: number;
       facturasVencidas: number;
-      proximas: Array<{
-        facturaId: string;
-        numero: string;
-        razonSocial: string;
-        saldo: string;
-        venceEl: string;
-      }>;
+      proximas: Array<{ facturaId: string; numero: string; razonSocial: string; saldo: string; venceEl: string }>;
     } | null;
   };
 };
@@ -94,9 +88,7 @@ export type ExportarReporteMutationVariables = Exact<{
   clave: string | number;
 }>;
 
-export type ExportarReporteMutation = {
-  exportarReporte: { url: string; nombreArchivo: string; expiraEn: string };
-};
+export type ExportarReporteMutation = { exportarReporte: { url: string; nombreArchivo: string; expiraEn: string } };
 
 export const TableroDocument = gql`
   query Tablero($periodo: Periodo!) {
