@@ -11,6 +11,7 @@ import {
   type ApiEvidencias,
   type Cola,
   type Evidencias,
+  type PosicionGuardada,
   type PuntosGps,
   SesionVencida,
   type Subida,
@@ -61,7 +62,13 @@ class ApiFalsa implements Api {
   enviadas: string[] = [];
   lotes: { puntos: number[]; loteId: string }[] = [];
   estado = 'EN_RUTA';
+  /** Respuestas de `GET /viajes/{id}` antes de la normal (200 con `estado`). */
+  respuestasEstado: Respuesta[] = [];
   cursorServidor: number | null = null;
+  /** Viajes cuyo cursor lanza (un adaptador que no envolvió el corte de red). */
+  cursorQueLanza = new Set<string>();
+  /** Operaciones cuyo envío lanza en vez de devolver una respuesta. */
+  lanzaAlEnviar = new Set<string>();
   responder(clave: string, ...r: Respuesta[]) {
     this.respuestas.set(clave, r);
   }
@@ -71,16 +78,27 @@ class ApiFalsa implements Api {
   }
   enviar = async (op: Operacion) => {
     this.enviadas.push(`${op.tipo}:${op.opId}`);
+    if (this.lanzaAlEnviar.has(op.opId)) throw new TypeError('Network request failed');
     return this.siguiente(`${op.tipo}:${op.opId}`);
   };
   enviarLoteGps = async (_v: string, _d: string, puntos: PuntoGps[], loteId: string) => {
     this.lotes.push({ puntos: puntos.map((p) => p.seq), loteId });
     return this.siguiente('GPS');
   };
-  estadoDelViaje = async () => this.estado;
+  estadoDelViaje = async (): Promise<Respuesta> => this.respuestasEstado.shift() ?? { estado: 200, cuerpo: { estado: this.estado } };
   misViajes = async () => [];
-  cursor = async () => this.cursorServidor;
+  cursor = async (_d: string, viajeId: string) => {
+    if (this.cursorQueLanza.has(viajeId)) throw new TypeError('Network request failed');
+    return this.cursorServidor;
+  };
   registrarDispositivo = async () => ({ estado: 200 });
+}
+
+class PosicionEnMemoria implements PosicionGuardada {
+  p: { lat: number; lng: number } | null = null;
+  leer = () => this.p;
+  guardar = (p: { lat: number; lng: number }) => void (this.p = p);
+  borrar = () => void (this.p = null);
 }
 
 class EvidenciasEnMemoria implements Evidencias {
@@ -139,7 +157,7 @@ const viaje = (viajeId: string): ViajeLocal => ({
 describe('motor de sincronización (spec 005, CU-08)', () => {
   let cola: ColaEnMemoria, puntos: PuntosEnMemoria, viajes: ViajesEnMemoria, api: ApiFalsa;
   let ahora: Date, conRed: boolean, sesionVencida: boolean, n: number;
-  let evidencias: EvidenciasEnMemoria, apiEvidencias: ApiEvidenciasFalsa;
+  let evidencias: EvidenciasEnMemoria, apiEvidencias: ApiEvidenciasFalsa, posicion: PosicionEnMemoria;
   let motor: MotorSincronizacion, casos: CasosDeUso;
 
   beforeEach(() => {
@@ -169,7 +187,8 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     };
     const subida = new SubidaEvidencias(evidencias, apiEvidencias, archivos);
     motor = new MotorSincronizacion(cola, puntos, viajes, api, sesion, red, reloj, ids, dispositivo, subida, () => 0.5);
-    casos = new CasosDeUso(cola, puntos, viajes, api, sesion, reloj, ids, dispositivo, evidencias, archivos);
+    posicion = new PosicionEnMemoria();
+    casos = new CasosDeUso(cola, puntos, viajes, api, sesion, reloj, ids, dispositivo, evidencias, archivos, posicion);
     viajes.guardarDelServidor([viaje('v1')]);
   });
 
@@ -355,5 +374,96 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     expect(apiEvidencias.completadas.map((c) => c.id)).toEqual(carga.evidencias);
     expect(api.enviadas).toContain(`CARGA_COMBUSTIBLE:${op}`);
     expect(() => casos.cargarCombustible('v1', { litros: 0, monto: '10', kilometraje: 1, foto: null })).toThrow();
+  });
+
+  it('409 CONFLICTO_ESTADO sin poder preguntar el estado (corte o 5xx): reintenta con la misma clave, no queda FALLIDA', async () => {
+    const inicio = casos.iniciarViaje('v1', null);
+    api.responder(`INICIO:${inicio}`, { estado: 409, codigo: 'CONFLICTO_ESTADO' });
+    api.respuestasEstado = [{ estado: 'SIN_RED' }, { estado: 503 }];
+    const op = cola.ops[0];
+    await motor.sincronizar();
+    expect(op).toMatchObject({ estado: 'PENDIENTE', intentos: 1 });
+    ahora = new Date(Date.parse(op.proximoIntentoEn!));
+    await motor.sincronizar();
+    expect(op).toMatchObject({ estado: 'PENDIENTE', intentos: 2 });
+
+    ahora = new Date(Date.parse(op.proximoIntentoEn!));
+    api.estado = 'CANCELADO';
+    expect((await motor.sincronizar()).cancelados).toEqual(['v1']);
+    expect(op.estado).toBe('DESCARTADA');
+    expect(new Set(api.enviadas)).toEqual(new Set([`INICIO:${inicio}`]));
+  });
+
+  it('409 CONFLICTO_ESTADO con el viaje en otro estado: FALLIDA con su código', async () => {
+    const inicio = casos.iniciarViaje('v1', null);
+    api.responder(`INICIO:${inicio}`, { estado: 409, codigo: 'CONFLICTO_ESTADO' });
+    api.estado = 'ENTREGADO';
+    await motor.sincronizar();
+    expect(cola.ops[0]).toMatchObject({ estado: 'FALLIDA', codigoError: 'CONFLICTO_ESTADO' });
+  });
+
+  it('un envío que lanza no rompe la tanda: esa operación se reintenta y los otros viajes siguen', async () => {
+    viajes.guardarDelServidor([viaje('v2')]);
+    const malo = casos.encolar('v1', 'HITO', { tipo: 'PARADA' });
+    const bueno = casos.encolar('v2', 'HITO', { tipo: 'PARADA' });
+    api.lanzaAlEnviar.add(malo);
+    const r = await motor.sincronizar();
+    expect(r.confirmadas).toBe(1);
+    expect(cola.ops.find((o) => o.opId === malo)).toMatchObject({ estado: 'PENDIENTE', intentos: 1 });
+    expect(cola.ops.find((o) => o.opId === bueno)?.estado).toBe('CONFIRMADA');
+  });
+
+  it('al abrir, un cursor que falla por red no rechaza ni impide limpiar los otros viajes', async () => {
+    for (let s = 0; s < 5; s++) gps(s);
+    puntos.agregar({
+      viajeId: 'v2',
+      seq: 0,
+      registradaEn: ahora.toISOString(),
+      lat: -17.7,
+      lng: -63.1,
+      velocidadKmh: 0,
+      precisionMetros: null,
+    });
+    api.cursorServidor = 3;
+    api.cursorQueLanza.add('v1');
+    await expect(motor.recuperarCursor()).resolves.toBeUndefined();
+    expect(puntos.pendientes('v1', 100)).toHaveLength(5);
+    expect(puntos.pendientes('v2', 100)).toHaveLength(0);
+  });
+
+  it('al abrir sin señal o con la sesión vencida, la limpieza del cursor no rechaza (la sincronización inicial corre igual)', async () => {
+    gps(0);
+    conRed = false;
+    await expect(motor.recuperarCursor()).resolves.toBeUndefined();
+    conRed = true;
+    sesionVencida = true;
+    await expect(motor.recuperarCursor()).resolves.toBeUndefined();
+    expect(puntos.contar()).toBe(1);
+  });
+
+  it('T7.7: sin GPS en esta sesión, la alerta de fatiga y la frenada salen con la última posición guardada', () => {
+    posicion.p = { lat: -17.75, lng: -63.17 };
+    const op = casos.registrarFatiga('v1')!;
+    expect(cola.ops.find((o) => o.opId === op)?.cuerpo).toMatchObject({ tipo: 'ALERTA_FATIGA', posicion: { lat: -17.75, lng: -63.17 } });
+    const frenada = casos.registrarFrenada('v1', 0.6)!;
+    expect(cola.ops.find((o) => o.opId === frenada)?.cuerpo).toMatchObject({ posicion: { lat: -17.75, lng: -63.17 } });
+  });
+
+  it('cada lectura del GPS queda guardada como última posición; olvidar limpia la memoria', () => {
+    casos.registrarLectura('v1', { lat: -17.71, lng: -63.18, velocidadMs: 10, precisionMetros: 5, en: ahora.getTime() });
+    expect(posicion.p).toEqual({ lat: -17.71, lng: -63.18 });
+    casos.olvidar();
+    expect(casos.ultimaPosicion()).toBeNull();
+    expect(casos.velocidadKmh()).toBe(0);
+  });
+
+  it('T7.6: el monto escrito con coma o sin decimales se normaliza como texto; uno inválido no entra a la cola', () => {
+    const cargar = (monto: string) => casos.cargarCombustible('v1', { litros: 100, monto, kilometraje: 1, foto: null });
+    const montoDe = (opId: string) => cola.ops.find((o) => o.opId === opId)?.cuerpo.monto;
+    expect(montoDe(cargar('675,5'))).toEqual({ monto: '675.50', moneda: 'BOB' });
+    expect(montoDe(cargar(' 0675 '))).toEqual({ monto: '675.00', moneda: 'BOB' });
+    expect(montoDe(cargar('999999999999.99'))).toEqual({ monto: '999999999999.99', moneda: 'BOB' });
+    for (const malo of ['1.234', '1,2,3', '-5', '1e3', '', '0,00', '1234567890123', 'Infinity']) expect(() => cargar(malo)).toThrow();
+    expect(cola.ops.filter((o) => o.tipo === 'CARGA_COMBUSTIBLE')).toHaveLength(3);
   });
 });

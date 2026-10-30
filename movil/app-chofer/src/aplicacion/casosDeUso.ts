@@ -1,9 +1,10 @@
+import { esPositivo, normalizarMonto } from '../dominio/dinero';
 import type { TipoEvidencia } from '../dominio/evidencia';
 import { descripcionValida, type OrigenHito, type TipoHito } from '../dominio/hito';
 import { kmh, type Lectura, MuestreoGps } from '../dominio/muestreo';
 import type { TipoOperacion } from '../dominio/operacion';
 import { puedeIniciar } from '../dominio/viaje';
-import type { Api, Archivos, Cola, Dispositivo, Evidencias, Ids, PuntosGps, Reloj, Sesion, Viajes } from './puertos';
+import type { Api, Archivos, Cola, Dispositivo, Evidencias, Ids, PosicionGuardada, PuntosGps, Reloj, Sesion, Viajes } from './puertos';
 
 /** Lo que hace el chofer. Las escrituras van primero a la cola local; el motor las envía cuando hay señal. */
 export class CasosDeUso {
@@ -21,6 +22,7 @@ export class CasosDeUso {
     private readonly dispositivo: Dispositivo,
     private readonly evidencias: Evidencias,
     private readonly archivos: Archivos,
+    private readonly posicionGuardada: PosicionGuardada | null = null,
   ) {}
 
   /** Paso 1 (con señal): `GET /viajes/mios` a SQLite para operar sin red. */
@@ -44,6 +46,7 @@ export class CasosDeUso {
   /** Spec 005, paso 4: cada lectura del GPS; se guarda solo si pasa el muestreo de D52. */
   registrarLectura(viajeId: string, l: Lectura): boolean {
     this.ultima = l;
+    this.posicionGuardada?.guardar({ lat: l.lat, lng: l.lng });
     const muestreo = this.muestreos.get(viajeId) ?? new MuestreoGps();
     this.muestreos.set(viajeId, muestreo);
     if (!muestreo.aceptar(l)) return false;
@@ -67,9 +70,23 @@ export class CasosDeUso {
     return this.ultima ? kmh(this.ultima.velocidadMs) : 0;
   }
 
+  /**
+   * Para los eventos de conducción, que el contrato pide con `posicion`: la última lectura de esta sesión o, si el GPS
+   * todavía no dio ninguna (la app se reabrió en un túnel), la última guardada en el celular.
+   */
+  private posicionParaEvento(): { lat: number; lng: number } | null {
+    return this.ultimaPosicion() ?? this.posicionGuardada?.leer() ?? null;
+  }
+
+  /** Al cerrar sesión: nada de la posición ni del muestreo del chofer anterior queda en memoria. */
+  olvidar(): void {
+    this.ultima = null;
+    this.muestreos.clear();
+  }
+
   /** Spec 005, paso 8: la frenada detectada en el celular (D08) va a la cola con la última posición del GPS. */
   registrarFrenada(viajeId: string, magnitudG: number): string | null {
-    const posicion = this.ultimaPosicion();
+    const posicion = this.posicionParaEvento();
     if (!posicion) return null;
     return this.encolar(viajeId, 'EVENTO_CONDUCCION', {
       eventoId: this.ids.nuevo(),
@@ -80,9 +97,12 @@ export class CasosDeUso {
     });
   }
 
-  /** D60 (FO6): ojos cerrados o bostezos; la alarma ya sonó en el celular, esto solo deja el evento en la cola. */
+  /**
+   * D60 (FO6): ojos cerrados o bostezos; la alarma ya sonó en el celular, esto solo deja el evento en la cola. Sin
+   * ninguna posición conocida (ni guardada) no se puede encolar: el contrato exige `posicion`.
+   */
   registrarFatiga(viajeId: string): string | null {
-    const posicion = this.ultimaPosicion();
+    const posicion = this.posicionParaEvento();
     if (!posicion) return null;
     return this.encolar(viajeId, 'EVENTO_CONDUCCION', {
       eventoId: this.ids.nuevo(),
@@ -161,10 +181,13 @@ export class CasosDeUso {
 
   /**
    * Spec 009: la carga de diésel va a Flota con su `opId` como Idempotency-Key (Flota exige que sean iguales). La
-   * foto del recibo se sube antes como evidencia RECIBO_COMBUSTIBLE.
+   * foto del recibo se sube antes como evidencia RECIBO_COMBUSTIBLE. El monto llega como lo escribió el chofer y se
+   * normaliza como texto (000 §3), nunca como `number`.
    */
   cargarCombustible(viajeId: string, datos: { litros: number; monto: string; kilometraje: number; foto: string | null }): string {
-    if (!(datos.litros > 0) || !(Number(datos.monto) > 0) || !(datos.kilometraje > 0)) {
+    const monto = normalizarMonto(datos.monto);
+    if (monto === null) throw new Error('Escribe el monto en Bs con hasta 2 decimales, por ejemplo 675,50');
+    if (!(datos.litros > 0) || !esPositivo(monto) || !(datos.kilometraje > 0)) {
       throw new Error('Litros, monto y kilometraje deben ser mayores que 0');
     }
     const foto = datos.foto ? this.evidencia(viajeId, 'RECIBO_COMBUSTIBLE', datos.foto) : null;
@@ -175,7 +198,7 @@ export class CasosDeUso {
         opId,
         viajeId,
         litros: datos.litros,
-        monto: { monto: Number(datos.monto).toFixed(2), moneda: 'BOB' },
+        monto: { monto, moneda: 'BOB' },
         kilometraje: datos.kilometraje,
         registradaEn: this.reloj.ahora().toISOString(),
         ...(posicion ? { posicion } : {}),

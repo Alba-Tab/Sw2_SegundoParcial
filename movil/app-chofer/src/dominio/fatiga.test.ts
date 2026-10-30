@@ -45,11 +45,28 @@ describe('detector de fatiga (D60)', () => {
     expect(serie(d, 1600, 2800, cerrados)).toEqual([]);
   });
 
-  it('perder el rostro corta el episodio de ojos cerrados', () => {
+  it('perder el rostro 0,5 s o más corta el episodio de ojos cerrados', () => {
     const d = new DetectorFatiga();
     serie(d, 0, 1000, cerrados);
-    serie(d, 1100, 1200, null);
-    expect(serie(d, 1300, 2700, cerrados)).toEqual([]);
+    serie(d, 1100, 1500, null);
+    expect(serie(d, 1600, 3000, cerrados)).toEqual([]);
+    expect(serie(d, 3100, 3100, cerrados)).toEqual([{ t: 3100, a: 'OJOS_CERRADOS' }]);
+  });
+
+  it('un hueco sin rostro de menos de 0,5 s no reinicia el episodio (sigue contando desde que se cerraron)', () => {
+    const d = new DetectorFatiga();
+    expect(serie(d, 0, 1000, cerrados)).toEqual([]);
+    expect(serie(d, 1100, 1400, null)).toEqual([]);
+    expect(serie(d, 1500, 1500, cerrados)).toEqual([{ t: 1500, a: 'OJOS_CERRADOS' }]);
+  });
+
+  it('un bostezo con un cuadro perdido en medio sigue contando', () => {
+    const d = new DetectorFatiga();
+    serie(d, 0, 500, bostezo);
+    serie(d, 600, 700, null);
+    serie(d, 800, 1000, bostezo);
+    serie(d, 1100, 1200, abiertos);
+    expect(d.bostezosRecientes(1200)).toBe(1);
   });
 
   it('3 bostezos de 1 s o más en 2 minutos', () => {

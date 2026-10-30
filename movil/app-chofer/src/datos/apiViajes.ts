@@ -66,9 +66,8 @@ export class ApiViajes implements Api {
     );
   }
 
-  async estadoDelViaje(viajeId: string, token: string): Promise<string | null> {
-    const r = (await obtenerViaje(viajeId, { headers: { Authorization: `Bearer ${token}` } })) as Crudo;
-    return r.status === 200 ? (r.data as Viaje).estado : null;
+  estadoDelViaje(viajeId: string, token: string): Promise<Respuesta> {
+    return respuesta(() => obtenerViaje(viajeId, { headers: { Authorization: `Bearer ${token}` } }));
   }
 
   async misViajes(token: string): Promise<ViajeLocal[]> {
@@ -78,8 +77,10 @@ export class ApiViajes implements Api {
   }
 
   async cursor(dispositivoId: string, viajeId: string, token: string): Promise<number | null> {
-    const r = (await obtenerCursorSincronizacion(dispositivoId, { viajeId }, { headers: { Authorization: `Bearer ${token}` } })) as Crudo;
-    return r.status === 200 ? ((r.data as { ultimaSecuencia: number | null }).ultimaSecuencia ?? null) : null;
+    const r = await respuesta(() =>
+      obtenerCursorSincronizacion(dispositivoId, { viajeId }, { headers: { Authorization: `Bearer ${token}` } }),
+    );
+    return r.estado === 200 ? ((r.cuerpo as { ultimaSecuencia: number | null }).ultimaSecuencia ?? null) : null;
   }
 
   registrarDispositivo(dispositivoId: string, plataforma: 'ANDROID' | 'IOS', tokenPush: string | null, token: string): Promise<Respuesta> {

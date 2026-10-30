@@ -40,3 +40,12 @@ export function estadoVisible(v: ViajeLocal): EstadoViaje {
 export function puedeIniciar(v: ViajeLocal, otros: ViajeLocal[]): boolean {
   return estadoVisible(v) === 'CONFIRMADO' && !otros.some((o) => o.viajeId !== v.viajeId && estadoVisible(o) === 'EN_RUTA');
 }
+
+/**
+ * Al bajar `GET /viajes/mios` (D50): los viajes del celular que el servidor ya no devuelve se borran (terminaron hace
+ * más de 7 días, se reasignaron o eran de otro chofer), salvo los que todavía tienen operaciones por enviar.
+ */
+export function viajesQueSobran(locales: string[], delServidor: string[], conPendientes: string[]): string[] {
+  const quedan = new Set([...delServidor, ...conPendientes]);
+  return locales.filter((id) => !quedan.has(id));
+}

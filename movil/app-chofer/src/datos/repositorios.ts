@@ -1,9 +1,10 @@
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
-import type { Cola, Evidencias, PuntosGps, Viajes } from '../aplicacion/puertos';
+import type { Cola, DatosDelChofer, Evidencias, PosicionGuardada, PuntosGps, Viajes } from '../aplicacion/puertos';
 import type { EvidenciaLocal } from '../dominio/evidencia';
 import type { PuntoGps } from '../dominio/gps';
 import type { EstadoOperacion, Operacion, TipoOperacion } from '../dominio/operacion';
-import type { EstadoViaje, ViajeLocal } from '../dominio/viaje';
+import { type EstadoViaje, type ViajeLocal, viajesQueSobran } from '../dominio/viaje';
+import { borrarEvidencias } from './archivos';
 import { bd } from './bd';
 import { ajuste, evidenciaLocal, operacionPendiente, puntoGps, viaje } from './esquema';
 
@@ -146,6 +147,24 @@ export class ViajesSqlite implements Viajes {
           .onConflictDoUpdate({ target: viaje.viajeId, set: { estado, datos: JSON.stringify(datos), actualizadoEn: ahora } })
           .run();
       }
+      // La lista del servidor manda también en qué viajes hay: los que ya no vienen se borran, salvo con cola pendiente.
+      const locales = tx
+        .select({ id: viaje.viajeId })
+        .from(viaje)
+        .all()
+        .map((f) => f.id);
+      const conCola = tx
+        .selectDistinct({ id: operacionPendiente.viajeId })
+        .from(operacionPendiente)
+        .where(eq(operacionPendiente.estado, 'PENDIENTE'))
+        .all()
+        .map((f) => f.id);
+      const sobran = viajesQueSobran(
+        locales,
+        viajes.map((v) => v.viajeId),
+        conCola,
+      );
+      if (sobran.length) tx.delete(viaje).where(inArray(viaje.viajeId, sobran)).run();
     });
   }
 
@@ -185,5 +204,45 @@ export class EvidenciasSqlite implements Evidencias {
 
   marcarCompleta(evidenciaId: string): void {
     bd.update(evidenciaLocal).set({ estado: 'COMPLETA' }).where(eq(evidenciaLocal.evidenciaId, evidenciaId)).run();
+  }
+}
+
+const CLAVE_POSICION = 'ultimaPosicion';
+
+/** La última posición del GPS en la tabla `ajuste` (JSON con lat y lng). */
+export class PosicionSqlite implements PosicionGuardada {
+  leer(): { lat: number; lng: number } | null {
+    try {
+      const f = bd.select().from(ajuste).where(eq(ajuste.clave, CLAVE_POSICION)).get();
+      return f ? (JSON.parse(f.valor) as { lat: number; lng: number }) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  guardar(p: { lat: number; lng: number }): void {
+    const valor = JSON.stringify({ lat: p.lat, lng: p.lng });
+    bd.insert(ajuste).values({ clave: CLAVE_POSICION, valor }).onConflictDoUpdate({ target: ajuste.clave, set: { valor } }).run();
+  }
+
+  borrar(): void {
+    bd.delete(ajuste).where(eq(ajuste.clave, CLAVE_POSICION)).run();
+  }
+}
+
+/**
+ * Al cerrar sesión: viajes, cola, evidencias (filas y archivos), puntos GPS y la última posición. Quedan el
+ * `dispositivoId` y el `seq` de cada viaje, que son del celular (D55) y no del chofer.
+ */
+export class DatosDelChoferSqlite implements DatosDelChofer {
+  borrar(): void {
+    bd.transaction((tx) => {
+      tx.delete(operacionPendiente).run();
+      tx.delete(evidenciaLocal).run();
+      tx.delete(puntoGps).run();
+      tx.delete(viaje).run();
+      tx.delete(ajuste).where(eq(ajuste.clave, CLAVE_POSICION)).run();
+    });
+    borrarEvidencias();
   }
 }

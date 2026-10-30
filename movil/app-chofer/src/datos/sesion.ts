@@ -1,7 +1,7 @@
 import * as AuthSession from 'expo-auth-session';
 import * as SecureStore from 'expo-secure-store';
 import * as WebBrowser from 'expo-web-browser';
-import { type Sesion, SesionVencida, SinRed } from '../aplicacion/puertos';
+import { type Sesion, type SesionCerrable, SesionVencida, SinRed } from '../aplicacion/puertos';
 import { configuracion } from '../configuracion';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -9,6 +9,8 @@ WebBrowser.maybeCompleteAuthSession();
 const CLAVE_REFRESH = 'sesion.refresh';
 /** Se renueva si al access token (5 min) le quedan menos de 30 s. */
 const MARGEN_MS = 30_000;
+/** Al cerrar sesión, cuánto se espera a Keycloak para revocar (como el tiempo de espera de la API, D62). */
+const ESPERA_REVOCAR_MS = 15_000;
 
 /** Endpoints de Keycloak armados desde el issuer: renovar no necesita leer la configuración por red. */
 const descubrimiento: AuthSession.DiscoveryDocument = {
@@ -22,7 +24,7 @@ const descubrimiento: AuthSession.DiscoveryDocument = {
  * Sesión del chofer (D27): PKCE con el cliente público `app-chofer` y `offline_access`. El refresh token *offline*
  * sobrevive sin red y vive en el almacenamiento seguro; el access token (5 min) solo en memoria.
  */
-export class SesionKeycloak implements Sesion {
+export class SesionKeycloak implements Sesion, SesionCerrable {
   private acceso: { token: string; venceEn: number } | null = null;
 
   async iniciar(): Promise<boolean> {
@@ -85,8 +87,23 @@ export class SesionKeycloak implements Sesion {
     }
   }
 
+  /**
+   * Cerrar sesión: el refresh token *offline* vive 30 días en Keycloak, así que se revoca (RFC 7009, endpoint
+   * `revoke`) además de borrarlo del celular. Primero se borra aquí; sin señal la revocación falla y la sesión offline
+   * queda en Keycloak hasta vencer, pero en el celular ya no hay con qué usarla.
+   */
   async cerrar(): Promise<void> {
+    const refresh = await SecureStore.getItemAsync(CLAVE_REFRESH);
     await this.olvidar();
+    if (!refresh) return;
+    const revocar = AuthSession.revokeAsync(
+      { token: refresh, tokenTypeHint: AuthSession.TokenTypeHint.RefreshToken, clientId: configuracion.clienteOidc },
+      descubrimiento,
+    ).catch(() => false);
+    let reloj: ReturnType<typeof setTimeout> | undefined;
+    const tope = new Promise<boolean>((resolver) => (reloj = setTimeout(() => resolver(false), ESPERA_REVOCAR_MS)));
+    await Promise.race([revocar, tope]);
+    clearTimeout(reloj);
   }
 
   private async guardar(t: AuthSession.TokenResponse) {

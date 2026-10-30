@@ -27,23 +27,36 @@ export async function tokenPush(): Promise<string | null> {
   }
 }
 
+/** Notificaciones ya atendidas en esta ejecución: el listener y la última respuesta pueden traer la misma. */
+const atendidas = new Set<string>();
+
 /**
  * Llama a `abrir` con el viaje de la notificación que el chofer tocó, también si la app estaba cerrada
- * (`getLastNotificationResponseAsync`, PoC-4), y a `recibida` cuando llega con la app abierta.
+ * (`getLastNotificationResponse`, PoC-4), a `recibida` cuando llega con la app abierta y a `tokenNuevo` cuando FCM rota
+ * el token (hay que volver a registrarlo con `PUT /dispositivos/mio`). La última respuesta se borra al atenderla: volver
+ * a montar la pantalla (otra sesión, la sesión vencida) no reabre el mismo viaje.
  */
-export function escucharPush(abrir: (viajeId: string) => void, recibida: () => void): () => void {
-  const viajeDe = (r: Notifications.NotificationResponse | null) => r?.notification.request.content.data?.viajeId as string | undefined;
-  void Notifications.getLastNotificationResponseAsync().then((r) => {
-    const v = viajeDe(r);
-    if (v) abrir(v);
-  });
-  const tocada = Notifications.addNotificationResponseReceivedListener((r) => {
-    const v = viajeDe(r);
-    if (v) abrir(v);
-  });
+export function escucharPush(abrir: (viajeId: string) => void, recibida: () => void, tokenNuevo: (token: string) => void): () => void {
+  const atender = (r: Notifications.NotificationResponse | null) => {
+    if (!r || atendidas.has(r.notification.request.identifier)) return;
+    atendidas.add(r.notification.request.identifier);
+    Notifications.clearLastNotificationResponse();
+    const viajeId = r.notification.request.content.data?.viajeId;
+    if (typeof viajeId === 'string') abrir(viajeId);
+  };
+  try {
+    atender(Notifications.getLastNotificationResponse());
+  } catch {
+    // Sin el módulo nativo (build sin notificaciones) no hay respuesta que atender.
+  }
+  const tocada = Notifications.addNotificationResponseReceivedListener(atender);
   const llegada = Notifications.addNotificationReceivedListener(() => recibida());
+  const rotado = Notifications.addPushTokenListener((t) => {
+    if (Platform.OS === 'android' && typeof t.data === 'string') tokenNuevo(t.data);
+  });
   return () => {
     tocada.remove();
     llegada.remove();
+    rotado.remove();
   };
 }
