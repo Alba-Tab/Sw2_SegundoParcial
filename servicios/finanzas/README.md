@@ -6,23 +6,24 @@ Cotizaciones, líneas de crédito, reservas de la saga, facturas y pagos. Larave
 |---|---|
 | `Monto` con brick/money (HALF_UP, BOB, sin negativos) y UUIDv7 | `app/Dominio/Comun/` |
 | Puerto `RegistroDeEventos` y su Outbox en `outbox_eventos` (falla fuera de una transacción) | `app/Aplicacion/Puertos/`, `app/Infraestructura/Persistencia/` |
-| Relay con *publisher confirms* y `FOR UPDATE SKIP LOCKED` (`outbox:publicar`); consumidor de `finanzas.eventos` con Inbox, que manda a la DLQ lo que no tiene manejador (`eventos:consumir`) | `app/Infraestructura/Mensajeria/`, `app/Infraestructura/Consola/` |
-| Salud `GET /health` y `GET /health/ready` (PostgreSQL y RabbitMQ), sin Keycloak (P10) | `app/Infraestructura/Http/SaludController.php` |
-| JWT con firebase/php-jwt (emisor, audiencia `finanzas`, llaves en memoria 10 min); sin `OIDC_ISSUER`, `/api/**` responde 503 | `app/Infraestructura/Http/Middleware/Autenticacion.php` |
-| Problem Details con `codigo` y `correlationId` para todo error; `X-Correlation-Id` en `Context` | `app/Infraestructura/Http/Problemas.php`, `Middleware/Correlacion.php` |
+| Relay con *publisher confirms* y `FOR UPDATE SKIP LOCKED` (`outbox:publicar`); consumidor de `finanzas.eventos` con Inbox (`eventos:consumir`): una falla pasajera (PostgreSQL, interbloqueo, `VersionDesactualizada`) vuelve a la cola tras 2 s; lo que no tiene manejador o es determinista va a la DLQ. Los dos cierran limpio con SIGTERM | `app/Infraestructura/Mensajeria/`, `app/Infraestructura/Consola/` |
+| Salud `GET /health` y `GET /health/ready` (PostgreSQL, Temporal por TCP a `TEMPORAL_ADDRESS` y RabbitMQ), sin Keycloak (P10) | `app/Infraestructura/Http/SaludController.php` |
+| JWT con firebase/php-jwt (emisor, audiencia `finanzas`, llaves en memoria 10 min, un `kid` desconocido no provoca otra descarga en 60 s); sin `OIDC_ISSUER` o sin respuesta de Keycloak, `/api/**` responde 503 | `app/Infraestructura/Http/Middleware/Autenticacion.php` |
+| Problem Details con `codigo` y `correlationId` para todo error (PostgreSQL caído: 503 con `Retry-After`); `X-Correlation-Id` y `traceparent` en `Context` (`Log/Traza.php`), que los logs (`traceId`) y el Outbox copian | `app/Infraestructura/Http/Problemas.php`, `Middleware/Correlacion.php` |
 | Logs JSON de 000 §10; trazas con la extensión `opentelemetry` solo si `OTEL_PHP_AUTOLOAD_ENABLED=true` | `app/Infraestructura/Log/FormatoJson.php`, Dockerfile |
 | Tablas comunes (igual que Viajes) | `database/migrations/2026_10_29_000001_crear_tablas_comunes.php` |
 | API: Octane con 4 workers (`.rr.octane.yaml`). Worker: `.rr.yaml` con Temporal (cola `finanzas`) y el plugin `service` (D29) | raíz del servicio |
 
 ```bash
-./probar.sh                       # Pint, 40 pruebas, Deptrac y Larastan (necesita el compose levantado)
+./probar.sh                       # Pint, Pest, Deptrac y Larastan (necesita el compose levantado)
 docker compose -f ../../plataforma/compose/compose.yaml --profile core --profile plataforma up -d --build finanzas-api finanzas-worker
 curl localhost:8103/health/ready
 ```
 
 ## Cotizar y línea de crédito (T4.2, spec 002)
 
-- `POST/GET /api/v1/cotizaciones`: idempotente, con tope de 30 t y vigencia `COTIZACION_VIGENCIA` (`PT24H`; `PT2M` para FS1).
+- `POST/GET /api/v1/cotizaciones`: idempotente, con tope de 30 t (toneladas con 2 decimales como máximo) y vigencia `COTIZACION_VIGENCIA` (`PT24H`; `PT2M` para FS1).
+- **Idempotencia** (`Http/Idempotencia.php`): la clave se registra `EN_PROCESO` y pasa a `COMPLETADA` en la misma transacción; la huella cubre método, ruta, `sub` y cuerpo, así que la misma clave en otro recurso o con otro usuario da `422 IDEMPOTENCIA_CUERPO_DISTINTO`. Un `VersionDesactualizada` repite la transacción hasta 3 veces y después da `409`.
 - `GET /api/v1/lineas-credito/mia` y `/{clienteId}`.
 - `ClienteActualizado` y `RutaActualizada` se aplican con Inbox y descartan versiones viejas. El primer `ClienteActualizado` crea la línea de 30.000,00 BOB.
 

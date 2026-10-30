@@ -1,5 +1,9 @@
 <?php
 
+use App\Aplicacion\Puertos\LineaCreditoRepositorio;
+use App\Aplicacion\Puertos\VersionDesactualizada;
+use App\Dominio\Credito\LineaCredito;
+use App\Infraestructura\Persistencia\LineaCreditoRepositorioDb;
 use App\Infraestructura\Temporal\FinanzasActividades;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -48,6 +52,8 @@ it('EntregaConfirmada emite una sola factura, consume la reserva y publica Factu
         ->and(DB::table('reserva_credito')->value('estado'))->toBe('CONSUMIDA')
         ->and(linea())->toMatchObject(['reservado' => '0.00', 'utilizado' => '2800.00']);
     $sobre = json_decode(DB::table('outbox_eventos')->where('tipo', 'FacturaEmitida')->value('sobre'), true);
+    // El sobre sigue la traza y la correlación del evento consumido.
+    expect($sobre)->toMatchArray(['traceparent' => $e['traceparent'], 'correlationId' => $e['correlationId']]);
     expect($sobre['datos'])->toMatchArray(['numero' => $f->numero, 'monto' => ['monto' => '2800.00', 'moneda' => 'BOB'],
         'cliente' => ['razonSocial' => 'Agroexport SRL', 'correo' => 'cobranzas@agroexport.example'],
         'enlacePortal' => 'http://localhost:5173/facturas/'.$f->factura_id]);
@@ -76,8 +82,8 @@ it('cobro parcial y total: saldo, estado, línea abonada y PagoRegistrado', func
     expect($p1->headers->get('Location'))->toStartWith("/api/v1/facturas/$id/pagos/");
     cumpleContrato($p1, '/api/v1/facturas/{facturaId}/pagos', 'post');
     pagar($this, $id, '2000.00', 'BNB-778812')->assertStatus(422)->assertJsonPath('codigo', 'PAGO_EXCEDE_SALDO');
-    // FF4: el negativo lo rechaza ya el contrato (patrón de Monto); el cero, el value object.
-    pagar($this, $id, '-100.00', 'BNB-778813')->assertStatus(400)->assertJsonPath('errores.0.campo', 'monto.monto');
+    // FF4: el negativo lo rechaza ya el contrato (patrón de Monto); el cero, el value object. En los dos, el campo es monto.
+    pagar($this, $id, '-100.00', 'BNB-778813')->assertStatus(400)->assertJsonPath('errores.0.campo', 'monto');
     pagar($this, $id, '0.00', 'BNB-778813')->assertStatus(400)->assertJsonPath('errores.0.campo', 'monto');
     $dup = pagar($this, $id, '100.00', 'BNB-778811')->assertStatus(409)->assertJsonPath('codigo', 'PAGO_DUPLICADO');
     expect($dup->json('pagoId'))->toBe($p1->json('pagos.0.pagoId'));
@@ -90,6 +96,89 @@ it('cobro parcial y total: saldo, estado, línea abonada y PagoRegistrado', func
     expect(linea()->utilizado)->toBe('0.00')
         ->and(DB::table('pago')->count())->toBe(2)
         ->and(DB::table('outbox_eventos')->where('tipo', 'PagoRegistrado')->count())->toBe(2);
+});
+
+it('PagoRegistrado lleva el traceparent y el X-Correlation-Id de la petición', function () {
+    consumidor()->aplicar(entregaConfirmada(reservaActiva($this)['servicio'], (string) Str::uuid7()));
+    $id = DB::table('factura')->value('factura_id');
+    $traza = '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01';
+    $correlacion = '0193a000-0000-7000-8000-00000000cafe';
+    $this->withHeaders(['traceparent' => $traza, 'X-Correlation-Id' => $correlacion]);
+    pagar($this, $id, '100.00', 'BNB-700001')->assertStatus(201)->assertHeader('X-Correlation-Id', $correlacion);
+    $sobre = json_decode(DB::table('outbox_eventos')->where('tipo', 'PagoRegistrado')->value('sobre'), true);
+    expect($sobre)->toMatchArray(['traceparent' => $traza, 'correlationId' => $correlacion]);
+
+    // Sin traceparent (o con uno inválido) se genera uno nuevo por petición.
+    $this->withHeaders(['traceparent' => '00-00000000000000000000000000000000-b7ad6b7169203331-01']);
+    pagar($this, $id, '100.00', 'BNB-700002')->assertStatus(201);
+    $otro = json_decode(DB::table('outbox_eventos')->where('tipo', 'PagoRegistrado')->where('id', '<>', $sobre['id'])->value('sobre'), true);
+    expect($otro['traceparent'])->not->toBe($traza)->toMatch('/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/');
+});
+
+it('la misma clave y el mismo cuerpo en otra factura no devuelven el pago de la primera', function () {
+    consumidor()->aplicar(entregaConfirmada(reservaActiva($this)['servicio'], (string) Str::uuid7()));
+    consumidor()->aplicar(entregaConfirmada(reservaActiva($this)['servicio'], (string) Str::uuid7()));
+    [$a, $b] = DB::table('factura')->orderBy('numero')->pluck('factura_id')->all();
+    $clave = (string) Str::uuid();
+
+    pagar($this, $a, '100.00', 'BNB-500001', $clave)->assertStatus(201)->assertJsonPath('facturaId', $a);
+    pagar($this, $b, '100.00', 'BNB-500001', $clave)->assertStatus(422)->assertJsonPath('codigo', 'IDEMPOTENCIA_CUERPO_DISTINTO');
+    pagar($this, $a, '100.00', 'BNB-500001', $clave, 'sub-otra~administracion~')->assertStatus(422);
+    expect(DB::table('pago')->where('factura_id', $b)->count())->toBe(0)
+        ->and(DB::table('factura')->where('factura_id', $b)->value('saldo'))->toBe('2800.00')
+        ->and(DB::table('pago')->count())->toBe(1);
+});
+
+/** La línea de crédito real, pero `actualizar` pierde el bloqueo optimista las primeras $fallas veces. */
+function lineaQueChoca(int $fallas): object
+{
+    $linea = new class(app(LineaCreditoRepositorioDb::class), $fallas) implements LineaCreditoRepositorio
+    {
+        public int $intentos = 0;
+
+        public function __construct(private LineaCreditoRepositorioDb $real, public int $fallas) {}
+
+        public function porCliente(string $clienteId): ?LineaCredito
+        {
+            return $this->real->porCliente($clienteId);
+        }
+
+        public function paraActualizar(string $clienteId): ?LineaCredito
+        {
+            return $this->real->paraActualizar($clienteId);
+        }
+
+        public function crear(LineaCredito $linea): void
+        {
+            $this->real->crear($linea);
+        }
+
+        public function actualizar(LineaCredito $linea): void
+        {
+            if (++$this->intentos <= $this->fallas) {
+                throw new VersionDesactualizada('otro cambio ganó');
+            }
+            $this->real->actualizar($linea);
+        }
+    };
+    app()->instance(LineaCreditoRepositorio::class, $linea);
+
+    return $linea;
+}
+
+it('VersionDesactualizada repite la transacción del pago hasta 3 veces y después responde 409', function () {
+    consumidor()->aplicar(entregaConfirmada(reservaActiva($this)['servicio'], (string) Str::uuid7()));
+    $id = DB::table('factura')->value('factura_id');
+
+    $linea = lineaQueChoca(2);
+    pagar($this, $id, '100.00', 'BNB-600001')->assertStatus(201)->assertJsonPath('saldo.monto', '2700.00');
+    expect($linea->intentos)->toBe(3)->and(DB::table('pago')->count())->toBe(1);
+
+    $linea->intentos = 0;
+    $linea->fallas = 3;
+    pagar($this, $id, '100.00', 'BNB-600002')->assertStatus(409)->assertJsonPath('codigo', 'VERSION_DESACTUALIZADA');
+    expect($linea->intentos)->toBe(3)->and(DB::table('pago')->count())->toBe(1)
+        ->and(DB::table('factura')->where('factura_id', $id)->value('saldo'))->toBe('2700.00');
 });
 
 it('el cliente ve solo sus facturas, con mora calculada; administración filtra por saldo y vencimiento', function () {

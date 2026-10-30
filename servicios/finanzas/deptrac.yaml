@@ -1,4 +1,7 @@
 # DDD (AGENTS.md): Dominio no conoce Eloquent ni Laravel; Aplicacion solo usa Dominio y sus puertos.
+# Vendor junta toda clase con namespace que no es de App, de brick/money ni del framework: una librería nueva usada en
+# Dominio o Aplicacion es una violación aunque nadie la haya clasificado. Las clases de PHP (DateTimeImmutable,
+# DomainException…) no tienen namespace y quedan fuera.
 deptrac:
   paths: [./app]
   layers:
@@ -20,7 +23,16 @@ deptrac:
         - { type: classLike, value: ^Firebase\\.* }
         - { type: classLike, value: ^Symfony\\.* }
         - { type: classLike, value: ^Monolog\\.* }
+    - name: Vendor
+      collectors:
+        - type: bool
+          must:
+            - { type: classLike, value: '^[A-Za-z_][A-Za-z0-9_]*\\' }
+          must_not:
+            - { type: classLike, value: ^App\\ }
+            - { type: layer, value: Dinero }
+            - { type: layer, value: Framework }
   ruleset:
     Dominio: [Dinero]
     Aplicacion: [Dominio, Dinero]
-    Infraestructura: [Aplicacion, Dominio, Dinero, Framework]
+    Infraestructura: [Aplicacion, Dominio, Dinero, Framework, Vendor]

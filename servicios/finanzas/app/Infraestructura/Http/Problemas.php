@@ -2,7 +2,9 @@
 
 namespace App\Infraestructura\Http;
 
+use App\Aplicacion\Puertos\VersionDesactualizada;
 use App\Dominio\Comun\ErrorDeDominio;
+use App\Infraestructura\Persistencia\FallaTransitoria;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Context;
@@ -50,8 +52,15 @@ final class Problemas
             $e instanceof ValidationException => self::respuesta('VALIDACION', 'Petición inválida', 'Revisa los campos indicados', 400,
                 ['errores' => collect($e->errors())->flatMap(fn ($m, $c) => array_map(fn ($x) => ['campo' => $c, 'mensaje' => $x], $m))->values()->all()]),
             $e instanceof AuthenticationException => self::respuesta('NO_AUTENTICADO', 'No autenticado', $e->getMessage(), 401),
+            // Idempotencia ya repitió la transacción 3 veces (spec 008).
+            $e instanceof VersionDesactualizada => self::respuesta('VERSION_DESACTUALIZADA', 'Versión desactualizada',
+                'Otro cambio modificó los mismos datos; vuelve a intentarlo', 409),
             $e instanceof HttpExceptionInterface => self::respuesta(self::POR_ESTADO[$e->getStatusCode()] ?? 'CONFLICTO_ESTADO',
                 'Error', $e->getMessage() ?: 'Error', $e->getStatusCode(), [], $e->getHeaders()),
+            // PostgreSQL caído, reiniciándose o en interbloqueo: la petición se puede repetir.
+            FallaTransitoria::es($e) => self::respuesta('DEPENDENCIA_NO_DISPONIBLE', 'Dependencia no disponible',
+                'La base de datos no responde; intenta de nuevo en unos segundos', 503, [], ['Retry-After' => '5']),
+            // 000 §5 no tiene un código para un error inesperado: sale 500 con DEPENDENCIA_NO_DISPONIBLE, como en Viajes.
             default => self::respuesta('DEPENDENCIA_NO_DISPONIBLE', 'Error interno', 'Ocurrió un error inesperado', 500),
         };
     }

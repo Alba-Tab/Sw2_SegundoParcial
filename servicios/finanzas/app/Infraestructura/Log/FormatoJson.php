@@ -5,7 +5,10 @@ namespace App\Infraestructura\Log;
 use Monolog\Formatter\FormatterInterface;
 use Monolog\LogRecord;
 
-/** Logs JSON de una línea con los campos de 000 §10: timestamp, nivel, servicio, correlationId, traceId, mensaje. */
+/**
+ * Logs JSON de una línea con los campos de 000 §10: timestamp, nivel, servicio, correlationId, traceId, mensaje. El
+ * traceId sale del traceparent que Traza dejó en el Context (Laravel lo copia en `extra`).
+ */
 final class FormatoJson implements FormatterInterface
 {
     public function format(LogRecord $r): string
@@ -15,7 +18,7 @@ final class FormatoJson implements FormatterInterface
             'nivel' => $r->level->getName(),
             'servicio' => 'finanzas',
             'correlationId' => $r->extra['correlationId'] ?? $r->context['correlationId'] ?? null,
-            'traceId' => $r->extra['traceId'] ?? null,
+            'traceId' => $r->extra['traceId'] ?? Traza::traceId($r->extra['traceparent'] ?? null),
             'mensaje' => $r->message,
         ];
         $resto = array_diff_key($r->context, ['correlationId' => 1]);

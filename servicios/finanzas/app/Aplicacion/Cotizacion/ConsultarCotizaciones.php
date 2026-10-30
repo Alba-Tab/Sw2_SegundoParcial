@@ -10,7 +10,8 @@ use App\Dominio\Cotizacion\Cotizacion;
 /** Lecturas de cotizaciones: el cliente solo las suyas; administración, comercial y gerente las de cualquiera. */
 final class ConsultarCotizaciones
 {
-    private const VEN_TODAS = ['administracion', 'comercial', 'gerente', 'despachador'];
+    /** Los roles de listarCotizaciones en finanzas.yaml y de la spec 002. */
+    private const VEN_TODAS = ['administracion', 'comercial', 'gerente'];
 
     public function __construct(private readonly CotizacionRepositorio $cotizaciones) {}
 

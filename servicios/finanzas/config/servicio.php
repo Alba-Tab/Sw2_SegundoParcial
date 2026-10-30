@@ -11,6 +11,8 @@ return [
         'usuario' => env('AMQP_USUARIO', 'finanzas'),
         'clave' => env('AMQP_CLAVE', 'finanzas'),
     ],
+    // host:puerto del frontend de Temporal; /health/ready lo revisa (finanzas.yaml) y el worker lo usa (.rr.yaml).
+    'temporal' => (string) env('TEMPORAL_ADDRESS', ''),
     // Copia de contratos/openapi en la imagen (Dockerfile); valida las peticiones (ValidarContrato).
     'contrato' => env('OPENAPI_CONTRATO', base_path('contrato/finanzas.yaml')),
     // Vigencia de la cotización (spec 002): PT24H; en demo PT2M.

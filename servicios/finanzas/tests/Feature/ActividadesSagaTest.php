@@ -61,6 +61,48 @@ it('reserva el monto de la cotización, la acepta y un reintento devuelve lo mis
         ->and(DB::table('cotizacion')->where('cotizacion_id', $cot)->value('estado'))->toBe('ACEPTADA');
 });
 
+it('un reintento con otra cotización u otro cliente, o sobre una reserva LIBERADA, es CONFLICTO_ESTADO', function () {
+    $cot = cotizacion($this, AULA, 28);
+    $otra = cotizacion($this, AULA, 10);
+    $servicio = (string) Str::uuid7();
+    reservar($servicio, $cot);
+    $f = falla(fn () => reservar($servicio, $otra));
+    expect($f->getType())->toBe('CONFLICTO_ESTADO')->and($f->isNonRetryable())->toBeTrue()
+        ->and(falla(fn () => reservar($servicio, $cot, OTRO_CLIENTE))->getType())->toBe('CONFLICTO_ESTADO');
+
+    actividades()->liberarCredito(['servicioId' => $servicio, 'motivo' => 'CREDITO_RECHAZADO']);
+    $f = falla(fn () => reservar($servicio, $cot));
+    expect($f->getType())->toBe('CONFLICTO_ESTADO')->and($f->isNonRetryable())->toBeTrue()
+        ->and(linea()->reservado)->toBe('0.00');
+});
+
+it('un intento simultáneo que reservó mientras se esperaba la cotización devuelve esa reserva', function () {
+    // Otro proceso hace de "primer intento": bloquea la cotización, la acepta y reserva; confirma 1 s después.
+    $cot = cotizacion($this, AULA, 28);
+    $servicio = (string) Str::uuid7();
+    $reserva = (string) Str::uuid7();
+    $db = config('database.connections.pgsql');
+    $codigo = <<<'PHP'
+        [$dsn, $u, $p, $cot, $servicio, $reserva, $cliente] = array_slice($argv, 1);
+        $pdo = new PDO($dsn, $u, $p, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $pdo->beginTransaction();
+        $pdo->prepare("UPDATE cotizacion SET estado = 'ACEPTADA' WHERE cotizacion_id = ?")->execute([$cot]);
+        $pdo->prepare("INSERT INTO reserva_credito (reserva_credito_id, servicio_id, cliente_id, cotizacion_id, monto, estado)
+            VALUES (?, ?, ?, ?, 2800.00, 'ACTIVA')")->execute([$reserva, $servicio, $cliente, $cot]);
+        echo "listo\n";
+        usleep(1_000_000);
+        $pdo->commit();
+        PHP;
+    $proceso = proc_open(['php', '-r', $codigo, '--', "pgsql:host={$db['host']};port={$db['port']};dbname={$db['database']}",
+        $db['username'], $db['password'], $cot, $servicio, $reserva, CLIENTE], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $tubos);
+    expect(trim((string) fgets($tubos[1])))->toBe('listo');
+
+    $r = reservar($servicio, $cot);
+    expect($r['resultado'])->toBe('RESERVADO')->and($r['reservaCreditoId'])->toBe($reserva)
+        ->and(DB::table('reserva_credito')->count())->toBe(1)
+        ->and(proc_close($proceso))->toBe(0);
+});
+
 it('crédito insuficiente no reintenta, trae el detalle y no deja nada a medias', function () {
     DB::table('linea_credito')->where('cliente_id', CLIENTE)->update(['limite' => '5000.00']);
     $cot = cotizacion($this, LA_PAZ, 20);
