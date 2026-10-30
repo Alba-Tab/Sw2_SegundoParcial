@@ -101,6 +101,7 @@ class ServiciosController implements ServiciosApi {
         if (v.iniciadoEn() != null) d.iniciadoEn(v.iniciadoEn().atOffset(ZoneOffset.UTC));
         if (v.entregadoEn() != null) d.entregadoEn(v.entregadoEn().atOffset(ZoneOffset.UTC));
         d.facturaId(v.facturaId()).numeroFactura(v.numeroFactura());
+        if (v.ultimaPosicion() != null) d.ultimaPosicion(ViajesController.coordenadas(v.ultimaPosicion()));
         var a = v.asignacion();
         if (a != null) {
             d.rutaId(a.rutaId())
@@ -117,13 +118,13 @@ class ServiciosController implements ServiciosApi {
     }
 
     /** Cursor opaco (000 §4): el último servicioId de la página, en base64url. */
-    private static String aCursor(UUID ultimo) {
+    static String aCursor(UUID ultimo) {
         return Base64.getUrlEncoder()
                 .withoutPadding()
                 .encodeToString(ultimo.toString().getBytes(StandardCharsets.UTF_8));
     }
 
-    private static UUID desdeCursor(String cursor) {
+    static UUID desdeCursor(String cursor) {
         if (cursor == null || cursor.isBlank()) return null;
         try {
             return UUID.fromString(new String(Base64.getUrlDecoder().decode(cursor), StandardCharsets.UTF_8));

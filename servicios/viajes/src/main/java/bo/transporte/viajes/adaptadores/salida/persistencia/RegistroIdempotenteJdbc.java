@@ -7,10 +7,13 @@ import bo.transporte.viajes.aplicacion.servicio.CancelacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ConfirmacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ServicioAceptado;
 import bo.transporte.viajes.aplicacion.servicio.ServicioVista;
+import bo.transporte.viajes.aplicacion.viaje.BitacoraDeRuta;
 import bo.transporte.viajes.aplicacion.viaje.EntregaDeViaje;
 import bo.transporte.viajes.aplicacion.viaje.InicioDeViaje;
 import bo.transporte.viajes.aplicacion.viaje.ResultadoEntrega;
 import bo.transporte.viajes.aplicacion.viaje.ViajeVista;
+import bo.transporte.viajes.dominio.viaje.EventoConduccion;
+import bo.transporte.viajes.dominio.viaje.Hito;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -33,7 +36,9 @@ class RegistroIdempotenteJdbc implements RegistroIdempotente {
             Map.entry(AltaDeCliente.OPERACION, ClienteVista.class),
             Map.entry(ConfirmacionDeServicio.OPERACION, ServicioAceptado.class),
             Map.entry(CancelacionDeServicio.OPERACION, ServicioVista.class),
-            Map.entry(InicioDeViaje.OPERACION, ViajeVista.class));
+            Map.entry(InicioDeViaje.OPERACION, ViajeVista.class),
+            Map.entry(BitacoraDeRuta.HITO, Hito.class),
+            Map.entry(BitacoraDeRuta.EVENTO, EventoConduccion.class));
 
     private final JdbcClient jdbc;
     private final JsonMapper json;

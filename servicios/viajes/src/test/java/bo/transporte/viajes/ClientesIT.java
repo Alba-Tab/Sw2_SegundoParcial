@@ -54,7 +54,7 @@ class ClientesIT {
     @BeforeEach
     void limpiar() {
         jdbc.sql(
-                        "TRUNCATE entrega, evidencia, viaje, servicio, cliente, ruta, operacion_idempotente, outbox_eventos, auditoria")
+                        "TRUNCATE hito, evento_conduccion, ultima_posicion, dispositivo, entrega, evidencia, viaje, servicio, cliente, ruta, operacion_idempotente, outbox_eventos, auditoria")
                 .update();
         reset(identidad);
     }

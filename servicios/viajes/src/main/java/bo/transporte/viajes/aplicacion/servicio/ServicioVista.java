@@ -1,6 +1,7 @@
 package bo.transporte.viajes.aplicacion.servicio;
 
 import bo.transporte.viajes.aplicacion.puerto.salida.ServicioRepositorio.ConViaje;
+import bo.transporte.viajes.aplicacion.puerto.salida.UltimaPosicionRepositorio.UltimaPosicion;
 import bo.transporte.viajes.dominio.viaje.Asignacion;
 import bo.transporte.viajes.dominio.viaje.EstadoViaje;
 import bo.transporte.viajes.dominio.viaje.Servicio;
@@ -15,8 +16,13 @@ public record ServicioVista(
         java.time.Instant iniciadoEn,
         java.time.Instant entregadoEn,
         java.util.UUID facturaId,
-        String numeroFactura) {
+        String numeroFactura,
+        UltimaPosicion ultimaPosicion) {
     static ServicioVista de(ConViaje f, String etapa) {
+        return de(f, etapa, null);
+    }
+
+    static ServicioVista de(ConViaje f, String etapa, UltimaPosicion ultimaPosicion) {
         var v = f.viaje();
         return new ServicioVista(
                 f.servicio(),
@@ -27,6 +33,7 @@ public record ServicioVista(
                 v == null ? null : v.iniciadoEn(),
                 v == null ? null : v.entregadoEn(),
                 v == null ? null : v.facturaId(),
-                v == null ? null : v.numeroFactura());
+                v == null ? null : v.numeroFactura(),
+                ultimaPosicion);
     }
 }

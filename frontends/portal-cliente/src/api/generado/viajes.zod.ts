@@ -673,6 +673,157 @@ export const DecidirAprobacionCreditoBody = zod.object({
 export const DecidirAprobacionCreditoResponse = zod.void();
 
 /**
+ * @summary Viajes con su última posición para el mapa en vivo (despachador, comercial, gerente, jefe_flota, agente_lectura). Spec 005.
+ */
+export const listarViajesQueryLimiteDefault = 20;
+export const listarViajesQueryLimiteMax = 100;
+
+export const listarViajesQueryCursorMax = 500;
+
+export const ListarViajesQueryParams = zod.object({
+  estado: zod
+    .enum([
+      'PROGRAMANDO',
+      'CONFIRMADO',
+      'EN_RUTA',
+      'ENTREGADO',
+      'CERRADO',
+      'CANCELADO',
+      'ENTREGA_OBSERVADA',
+      'ENTREGA_RECHAZADA',
+      'REQUIERE_INTERVENCION',
+    ])
+    .optional(),
+  limite: zod.int().min(1).max(listarViajesQueryLimiteMax).default(listarViajesQueryLimiteDefault),
+  cursor: zod.string().max(listarViajesQueryCursorMax).optional().describe('Valor opaco devuelto en `siguienteCursor`.'),
+});
+
+export const listarViajesResponseItemsItemRutaOrigenCoordenadasLatMin = -90;
+export const listarViajesResponseItemsItemRutaOrigenCoordenadasLatMax = 90;
+
+export const listarViajesResponseItemsItemRutaOrigenCoordenadasLngMin = -180;
+export const listarViajesResponseItemsItemRutaOrigenCoordenadasLngMax = 180;
+
+export const listarViajesResponseItemsItemRutaDestinoOneCoordenadasLatMin = -90;
+export const listarViajesResponseItemsItemRutaDestinoOneCoordenadasLatMax = 90;
+
+export const listarViajesResponseItemsItemRutaDestinoOneCoordenadasLngMin = -180;
+export const listarViajesResponseItemsItemRutaDestinoOneCoordenadasLngMax = 180;
+
+export const listarViajesResponseItemsItemRutaDestinoTwoRadioMetrosMin = 50;
+export const listarViajesResponseItemsItemRutaDestinoTwoRadioMetrosMax = 5000;
+
+export const listarViajesResponseItemsItemRutaDistanciaKmExclusiveMin = 0;
+
+export const listarViajesResponseItemsItemToneladasExclusiveMin = 0;
+export const listarViajesResponseItemsItemToneladasMax = 30;
+
+export const listarViajesResponseItemsItemPlacaRegExp = new RegExp('^[0-9]{3,4}[A-Z]{3}$');
+export const listarViajesResponseItemsItemUltimaPosicionPosicionLatMin = -90;
+export const listarViajesResponseItemsItemUltimaPosicionPosicionLatMax = 90;
+
+export const listarViajesResponseItemsItemUltimaPosicionPosicionLngMin = -180;
+export const listarViajesResponseItemsItemUltimaPosicionPosicionLngMax = 180;
+
+export const listarViajesResponseItemsItemUltimaPosicionVelocidadKmhMin = 0;
+export const listarViajesResponseItemsItemUltimaPosicionVelocidadKmhMax = 200;
+
+export const ListarViajesResponse = zod.object({
+  items: zod.array(
+    zod
+      .object({
+        viajeId: zod.uuid(),
+        servicioId: zod.uuid(),
+        estado: zod.enum([
+          'PROGRAMANDO',
+          'CONFIRMADO',
+          'EN_RUTA',
+          'ENTREGADO',
+          'CERRADO',
+          'CANCELADO',
+          'ENTREGA_OBSERVADA',
+          'ENTREGA_RECHAZADA',
+          'REQUIERE_INTERVENCION',
+        ]),
+        motivo: zod.string().optional().describe('Código de 000 §5 cuando el viaje terminó CANCELADO.'),
+        cliente: zod.object({
+          clienteId: zod.uuid(),
+          razonSocial: zod.string(),
+        }),
+        ruta: zod.object({
+          rutaId: zod.uuid(),
+          nombre: zod.string(),
+          origen: zod.object({
+            nombre: zod.string(),
+            coordenadas: zod.object({
+              lat: zod
+                .number()
+                .min(listarViajesResponseItemsItemRutaOrigenCoordenadasLatMin)
+                .max(listarViajesResponseItemsItemRutaOrigenCoordenadasLatMax),
+              lng: zod
+                .number()
+                .min(listarViajesResponseItemsItemRutaOrigenCoordenadasLngMin)
+                .max(listarViajesResponseItemsItemRutaOrigenCoordenadasLngMax),
+            }),
+          }),
+          destino: zod
+            .object({
+              nombre: zod.string(),
+              coordenadas: zod.object({
+                lat: zod
+                  .number()
+                  .min(listarViajesResponseItemsItemRutaDestinoOneCoordenadasLatMin)
+                  .max(listarViajesResponseItemsItemRutaDestinoOneCoordenadasLatMax),
+                lng: zod
+                  .number()
+                  .min(listarViajesResponseItemsItemRutaDestinoOneCoordenadasLngMin)
+                  .max(listarViajesResponseItemsItemRutaDestinoOneCoordenadasLngMax),
+              }),
+            })
+            .and(
+              zod.object({
+                radioMetros: zod
+                  .int()
+                  .min(listarViajesResponseItemsItemRutaDestinoTwoRadioMetrosMin)
+                  .max(listarViajesResponseItemsItemRutaDestinoTwoRadioMetrosMax)
+                  .describe('Radio de la geocerca (D06).'),
+              }),
+            ),
+          distanciaKm: zod.number().gt(listarViajesResponseItemsItemRutaDistanciaKmExclusiveMin),
+          activa: zod.boolean(),
+        }),
+        tipoCarga: zod.enum(['GRANOS', 'INSUMOS', 'INSUMOS_LIQUIDOS', 'CONTENEDOR']),
+        toneladas: zod.number().gt(listarViajesResponseItemsItemToneladasExclusiveMin).max(listarViajesResponseItemsItemToneladasMax),
+        fechaViaje: zod.iso.date().describe('Fecha sin hora, en America/La_Paz.'),
+        placa: zod.string().regex(listarViajesResponseItemsItemPlacaRegExp),
+        choferNombre: zod.string(),
+        iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
+        ultimaPosicion: zod
+          .object({
+            posicion: zod.object({
+              lat: zod
+                .number()
+                .min(listarViajesResponseItemsItemUltimaPosicionPosicionLatMin)
+                .max(listarViajesResponseItemsItemUltimaPosicionPosicionLatMax),
+              lng: zod
+                .number()
+                .min(listarViajesResponseItemsItemUltimaPosicionPosicionLngMin)
+                .max(listarViajesResponseItemsItemUltimaPosicionPosicionLngMax),
+            }),
+            velocidadKmh: zod
+              .number()
+              .min(listarViajesResponseItemsItemUltimaPosicionVelocidadKmhMin)
+              .max(listarViajesResponseItemsItemUltimaPosicionVelocidadKmhMax),
+            registradaEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+          })
+          .optional(),
+      })
+      .describe('La operación, sin montos (D51).'),
+  ),
+  siguienteCursor: zod.string().nullable(),
+});
+
+/**
  * Los viajes con `choferUsuarioSub = sub` en CONFIRMADO, EN_RUTA o ENTREGA_OBSERVADA, más los que terminaron en
  * los últimos 7 días. La app los guarda en SQLite para operar sin señal.
  * @summary Viajes del chofer del token (spec 005, D50); sin montos (D51).
@@ -698,6 +849,14 @@ export const listarMisViajesResponseItemsItemToneladasExclusiveMin = 0;
 export const listarMisViajesResponseItemsItemToneladasMax = 30;
 
 export const listarMisViajesResponseItemsItemPlacaRegExp = new RegExp('^[0-9]{3,4}[A-Z]{3}$');
+export const listarMisViajesResponseItemsItemUltimaPosicionPosicionLatMin = -90;
+export const listarMisViajesResponseItemsItemUltimaPosicionPosicionLatMax = 90;
+
+export const listarMisViajesResponseItemsItemUltimaPosicionPosicionLngMin = -180;
+export const listarMisViajesResponseItemsItemUltimaPosicionPosicionLngMax = 180;
+
+export const listarMisViajesResponseItemsItemUltimaPosicionVelocidadKmhMin = 0;
+export const listarMisViajesResponseItemsItemUltimaPosicionVelocidadKmhMax = 200;
 
 export const ListarMisViajesResponse = zod.object({
   items: zod.array(
@@ -769,6 +928,25 @@ export const ListarMisViajesResponse = zod.object({
         placa: zod.string().regex(listarMisViajesResponseItemsItemPlacaRegExp),
         choferNombre: zod.string(),
         iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
+        ultimaPosicion: zod
+          .object({
+            posicion: zod.object({
+              lat: zod
+                .number()
+                .min(listarMisViajesResponseItemsItemUltimaPosicionPosicionLatMin)
+                .max(listarMisViajesResponseItemsItemUltimaPosicionPosicionLatMax),
+              lng: zod
+                .number()
+                .min(listarMisViajesResponseItemsItemUltimaPosicionPosicionLngMin)
+                .max(listarMisViajesResponseItemsItemUltimaPosicionPosicionLngMax),
+            }),
+            velocidadKmh: zod
+              .number()
+              .min(listarMisViajesResponseItemsItemUltimaPosicionVelocidadKmhMin)
+              .max(listarMisViajesResponseItemsItemUltimaPosicionVelocidadKmhMax),
+            registradaEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+          })
+          .optional(),
       })
       .describe('La operación, sin montos (D51).'),
   ),
@@ -802,6 +980,14 @@ export const obtenerViajeResponseToneladasExclusiveMin = 0;
 export const obtenerViajeResponseToneladasMax = 30;
 
 export const obtenerViajeResponsePlacaRegExp = new RegExp('^[0-9]{3,4}[A-Z]{3}$');
+export const obtenerViajeResponseUltimaPosicionPosicionLatMin = -90;
+export const obtenerViajeResponseUltimaPosicionPosicionLatMax = 90;
+
+export const obtenerViajeResponseUltimaPosicionPosicionLngMin = -180;
+export const obtenerViajeResponseUltimaPosicionPosicionLngMax = 180;
+
+export const obtenerViajeResponseUltimaPosicionVelocidadKmhMin = 0;
+export const obtenerViajeResponseUltimaPosicionVelocidadKmhMax = 200;
 
 export const ObtenerViajeResponse = zod
   .object({
@@ -865,6 +1051,19 @@ export const ObtenerViajeResponse = zod
     placa: zod.string().regex(obtenerViajeResponsePlacaRegExp),
     choferNombre: zod.string(),
     iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
+    ultimaPosicion: zod
+      .object({
+        posicion: zod.object({
+          lat: zod.number().min(obtenerViajeResponseUltimaPosicionPosicionLatMin).max(obtenerViajeResponseUltimaPosicionPosicionLatMax),
+          lng: zod.number().min(obtenerViajeResponseUltimaPosicionPosicionLngMin).max(obtenerViajeResponseUltimaPosicionPosicionLngMax),
+        }),
+        velocidadKmh: zod
+          .number()
+          .min(obtenerViajeResponseUltimaPosicionVelocidadKmhMin)
+          .max(obtenerViajeResponseUltimaPosicionVelocidadKmhMax),
+        registradaEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+      })
+      .optional(),
   })
   .describe('La operación, sin montos (D51).');
 
@@ -921,6 +1120,14 @@ export const iniciarViajeResponseToneladasExclusiveMin = 0;
 export const iniciarViajeResponseToneladasMax = 30;
 
 export const iniciarViajeResponsePlacaRegExp = new RegExp('^[0-9]{3,4}[A-Z]{3}$');
+export const iniciarViajeResponseUltimaPosicionPosicionLatMin = -90;
+export const iniciarViajeResponseUltimaPosicionPosicionLatMax = 90;
+
+export const iniciarViajeResponseUltimaPosicionPosicionLngMin = -180;
+export const iniciarViajeResponseUltimaPosicionPosicionLngMax = 180;
+
+export const iniciarViajeResponseUltimaPosicionVelocidadKmhMin = 0;
+export const iniciarViajeResponseUltimaPosicionVelocidadKmhMax = 200;
 
 export const IniciarViajeResponse = zod
   .object({
@@ -984,8 +1191,340 @@ export const IniciarViajeResponse = zod
     placa: zod.string().regex(iniciarViajeResponsePlacaRegExp),
     choferNombre: zod.string(),
     iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
+    ultimaPosicion: zod
+      .object({
+        posicion: zod.object({
+          lat: zod.number().min(iniciarViajeResponseUltimaPosicionPosicionLatMin).max(iniciarViajeResponseUltimaPosicionPosicionLatMax),
+          lng: zod.number().min(iniciarViajeResponseUltimaPosicionPosicionLngMin).max(iniciarViajeResponseUltimaPosicionPosicionLngMax),
+        }),
+        velocidadKmh: zod
+          .number()
+          .min(iniciarViajeResponseUltimaPosicionVelocidadKmhMin)
+          .max(iniciarViajeResponseUltimaPosicionVelocidadKmhMax),
+        registradaEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+      })
+      .optional(),
   })
   .describe('La operación, sin montos (D51).');
+
+/**
+ * Excepción de 000 §4.1: `Idempotency-Key` es el `loteId` y va a los logs, pero la autoridad es la llave de
+ * DynamoDB (`viajeId` + `ts#seq`); un reenvío reescribe los mismos puntos y responde 200 sin otro
+ * PosicionActualizada. Si DynamoDB sigue con *throttling* después de 5 reintentos, 503 con `Retry-After: 10`.
+ * Acepta puntos tardíos después de la entrega; en CONFIRMADO, PROGRAMANDO o CANCELADO responde 409.
+ * @summary Lote de 1 a 100 puntos GPS de la cola del celular (spec 005, pasos 5 y 6).
+ */
+export const RegistrarLoteGpsParams = zod.object({
+  viajeId: zod.uuid(),
+});
+
+export const RegistrarLoteGpsHeader = zod.object({
+  'Idempotency-Key': zod.uuid().describe('UUID generado por el cliente, uno por intento (000 §4.1).'),
+});
+
+export const registrarLoteGpsBodyPuntosItemSeqMin = 0;
+
+export const registrarLoteGpsBodyPuntosItemLatMin = -90;
+export const registrarLoteGpsBodyPuntosItemLatMax = 90;
+
+export const registrarLoteGpsBodyPuntosItemLngMin = -180;
+export const registrarLoteGpsBodyPuntosItemLngMax = 180;
+
+export const registrarLoteGpsBodyPuntosItemVelocidadKmhMin = 0;
+export const registrarLoteGpsBodyPuntosItemVelocidadKmhMax = 200;
+
+export const registrarLoteGpsBodyPuntosItemPrecisionMetrosMin = 0;
+
+export const registrarLoteGpsBodyPuntosMax = 100;
+
+export const RegistrarLoteGpsBody = zod
+  .object({
+    dispositivoId: zod.uuid(),
+    puntos: zod
+      .array(
+        zod.object({
+          seq: zod.int().min(registrarLoteGpsBodyPuntosItemSeqMin).describe('Creciente por dispositivo y viaje.'),
+          registradaEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+          lat: zod.number().min(registrarLoteGpsBodyPuntosItemLatMin).max(registrarLoteGpsBodyPuntosItemLatMax),
+          lng: zod.number().min(registrarLoteGpsBodyPuntosItemLngMin).max(registrarLoteGpsBodyPuntosItemLngMax),
+          velocidadKmh: zod.number().min(registrarLoteGpsBodyPuntosItemVelocidadKmhMin).max(registrarLoteGpsBodyPuntosItemVelocidadKmhMax),
+          precisionMetros: zod.number().min(registrarLoteGpsBodyPuntosItemPrecisionMetrosMin).optional(),
+        }),
+      )
+      .min(1)
+      .max(registrarLoteGpsBodyPuntosMax),
+  })
+  .describe('`seq` sin repetir; `registradaEn` ≤ ahora + 2 min y ≥ iniciadoEn − 10 min (D56, D57).');
+
+export const registrarLoteGpsResponseAceptadosMin = 0;
+
+export const registrarLoteGpsResponseUltimaSecuenciaMin = 0;
+
+export const RegistrarLoteGpsResponse = zod.object({
+  aceptados: zod.int().min(registrarLoteGpsResponseAceptadosMin),
+  ultimaSecuencia: zod
+    .int()
+    .min(registrarLoteGpsResponseUltimaSecuenciaMin)
+    .describe('El seq más alto del lote; la app borra de SQLite hasta ahí.'),
+  ultimaPosicionActualizada: zod.boolean(),
+});
+
+/**
+ * Chofer propio, despachador, comercial, gerente, jefe_flota y agente_lectura.
+ * @summary Los puntos del viaje en orden de tiempo, hasta 1.000 por página (consulta por viajeId en DynamoDB, nunca un scan).
+ */
+export const ObtenerRecorridoParams = zod.object({
+  viajeId: zod.uuid(),
+});
+
+export const obtenerRecorridoQueryCursorMax = 500;
+
+export const ObtenerRecorridoQueryParams = zod.object({
+  cursor: zod.string().max(obtenerRecorridoQueryCursorMax).optional(),
+});
+
+export const ObtenerRecorridoResponse = zod.object({
+  items: zod.array(
+    zod.object({
+      seq: zod.int(),
+      registradaEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+      lat: zod.number(),
+      lng: zod.number(),
+      velocidadKmh: zod.number(),
+      precisionMetros: zod.number().optional(),
+      dispositivoId: zod.uuid(),
+    }),
+  ),
+  siguienteCursor: zod.string().nullable(),
+});
+
+/**
+ * Solo con el viaje EN_RUTA o después de la entrega (llega tarde); si no, 409 CONFLICTO_ESTADO.
+ * @summary Hito de la bitácora (voz o texto) del chofer asignado; publica HitoRegistrado (spec 005, paso 7).
+ */
+export const RegistrarHitoParams = zod.object({
+  viajeId: zod.uuid(),
+});
+
+export const RegistrarHitoHeader = zod.object({
+  'Idempotency-Key': zod.uuid().describe('UUID generado por el cliente, uno por intento (000 §4.1).'),
+});
+
+export const registrarHitoBodyDescripcionMin = 3;
+export const registrarHitoBodyDescripcionMax = 500;
+
+export const registrarHitoBodyPosicionLatMin = -90;
+export const registrarHitoBodyPosicionLatMax = 90;
+
+export const registrarHitoBodyPosicionLngMin = -180;
+export const registrarHitoBodyPosicionLngMax = 180;
+
+export const RegistrarHitoBody = zod.object({
+  hitoId: zod.uuid(),
+  tipo: zod.enum(['BLOQUEO', 'PARADA', 'PUNTO_CONTROL', 'FALLA_MECANICA', 'OTRO']),
+  descripcion: zod.string().min(registrarHitoBodyDescripcionMin).max(registrarHitoBodyDescripcionMax),
+  posicion: zod.object({
+    lat: zod.number().min(registrarHitoBodyPosicionLatMin).max(registrarHitoBodyPosicionLatMax),
+    lng: zod.number().min(registrarHitoBodyPosicionLngMin).max(registrarHitoBodyPosicionLngMax),
+  }),
+  registradoEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+  origen: zod.enum(['VOZ', 'TEXTO']).describe('El audio nunca sale del celular (D53); solo viaja el texto revisado por el chofer.'),
+});
+
+export const registrarHitoResponseOneDescripcionMin = 3;
+export const registrarHitoResponseOneDescripcionMax = 500;
+
+export const registrarHitoResponseOnePosicionLatMin = -90;
+export const registrarHitoResponseOnePosicionLatMax = 90;
+
+export const registrarHitoResponseOnePosicionLngMin = -180;
+export const registrarHitoResponseOnePosicionLngMax = 180;
+
+export const RegistrarHitoResponse = zod
+  .object({
+    hitoId: zod.uuid(),
+    tipo: zod.enum(['BLOQUEO', 'PARADA', 'PUNTO_CONTROL', 'FALLA_MECANICA', 'OTRO']),
+    descripcion: zod.string().min(registrarHitoResponseOneDescripcionMin).max(registrarHitoResponseOneDescripcionMax),
+    posicion: zod.object({
+      lat: zod.number().min(registrarHitoResponseOnePosicionLatMin).max(registrarHitoResponseOnePosicionLatMax),
+      lng: zod.number().min(registrarHitoResponseOnePosicionLngMin).max(registrarHitoResponseOnePosicionLngMax),
+    }),
+    registradoEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+    origen: zod.enum(['VOZ', 'TEXTO']).describe('El audio nunca sale del celular (D53); solo viaja el texto revisado por el chofer.'),
+  })
+  .and(
+    zod.object({
+      viajeId: zod.uuid(),
+    }),
+  );
+
+/**
+ * Chofer propio, despachador, comercial, gerente y agente_lectura. `texto` se busca sin distinguir mayúsculas.
+ * @summary Bitácora del viaje, del más nuevo al más viejo; sin texto, los 20 más nuevos (spec 005 y 014).
+ */
+export const ListarHitosParams = zod.object({
+  viajeId: zod.uuid(),
+});
+
+export const listarHitosQueryTextoMin = 2;
+export const listarHitosQueryTextoMax = 100;
+
+export const ListarHitosQueryParams = zod.object({
+  texto: zod.string().min(listarHitosQueryTextoMin).max(listarHitosQueryTextoMax).optional(),
+});
+
+export const listarHitosResponseItemsItemOneDescripcionMin = 3;
+export const listarHitosResponseItemsItemOneDescripcionMax = 500;
+
+export const listarHitosResponseItemsItemOnePosicionLatMin = -90;
+export const listarHitosResponseItemsItemOnePosicionLatMax = 90;
+
+export const listarHitosResponseItemsItemOnePosicionLngMin = -180;
+export const listarHitosResponseItemsItemOnePosicionLngMax = 180;
+
+export const ListarHitosResponse = zod.object({
+  items: zod.array(
+    zod
+      .object({
+        hitoId: zod.uuid(),
+        tipo: zod.enum(['BLOQUEO', 'PARADA', 'PUNTO_CONTROL', 'FALLA_MECANICA', 'OTRO']),
+        descripcion: zod.string().min(listarHitosResponseItemsItemOneDescripcionMin).max(listarHitosResponseItemsItemOneDescripcionMax),
+        posicion: zod.object({
+          lat: zod.number().min(listarHitosResponseItemsItemOnePosicionLatMin).max(listarHitosResponseItemsItemOnePosicionLatMax),
+          lng: zod.number().min(listarHitosResponseItemsItemOnePosicionLngMin).max(listarHitosResponseItemsItemOnePosicionLngMax),
+        }),
+        registradoEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+        origen: zod.enum(['VOZ', 'TEXTO']).describe('El audio nunca sale del celular (D53); solo viaja el texto revisado por el chofer.'),
+      })
+      .and(
+        zod.object({
+          viajeId: zod.uuid(),
+        }),
+      ),
+  ),
+});
+
+/**
+ * FRENADA_BRUSCA exige magnitudG ≥ 0,4 (D08). Mismos estados válidos que los hitos.
+ * @summary Frenada brusca o alerta de fatiga detectada en el celular; publica EventoConduccionRegistrado (spec 005, paso 8).
+ */
+export const RegistrarEventoConduccionParams = zod.object({
+  viajeId: zod.uuid(),
+});
+
+export const RegistrarEventoConduccionHeader = zod.object({
+  'Idempotency-Key': zod.uuid().describe('UUID generado por el cliente, uno por intento (000 §4.1).'),
+});
+
+export const registrarEventoConduccionBodyMagnitudGMin = 0;
+export const registrarEventoConduccionBodyMagnitudGMax = 5;
+
+export const registrarEventoConduccionBodyPosicionLatMin = -90;
+export const registrarEventoConduccionBodyPosicionLatMax = 90;
+
+export const registrarEventoConduccionBodyPosicionLngMin = -180;
+export const registrarEventoConduccionBodyPosicionLngMax = 180;
+
+export const RegistrarEventoConduccionBody = zod.object({
+  eventoId: zod.uuid(),
+  tipo: zod.enum(['FRENADA_BRUSCA', 'ALERTA_FATIGA']),
+  magnitudG: zod
+    .number()
+    .min(registrarEventoConduccionBodyMagnitudGMin)
+    .max(registrarEventoConduccionBodyMagnitudGMax)
+    .optional()
+    .describe('Obligatoria en FRENADA_BRUSCA y ≥ 0,4 (D08).'),
+  posicion: zod.object({
+    lat: zod.number().min(registrarEventoConduccionBodyPosicionLatMin).max(registrarEventoConduccionBodyPosicionLatMax),
+    lng: zod.number().min(registrarEventoConduccionBodyPosicionLngMin).max(registrarEventoConduccionBodyPosicionLngMax),
+  }),
+  registradoEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+});
+
+export const registrarEventoConduccionResponseOneMagnitudGMin = 0;
+export const registrarEventoConduccionResponseOneMagnitudGMax = 5;
+
+export const registrarEventoConduccionResponseOnePosicionLatMin = -90;
+export const registrarEventoConduccionResponseOnePosicionLatMax = 90;
+
+export const registrarEventoConduccionResponseOnePosicionLngMin = -180;
+export const registrarEventoConduccionResponseOnePosicionLngMax = 180;
+
+export const RegistrarEventoConduccionResponse = zod
+  .object({
+    eventoId: zod.uuid(),
+    tipo: zod.enum(['FRENADA_BRUSCA', 'ALERTA_FATIGA']),
+    magnitudG: zod
+      .number()
+      .min(registrarEventoConduccionResponseOneMagnitudGMin)
+      .max(registrarEventoConduccionResponseOneMagnitudGMax)
+      .optional()
+      .describe('Obligatoria en FRENADA_BRUSCA y ≥ 0,4 (D08).'),
+    posicion: zod.object({
+      lat: zod.number().min(registrarEventoConduccionResponseOnePosicionLatMin).max(registrarEventoConduccionResponseOnePosicionLatMax),
+      lng: zod.number().min(registrarEventoConduccionResponseOnePosicionLngMin).max(registrarEventoConduccionResponseOnePosicionLngMax),
+    }),
+    registradoEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+  })
+  .and(
+    zod.object({
+      viajeId: zod.uuid(),
+    }),
+  );
+
+/**
+ * @summary El celular del chofer (reemplazo completo; sin Idempotency-Key). tokenPush solo en Android (D45).
+ */
+export const registrarDispositivoBodyTokenPushMin = 10;
+export const registrarDispositivoBodyTokenPushMax = 4096;
+
+export const RegistrarDispositivoBody = zod.object({
+  dispositivoId: zod.uuid(),
+  plataforma: zod.enum(['ANDROID', 'IOS']),
+  tokenPush: zod
+    .string()
+    .min(registrarDispositivoBodyTokenPushMin)
+    .max(registrarDispositivoBodyTokenPushMax)
+    .optional()
+    .describe('Token de FCM; solo Android (D45).'),
+});
+
+export const registrarDispositivoResponseOneTokenPushMin = 10;
+export const registrarDispositivoResponseOneTokenPushMax = 4096;
+
+export const RegistrarDispositivoResponse = zod
+  .object({
+    dispositivoId: zod.uuid(),
+    plataforma: zod.enum(['ANDROID', 'IOS']),
+    tokenPush: zod
+      .string()
+      .min(registrarDispositivoResponseOneTokenPushMin)
+      .max(registrarDispositivoResponseOneTokenPushMax)
+      .optional()
+      .describe('Token de FCM; solo Android (D45).'),
+  })
+  .and(
+    zod.object({
+      actualizadoEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+    }),
+  );
+
+/**
+ * @summary Último seq de GPS aceptado de ese dispositivo y viaje; solo el chofer que registró el dispositivo (spec 005).
+ */
+export const ObtenerCursorSincronizacionParams = zod.object({
+  dispositivoId: zod.uuid(),
+});
+
+export const ObtenerCursorSincronizacionQueryParams = zod.object({
+  viajeId: zod.uuid(),
+});
+
+export const ObtenerCursorSincronizacionResponse = zod.object({
+  dispositivoId: zod.uuid(),
+  viajeId: zod.uuid(),
+  ultimaSecuencia: zod.int().nullable().describe('null si todavía no se aceptó ningún punto.'),
+});
 
 /**
  * Partes de 5 MB (la última puede ser menor), URL `PUT` firmadas de 15 min. La autoridad de idempotencia es el
@@ -1265,6 +1804,14 @@ export const aprobarEntregaObservadaResponseToneladasExclusiveMin = 0;
 export const aprobarEntregaObservadaResponseToneladasMax = 30;
 
 export const aprobarEntregaObservadaResponsePlacaRegExp = new RegExp('^[0-9]{3,4}[A-Z]{3}$');
+export const aprobarEntregaObservadaResponseUltimaPosicionPosicionLatMin = -90;
+export const aprobarEntregaObservadaResponseUltimaPosicionPosicionLatMax = 90;
+
+export const aprobarEntregaObservadaResponseUltimaPosicionPosicionLngMin = -180;
+export const aprobarEntregaObservadaResponseUltimaPosicionPosicionLngMax = 180;
+
+export const aprobarEntregaObservadaResponseUltimaPosicionVelocidadKmhMin = 0;
+export const aprobarEntregaObservadaResponseUltimaPosicionVelocidadKmhMax = 200;
 
 export const AprobarEntregaObservadaResponse = zod
   .object({
@@ -1334,6 +1881,25 @@ export const AprobarEntregaObservadaResponse = zod
     placa: zod.string().regex(aprobarEntregaObservadaResponsePlacaRegExp),
     choferNombre: zod.string(),
     iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
+    ultimaPosicion: zod
+      .object({
+        posicion: zod.object({
+          lat: zod
+            .number()
+            .min(aprobarEntregaObservadaResponseUltimaPosicionPosicionLatMin)
+            .max(aprobarEntregaObservadaResponseUltimaPosicionPosicionLatMax),
+          lng: zod
+            .number()
+            .min(aprobarEntregaObservadaResponseUltimaPosicionPosicionLngMin)
+            .max(aprobarEntregaObservadaResponseUltimaPosicionPosicionLngMax),
+        }),
+        velocidadKmh: zod
+          .number()
+          .min(aprobarEntregaObservadaResponseUltimaPosicionVelocidadKmhMin)
+          .max(aprobarEntregaObservadaResponseUltimaPosicionVelocidadKmhMax),
+        registradaEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+      })
+      .optional(),
   })
   .describe('La operación, sin montos (D51).');
 
@@ -1376,6 +1942,14 @@ export const rechazarEntregaObservadaResponseToneladasExclusiveMin = 0;
 export const rechazarEntregaObservadaResponseToneladasMax = 30;
 
 export const rechazarEntregaObservadaResponsePlacaRegExp = new RegExp('^[0-9]{3,4}[A-Z]{3}$');
+export const rechazarEntregaObservadaResponseUltimaPosicionPosicionLatMin = -90;
+export const rechazarEntregaObservadaResponseUltimaPosicionPosicionLatMax = 90;
+
+export const rechazarEntregaObservadaResponseUltimaPosicionPosicionLngMin = -180;
+export const rechazarEntregaObservadaResponseUltimaPosicionPosicionLngMax = 180;
+
+export const rechazarEntregaObservadaResponseUltimaPosicionVelocidadKmhMin = 0;
+export const rechazarEntregaObservadaResponseUltimaPosicionVelocidadKmhMax = 200;
 
 export const RechazarEntregaObservadaResponse = zod
   .object({
@@ -1445,6 +2019,25 @@ export const RechazarEntregaObservadaResponse = zod
     placa: zod.string().regex(rechazarEntregaObservadaResponsePlacaRegExp),
     choferNombre: zod.string(),
     iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
+    ultimaPosicion: zod
+      .object({
+        posicion: zod.object({
+          lat: zod
+            .number()
+            .min(rechazarEntregaObservadaResponseUltimaPosicionPosicionLatMin)
+            .max(rechazarEntregaObservadaResponseUltimaPosicionPosicionLatMax),
+          lng: zod
+            .number()
+            .min(rechazarEntregaObservadaResponseUltimaPosicionPosicionLngMin)
+            .max(rechazarEntregaObservadaResponseUltimaPosicionPosicionLngMax),
+        }),
+        velocidadKmh: zod
+          .number()
+          .min(rechazarEntregaObservadaResponseUltimaPosicionVelocidadKmhMin)
+          .max(rechazarEntregaObservadaResponseUltimaPosicionVelocidadKmhMax),
+        registradaEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+      })
+      .optional(),
   })
   .describe('La operación, sin montos (D51).');
 

@@ -1,5 +1,6 @@
 package bo.transporte.viajes.aplicacion.viaje;
 
+import bo.transporte.viajes.aplicacion.puerto.salida.UltimaPosicionRepositorio.UltimaPosicion;
 import bo.transporte.viajes.dominio.comun.TipoCarga;
 import bo.transporte.viajes.dominio.ruta.Ruta;
 import bo.transporte.viajes.dominio.viaje.EstadoViaje;
@@ -26,9 +27,10 @@ public record ViajeVista(
         LocalDate fechaViaje,
         String placa,
         String choferNombre,
-        Instant iniciadoEn) {
+        Instant iniciadoEn,
+        UltimaPosicion ultimaPosicion) {
 
-    static ViajeVista de(Viaje v, String razonSocial, Ruta ruta) {
+    static ViajeVista de(Viaje v, String razonSocial, Ruta ruta, UltimaPosicion ultimaPosicion) {
         var a = v.asignacion();
         return new ViajeVista(
                 v.viajeId(),
@@ -43,6 +45,7 @@ public record ViajeVista(
                 a.fechaViaje(),
                 a.placa(),
                 a.choferNombre(),
-                v.iniciadoEn());
+                v.iniciadoEn(),
+                ultimaPosicion);
     }
 }

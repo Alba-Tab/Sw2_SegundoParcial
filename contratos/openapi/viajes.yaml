@@ -21,6 +21,8 @@ tags:
   - name: viajes
   - name: evidencias
   - name: entregas
+  - name: ruta
+  - name: dispositivos
 paths:
   /health:
     get:
@@ -351,6 +353,32 @@ paths:
           $ref: './comun.yaml#/components/responses/Conflicto'
         '503':
           $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/viajes:
+    get:
+      tags: [viajes]
+      operationId: listarViajes
+      summary: Viajes con su última posición para el mapa en vivo (despachador, comercial, gerente, jefe_flota, agente_lectura). Spec 005.
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/EstadoViaje'
+        - $ref: './comun.yaml#/components/parameters/Limite'
+        - $ref: './comun.yaml#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Página de viajes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaViajes'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
   /api/v1/viajes/mios:
     get:
       tags: [viajes]
@@ -429,6 +457,233 @@ paths:
           $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
         '503':
           $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/viajes/{viajeId}/gps/lotes:
+    parameters:
+      - $ref: '#/components/parameters/ViajeId'
+    post:
+      tags: [ruta]
+      operationId: registrarLoteGps
+      summary: Lote de 1 a 100 puntos GPS de la cola del celular (spec 005, pasos 5 y 6).
+      description: |
+        Excepción de 000 §4.1: `Idempotency-Key` es el `loteId` y va a los logs, pero la autoridad es la llave de
+        DynamoDB (`viajeId` + `ts#seq`); un reenvío reescribe los mismos puntos y responde 200 sin otro
+        PosicionActualizada. Si DynamoDB sigue con *throttling* después de 5 reintentos, 503 con `Retry-After: 10`.
+        Acepta puntos tardíos después de la entrega; en CONFIRMADO, PROGRAMANDO o CANCELADO responde 409.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoteGps'
+      responses:
+        '200':
+          description: Puntos guardados.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultadoLoteGps'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/viajes/{viajeId}/recorrido:
+    parameters:
+      - $ref: '#/components/parameters/ViajeId'
+    get:
+      tags: [ruta]
+      operationId: obtenerRecorrido
+      summary: Los puntos del viaje en orden de tiempo, hasta 1.000 por página (consulta por viajeId en DynamoDB, nunca un scan).
+      description: Chofer propio, despachador, comercial, gerente, jefe_flota y agente_lectura.
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+            maxLength: 500
+      responses:
+        '200':
+          description: Página del recorrido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaRecorrido'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+  /api/v1/viajes/{viajeId}/hitos:
+    parameters:
+      - $ref: '#/components/parameters/ViajeId'
+    post:
+      tags: [ruta]
+      operationId: registrarHito
+      summary: Hito de la bitácora (voz o texto) del chofer asignado; publica HitoRegistrado (spec 005, paso 7).
+      description: Solo con el viaje EN_RUTA o después de la entrega (llega tarde); si no, 409 CONFLICTO_ESTADO.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HitoNuevo'
+      responses:
+        '200':
+          description: Hito guardado (también en el reenvío con la misma clave).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Hito'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+    get:
+      tags: [ruta]
+      operationId: listarHitos
+      summary: Bitácora del viaje, del más nuevo al más viejo; sin texto, los 20 más nuevos (spec 005 y 014).
+      description: Chofer propio, despachador, comercial, gerente y agente_lectura. `texto` se busca sin distinguir mayúsculas.
+      parameters:
+        - name: texto
+          in: query
+          required: false
+          schema:
+            type: string
+            minLength: 2
+            maxLength: 100
+      responses:
+        '200':
+          description: Hitos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaHitos'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+  /api/v1/viajes/{viajeId}/eventos-conduccion:
+    parameters:
+      - $ref: '#/components/parameters/ViajeId'
+    post:
+      tags: [ruta]
+      operationId: registrarEventoConduccion
+      summary: Frenada brusca o alerta de fatiga detectada en el celular; publica EventoConduccionRegistrado (spec 005, paso 8).
+      description: FRENADA_BRUSCA exige magnitudG ≥ 0,4 (D08). Mismos estados válidos que los hitos.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventoConduccionNuevo'
+      responses:
+        '200':
+          description: Evento guardado (también en el reenvío con la misma clave).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EventoConduccion'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/dispositivos/mio:
+    put:
+      tags: [dispositivos]
+      operationId: registrarDispositivo
+      summary: El celular del chofer (reemplazo completo; sin Idempotency-Key). tokenPush solo en Android (D45).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DispositivoNuevo'
+      responses:
+        '200':
+          description: Dispositivo registrado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Dispositivo'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+  /api/v1/dispositivos/{dispositivoId}/cursor:
+    parameters:
+      - name: dispositivoId
+        in: path
+        required: true
+        schema:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    get:
+      tags: [dispositivos]
+      operationId: obtenerCursorSincronizacion
+      summary: Último seq de GPS aceptado de ese dispositivo y viaje; solo el chofer que registró el dispositivo (spec 005).
+      parameters:
+        - name: viajeId
+          in: query
+          required: true
+          schema:
+            $ref: './comun.yaml#/components/schemas/Uuid'
+      responses:
+        '200':
+          description: Cursor.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CursorSincronizacion'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
   /api/v1/viajes/{viajeId}/evidencias:
     parameters:
       - $ref: '#/components/parameters/ViajeId'
@@ -924,6 +1179,215 @@ components:
           type: string
         iniciadoEn:
           $ref: './comun.yaml#/components/schemas/Instante'
+        ultimaPosicion:
+          $ref: '#/components/schemas/UltimaPosicion'
+    UltimaPosicion:
+      type: object
+      required: [posicion, velocidadKmh, registradaEn]
+      properties:
+        posicion:
+          $ref: './comun.yaml#/components/schemas/Coordenadas'
+        velocidadKmh:
+          type: number
+          minimum: 0
+          maximum: 200
+        registradaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+    PaginaViajes:
+      type: object
+      required: [items, siguienteCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Viaje'
+        siguienteCursor:
+          type: string
+          nullable: true
+    PuntoGps:
+      type: object
+      required: [seq, registradaEn, lat, lng, velocidadKmh]
+      additionalProperties: false
+      properties:
+        seq:
+          type: integer
+          minimum: 0
+          description: Creciente por dispositivo y viaje.
+        registradaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        lat:
+          type: number
+          minimum: -90
+          maximum: 90
+        lng:
+          type: number
+          minimum: -180
+          maximum: 180
+        velocidadKmh:
+          type: number
+          minimum: 0
+          maximum: 200
+        precisionMetros:
+          type: number
+          minimum: 0
+    LoteGps:
+      type: object
+      required: [dispositivoId, puntos]
+      additionalProperties: false
+      description: '`seq` sin repetir; `registradaEn` ≤ ahora + 2 min y ≥ iniciadoEn − 10 min (D56, D57).'
+      properties:
+        dispositivoId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        puntos:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            $ref: '#/components/schemas/PuntoGps'
+    ResultadoLoteGps:
+      type: object
+      required: [aceptados, ultimaSecuencia, ultimaPosicionActualizada]
+      properties:
+        aceptados:
+          type: integer
+          minimum: 0
+        ultimaSecuencia:
+          type: integer
+          minimum: 0
+          description: El seq más alto del lote; la app borra de SQLite hasta ahí.
+        ultimaPosicionActualizada:
+          type: boolean
+    PuntoRecorrido:
+      type: object
+      required: [seq, registradaEn, lat, lng, velocidadKmh, dispositivoId]
+      properties:
+        seq:
+          type: integer
+        registradaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        lat:
+          type: number
+        lng:
+          type: number
+        velocidadKmh:
+          type: number
+        precisionMetros:
+          type: number
+        dispositivoId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    PaginaRecorrido:
+      type: object
+      required: [items, siguienteCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/PuntoRecorrido'
+        siguienteCursor:
+          type: string
+          nullable: true
+    TipoHito:
+      type: string
+      enum: [BLOQUEO, PARADA, PUNTO_CONTROL, FALLA_MECANICA, OTRO]
+    HitoNuevo:
+      type: object
+      required: [hitoId, tipo, descripcion, posicion, registradoEn, origen]
+      additionalProperties: false
+      properties:
+        hitoId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        tipo:
+          $ref: '#/components/schemas/TipoHito'
+        descripcion:
+          type: string
+          minLength: 3
+          maxLength: 500
+        posicion:
+          $ref: './comun.yaml#/components/schemas/Coordenadas'
+        registradoEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        origen:
+          type: string
+          enum: [VOZ, TEXTO]
+          description: El audio nunca sale del celular (D53); solo viaja el texto revisado por el chofer.
+    Hito:
+      allOf:
+        - $ref: '#/components/schemas/HitoNuevo'
+        - type: object
+          required: [viajeId]
+          properties:
+            viajeId:
+              $ref: './comun.yaml#/components/schemas/Uuid'
+    ListaHitos:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Hito'
+    EventoConduccionNuevo:
+      type: object
+      required: [eventoId, tipo, posicion, registradoEn]
+      additionalProperties: false
+      properties:
+        eventoId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        tipo:
+          type: string
+          enum: [FRENADA_BRUSCA, ALERTA_FATIGA]
+        magnitudG:
+          type: number
+          minimum: 0
+          maximum: 5
+          description: Obligatoria en FRENADA_BRUSCA y ≥ 0,4 (D08).
+        posicion:
+          $ref: './comun.yaml#/components/schemas/Coordenadas'
+        registradoEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+    EventoConduccion:
+      allOf:
+        - $ref: '#/components/schemas/EventoConduccionNuevo'
+        - type: object
+          required: [viajeId]
+          properties:
+            viajeId:
+              $ref: './comun.yaml#/components/schemas/Uuid'
+    DispositivoNuevo:
+      type: object
+      required: [dispositivoId, plataforma]
+      additionalProperties: false
+      properties:
+        dispositivoId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        plataforma:
+          type: string
+          enum: [ANDROID, IOS]
+        tokenPush:
+          type: string
+          minLength: 10
+          maxLength: 4096
+          description: Token de FCM; solo Android (D45).
+    Dispositivo:
+      allOf:
+        - $ref: '#/components/schemas/DispositivoNuevo'
+        - type: object
+          required: [actualizadoEn]
+          properties:
+            actualizadoEn:
+              $ref: './comun.yaml#/components/schemas/Instante'
+    CursorSincronizacion:
+      type: object
+      required: [dispositivoId, viajeId, ultimaSecuencia]
+      properties:
+        dispositivoId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        viajeId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        ultimaSecuencia:
+          type: integer
+          nullable: true
+          description: null si todavía no se aceptó ningún punto.
     ListaViajes:
       type: object
       required: [items]

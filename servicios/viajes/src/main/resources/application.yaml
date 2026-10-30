@@ -56,6 +56,10 @@ almacen:
   bucket: ${S3_BUCKET:transporte-evidencias}
   region: ${AWS_REGION:us-east-1}
 
+# Puntos GPS y cursor de sincronización en DynamoDB (spec 005). En local, DynamoDB Local por GPS_DYNAMODB_ENDPOINT.
+gps:
+  endpoint: ${GPS_DYNAMODB_ENDPOINT:}
+
 # plataforma/semilla copiada en la imagen; --semilla.cargar=true la carga y termina (D102).
 semilla:
   dir: ${SEMILLA_DIR:/app/semilla}
