@@ -24,6 +24,24 @@ public class SemillaJdbc {
         this.json = json;
     }
 
+    /**
+     * {@code demo:reiniciar} (T8.8, D102): vacía todas las tablas de Viajes (Outbox, Inbox, idempotencia, servicios,
+     * viajes, posiciones…) menos el historial de Flyway, y vuelve a cargar la semilla, todo en una transacción.
+     *
+     * @return cuántos clientes y rutas cargó
+     */
+    @Transactional
+    public int[] reiniciar(Path dir) throws java.io.IOException {
+        String tablas = String.join(
+                ", ",
+                jdbc.sql(
+                                "SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> 'flyway_schema_history'")
+                        .query(String.class)
+                        .list());
+        jdbc.sql("TRUNCATE " + tablas + " RESTART IDENTITY").update();
+        return cargar(dir);
+    }
+
     /** @return cuántos clientes y rutas cargó */
     @Transactional
     public int[] cargar(Path dir) throws java.io.IOException {
