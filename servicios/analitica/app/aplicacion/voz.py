@@ -1,6 +1,8 @@
 """Consulta por voz (spec 015, A): intención del LLM validada en código → reporte por el MCP → redacción verificada."""
 
+import asyncio
 import json
+from dataclasses import replace
 from datetime import date
 from typing import Any
 
@@ -12,10 +14,12 @@ from app.dominio.reportes import CATALOGO, PLACA, Parametros, ReporteId, validar
 from app.dominio.voz import PERIODOS, Intencion, coincidencias, fechas, numeros_validos, plantilla
 from app.infraestructura.bd import Cliente, Ruta, transaccion
 from app.infraestructura.llm import Llm, LlmNoDisponible
-from app.infraestructura.mcp import conectar, resultado
-from app.infraestructura.tokens import Tokens
+from app.infraestructura.mcp import ERRORES_MCP, conectar, resultado
+from app.infraestructura.tokens import ErrorToken, Tokens
 
 ROLES_VOZ = {"gerente", "administracion", "despachador", "jefe_flota"}
+# Periodo de una opción cuando el que dijo el usuario no sirve: cabe en el max_dias de cualquier reporte.
+PERIODO_POR_DEFECTO = {ReporteId.CUENTAS_POR_COBRAR: "ESTA_SEMANA"}
 
 ESQUEMA = {
     "type": "object",
@@ -76,14 +80,54 @@ def _intencion(datos: dict[str, Any]) -> Intencion:
     )
 
 
-def _opciones_catalogo(roles: set[str], primero: str | None) -> list[dict[str, Any]]:
+def _periodo(reporte: ReporteId, i: Intencion, hoy_: date) -> dict[str, str]:
+    """`desde` y `hasta` para una opción: los del periodo dicho si caben en el reporte; si no, los de por defecto."""
+    d = CATALOGO[reporte]
+    if d.max_dias is None:
+        return {}
+    try:
+        desde, hasta = fechas(reporte, i, hoy_)
+        if hasta < desde or (hasta - desde).days + 1 > d.max_dias:
+            raise ErrorDeDominio("ACLARACION", "fuera de rango")
+    except ErrorDeDominio:
+        defecto = Intencion(reporte.value, PERIODO_POR_DEFECTO.get(reporte, "ULTIMOS_30_DIAS"))
+        desde, hasta = fechas(reporte, defecto, hoy_)
+    return {"desde": desde.isoformat(), "hasta": hasta.isoformat()}
+
+
+def _etiqueta(reporte: ReporteId, parametros: dict[str, Any]) -> str:
+    titulo = CATALOGO[reporte].titulo
+    if "desde" not in parametros:
+        return titulo
+    desde, hasta = date.fromisoformat(parametros["desde"]), date.fromisoformat(parametros["hasta"])
+    return f"{titulo} del {desde:%d/%m} al {hasta:%d/%m/%Y}"
+
+
+def _opciones_catalogo(roles: set[str], primero: ReporteId, i: Intencion, hoy_: date) -> list[dict[str, Any]]:
+    """Hasta 3 reportes que el rol puede ver, empezando por el propuesto, cada uno listo para correr sin el LLM."""
     permitidos = [d for d in CATALOGO.values() if set(d.roles) & roles]
-    permitidos.sort(key=lambda d: d.reporte_id.value != primero)
-    return [{"etiqueta": d.titulo, "reporteId": d.reporte_id.value, "parametros": {}} for d in permitidos[:3]]
+    permitidos.sort(key=lambda d: d.reporte_id != primero)
+    return [
+        {"etiqueta": d.titulo, "reporteId": d.reporte_id.value, "parametros": _periodo(d.reporte_id, i, hoy_)}
+        for d in permitidos[:3]
+    ]
+
+
+def _con_periodo_por_defecto(texto: str, reporte: ReporteId, parametros: dict[str, Any], hoy_: date) -> dict[str, Any]:
+    """El periodo dicho no sirve: se pregunta y se ofrece el mismo reporte con el periodo por defecto."""
+    opcion = {**parametros, **_periodo(reporte, Intencion(reporte.value, None), hoy_)}
+    return {
+        "tipo": "ACLARACION",
+        "texto": texto,
+        "opciones": [{"etiqueta": _etiqueta(reporte, opcion), "reporteId": reporte.value, "parametros": opcion}],
+    }
 
 
 def validar_intencion(i: Intencion, roles: set[str], hoy_: date) -> dict[str, Any]:
-    """Validación en código, en el orden de la spec 015 (paso 4). Devuelve INTENCION o ACLARACION."""
+    """Validación en código, en el orden de la spec 015 (paso 4). Devuelve INTENCION o ACLARACION.
+
+    Cada opción de una ACLARACION trae parámetros completos (pasa `validar`): la pantalla la corre sin el LLM.
+    """
     try:
         reporte = ReporteId(i.reporte_id) if i.reporte_id else None
     except ValueError:
@@ -91,44 +135,45 @@ def validar_intencion(i: Intencion, roles: set[str], hoy_: date) -> dict[str, An
     if reporte is None:
         raise ErrorDeDominio("PREGUNTA_FUERA_DE_ALCANCE", "Puedo responder sobre los 5 reportes del catálogo")
     if i.aclaracion:
-        return {"tipo": "ACLARACION", "texto": i.aclaracion, "opciones": _opciones_catalogo(roles, reporte.value)}
+        return {"tipo": "ACLARACION", "texto": i.aclaracion, "opciones": _opciones_catalogo(roles, reporte, i, hoy_)}
     if not set(CATALOGO[reporte].roles) & roles:
         raise ErrorDeDominio("SIN_PERMISO", "No tienes permiso para ese reporte")
     d = CATALOGO[reporte]
-    parametros: dict[str, Any] = {}
+    clientes = rutas = None
     with transaccion() as s:
         if i.cliente and "clienteId" in d.filtros:
-            nombres = {str(c.cliente_id): c.razon_social for c in s.scalars(select(Cliente))}
-            ids = coincidencias(i.cliente, nombres)
-            if not ids:
-                return {"tipo": "ACLARACION", "texto": f"No encontré el cliente «{i.cliente}»", "opciones": []}
-            if len(ids) > 1:
-                base = validar_intencion(Intencion(**{**i.__dict__, "cliente": None}), roles, hoy_)
-                return {
-                    "tipo": "ACLARACION",
-                    "texto": f"¿Te refieres a {' o a '.join(nombres[x] for x in ids[:3])}?",
-                    "opciones": [
-                        {
-                            "etiqueta": nombres[x],
-                            "reporteId": reporte.value,
-                            "parametros": {**base.get("parametros", {}), "clienteId": x},
-                        }
-                        for x in ids[:3]
-                    ],
-                }
-            parametros["clienteId"] = ids[0]
+            clientes = {str(c.cliente_id): c.razon_social for c in s.scalars(select(Cliente))}
         if i.ruta and "rutaId" in d.filtros:
             rutas = {str(r.ruta_id): r.nombre for r in s.scalars(select(Ruta))}
-            ids = coincidencias(i.ruta, rutas)
-            if len(ids) != 1:
-                return {
-                    "tipo": "ACLARACION",
-                    "texto": f"No encontré la ruta «{i.ruta}»" if not ids else "¿Cuál de estas rutas?",
-                    "opciones": [
-                        {"etiqueta": rutas[x], "reporteId": reporte.value, "parametros": {"rutaId": x}} for x in ids[:3]
-                    ],
-                }
-            parametros["rutaId"] = ids[0]
+    parametros: dict[str, Any] = {}
+    for clave, campo, dicho, nombres in (
+        ("clienteId", "cliente", i.cliente, clientes),
+        ("rutaId", "ruta", i.ruta, rutas),
+    ):
+        if nombres is None or dicho is None:
+            continue
+        ids = coincidencias(dicho, nombres)
+        if not ids:
+            que = "el cliente" if campo == "cliente" else "la ruta"
+            return {"tipo": "ACLARACION", "texto": f"No encontré {que} «{dicho}»", "opciones": []}
+        if len(ids) > 1:
+            # Los demás parámetros salen de la misma intención sin ese nombre (o del periodo por defecto).
+            base = validar_intencion(replace(i, **{campo: None}), roles, hoy_)
+            comunes = base["parametros"] if base["tipo"] == "INTENCION" else _periodo(reporte, i, hoy_)
+            texto = (
+                f"¿Te refieres a {' o a '.join(nombres[x] for x in ids[:3])}?"
+                if campo == "cliente"
+                else "¿Cuál de estas rutas?"
+            )
+            return {
+                "tipo": "ACLARACION",
+                "texto": texto,
+                "opciones": [
+                    {"etiqueta": nombres[x], "reporteId": reporte.value, "parametros": {**comunes, clave: x}}
+                    for x in ids[:3]
+                ],
+            }
+        parametros[clave] = ids[0]
     if i.placa and "placa" in d.filtros:
         placa = i.placa.replace(" ", "").replace("-", "").upper()
         if not PLACA.match(placa):
@@ -139,14 +184,18 @@ def validar_intencion(i: Intencion, roles: set[str], hoy_: date) -> dict[str, An
     if d.max_dias is not None:
         try:
             desde, hasta = fechas(reporte, i, hoy_)
-        except ErrorDeDominio as e:
-            return {"tipo": "ACLARACION", "texto": e.mensaje, "opciones": _opciones_catalogo(roles, reporte.value)[:1]}
-        parametros |= {"desde": desde.isoformat(), "hasta": hasta.isoformat()}
-        try:
             validar(reporte, Parametros(desde=desde, hasta=hasta), roles)
         except ErrorDeDominio as e:
-            return {"tipo": "ACLARACION", "texto": e.mensaje, "opciones": []}
+            return _con_periodo_por_defecto(e.mensaje, reporte, parametros, hoy_)
+        parametros |= {"desde": desde.isoformat(), "hasta": hasta.isoformat()}
     return {"tipo": "INTENCION", "reporteId": reporte.value, "parametros": parametros}
+
+
+def _raiz(e: BaseException) -> BaseException:
+    """El cliente MCP corre en un TaskGroup de anyio: se desenvuelve para responder con el código correcto."""
+    while isinstance(e, BaseExceptionGroup) and len(e.exceptions) == 1:
+        e = e.exceptions[0]
+    return e
 
 
 class Voz:
@@ -165,7 +214,8 @@ class Voz:
             datos = json.loads(r.get("content") or "{}")
         except (LlmNoDisponible, ValueError) as e:
             raise ErrorDeDominio("LLM_NO_DISPONIBLE", "El asistente no está disponible") from e
-        return validar_intencion(_intencion(datos), roles, hoy())
+        # Lee las copias de clientes y rutas: fuera del bucle de eventos.
+        return await asyncio.to_thread(validar_intencion, _intencion(datos), roles, hoy())
 
     async def redactar(self, pregunta: str, resultado_reporte: dict[str, Any], prompt: str | None = None) -> str:
         reporte = ReporteId(resultado_reporte["reporteId"])
@@ -186,12 +236,14 @@ class Voz:
         """Cadena de 3 intercambios: cc-tablero → gateway → analitica → mcp-server → analitica (spec 015, paso 5)."""
         try:
             return await self._preguntar(texto, roles, token_usuario)
-        except BaseExceptionGroup as grupo:
-            # El cliente MCP corre en un TaskGroup de anyio: se desenvuelve para responder con el código correcto.
-            e: BaseException = grupo
-            while isinstance(e, BaseExceptionGroup) and len(e.exceptions) == 1:
-                e = e.exceptions[0]
-            raise e from grupo
+        except BaseException as envuelto:
+            e = _raiz(envuelto)
+            # Keycloak o el MCP caídos son una dependencia que no responde (503), no un error interno.
+            if isinstance(e, (ErrorToken, *ERRORES_MCP)):
+                raise ErrorDeDominio("DEPENDENCIA_NO_DISPONIBLE", "El servidor MCP o Keycloak no responden") from e
+            if e is envuelto:
+                raise
+            raise e from envuelto
 
     async def _preguntar(self, texto: str, roles: set[str], token_usuario: str) -> dict[str, Any]:
         token_mcp = await self.tokens.para_mcp(token_usuario)

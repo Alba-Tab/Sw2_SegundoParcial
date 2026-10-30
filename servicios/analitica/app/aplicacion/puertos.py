@@ -20,12 +20,17 @@ class Puntaje:
 class Modelos(Protocol):
     """Los dos modelos de ML entrenados en el build (T8.4). `None` si no están cargados."""
 
+    @property
+    def cargados(self) -> bool: ...
+
     def retraso(self, variables: dict[str, float | str]) -> Prediccion | None: ...
 
     def anomalia(self, km_por_litro: float, litros: float) -> Puntaje | None: ...
 
 
 class SinModelos:
+    cargados = False
+
     def retraso(self, variables: dict[str, float | str]) -> Prediccion | None:
         return None
 

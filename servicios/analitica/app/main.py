@@ -2,6 +2,7 @@
 
 import asyncio
 import logging
+import uuid
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime
@@ -11,8 +12,10 @@ from fastapi.encoders import ENCODERS_BY_TYPE
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from starlette.concurrency import run_in_threadpool
 
 from app.api import errores
+from app.api.limite import Limitador
 from app.api.rutas_acciones import rutas as rutas_acciones
 from app.api.rutas_agente import rutas as rutas_agente
 from app.api.rutas_lectura import rutas as rutas_lectura
@@ -28,6 +31,8 @@ from app.infraestructura.bd import motor
 from app.infraestructura.llm import Llm
 from app.infraestructura.mensajeria import ConsumidorEventos
 from app.infraestructura.ml import cargar_modelos
+from app.infraestructura.observabilidad import con_correlacion
+from app.infraestructura.observabilidad import iniciar as iniciar_trazas
 from app.infraestructura.relay import RelayOutbox
 from app.infraestructura.tokens import Tokens
 
@@ -42,6 +47,7 @@ async def ciclo(app: FastAPI) -> AsyncIterator[None]:
     app.state.llm, tokens = Llm(), Tokens()
     app.state.agente = Agente(app.state.llm, tokens)
     app.state.voz = Voz(app.state.llm, tokens)
+    app.state.limite_voz = Limitador(configuracion().voz_peticiones_por_minuto)
     consumidor = ConsumidorEventos(Proyecciones(app.state.modelos))
     app.state.consumidor = consumidor
     tarea = asyncio.create_task(consumidor.iniciar()) if configuracion().consumir_eventos else None
@@ -58,8 +64,19 @@ async def ciclo(app: FastAPI) -> AsyncIterator[None]:
     await relay.detener()
 
 
-app = FastAPI(title="Analítica", version="1.0.0", lifespan=ciclo)
+# /docs y /openapi.json solo si se piden (DOCUMENTACION_API=true en local): no se sirven sin token (el contrato está
+# en contratos/openapi/analitica.yaml).
+_documentacion = configuracion().documentacion_api
+app = FastAPI(
+    title="Analítica",
+    version="1.0.0",
+    lifespan=ciclo,
+    docs_url="/docs" if _documentacion else None,
+    redoc_url=None,
+    openapi_url="/openapi.json" if _documentacion else None,
+)
 errores.registrar(app)
+iniciar_trazas(app, motor)
 if configuracion().cors_origenes:
     app.add_middleware(
         CORSMiddleware,
@@ -71,13 +88,18 @@ if configuracion().cors_origenes:
 
 @app.middleware("http")
 async def autenticar_api(request: Request, siguiente):  # type: ignore[no-untyped-def]
-    """401/503 antes que 404 en /api/** (igual que Viajes y Flota): el token se valida antes de enrutar."""
-    if request.url.path.startswith("/api/") and request.method != "OPTIONS":
-        try:
-            request.state.usuario = usuario_actual(request)
-        except ErrorDeDominio as e:
-            return errores.problema(request, e.codigo, e.mensaje)
-    return await siguiente(request)
+    """401/503 antes que 404 en /api/** (igual que Viajes y Flota): el token se valida antes de enrutar.
+
+    El `correlationId` de la petición queda en el contexto: viaja al MCP y al LLM (`X-Correlation-Id`).
+    """
+    with con_correlacion(request.headers.get("x-correlation-id") or str(uuid.uuid4())):
+        if request.url.path.startswith("/api/") and request.method != "OPTIONS":
+            try:
+                # Las llaves de Keycloak se bajan por red la primera vez: fuera del bucle de eventos.
+                request.state.usuario = await run_in_threadpool(usuario_actual, request)
+            except ErrorDeDominio as e:
+                return errores.problema(request, e.codigo, e.mensaje)
+        return await siguiente(request)
 
 
 @app.get("/health")

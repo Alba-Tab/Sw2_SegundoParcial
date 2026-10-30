@@ -20,6 +20,19 @@ FORMATOS = {
 }
 
 
+# Inyección de fórmulas (CSV/Excel injection): `razonSocial` y otros textos los escribe cualquier cliente.
+PELIGROSOS = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _texto_seguro(hoja: Any) -> None:
+    """Toda celda de texto que podría leerse como fórmula queda como texto (`data_type = s` y `quotePrefix`)."""
+    for fila in hoja.iter_rows():
+        for celda in fila:
+            if isinstance(celda.value, str) and celda.value.startswith(PELIGROSOS):
+                celda.data_type = "s"
+                celda.quotePrefix = True
+
+
 def _celda(valor: Any, tipo: str) -> Any:
     if valor is None:
         return None
@@ -78,6 +91,8 @@ def libro(resultado: dict[str, Any], sub: str, ahora: datetime) -> bytes:
             fila[0].number_format = FORMATOS["INSTANTE"]
     parametros.column_dimensions["A"].width = 24
     parametros.column_dimensions["B"].width = 48
+    for hoja in (datos, parametros):
+        _texto_seguro(hoja)
 
     salida = BytesIO()
     wb.save(salida)

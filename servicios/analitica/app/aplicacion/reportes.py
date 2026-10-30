@@ -28,8 +28,11 @@ CENTAVO = Decimal("0.01")
 Fila = dict[str, Any]
 
 
-def bob(valor: Decimal | float | int | None) -> str:
-    return str(Decimal(str(valor or 0)).quantize(CENTAVO, rounding=ROUND_HALF_UP))
+def bob(valor: Decimal | int | None) -> str:
+    """Monto como texto con 2 decimales. Dinero nunca en float (000 §3): un float aquí es un error de programación."""
+    if isinstance(valor, float):
+        raise TypeError("Un monto no puede ser float")
+    return str(Decimal(valor or 0).quantize(CENTAVO, rounding=ROUND_HALF_UP))
 
 
 def redondear(valor: float | Decimal, decimales: int = 2) -> float:
@@ -228,11 +231,15 @@ def rentabilidad(s: Session, p: Parametros) -> tuple[list[Fila], dict[str, Any],
     grupos: dict[str, dict[str, Any]] = {}
     for v, ruta, ing, comb in s.execute(consulta.order_by(HechoViaje.terminado_en)):
         if p.agrupar == "RUTA":
-            clave = ruta or "Sin ruta"
+            clave = etiqueta = ruta or "Sin ruta"
         else:
+            # Por viaje: dos viajes con la misma placa, ruta y fecha son dos filas.
             fecha = v.terminado_en.astimezone(ZONA).date().isoformat() if v.terminado_en else ""
-            clave = f"{v.placa or '—'} · {ruta or 'Sin ruta'} · {fecha}"
-        g = grupos.setdefault(clave, {"viajes": 0, "km": Decimal(0), "ingreso": Decimal(0), "combustible": Decimal(0)})
+            clave, etiqueta = str(v.viaje_id), f"{v.placa or '—'} · {ruta or 'Sin ruta'} · {fecha}"
+        g = grupos.setdefault(
+            clave,
+            {"etiqueta": etiqueta, "viajes": 0, "km": Decimal(0), "ingreso": Decimal(0), "combustible": Decimal(0)},
+        )
         g["viajes"] += 1
         g["km"] += v.km_recorridos or 0
         g["ingreso"] += ing or 0
@@ -240,11 +247,11 @@ def rentabilidad(s: Session, p: Parametros) -> tuple[list[Fila], dict[str, Any],
         if p.agrupar == "VIAJE":
             g["viajeId"] = str(v.viaje_id)
     filas = []
-    for clave, g in grupos.items():
+    for g in grupos.values():
         margen = g["ingreso"] - g["combustible"]
         filas.append(
             {
-                "grupo": clave,
+                "grupo": g["etiqueta"],
                 **({"viajeId": g["viajeId"]} if "viajeId" in g else {}),
                 "viajes": g["viajes"],
                 "km": float(g["km"]),

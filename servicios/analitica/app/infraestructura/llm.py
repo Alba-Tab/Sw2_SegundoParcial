@@ -6,6 +6,7 @@ from typing import Any
 import httpx
 
 from app.configuracion import configuracion
+from app.infraestructura.observabilidad import cabeceras_traza
 
 
 class LlmNoDisponible(Exception):
@@ -42,7 +43,7 @@ class Llm:
             cuerpo["format"] = formato
         try:
             async with httpx.AsyncClient(timeout=configuracion().llm_turno_s) as c:
-                r = await c.post(f"{self.base}/api/chat", json=cuerpo)
+                r = await c.post(f"{self.base}/api/chat", json=cuerpo, headers=cabeceras_traza())
                 r.raise_for_status()
                 return r.json()["message"]
         except (httpx.HTTPError, KeyError, json.JSONDecodeError) as e:

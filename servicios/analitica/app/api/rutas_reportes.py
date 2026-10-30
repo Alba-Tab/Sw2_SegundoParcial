@@ -55,10 +55,15 @@ def listar_reportes(usuario: UsuarioActual) -> dict[str, Any]:
 
 @rutas.get("/reportes/{reporte_id}")
 def ejecutar_reporte(
-    reporte_id: ReporteId, usuario: UsuarioActual, parametros: Annotated[ParametrosReporte, Query()]
+    reporte_id: str, usuario: UsuarioActual, parametros: Annotated[ParametrosReporte, Query()]
 ) -> dict[str, Any]:
+    # Un reporte que no está en el catálogo no existe (404 del contrato), no es una petición mal formada.
+    try:
+        reporte = ReporteId(reporte_id)
+    except ValueError as e:
+        raise ErrorDeDominio("NO_ENCONTRADO", "Ese reporte no está en el catálogo") from e
     with transaccion() as s:
-        return reportes.ejecutar(s, reporte_id, parametros.dominio(), usuario.roles)
+        return reportes.ejecutar(s, reporte, parametros.dominio(), usuario.roles)
 
 
 class ExportacionNueva(BaseModel):

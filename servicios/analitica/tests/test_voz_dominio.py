@@ -44,3 +44,17 @@ def test_regla_de_numeros_en_la_redaccion():
         plantilla(ReporteId.CUENTAS_POR_COBRAR, filas * 2, totales)
         == "Hay 2 facturas con saldo por 10.400,00 BOB en el periodo."
     )
+
+
+def test_un_monto_con_centavos_no_acepta_el_redondeo():
+    filas, totales = [{"saldo": "8400.50", "kmPorLitro": 2.5}], {"saldo": "8400.50", "facturas": 3}
+    assert numeros_validos("Se deben 8.400,50 BOB en 3 facturas.", filas, totales)
+    assert not numeros_validos("Se deben 8.400 BOB.", filas, totales)
+    assert not numeros_validos("Se deben 8400 BOB.", filas, totales)
+    assert not numeros_validos("Rinde 3 km/L.", filas, {"saldo": "8400.50"})  # 2,5 no se redondea a 3
+    # Un monto entero sí se puede decir sin decimales.
+    assert numeros_validos("Se deben 8.400 BOB.", [], {"saldo": "8400.00"})
+    assert (
+        plantilla(ReporteId.CUENTAS_POR_COBRAR, filas, totales)
+        == "Hay 1 facturas con saldo por 8.400,50 BOB en el periodo."
+    )

@@ -23,9 +23,15 @@ class Tokens:
     def _url(self) -> str:
         return f"{configuracion().oidc_issuer.rstrip('/')}/protocol/openid-connect/token"
 
+    def _purgar(self, ahora: float) -> None:
+        """Los intercambios van por `sub` y vencimiento: sin purga la caché crece con cada token de usuario."""
+        for clave in [c for c, (_, vence) in self._cache.items() if vence - 30 <= ahora]:
+            del self._cache[clave]
+
     async def _pedir(self, clave: str, datos: dict[str, str]) -> str:
+        self._purgar(time.time())
         guardado = self._cache.get(clave)
-        if guardado and guardado[1] - 30 > time.time():
+        if guardado:
             return guardado[0]
         try:
             async with httpx.AsyncClient(timeout=5) as c:

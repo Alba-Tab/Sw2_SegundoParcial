@@ -12,6 +12,7 @@ from app.aplicacion.puertos import Modelos, Prediccion
 from app.dominio.alertas import TipoAlerta
 from app.dominio.retraso import UMBRAL_RIESGO, DatosViaje, variables
 from app.infraestructura.bd import HechoViaje, PosicionViaje, PrediccionRetraso, Ruta
+from app.infraestructura.observabilidad import tramo
 
 INTERVALO = timedelta(minutes=1)
 VIGENCIA_AGENTE = timedelta(minutes=5)
@@ -53,7 +54,10 @@ def recalcular_riesgo(
         return previa
     # El simulador retrotrae el GPS: el "ahora" del viaje es su última posición si es más nueva que el reloj.
     referencia = max(ahora, viaje.ultima_posicion_en) if viaje.ultima_posicion_en else ahora
-    resultado: Prediccion | None = modelos.retraso(variables(datos, referencia))
+    with tramo("predecir retraso", viaje=viaje_id) as span:
+        resultado: Prediccion | None = modelos.retraso(variables(datos, referencia))
+        if resultado is not None:
+            span.set_attribute("probabilidad", resultado.probabilidad)
     if resultado is None:
         return previa
     fila = {

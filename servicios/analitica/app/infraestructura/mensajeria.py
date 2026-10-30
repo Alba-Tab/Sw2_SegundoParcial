@@ -11,14 +11,19 @@ import logging
 
 import aio_pika
 from aio_pika.abc import AbstractIncomingMessage
-from sqlalchemy.exc import OperationalError
+from opentelemetry.trace import SpanKind
+from sqlalchemy.exc import InterfaceError, OperationalError
+from sqlalchemy.exc import TimeoutError as PoolAgotado
 
 from app.aplicacion.proyecciones import Proyecciones
 from app.configuracion import configuracion
-from app.infraestructura.bd import transaccion
+from app.infraestructura.bd import PREFETCH, transaccion
 from app.infraestructura.eventos import valido
+from app.infraestructura.observabilidad import con_correlacion, tramo
 
 COLA = "analitica.eventos"
+# Fallas técnicas de la base (caída, conexión rota o pool agotado): el mensaje se reencola.
+FALLAS_TECNICAS = (OperationalError, InterfaceError, PoolAgotado)
 log = logging.getLogger(__name__)
 
 
@@ -33,7 +38,7 @@ class ConsumidorEventos:
             try:
                 self.conexion = await aio_pika.connect_robust(configuracion().amqp_url)
                 canal = await self.conexion.channel()
-                await canal.set_qos(prefetch_count=10)
+                await canal.set_qos(prefetch_count=PREFETCH)
                 cola = await canal.get_queue(COLA, ensure=False)
                 await cola.consume(self.recibir)
                 self.conectado = True
@@ -61,7 +66,7 @@ class ConsumidorEventos:
             await mensaje.ack()
             if not nuevo:
                 log.info("%s %s ya procesado (Inbox)", sobre["tipo"], sobre["id"])
-        except OperationalError as e:
+        except FALLAS_TECNICAS as e:
             log.warning("%s %s falló, se reencola: %s", sobre["tipo"], sobre["id"], e)
             await mensaje.nack(requeue=True)
         except Exception:
@@ -69,5 +74,16 @@ class ConsumidorEventos:
             await mensaje.nack(requeue=False)
 
     def _procesar(self, sobre: dict) -> bool:
-        with transaccion() as sesion:
+        """Un span por evento que continúa el `traceparent` del sobre (D23: en Jaeger se ve evento → alerta)."""
+        with (
+            con_correlacion(sobre.get("correlationId")),
+            tramo(
+                f"consumir {sobre['tipo']}",
+                padre=sobre.get("traceparent"),
+                tipo=SpanKind.CONSUMER,
+                evento=sobre["id"],
+                productor=sobre.get("productor"),
+            ),
+            transaccion() as sesion,
+        ):
             return self.proyecciones.procesar(sesion, sobre)

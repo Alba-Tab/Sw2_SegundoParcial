@@ -284,7 +284,9 @@ paths:
         - name: incluirVencidas
           in: query
           required: false
-          description: Solo CUENTAS_POR_COBRAR.
+          description: >-
+            Solo CUENTAS_POR_COBRAR. Dentro del rango de vencimiento `desde`/`hasta`: con false, solo las facturas que
+            todavía no vencieron (vencimiento ≥ hoy).
           schema:
             type: boolean
             default: true
@@ -408,6 +410,8 @@ paths:
           $ref: './comun.yaml#/components/responses/SinPermiso'
         '422':
           $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '429':
+          $ref: '#/components/responses/LimitePeticiones'
         '503':
           $ref: './comun.yaml#/components/responses/NoDisponible'
   /api/v1/voz/interpretaciones:
@@ -438,13 +442,17 @@ paths:
           $ref: './comun.yaml#/components/responses/SinPermiso'
         '422':
           $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '429':
+          $ref: '#/components/responses/LimitePeticiones'
         '503':
           $ref: './comun.yaml#/components/responses/NoDisponible'
   /api/v1/voz/redacciones:
     post:
       tags: [voz]
       operationId: redactarRespuesta
-      summary: Plan B de K1 — redacta el texto con el resultado del reporte; cada número debe estar en filas o totales.
+      summary: >-
+        Plan B de K1 — redacta el texto con el resultado del reporte; cada número debe estar en filas o totales. El rol
+        del token debe poder ver ese reporte; la respuesta no es exportable (el resultado lo mandó quien llama).
       parameters:
         - $ref: './comun.yaml#/components/parameters/CorrelationId'
       requestBody:
@@ -466,6 +474,8 @@ paths:
           $ref: './comun.yaml#/components/responses/NoAutenticado'
         '403':
           $ref: './comun.yaml#/components/responses/SinPermiso'
+        '429':
+          $ref: '#/components/responses/LimitePeticiones'
 
   # ------------------------------------------------------------------ acciones y agente (spec 014)
   /api/v1/acciones:
@@ -497,7 +507,10 @@ paths:
     post:
       tags: [acciones]
       operationId: crearAccionPropuesta
-      summary: Solo agente_lectura (por el MCP). Una por (tipo, viajeId) salvo ARCHIVADA; repetida → la existente con creada = false.
+      summary: >-
+        Solo agente_lectura (por el MCP). Una por (tipo, viajeId) salvo ARCHIVADA; repetida → la existente con
+        creada = false. El viaje debe estar EN_RUTA o ENTREGA_OBSERVADA y con riesgo de retraso ≥ 0,70 (o una
+        RIESGO_RETRASO sin resolver); si no, 409 CONFLICTO_ESTADO.
       parameters:
         - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
         - $ref: './comun.yaml#/components/parameters/CorrelationId'
@@ -711,6 +724,19 @@ components:
   securitySchemes:
     bearer:
       $ref: './comun.yaml#/components/securitySchemes/bearer'
+
+  responses:
+    LimitePeticiones:
+      description: >-
+        Más de 20 peticiones por minuto del mismo `sub` en la consulta por voz (`LIMITE_PETICIONES`, como el servidor
+        MCP).
+      headers:
+        Retry-After:
+          $ref: './comun.yaml#/components/headers/RetryAfter'
+      content:
+        application/problem+json:
+          schema:
+            $ref: './comun.yaml#/components/schemas/Problema'
 
   parameters:
     AlertaId:
@@ -963,6 +989,7 @@ components:
           enum: [VIAJE, RUTA]
         incluirVencidas:
           type: boolean
+          description: Dentro del rango de vencimiento; con false, solo las que todavía no vencieron.
     DescripcionReporte:
       type: object
       required: [reporteId, titulo, descripcion, roles, parametros]
@@ -1133,6 +1160,7 @@ components:
             $ref: '#/components/schemas/Opcion'
         exportable:
           type: boolean
+          description: false en `redactarRespuesta`, cuyo resultado lo manda quien llama.
 
     # --- acciones y agente
     EstadoAccion:

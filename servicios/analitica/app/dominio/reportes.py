@@ -216,7 +216,11 @@ def esquema_parametros(reporte: ReporteId) -> dict[str, Any]:
         "placa": {"type": "string", "pattern": PLACA.pattern},
         "umbral": {"type": "number", "minimum": 0.5, "maximum": 0.95, "default": 0.7},
         "agrupar": {"type": "string", "enum": ["VIAJE", "RUTA"], "default": "VIAJE"},
-        "incluirVencidas": {"type": "boolean", "default": True},
+        "incluirVencidas": {
+            "type": "boolean",
+            "default": True,
+            "description": "Dentro del rango de vencimiento: con false, solo las que todavía no vencieron (vencimiento ≥ hoy)",
+        },
     }
     propiedades |= {f: tipos[f] for f in d.filtros}
     return {"type": "object", "additionalProperties": False, "properties": propiedades, "required": requeridos}

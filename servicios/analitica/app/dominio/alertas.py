@@ -56,6 +56,11 @@ ENLACES: dict[str, str] = {
 
 LARGO_NOTA = 300
 
+# Los tipos que el sistema cierra solos tienen una sola alerta viva (ABIERTA o ATENDIDA) por causa: una predicción o un
+# evento nuevo actualiza la que ya existe aunque alguien la haya atendido (spec 013). La migración 0003 usa esta lista.
+TIPOS_QUE_SE_RESUELVEN = tuple(t.value for t, r in REGLAS.items() if r.se_resuelve_sola)
+ESTADOS_VIVOS = (EstadoAlerta.ABIERTA.value, EstadoAlerta.ATENDIDA.value)
+
 
 def enlace(entidad: str, entidad_id: str) -> str:
     return ENLACES[entidad].format(id=entidad_id)

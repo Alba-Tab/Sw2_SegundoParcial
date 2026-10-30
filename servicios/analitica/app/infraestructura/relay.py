@@ -66,21 +66,36 @@ class RelayOutbox:
             return 0
         if self.conexion is None or self.conexion.is_closed:
             self.conexion = await aio_pika.connect_robust(configuracion().amqp_url)
-        canal = await self.conexion.channel(publisher_confirms=True)
-        exchange = await canal.get_exchange(EXCHANGE, ensure=False)
-        for evento_id, clave, sobre in pendientes:
-            mensaje = aio_pika.Message(
-                json.dumps(sobre).encode(),
-                content_type="application/json",
-                content_encoding="utf-8",
-                message_id=evento_id,
-                delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
-            )
-            await exchange.publish(mensaje, routing_key=clave)  # espera la confirmación del broker
-            await asyncio.to_thread(confirmar, evento_id, sobre)
-        await canal.close()
-        log.info("Outbox: %s eventos publicados", len(pendientes))
-        return len(pendientes)
+        # on_return_raises: un mensaje `mandatory` que ninguna cola recibe falla en vez de darse por publicado.
+        canal = await self.conexion.channel(publisher_confirms=True, on_return_raises=True)
+        publicados = 0
+        try:
+            exchange = await canal.get_exchange(EXCHANGE, ensure=False)
+            for evento_id, clave, sobre in pendientes:
+                mensaje = aio_pika.Message(
+                    json.dumps(sobre).encode(),
+                    content_type="application/json",
+                    content_encoding="utf-8",
+                    message_id=evento_id,
+                    correlation_id=sobre.get("correlationId"),
+                    headers={"traceparent": sobre["traceparent"]} if sobre.get("traceparent") else None,
+                    delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+                )
+                try:
+                    # Espera la confirmación del broker.
+                    await exchange.publish(mensaje, routing_key=clave, mandatory=True)
+                except aio_pika.exceptions.DeliveryError as e:
+                    # Sin ruta (o rechazado): queda pendiente y la acción sigue APROBADA; se reintenta al vencer el
+                    # reclamo.
+                    log.warning("Outbox: %s (%s) no se entregó, queda pendiente: %s", evento_id, clave, e)
+                    continue
+                await asyncio.to_thread(confirmar, evento_id, sobre)
+                publicados += 1
+        finally:
+            if not canal.is_closed:
+                await canal.close()
+        log.info("Outbox: %s de %s eventos publicados", publicados, len(pendientes))
+        return publicados
 
     async def detener(self) -> None:
         if self.conexion:
