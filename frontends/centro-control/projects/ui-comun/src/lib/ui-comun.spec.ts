@@ -3,7 +3,7 @@ import { avisosServicio } from './aviso-servicios';
 import { esperaReconexion } from './conexion';
 import { APPS_POR_ROL, DESTINO_POR_ROL } from './configuracion';
 import { codigoDe, mensajeDe, servicioCaido } from './errores';
-import { BobPipe, fechaLaPaz, FechaPipe, pct } from './formato';
+import { aCentavos, BobPipe, fechaLaPaz, FechaPipe, pct, sumarMontos } from './formato';
 import { reclamos } from './sesion';
 
 const jwt = (datos: object) => `x.${btoa(JSON.stringify(datos)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')}.y`;
@@ -74,5 +74,16 @@ describe('ui-comun', () => {
     expect(avisosServicio(soloPermiso, campos)).toEqual([]);
     expect(avisosServicio(new TypeError('Failed to fetch'), campos, true)).toEqual(['Failed to fetch']);
     expect(avisosServicio(undefined, campos, true)).toEqual([]);
+  });
+
+  it('dinero sin float: BobPipe no pasa por Number y las sumas van en centavos enteros', () => {
+    // 2^53 + 1 centavos: con Number se perdería el último dígito.
+    expect(new BobPipe().transform('90071992547409.93')).toBe('90.071.992.547.409,93 BOB');
+    expect(new BobPipe().transform('-1250.5', false)).toBe('-1.250,50');
+    expect(new BobPipe().transform('0.00')).toBe('0,00 BOB');
+    expect(new BobPipe().transform('abc')).toBe('abc');
+    expect(aCentavos('2800.005')).toBe(280001n); // HALF_UP al final
+    expect(sumarMontos(['0.10', '0.20', null, 'x'])).toBe('0.30');
+    expect(sumarMontos(['90071992547409.93', '0.01'])).toBe('90071992547409.94');
   });
 });

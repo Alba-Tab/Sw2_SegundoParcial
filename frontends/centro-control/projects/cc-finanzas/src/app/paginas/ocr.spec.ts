@@ -12,6 +12,11 @@ describe('OCR del recibo', () => {
     expect(JSON.stringify(rutas)).not.toMatch(/jsdelivr|unpkg|cdn/);
   });
 
+  it('elige el mayor monto comparando centavos enteros, no floats', () => {
+    expect(interpretar('Comisión 9.007.199.254.740.992,01\nTotal 9.007.199.254.740.992,02').monto).toBe('9007199254740992.02');
+    expect(interpretar('950.50 y 2.800,00 y 12,00').monto).toBe('2800.00');
+  });
+
   it('propone monto, fecha y referencia del texto leído', () => {
     expect(interpretar('BANCO UNION\nFecha: 28/10/2026\nRef: TRX-99812\nComisión 5,00\nTotal Bs 2.800,00')).toEqual({
       monto: '2800.00',

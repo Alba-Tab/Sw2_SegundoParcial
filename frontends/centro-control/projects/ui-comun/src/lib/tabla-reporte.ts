@@ -1,6 +1,6 @@
 import { Component, computed, input } from '@angular/core';
 import { MatTableModule } from '@angular/material/table';
-import { BobPipe, FechaPipe, pct } from './formato';
+import { aCentavos, BobPipe, FechaPipe, pct, sumarMontos } from './formato';
 
 export interface Columna {
   clave: string;
@@ -105,6 +105,7 @@ export class TablaReporte {
     const { grafico, filas, columnas } = this.resultado();
     const datos = grafico.datos ?? filas;
     const tipoSerie = columnas.find((c) => c.clave === grafico.series[0]?.clave)?.tipo ?? 'NUMERO';
+    // Number solo para el largo de las barras (dibujo); el texto de los montos se calcula en centavos enteros.
     const valores = datos.map((d) => grafico.series.map((s) => Number(d[s.clave] ?? 0)));
     const maximo = Math.max(1, ...valores.map((v) => v.reduce((a, b) => a + Math.max(0, b), 0)));
     const escala = (this.ancho - 260) / maximo;
@@ -121,7 +122,7 @@ export class TablaReporte {
         etiqueta: String(d[grafico.ejeX] ?? '').slice(0, 24),
         segmentos,
         total: total * escala,
-        texto: this.celda(grafico.series.length > 1 ? total.toFixed(2) : d[grafico.series[0].clave], {
+        texto: this.celda(grafico.series.length > 1 ? this.totalSeries(d, grafico.series, tipoSerie, total) : d[grafico.series[0].clave], {
           clave: '',
           titulo: '',
           tipo: tipoSerie,
@@ -129,6 +130,12 @@ export class TablaReporte {
       };
     });
   });
+
+  /** Total de la barra apilada (solo las partes positivas, como se dibujan); si es dinero, sin float. */
+  private totalSeries(d: Record<string, unknown>, series: { clave: string }[], tipo: string, total: number): string {
+    if (tipo !== 'MONTO') return total.toFixed(2);
+    return sumarMontos(series.map((s) => d[s.clave]).filter((v) => (aCentavos(String(v ?? '0')) ?? 0n) > 0n));
+  }
 
   numerica(c: Columna): boolean {
     return ['MONTO', 'NUMERO', 'PORCENTAJE'].includes(c.tipo);
