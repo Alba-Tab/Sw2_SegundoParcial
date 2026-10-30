@@ -123,13 +123,7 @@ export type ViajeQuery = {
       factores: Array<{ nombre: string; aporte: number }>;
     } | null;
     unidad: { unidadId: string; placa: string; estado: EstadoUnidad } | null;
-    hitos: Array<{
-      hitoId: string;
-      tipo: string;
-      descripcion: string;
-      origen: string | null;
-      registradoEn: string;
-    }> | null;
+    hitos: Array<{ hitoId: string; tipo: string; descripcion: string; origen: string | null; registradoEn: string }> | null;
     entrega: {
       entregaId: string;
       tipo: string;
@@ -240,11 +234,7 @@ export type AccionesQuery = {
     decididaEn: string | null;
     motivoRechazo: string | null;
     evidencia: Array<{ fuente: string; referencia: string; resumen: string }>;
-    viaje: {
-      placa: string | null;
-      estado: EstadoViaje;
-      ruta: { nombre: string; destino: string };
-    } | null;
+    viaje: { placa: string | null; estado: EstadoViaje; ruta: { nombre: string; destino: string } } | null;
   }> | null;
 };
 
@@ -254,9 +244,7 @@ export type AprobarEntregaMutationVariables = Exact<{
   clave: string | number;
 }>;
 
-export type AprobarEntregaMutation = {
-  aprobarEntregaObservada: { viajeId: string; estado: EstadoViaje };
-};
+export type AprobarEntregaMutation = { aprobarEntregaObservada: { viajeId: string; estado: EstadoViaje } };
 
 export type RechazarEntregaMutationVariables = Exact<{
   viajeId: string | number;
@@ -264,9 +252,7 @@ export type RechazarEntregaMutationVariables = Exact<{
   clave: string | number;
 }>;
 
-export type RechazarEntregaMutation = {
-  rechazarEntregaObservada: { viajeId: string; estado: EstadoViaje };
-};
+export type RechazarEntregaMutation = { rechazarEntregaObservada: { viajeId: string; estado: EstadoViaje } };
 
 export type ResolverIntervencionMutationVariables = Exact<{
   viajeId: string | number;
@@ -275,9 +261,7 @@ export type ResolverIntervencionMutationVariables = Exact<{
   clave: string | number;
 }>;
 
-export type ResolverIntervencionMutation = {
-  resolverIntervencion: { viajeId: string; estado: EstadoViaje };
-};
+export type ResolverIntervencionMutation = { resolverIntervencion: { viajeId: string; estado: EstadoViaje } };
 
 export type CancelarServicioMutationVariables = Exact<{
   servicioId: string | number;
@@ -285,9 +269,7 @@ export type CancelarServicioMutationVariables = Exact<{
   clave: string | number;
 }>;
 
-export type CancelarServicioMutation = {
-  cancelarServicio: { servicioId: string; estado: EstadoServicio };
-};
+export type CancelarServicioMutation = { cancelarServicio: { servicioId: string; estado: EstadoServicio } };
 
 export type AprobarAccionMutationVariables = Exact<{
   id: string | number;

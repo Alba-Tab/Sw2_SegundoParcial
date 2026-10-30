@@ -124,14 +124,7 @@ export type ConduccionQuery = {
     desde: string;
     hasta: string;
     datosAl: string | null;
-    choferes: Array<{
-      choferId: string;
-      nombre: string | null;
-      frenadas: number;
-      fatigas: number;
-      km: number;
-      puntaje: number;
-    }>;
+    choferes: Array<{ choferId: string; nombre: string | null; frenadas: number; fatigas: number; km: number; puntaje: number }>;
     viajes: Array<{
       viajeId: string | null;
       choferId: string;
@@ -148,17 +141,13 @@ export type ProgramarMantenimientoMutationVariables = Exact<{
   input: MantenimientoInput;
 }>;
 
-export type ProgramarMantenimientoMutation = {
-  programarMantenimiento: { mantenimientoId: string; estado: string };
-};
+export type ProgramarMantenimientoMutation = { programarMantenimiento: { mantenimientoId: string; estado: string } };
 
 export type CerrarMantenimientoMutationVariables = Exact<{
   input: CierreMantenimientoInput;
 }>;
 
-export type CerrarMantenimientoMutation = {
-  cerrarMantenimiento: { mantenimientoId: string; estado: string };
-};
+export type CerrarMantenimientoMutation = { cerrarMantenimiento: { mantenimientoId: string; estado: string } };
 
 export const UnidadesDocument = gql`
   query Unidades($tipo: TipoUnidad, $estado: EstadoUnidad) {
