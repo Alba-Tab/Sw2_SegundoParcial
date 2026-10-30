@@ -8,8 +8,8 @@ import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
 import { useQueryClient } from '@tanstack/react-query';
 import { Navigate, Outlet, useRouterState } from '@tanstack/react-router';
-import { useEffect } from 'react';
-import { asegurarDueno, limpiarCache } from '../offline/cache';
+import { limpiarCache } from '../offline/cache';
+import { useCacheDelUsuario } from '../offline/useCacheDelUsuario';
 import { useEnLinea } from '../offline/useEnLinea';
 import { useClienteActivo } from '../sesion/ClienteActivo';
 import { useSesion } from '../sesion/useSesion';
@@ -44,14 +44,12 @@ export function Marco() {
   const enLinea = useEnLinea();
   const ruta = useRouterState({ select: (e) => e.location.pathname });
 
-  useEffect(() => {
-    if (s.sub) asegurarDueno(consultas, s.sub);
-  }, [consultas, s.sub]);
+  const cacheLista = useCacheDelUsuario(consultas, s.sub);
 
   const soloCache = !s.autenticado && !enLinea && SIN_CONEXION.some((r) => ruta.startsWith(r));
   let contenido = <Outlet />;
   if (soloCache) contenido = <Outlet />;
-  else if (s.cargando) contenido = <CircularProgress sx={{ display: 'block', mx: 'auto', mt: 8 }} aria-label="Cargando" />;
+  else if (s.cargando || !cacheLista) contenido = <CircularProgress sx={{ display: 'block', mx: 'auto', mt: 8 }} aria-label="Cargando" />;
   else if (!s.autenticado) contenido = <Bienvenida sinConexion={!enLinea} />;
   else if (s.necesitaEmpresa && ruta !== '/empresa') contenido = <Navigate to="/empresa" />;
   else if (activo.modoComercial && !activo.clienteId && ruta !== '/clientes') contenido = <Navigate to="/clientes" />;
@@ -91,7 +89,7 @@ export function Marco() {
           )}
         </Toolbar>
       </AppBar>
-      {s.autenticado && <AvisoComercial />}
+      {s.autenticado && cacheLista && <AvisoComercial />}
       {soloCache && (
         <Alert severity="info" square>
           Sin conexión: ves lo último que guardaste en este equipo. Para cotizar o confirmar, vuelve a conectarte.
