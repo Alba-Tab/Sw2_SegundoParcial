@@ -45,6 +45,11 @@ saga:
     schedule-to-close: ${SAGA_COMPENSACION_SCHEDULE_TO_CLOSE:PT10M}
     maximo-intentos: ${SAGA_COMPENSACION_MAXIMO_INTENTOS:8}
 
+# plataforma/semilla copiada en la imagen; --semilla.cargar=true la carga y termina (D102).
+semilla:
+  dir: ${SEMILLA_DIR:/app/semilla}
+  cargar: false
+
 outbox:
   intervalo: PT1S
   lote: 100

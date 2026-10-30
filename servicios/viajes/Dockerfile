@@ -18,6 +18,7 @@ COPY --from=build /src/servicios/viajes/target/capas/dependencies/ ./
 COPY --from=build /src/servicios/viajes/target/capas/spring-boot-loader/ ./
 COPY --from=build /src/servicios/viajes/target/capas/snapshot-dependencies/ ./
 COPY --from=build /src/servicios/viajes/target/capas/application/ ./
+COPY plataforma/semilla semilla/
 USER viajes
 EXPOSE 8101
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "org.springframework.boot.loader.launch.JarLauncher"]

@@ -13,7 +13,7 @@ Unidades (tractos y remolques), choferes, reservas de la saga, combustible y man
 | Dos procesos: `main.ts` (API) y `worker.ts` (relay y actividades de Temporal; consumidores en F5) | `src/` |
 
 ```bash
-npm ci && npm run verificar     # 21 pruebas + tipos + capas + formato
+npm ci && npm run verificar     # 22 pruebas + tipos + capas + formato
 docker compose -f ../../plataforma/compose/compose.yaml --profile core --profile plataforma up -d --build flota-api flota-worker
 curl localhost:8102/health/ready
 ```

@@ -1,0 +1,47 @@
+[
+  {
+    "facturaId": "01933f00-0000-7000-8000-000000000001",
+    "numero": "FAC-000001",
+    "viajeId": "01933e00-0000-7000-8000-000000000101",
+    "servicioId": "01933e00-0000-7000-8000-000000000001",
+    "clienteId": "0193a000-0000-7000-8000-0000000c0002",
+    "monto": "5000.00",
+    "saldo": "5000.00",
+    "emitidaElDiasDesdeHoy": -50,
+    "venceElDiasDesdeHoy": -20,
+    "rutaId": "01933a00-0000-7000-8000-000000000001",
+    "tipoCarga": "GRANOS",
+    "toneladas": 20,
+    "fechaViajeDiasDesdeHoy": -52
+  },
+  {
+    "facturaId": "01933f00-0000-7000-8000-000000000002",
+    "numero": "FAC-000002",
+    "viajeId": "01933e00-0000-7000-8000-000000000102",
+    "servicioId": "01933e00-0000-7000-8000-000000000002",
+    "clienteId": "0193a000-0000-7000-8000-0000000c0001",
+    "monto": "7600.00",
+    "saldo": "7600.00",
+    "emitidaElDiasDesdeHoy": -28,
+    "venceElDiasDesdeHoy": 2,
+    "rutaId": "01933a00-0000-7000-8000-000000000002",
+    "tipoCarga": "GRANOS",
+    "toneladas": 20,
+    "fechaViajeDiasDesdeHoy": -30
+  },
+  {
+    "facturaId": "01933f00-0000-7000-8000-000000000003",
+    "numero": "FAC-000003",
+    "viajeId": "01933e00-0000-7000-8000-000000000103",
+    "servicioId": "01933e00-0000-7000-8000-000000000003",
+    "clienteId": "0193a000-0000-7000-8000-0000000c0001",
+    "monto": "2800.00",
+    "saldo": "2800.00",
+    "emitidaElDiasDesdeHoy": -25,
+    "venceElDiasDesdeHoy": 5,
+    "rutaId": "01933a00-0000-7000-8000-000000000004",
+    "tipoCarga": "GRANOS",
+    "toneladas": 28,
+    "fechaViajeDiasDesdeHoy": -26
+  }
+]

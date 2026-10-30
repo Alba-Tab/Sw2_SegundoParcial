@@ -8,6 +8,7 @@ import { ActividadesFlota } from '../../src/infraestructura/temporal/actividades
 import { CHOFERES, RESERVAS, UNIDADES } from '../../src/infraestructura/persistencia/colecciones-flota';
 import { LiberarPorCancelacion } from '../../src/aplicacion/reserva/liberar-por-cancelacion';
 import { INBOX_EVENTOS } from '../../src/infraestructura/persistencia/inbox-mongo';
+import { cargarSemilla, diaDesdeHoy } from '../../src/infraestructura/persistencia/semilla-mongo';
 import { iniciarMongoRs0 } from './contenedores';
 
 /** Actividades Flota.* (spec 003, paso 3, 5 y compensación) contra Mongo rs0, como las llama el worker de Temporal. */
@@ -183,5 +184,33 @@ describe('Reservas de la saga (Mongo rs0)', () => {
     expect(await cancelaciones.ejecutar(sobre)).toBe(false);
     expect([await estado('t2'), await estado('f1'), await libre('ch1')]).toEqual(['DISPONIBLE', 'DISPONIBLE', true]);
     expect((await conexion.collection(RESERVAS).findOne({ servicioId: servicio }))?.estado).toBe('LIBERADA');
+  });
+
+  it('la semilla deja 5 tractos, 6 remolques y 4 choferes, y la reserva del Aula toma 4521KTR, el furgón de 9.950 km y a chofer1', async () => {
+    await Promise.all([UNIDADES, CHOFERES].map((c) => conexion.collection(c).deleteMany({})));
+    await cargarSemilla(conexion, '../../plataforma/semilla');
+    expect(await cargarSemilla(conexion, '../../plataforma/semilla')).toEqual({ unidades: 11, choferes: 4 });
+    expect(await conexion.collection(UNIDADES).countDocuments({ tipoUnidad: 'TRACTO' })).toBe(5);
+    expect((await conexion.collection(CHOFERES).findOne({ usuarioSub: '0193a000-0000-7000-8000-000000000011' }))?.licenciaVenceEl).toBe(
+      diaDesdeHoy(400),
+    );
+    const r = await flota['Flota.reservarUnidad']({
+      servicioId: uuid7(),
+      viajeId: uuid7(),
+      tipoCarga: 'GRANOS',
+      toneladas: 28,
+      fechaViaje: diaDesdeHoy(0),
+    });
+    expect(r).toMatchObject({ placa: '4521KTR', remolqueId: '01933c00-0000-7000-8000-000000000011', choferNombre: 'Marco Quispe' });
+    const f = await falla(
+      flota['Flota.reservarUnidad']({
+        servicioId: uuid7(),
+        viajeId: uuid7(),
+        tipoCarga: 'INSUMOS_LIQUIDOS',
+        toneladas: 20,
+        fechaViaje: diaDesdeHoy(0),
+      }),
+    );
+    expect(f.type).toBe('SIN_UNIDAD_COMPATIBLE');
   });
 });

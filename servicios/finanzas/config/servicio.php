@@ -15,5 +15,7 @@ return [
     'contrato' => env('OPENAPI_CONTRATO', base_path('contrato/finanzas.yaml')),
     // Vigencia de la cotización (spec 002): PT24H; en demo PT2M.
     'cotizacion_vigencia' => env('COTIZACION_VIGENCIA', 'PT24H'),
+    // plataforma/semilla copiada en la imagen (D102): la carga semilla:cargar.
+    'semilla' => env('SEMILLA_DIR', base_path('semilla')),
     'outbox' => ['intervalo_ms' => (int) env('OUTBOX_INTERVALO_MS', 1000), 'lote' => 100],
 ];
