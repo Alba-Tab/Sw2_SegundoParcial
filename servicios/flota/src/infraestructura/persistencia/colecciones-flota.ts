@@ -50,6 +50,29 @@ export class UnidadRepositorioMongo implements UnidadRepositorio {
   async devolver(unidadId: string): Promise<void> {
     await this.col.updateOne({ _id: unidadId, estado: 'RESERVADA' }, { $set: { estado: 'DISPONIBLE' } }, opciones());
   }
+
+  async ponerEnViaje(unidadId: string): Promise<void> {
+    await this.col.updateOne({ _id: unidadId, estado: 'RESERVADA' }, { $set: { estado: 'EN_VIAJE' } }, opciones());
+  }
+
+  async guardar(u: Unidad): Promise<void> {
+    const { unidadId, ...resto } = u;
+    await this.col.replaceOne({ _id: unidadId }, resto, opciones());
+  }
+
+  async listar(filtro: { tipo?: string; estado?: string }, despuesDe: string | undefined, limite: number): Promise<Unidad[]> {
+    const q: Record<string, unknown> = {};
+    if (filtro.tipo) q.tipoUnidad = filtro.tipo;
+    if (filtro.estado) q.estado = filtro.estado;
+    if (despuesDe) q._id = { $gt: despuesDe };
+    return (
+      await this.col
+        .find(q as never, opciones())
+        .sort({ _id: 1 })
+        .limit(limite)
+        .toArray()
+    ).map(aUnidad);
+  }
 }
 
 @Injectable()
@@ -76,6 +99,29 @@ export class ChoferRepositorioMongo implements ChoferRepositorio {
 
   async devolver(choferId: string): Promise<void> {
     await this.col.updateOne({ _id: choferId }, { $set: { disponible: true } }, opciones());
+  }
+
+  async porUsuarioSub(sub: string) {
+    const d = await this.col.findOne({ usuarioSub: sub }, opciones());
+    return d ? (aChofer(d) as Chofer & { versionAgregado: number }) : null;
+  }
+
+  async guardar(c: Chofer & { versionAgregado: number }): Promise<void> {
+    const { choferId, ...resto } = c;
+    await this.col.replaceOne({ _id: choferId }, resto, opciones());
+  }
+
+  async listar(filtro: { activo?: boolean }, despuesDe: string | undefined, limite: number): Promise<Chofer[]> {
+    const q: Record<string, unknown> = {};
+    if (filtro.activo !== undefined) q.activo = filtro.activo;
+    if (despuesDe) q._id = { $gt: despuesDe };
+    return (
+      await this.col
+        .find(q as never, opciones())
+        .sort({ _id: 1 })
+        .limit(limite)
+        .toArray()
+    ).map(aChofer);
   }
 }
 

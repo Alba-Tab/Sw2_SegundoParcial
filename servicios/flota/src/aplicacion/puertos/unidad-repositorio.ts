@@ -8,5 +8,10 @@ export interface UnidadRepositorio {
   tomar(unidadId: string): Promise<boolean>;
   /** RESERVADA → DISPONIBLE; no toca una unidad que ya cambió de estado. */
   devolver(unidadId: string): Promise<void>;
+  /** RESERVADA → EN_VIAJE (D20); no toca una unidad que ya cambió de estado. */
+  ponerEnViaje(unidadId: string): Promise<void>;
+  /** Reemplaza el documento (estado, km, documentos, atributos) dentro de la transacción en curso. */
+  guardar(unidad: Unidad): Promise<void>;
+  listar(filtro: { tipo?: string; estado?: string }, despuesDe: string | undefined, limite: number): Promise<Unidad[]>;
 }
 export const UNIDAD_REPOSITORIO = Symbol('UnidadRepositorio');

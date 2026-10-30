@@ -1,4 +1,19 @@
+import { join } from 'node:path';
 import { GenericContainer, StartedTestContainer, Wait } from 'testcontainers';
+
+// Los contratos del repo (en la imagen están en /app/contratos): el Outbox valida cada evento.
+process.env.CONTRATOS_DIR ??= join(__dirname, '../../../../contratos');
+
+/** Un ChoferActualizado válido según contratos/eventos. */
+export const choferActualizado = (choferId: string) => ({
+  choferId,
+  versionAgregado: 1,
+  nombre: 'Marco Quispe',
+  usuarioSub: '0193a000-0000-7000-8000-000000000011',
+  licenciaCategoria: 'C',
+  licenciaVenceEl: '2028-01-01',
+  activo: true,
+});
 
 /**
  * Mongo 8 con réplica rs0 de un nodo (las transacciones del Outbox la necesitan): se espera el log, se inicia la

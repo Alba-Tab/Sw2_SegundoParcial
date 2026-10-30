@@ -1,25 +1,40 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { LoggerModule } from 'nestjs-pino';
+import { CHOFER_REPOSITORIO } from '../aplicacion/puertos/chofer-repositorio';
+import { INBOX } from '../aplicacion/puertos/inbox';
 import { REGISTRO_DE_EVENTOS } from '../aplicacion/puertos/registro-de-eventos';
+import { RELOJ } from '../aplicacion/puertos/reloj';
+import { RESERVA_UNIDAD_REPOSITORIO } from '../aplicacion/puertos/reserva-unidad-repositorio';
 import { UNIDAD_DE_TRABAJO } from '../aplicacion/puertos/unidad-de-trabajo';
+import { UNIDAD_REPOSITORIO } from '../aplicacion/puertos/unidad-repositorio';
 import { entorno } from './configuracion/entorno';
 import { ConexionAmqp } from './mensajeria/conexion-amqp';
+import { ValidadorEventos } from './mensajeria/validador-eventos';
 import { opcionesLog } from './observabilidad/logger';
+import { ChoferRepositorioMongo, ReservaUnidadRepositorioMongo, UnidadRepositorioMongo } from './persistencia/colecciones-flota';
+import { InboxMongo } from './persistencia/inbox-mongo';
 import { MongoUnidadDeTrabajo } from './persistencia/mongo-unidad-de-trabajo';
 import { RegistroDeEventosMongo } from './persistencia/registro-de-eventos-mongo';
+import { RelojSistema } from './persistencia/reloj-sistema';
 
-/** Lo que comparten la API y el worker: logs, Mongo, AMQP y los adaptadores de los puertos. */
+const PUERTOS = [
+  { provide: UNIDAD_DE_TRABAJO, useClass: MongoUnidadDeTrabajo },
+  { provide: REGISTRO_DE_EVENTOS, useClass: RegistroDeEventosMongo },
+  { provide: UNIDAD_REPOSITORIO, useClass: UnidadRepositorioMongo },
+  { provide: CHOFER_REPOSITORIO, useClass: ChoferRepositorioMongo },
+  { provide: RESERVA_UNIDAD_REPOSITORIO, useClass: ReservaUnidadRepositorioMongo },
+  { provide: INBOX, useClass: InboxMongo },
+  { provide: RELOJ, useClass: RelojSistema },
+];
+
+/** Lo que comparten la API, el worker y la CLI: logs, Mongo, AMQP, la validación de eventos y los adaptadores de los puertos. */
 @Module({
   imports: [
     LoggerModule.forRoot(opcionesLog('flota')),
     MongooseModule.forRootAsync({ useFactory: () => ({ uri: entorno().MONGO_URI, serverSelectionTimeoutMS: 5000 }) }),
   ],
-  providers: [
-    ConexionAmqp,
-    { provide: UNIDAD_DE_TRABAJO, useClass: MongoUnidadDeTrabajo },
-    { provide: REGISTRO_DE_EVENTOS, useClass: RegistroDeEventosMongo },
-  ],
-  exports: [ConexionAmqp, UNIDAD_DE_TRABAJO, REGISTRO_DE_EVENTOS],
+  providers: [ConexionAmqp, ValidadorEventos, ...PUERTOS],
+  exports: [ConexionAmqp, ...PUERTOS.map((p) => p.provide)],
 })
 export class ComunModule {}

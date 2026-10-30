@@ -34,6 +34,8 @@
     "@temporalio/activity": "1.25.0",
     "@temporalio/common": "1.25.0",
     "@temporalio/worker": "1.25.0",
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1",
     "amqplib": "0.10.9",
     "decimal.js": "10.6.0",
     "jose": "6.2.14",
