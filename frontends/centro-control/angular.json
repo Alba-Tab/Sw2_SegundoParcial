@@ -339,6 +339,16 @@
               {
                 "glob": "**/*",
                 "input": "projects/cc-finanzas/public"
+              },
+              {
+                "glob": "worker.min.js",
+                "input": "node_modules/tesseract.js/dist",
+                "output": "tesseract"
+              },
+              {
+                "glob": "tesseract-core*-lstm.wasm.js",
+                "input": "node_modules/tesseract.js-core",
+                "output": "tesseract"
               }
             ],
             "styles": [

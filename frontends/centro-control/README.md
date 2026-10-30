@@ -23,6 +23,10 @@ Cuatro apps Angular 22 independientes y la librería `ui-comun`, en un solo work
 - La respuesta trae el texto, la tabla, el gráfico y "Exportar a Excel". Una aclaración muestra botones que corren `reporte(id, params)` sin LLM. Con `LLM_NO_DISPONIBLE` o una pregunta fuera del catálogo quedan los 5 reportes como botones (FR4).
 - **Panel del agente** (`/agente`, spec 014): las misiones con cada paso (herramienta, argumentos, resumen y ms) y "Disparar misión". Si ya hay una en curso avisa (`409`), y sin LLM la misión queda saltada. Las acciones se deciden en cc-operaciones.
 
+## OCR en cc-finanzas
+
+Tesseract.js lee el recibo en el navegador (spec 008, paso 2). El worker y el core LSTM salen de `node_modules` y el build los copia a `/tesseract`; el idioma `spa` (`spa.traineddata.gz`, 2 MB, no se versiona) lo baja `npm run modelos` a `public/tesseract`. Con `workerPath`, `corePath` y `langPath` apuntando al hosting propio, la pestaña Red no muestra pedidos a jsdelivr (D38).
+
 ## GraphQL Code Generator (D49)
 
 Cada proyecto escribe sus operaciones en `*.graphql`. `npm run generar` produce los servicios tipados de Apollo Angular (`graphql/generado.ts`) desde `contratos/graphql/centro-control.graphql`. La CI falla si lo versionado no coincide (`npm run generar:verificar`).
@@ -35,7 +39,7 @@ Cada app lee `/configuracion.json` del hosting antes de arrancar (issuer, client
 
 ```bash
 npm ci
-npm run modelos                 # Whisper tiny para la voz de cc-tablero (una vez)
+npm run modelos                 # Whisper tiny (voz de cc-tablero) y Tesseract spa (OCR de cc-finanzas), una vez
 npm run verificar               # formato, pruebas de ui-comun y build de las 4 apps
 npx ng serve cc-tablero         # http://localhost:4201 (y cc-operaciones 4202, cc-flota 4203, cc-finanzas 4204)
 ```

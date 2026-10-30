@@ -13,7 +13,7 @@
     "construir": "ng build cc-tablero && ng build cc-operaciones && ng build cc-flota && ng build cc-finanzas",
     "probar": "ng test ui-comun --watch=false && ng test cc-operaciones --watch=false && ng test cc-finanzas --watch=false",
     "verificar": "npm run formato && npm run probar && npm run construir",
-    "modelos": "sh scripts/descargar-whisper.sh"
+    "modelos": "sh scripts/descargar-whisper.sh && sh scripts/descargar-tesseract.sh"
   },
   "private": true,
   "packageManager": "npm@11.19.1",
