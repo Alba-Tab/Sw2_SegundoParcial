@@ -1,6 +1,6 @@
 import { GraphQLError } from 'graphql';
 import type { Contexto } from '../autenticacion';
-import type { ClienteServicios } from '../servicios';
+import { rutaRest, type ClienteServicios } from '../servicios';
 
 export const INTERVALO_MS = 3000;
 /** Límite de una petición de Cloud Run: la suscripción se cierra a los 3.600 s y la app reconecta (spec 013). */
@@ -31,7 +31,7 @@ export function alertasNuevas(servicios: ClienteServicios, ctx: Contexto, interv
     });
 
   async function vuelta(): Promise<void> {
-    const pagina = await servicios.get<Pagina>(ctx, 'analitica', '/api/v1/alertas', {
+    const pagina = await servicios.get<Pagina>(ctx, 'analitica', rutaRest`/api/v1/alertas`, {
       query: { cursor: cursor ?? undefined, limite: 100 },
     });
     cursor = pagina.siguienteCursor ?? cursor;

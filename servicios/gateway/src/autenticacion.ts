@@ -14,12 +14,22 @@ export interface Usuario {
   venceMs: number;
 }
 
+/** Aviso que no es error: por ejemplo, la escritura se aplicó pero no se pudo releer el recurso. */
+export interface Aviso {
+  mensaje: string;
+  codigo?: string;
+  servicio?: string;
+  path?: (string | number)[];
+}
+
 /** Contexto de cada operación GraphQL. */
 export interface Contexto {
   usuario: Usuario;
   correlationId: string;
   traceparent: string;
   cargadores?: unknown;
+  /** Van en `extensions.avisos` de la respuesta. */
+  avisos?: Aviso[];
 }
 
 export class TokenInvalido extends Error {
