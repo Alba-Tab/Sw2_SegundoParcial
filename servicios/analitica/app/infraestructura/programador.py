@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
 
-from app.aplicacion import exportaciones, prediccion
+from app.aplicacion import acciones, exportaciones, prediccion
 from app.infraestructura.bd import transaccion
 
 log = logging.getLogger(__name__)
@@ -26,9 +26,17 @@ def purgar_exportaciones() -> None:
             log.info("Exportaciones vencidas borradas: %s", n)
 
 
+def archivar_acciones() -> None:
+    """D87: PENDIENTE sin decisión en 24 h, o cuyo viaje terminó, pasa a ARCHIVADA."""
+    with transaccion() as s:
+        if n := acciones.archivar(s, datetime.now(UTC)):
+            log.info("Acciones archivadas: %s", n)
+
+
 def iniciar(app: FastAPI) -> BackgroundScheduler:
     tareas = BackgroundScheduler(timezone="UTC", job_defaults={"coalesce": True, "max_instances": 1})
     tareas.add_job(recalcular_pendientes, "interval", seconds=60, args=[app], id="riesgo-pendiente")
     tareas.add_job(purgar_exportaciones, "interval", minutes=5, id="purgar-exportaciones")
+    tareas.add_job(archivar_acciones, "interval", minutes=5, id="archivar-acciones")
     tareas.start()
     return tareas

@@ -14,6 +14,7 @@ class Configuracion(BaseSettings):
     database_url: str = "postgresql+psycopg://analitica:analitica@localhost:5433/analitica"
     amqp_url: str = "amqp://analitica:analitica@localhost:5672/"
     consumir_eventos: bool = True
+    publicar_outbox: bool = True
     oidc_issuer: str = ""
     audiencia: str = "analitica"
     cors_origenes: str = ""

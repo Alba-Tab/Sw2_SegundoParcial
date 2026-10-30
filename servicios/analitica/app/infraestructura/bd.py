@@ -293,3 +293,47 @@ def fabrica() -> sessionmaker[Session]:
 def transaccion() -> Iterator[Session]:
     with fabrica()() as sesion, sesion.begin():
         yield sesion
+
+
+class Mision(Base):
+    __tablename__ = "mision"
+    mision_id: Mapped[UUID] = mapped_column(primary_key=True)
+    estado: Mapped[str] = mapped_column(String(12))
+    origen: Mapped[str] = mapped_column(String(12))
+    disparada_por: Mapped[str | None] = mapped_column(String(64))
+    iniciada_en: Mapped[datetime] = mapped_column(Instante)
+    terminada_en: Mapped[datetime | None] = mapped_column(Instante)
+    codigo: Mapped[str | None] = mapped_column(String(40))
+    trace_id: Mapped[str | None] = mapped_column(String(32))
+    acciones_creadas: Mapped[int] = mapped_column(Integer, default=0)
+    pasos: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
+    conclusion: Mapped[str | None] = mapped_column(Text)
+
+
+class AccionPropuesta(Base):
+    __tablename__ = "accion_propuesta"
+    accion_id: Mapped[UUID] = mapped_column(primary_key=True)
+    tipo: Mapped[str] = mapped_column(String(40))
+    viaje_id: Mapped[UUID]
+    servicio_id: Mapped[UUID | None]
+    cliente_id: Mapped[UUID]
+    mensaje: Mapped[str] = mapped_column(String(1000))
+    evidencia: Mapped[list[dict[str, Any]]] = mapped_column(JSONB)
+    estado: Mapped[str] = mapped_column(String(12))
+    mision_id: Mapped[UUID | None]
+    creada_en: Mapped[datetime] = mapped_column(Instante)
+    decidida_por: Mapped[str | None] = mapped_column(String(64))
+    decidida_en: Mapped[datetime | None] = mapped_column(Instante)
+    motivo_rechazo: Mapped[str | None] = mapped_column(String(300))
+
+
+class Outbox(Base):
+    """Se escribe en la misma transacción que el cambio; el relay publica con confirmación del broker."""
+
+    __tablename__ = "outbox"
+    evento_id: Mapped[UUID] = mapped_column(primary_key=True)
+    clave_enrutamiento: Mapped[str] = mapped_column(String(80))
+    sobre: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    creado_en: Mapped[datetime] = mapped_column(Instante)
+    publicado_en: Mapped[datetime | None] = mapped_column(Instante)
+    reclamado_hasta: Mapped[datetime | None] = mapped_column(Instante)

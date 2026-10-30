@@ -45,6 +45,13 @@ consumidor de `analitica.eventos`. Es la única fuente de alertas del Centro de 
 - **Anomalías:** `IsolationForest(contamination=0.05, n_estimators=100, random_state=42)` sobre `[kmPorLitro, litros]`; la primera carga de un tracto queda `SIN_REFERENCIA`.
 - Sin modelos (por ejemplo, en `uv run` sin entrenar), `obtenerRiesgoRetraso` responde `503 MODELO_NO_DISPONIBLE` y no se crean alertas de ML. Para entrenar en local: `uv run python -m ml.entrenar --datos ../../plataforma/datos-sinteticos --salida modelos`.
 
+## Acciones propuestas y aviso al cliente (T8.6)
+
+- `POST /api/v1/acciones` (solo `agente_lectura`, por el MCP): una por `(tipo, viaje)` salvo `ARCHIVADA` (índice único parcial). La repetida devuelve la existente con `creada = false`. El destinatario tiene que ser el cliente del viaje. Hay como máximo 3 por misión (`X-Mision-Id`, D86). Abre la alerta `ACCION_PROPUESTA`.
+- Aprobar (solo `despachador`, con `Idempotency-Key`): en una transacción pasa a `APROBADA`, se audita y se escribe `AvisoClienteAprobado` en el `outbox`. El destinatario y el correo salen de la copia `cliente`; el asunto, de la plantilla; el enlace, de `PORTAL_URL`. Rechazar → `RECHAZADA`. El gerente recibe 403.
+- El relay del Outbox (Python, cada 2 s) reclama con `SKIP LOCKED` y publica con confirmación del broker. Recién después marca publicado y pasa la acción a `EJECUTADA`. n8n (`aviso-cliente`) envía el correo una sola vez por `eventId`.
+- Un job cada 5 min archiva las `PENDIENTE` de más de 24 h o cuyo viaje terminó (D87).
+
 ## Correr
 
 ```bash

@@ -28,6 +28,7 @@ def base() -> Iterator[str]:
             DATABASE_URL=url,
             OIDC_ISSUER=EMISOR,
             CONSUMIR_EVENTOS="false",
+            PUBLICAR_OUTBOX="false",
             PROGRAMAR_TAREAS="false",
             CONTRATOS_DIR=str(CONTRATOS),
             MODELOS_DIR=str(Path(__file__).parent / "sin-modelos"),
