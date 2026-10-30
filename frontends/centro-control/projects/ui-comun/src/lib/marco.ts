@@ -205,8 +205,14 @@ export class Marco implements OnInit {
       this.apps()
         .filter((a) => a !== this.config.app)
         .map(async (a) => {
-          const ok = await fetch(`${this.config.urls[a]}/salud.json`, { cache: 'no-store', signal: AbortSignal.timeout(5000) }).then(
-            (r) => r.ok,
+          // Otro origen sin CORS: con no-cors la respuesta es opaca y no se puede leer `ok`; que resuelva basta para saber que
+          // el hosting responde. Solo un fallo de red o el tiempo de espera marcan la app "no disponible" (FR3).
+          const ok = await fetch(`${this.config.urls[a]}/salud.json`, {
+            mode: 'no-cors',
+            cache: 'no-store',
+            signal: AbortSignal.timeout(5000),
+          }).then(
+            () => true,
             () => false,
           );
           if (!ok) caidas.add(a);
