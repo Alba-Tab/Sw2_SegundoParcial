@@ -234,6 +234,22 @@ services:
       CORS_ORIGENES: ${CORS_ORIGENES:-}
     ports: ["8105:8105"]
 
+  # Servidor MCP (spec 014): herramientas cerradas para el agente y la voz; sin base.
+  mcp-server:
+    <<: *comun
+    build: { context: ../.., dockerfile: servicios/mcp-server/Dockerfile }
+    image: transporte/mcp-server:local
+    profiles: [ia]
+    environment:
+      OIDC_ISSUER: ${OIDC_ISSUER:-}
+      OIDC_CLIENTE_SECRETO: ${KC_SECRETO_MCP_SERVER}
+      VIAJES_URL: http://viajes:8101
+      FLOTA_URL: http://flota-api:8102
+      FINANZAS_URL: http://finanzas-api:8103
+      ANALITICA_URL: http://analitica:8104
+      MCP_CLIENTES: ${MCP_CLIENTES:-agente,analitica}
+    ports: ["8106:8106"]
+
   # Analítica (spec 013): modelo de lectura, alertas, ML, reportes y agente. Perfil ia (propuesta 11).
   analitica:
     <<: *comun
