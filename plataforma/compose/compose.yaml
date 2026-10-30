@@ -2,7 +2,7 @@
 #   cp .env.example .env
 #   docker compose --profile core --profile plataforma up -d
 # Perfiles: core (bases y servicios), plataforma (Temporal, RabbitMQ, Keycloak, n8n, Mailpit), trazas (OTel + Jaeger),
-# demo (Toxiproxy, con --env-file .env.demo).
+# demo (Toxiproxy, con --env-file .env.demo), simulador (sensor de combustible, con docker compose run).
 
 x-comun: &comun
   restart: unless-stopped
@@ -404,6 +404,18 @@ services:
     image: jaegertracing/jaeger:2.22.0
     profiles: [trazas]
     ports: ["16686:16686"]
+
+  # ---------------------------------------------------------------- simulador de combustible (T5.4, spec 009)
+  # docker compose --profile simulador run --rm --no-deps simulador-combustible --placa 4521KTR --escenario robo
+  simulador-combustible:
+    build: { context: ../simulador-combustible }
+    image: transporte/simulador-combustible:local
+    profiles: [simulador]
+    depends_on:
+      rabbitmq: { condition: service_healthy }
+    environment:
+      MQTT_URL: mqtt://rabbitmq:1883
+      MQTT_CLAVE: ${RABBITMQ_CLAVE_SENSOR}
 
   # ---------------------------------------------------------------- demo (fallos con Toxiproxy)
   toxiproxy:
