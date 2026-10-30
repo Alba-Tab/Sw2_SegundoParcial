@@ -14,6 +14,7 @@ from sqlalchemy import text
 
 from app.api import errores
 from app.api.rutas_lectura import rutas as rutas_lectura
+from app.api.rutas_reportes import rutas as rutas_reportes
 from app.api.seguridad import usuario_actual
 from app.aplicacion.proyecciones import Proyecciones
 from app.configuracion import configuracion
@@ -92,3 +93,4 @@ def salud_lista(request: Request) -> JSONResponse:
 
 
 app.include_router(rutas_lectura)
+app.include_router(rutas_reportes)

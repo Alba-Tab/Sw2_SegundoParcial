@@ -52,6 +52,8 @@ def minutos_detenido(puntos: list[tuple[datetime, float]], hasta: datetime) -> f
     """Minutos de la última hora (hasta `hasta`) en que el camión iba a menos de 3 km/h, de 0 a 60."""
     desde = hasta - timedelta(hours=1)
     ordenados = sorted(p for p in puntos if p[0] <= hasta)
+    if not ordenados:
+        return 0.0
     total = 0.0
     for (t1, v1), (t2, _) in zip(ordenados, [*ordenados[1:], (hasta, 0.0)], strict=True):
         inicio, fin = max(t1, desde), min(t2, hasta)

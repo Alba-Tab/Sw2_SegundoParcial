@@ -30,6 +30,14 @@ consumidor de `analitica.eventos`. Es la única fuente de alertas del Centro de 
 - `GET /api/v1/alertas` filtra por los roles del token, en orden de `secuencia`, con cursor opaco y la cifra `abiertas` de la campana. Sin estado, las abiertas y las cerradas de las últimas 24 h (D83).
 - `POST /api/v1/alertas/{id}/atencion` con `Idempotency-Key` (`operacion_idempotente`): solo un rol de la alerta y nunca el gerente (403).
 
+## Reportes y Excel (T8.3)
+
+- Catálogo cerrado de 5 reportes (`app/dominio/reportes.py`): parámetros, roles, rango máximo (92 o 366 días) y columnas. `GET /api/v1/reportes` lo publica con el JSON Schema de cada uno (el MCP lo expone como `catalogo://reportes`).
+- `GET /api/v1/reportes/{id}` valida rol y rango en código y calcula todo desde el modelo de lectura: montos como texto con 2 decimales, `totales`, datos del gráfico y `datosAl`. Máximo 500 filas en pantalla y 10.000 en Excel (D93); más → `400 VALIDACION` en el rango.
+- `RENTABILIDAD` une Viajes (km, ruta), Finanzas (facturado) y Flota (combustible del viaje).
+- `POST /api/v1/exportaciones` (con `Idempotency-Key`) corre el mismo reporte y guarda el `.xlsx` (hojas "Datos" y "Parámetros", openpyxl) 10 minutos; hasta 5 MB (D96). Un job borra las vencidas cada 5 min.
+- `GET /api/v1/exportaciones/{id}/archivo` solo responde al token de servicio del `gateway` con `X-Solicitante-Sub` igual a quien la creó (D21); vencida → `404 EXPORTACION_VENCIDA`.
+
 ## Correr
 
 ```bash
