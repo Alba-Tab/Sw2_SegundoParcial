@@ -138,7 +138,18 @@
       "auto_delete": false,
       "arguments": {
         "x-queue-type": "quorum",
-        "x-delivery-limit": 5
+        "x-delivery-limit": 5,
+        "x-dead-letter-exchange": "transporte.dlx",
+        "x-dead-letter-routing-key": "flota.sensor.dlq"
+      }
+    },
+    {
+      "name": "flota.sensor.dlq",
+      "vhost": "/",
+      "durable": true,
+      "auto_delete": false,
+      "arguments": {
+        "x-queue-type": "quorum"
       }
     }
   ],
@@ -213,6 +224,14 @@
       "destination": "flota.eventos.dlq",
       "destination_type": "queue",
       "routing_key": "flota.eventos.dlq",
+      "arguments": {}
+    },
+    {
+      "source": "transporte.dlx",
+      "vhost": "/",
+      "destination": "flota.sensor.dlq",
+      "destination_type": "queue",
+      "routing_key": "flota.sensor.dlq",
       "arguments": {}
     },
     {
