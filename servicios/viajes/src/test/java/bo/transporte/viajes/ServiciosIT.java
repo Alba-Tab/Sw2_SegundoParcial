@@ -509,7 +509,7 @@ class ServiciosIT {
         jdbc.sql("UPDATE servicio SET confirmacion_completa = true WHERE servicio_id = CAST(:id AS uuid)")
                 .param("id", servicioId)
                 .update();
-        jdbc.sql("UPDATE viaje SET estado = 'EN_RUTA' WHERE servicio_id = CAST(:id AS uuid)")
+        jdbc.sql("UPDATE viaje SET estado = 'EN_RUTA', iniciado_en = now() WHERE servicio_id = CAST(:id AS uuid)")
                 .param("id", servicioId)
                 .update();
         var enRuta = cancelar(despachador, servicioId, UUID.randomUUID(), "Pedido del cliente");
@@ -519,5 +519,109 @@ class ServiciosIT {
                 404,
                 cancelar(despachador, UUID.randomUUID().toString(), UUID.randomUUID(), "No existe")
                         .estado());
+    }
+
+    static final String CHOFER = TokensDePrueba.token("0193a000-0000-7000-8000-000000000005", "chofer", null);
+
+    private String viajeDe(String servicioId) {
+        return jdbc.sql("SELECT viaje_id::text FROM viaje WHERE servicio_id = CAST(:id AS uuid)")
+                .param("id", servicioId)
+                .query(String.class)
+                .single();
+    }
+
+    private Respuesta iniciar(String token, String viajeId, UUID clave, String iniciadoEn) throws Exception {
+        return pedir(
+                "POST",
+                "/api/v1/viajes/" + viajeId + "/inicio",
+                token,
+                clave,
+                "{\"dispositivoId\":\"0193a000-0000-7000-8000-0000000d0001\",\"iniciadoEn\":\"" + iniciadoEn
+                        + "\",\"posicion\":{\"lat\":-17.78,\"lng\":-63.18}}");
+    }
+
+    @Test
+    void elChoferVeSuViajeSinMontosYLoInicia() throws Exception {
+        String servicioId = confirmado();
+        String viajeId = viajeDe(servicioId);
+
+        var mios = pedir("GET", "/api/v1/viajes/mios", CHOFER, null, null);
+        assertEquals(200, mios.estado());
+        JsonNode v = mios.cuerpo().get("items").get(0);
+        assertEquals(viajeId, v.get("viajeId").asString());
+        assertEquals("Agroexport SRL", v.get("cliente").get("razonSocial").asString());
+        assertEquals(300, v.get("ruta").get("destino").get("radioMetros").asInt());
+        assertFalse(v.has("monto"));
+        assertEquals(
+                0,
+                pedir("GET", "/api/v1/viajes/mios", TokensDePrueba.token("otro", "chofer", null), null, null)
+                        .cuerpo()
+                        .get("items")
+                        .size());
+        assertEquals(
+                403,
+                pedir("GET", "/api/v1/viajes/" + viajeId, TokensDePrueba.token("otro", "chofer", null), null, null)
+                        .estado());
+
+        String ahora = java.time.Instant.now()
+                .truncatedTo(java.time.temporal.ChronoUnit.SECONDS)
+                .toString();
+        assertEquals(
+                403,
+                iniciar(TokensDePrueba.token("otro", "chofer", null), viajeId, UUID.randomUUID(), ahora)
+                        .estado());
+        var futuro = iniciar(
+                CHOFER,
+                viajeId,
+                UUID.randomUUID(),
+                java.time.Instant.now().plusSeconds(600).toString());
+        assertEquals(400, futuro.estado());
+        assertEquals(
+                "iniciadoEn", futuro.cuerpo().get("errores").get(0).get("campo").asString());
+
+        UUID opId = UUID.randomUUID();
+        var r = iniciar(CHOFER, viajeId, opId, ahora);
+        assertEquals(200, r.estado(), String.valueOf(r.cuerpo()));
+        assertEquals("EN_RUTA", r.cuerpo().get("estado").asString());
+        assertEquals(r.cuerpo(), iniciar(CHOFER, viajeId, opId, ahora).cuerpo());
+        assertEquals(
+                422,
+                iniciar(CHOFER, viajeId, opId, java.time.Instant.now().toString())
+                        .estado());
+        assertEquals(409, iniciar(CHOFER, viajeId, UUID.randomUUID(), ahora).estado());
+
+        JsonNode datos = sobre("ViajeIniciado").get("datos");
+        assertEquals("4521KTR", datos.get("placa").asString());
+        assertEquals(ahora, datos.get("iniciadoEn").asString());
+        assertEquals(-17.78, datos.get("posicion").get("lat").asDouble());
+        JsonNode s = pedir("GET", "/api/v1/servicios/" + servicioId, cliente(CLIENTE), null, null)
+                .cuerpo();
+        assertEquals("EN_RUTA", s.get("estado").asString());
+        assertTrue(s.has("iniciadoEn"));
+        assertEquals(
+                1,
+                jdbc.sql("SELECT count(*) FROM auditoria WHERE accion = 'INICIAR_VIAJE' AND canal = 'APP_CHOFER'")
+                        .query(Integer.class)
+                        .single());
+    }
+
+    @Test
+    void noSeIniciaSinConfirmacionCompletaNiConOtroViajeEnRuta() throws Exception {
+        String ahora = java.time.Instant.now().toString();
+        String a = confirmado(), b = confirmado();
+        jdbc.sql("UPDATE servicio SET confirmacion_completa = false WHERE servicio_id = CAST(:id AS uuid)")
+                .param("id", a)
+                .update();
+        var enCurso = iniciar(CHOFER, viajeDe(a), UUID.randomUUID(), ahora);
+        assertEquals(409, enCurso.estado());
+        assertEquals("CONFIRMACION_EN_CURSO", enCurso.cuerpo().get("codigo").asString());
+
+        assertEquals(200, iniciar(CHOFER, viajeDe(b), UUID.randomUUID(), ahora).estado());
+        jdbc.sql("UPDATE servicio SET confirmacion_completa = true WHERE servicio_id = CAST(:id AS uuid)")
+                .param("id", a)
+                .update();
+        var otro = iniciar(CHOFER, viajeDe(a), UUID.randomUUID(), ahora);
+        assertEquals(409, otro.estado());
+        assertEquals("CONFLICTO_ESTADO", otro.cuerpo().get("codigo").asString());
     }
 }

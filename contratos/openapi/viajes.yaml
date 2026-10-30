@@ -18,6 +18,7 @@ tags:
   - name: rutas
   - name: servicios
   - name: saga
+  - name: viajes
 paths:
   /health:
     get:
@@ -348,6 +349,84 @@ paths:
           $ref: './comun.yaml#/components/responses/Conflicto'
         '503':
           $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/viajes/mios:
+    get:
+      tags: [viajes]
+      operationId: listarMisViajes
+      summary: Viajes del chofer del token (spec 005, D50); sin montos (D51).
+      description: |
+        Los viajes con `choferUsuarioSub = sub` en CONFIRMADO, EN_RUTA o ENTREGA_OBSERVADA, más los que terminaron en
+        los últimos 7 días. La app los guarda en SQLite para operar sin señal.
+      responses:
+        '200':
+          description: Viajes del chofer.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaViajes'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+  /api/v1/viajes/{viajeId}:
+    parameters:
+      - $ref: '#/components/parameters/ViajeId'
+    get:
+      tags: [viajes]
+      operationId: obtenerViaje
+      summary: Un viaje. El chofer solo ve los suyos; despachador, comercial, gerente, jefe_flota y agente_lectura, todos.
+      responses:
+        '200':
+          description: Viaje.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Viaje'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+  /api/v1/viajes/{viajeId}/inicio:
+    parameters:
+      - $ref: '#/components/parameters/ViajeId'
+    post:
+      tags: [viajes]
+      operationId: iniciarViaje
+      summary: El chofer asignado registra el inicio (spec 005); CONFIRMADO → EN_RUTA y ViajeIniciado.
+      description: |
+        `Idempotency-Key` es el `opId` de la cola del celular. Con la confirmación de la saga todavía en curso responde
+        409 CONFIRMACION_EN_CURSO y la app reintenta; un viaje cancelado responde 409 CONFLICTO_ESTADO.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InicioViaje'
+      responses:
+        '200':
+          description: Viaje en ruta.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Viaje'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
   /api/v1/viajes/{viajeId}/intervencion:
     parameters:
       - name: viajeId
@@ -399,6 +478,12 @@ components:
         $ref: './comun.yaml#/components/schemas/Uuid'
     ServicioId:
       name: servicioId
+      in: path
+      required: true
+      schema:
+        $ref: './comun.yaml#/components/schemas/Uuid'
+    ViajeId:
+      name: viajeId
       in: path
       required: true
       schema:
@@ -494,6 +579,62 @@ components:
           exclusiveMinimum: true
         activa:
           type: boolean
+    InicioViaje:
+      type: object
+      description: '`iniciadoEn` es el reloj del celular al pulsar "Iniciar viaje"; como máximo 2 min en el futuro.'
+      required: [dispositivoId, iniciadoEn]
+      additionalProperties: false
+      properties:
+        dispositivoId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        iniciadoEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        posicion:
+          $ref: './comun.yaml#/components/schemas/Coordenadas'
+    Viaje:
+      type: object
+      description: La operación, sin montos (D51).
+      required: [viajeId, servicioId, estado, cliente, ruta, tipoCarga, toneladas, fechaViaje, placa, choferNombre]
+      properties:
+        viajeId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        servicioId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        estado:
+          $ref: './comun.yaml#/components/schemas/EstadoViaje'
+        motivo:
+          type: string
+          description: Código de 000 §5 cuando el viaje terminó CANCELADO.
+        cliente:
+          type: object
+          required: [clienteId, razonSocial]
+          properties:
+            clienteId:
+              $ref: './comun.yaml#/components/schemas/Uuid'
+            razonSocial:
+              type: string
+        ruta:
+          $ref: '#/components/schemas/Ruta'
+        tipoCarga:
+          $ref: './comun.yaml#/components/schemas/TipoCarga'
+        toneladas:
+          $ref: './comun.yaml#/components/schemas/Toneladas'
+        fechaViaje:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+        placa:
+          $ref: './comun.yaml#/components/schemas/Placa'
+        choferNombre:
+          type: string
+        iniciadoEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+    ListaViajes:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Viaje'
     ServicioNuevo:
       type: object
       required: [cotizacionId]
@@ -558,6 +699,8 @@ components:
           type: string
         ultimaPosicion:
           $ref: './comun.yaml#/components/schemas/Coordenadas'
+        iniciadoEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
         creadoEn:
           $ref: './comun.yaml#/components/schemas/Instante'
     PaginaServicios:

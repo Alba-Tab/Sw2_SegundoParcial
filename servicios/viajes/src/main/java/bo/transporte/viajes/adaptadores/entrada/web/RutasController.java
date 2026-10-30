@@ -33,7 +33,7 @@ class RutasController implements RutasApi {
         return ResponseEntity.ok(dto(consulta.porId(rutaId)));
     }
 
-    private static RutaDto dto(Ruta r) {
+    static RutaDto dto(Ruta r) {
         return new RutaDto(
                 r.rutaId(),
                 r.nombre(),

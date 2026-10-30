@@ -98,6 +98,7 @@ class ServiciosController implements ServiciosApi {
                 .creadoPor(s.creadoPor())
                 .motivo(v.motivo());
         if (v.etapa() != null) d.etapa(ServicioDto.EtapaEnum.fromValue(v.etapa()));
+        if (v.iniciadoEn() != null) d.iniciadoEn(v.iniciadoEn().atOffset(ZoneOffset.UTC));
         var a = v.asignacion();
         if (a != null) {
             d.rutaId(a.rutaId())

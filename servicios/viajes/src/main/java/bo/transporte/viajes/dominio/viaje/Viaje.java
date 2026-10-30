@@ -21,6 +21,7 @@ public final class Viaje {
     private Asignacion asignacion;
     private String motivo;
     private String detalle;
+    private Instant iniciadoEn;
 
     private Viaje(
             UUID viajeId,
@@ -31,7 +32,8 @@ public final class Viaje {
             EstadoViaje estado,
             Asignacion asignacion,
             String motivo,
-            String detalle) {
+            String detalle,
+            Instant iniciadoEn) {
         this.viajeId = Objects.requireNonNull(viajeId);
         this.servicioId = Objects.requireNonNull(servicioId);
         this.clienteId = Objects.requireNonNull(clienteId);
@@ -41,6 +43,7 @@ public final class Viaje {
         this.asignacion = asignacion;
         this.motivo = motivo;
         this.detalle = detalle;
+        this.iniciadoEn = iniciadoEn;
     }
 
     /** Paso 1 de la saga. */
@@ -52,6 +55,7 @@ public final class Viaje {
                 s.cotizacionId(),
                 ahora,
                 EstadoViaje.PROGRAMANDO,
+                null,
                 null,
                 null,
                 null);
@@ -66,8 +70,30 @@ public final class Viaje {
             EstadoViaje estado,
             Asignacion asignacion,
             String motivo,
-            String detalle) {
-        return new Viaje(viajeId, servicioId, clienteId, cotizacionId, creadoEn, estado, asignacion, motivo, detalle);
+            String detalle,
+            Instant iniciadoEn) {
+        return new Viaje(
+                viajeId,
+                servicioId,
+                clienteId,
+                cotizacionId,
+                creadoEn,
+                estado,
+                asignacion,
+                motivo,
+                detalle,
+                iniciadoEn);
+    }
+
+    /** Spec 005: el chofer registra el inicio; CONFIRMADO → EN_RUTA con la hora del celular. */
+    public void iniciar(Instant iniciadoEn) {
+        pasarA(EstadoViaje.EN_RUTA);
+        this.iniciadoEn = Objects.requireNonNull(iniciadoEn);
+    }
+
+    /** El chofer asignado en el pivote; null antes de confirmar. */
+    public String choferUsuarioSub() {
+        return asignacion == null ? null : asignacion.choferUsuarioSub();
     }
 
     /** Pivote (paso 4): CONFIRMADO con ruta, carga, monto, unidad y chofer. */
@@ -138,5 +164,9 @@ public final class Viaje {
 
     public String detalle() {
         return detalle;
+    }
+
+    public Instant iniciadoEn() {
+        return iniciadoEn;
     }
 }

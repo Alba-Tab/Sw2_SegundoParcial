@@ -12,6 +12,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -21,7 +22,7 @@ import org.springframework.stereotype.Component;
 class ViajeRepositorioJdbc implements ViajeRepositorio {
     static final String COLUMNAS = "v.viaje_id, v.servicio_id, v.cliente_id, v.cotizacion_id, v.estado, v.motivo,"
             + " v.detalle, v.ruta_id, v.tipo_carga, v.toneladas, v.fecha_viaje, v.monto, v.reserva_unidad_id,"
-            + " v.tracto_id, v.remolque_id, v.placa, v.chofer_id, v.chofer_nombre, v.chofer_usuario_sub, v.creado_en";
+            + " v.tracto_id, v.remolque_id, v.placa, v.chofer_id, v.chofer_nombre, v.chofer_usuario_sub, v.creado_en, v.iniciado_en";
     private final JdbcClient jdbc;
 
     ViajeRepositorioJdbc(JdbcClient jdbc) {
@@ -60,7 +61,7 @@ class ViajeRepositorioJdbc implements ViajeRepositorio {
                                tipo_carga = :tipoCarga, toneladas = :toneladas, fecha_viaje = :fecha, monto = :monto,
                                reserva_unidad_id = :reserva, tracto_id = :tracto, remolque_id = :remolque, placa = :placa,
                                chofer_id = :chofer, chofer_nombre = :choferNombre, chofer_usuario_sub = :choferSub,
-                               actualizado_en = :ahora
+                               iniciado_en = :iniciadoEn, actualizado_en = :ahora
                         WHERE viaje_id = :id""")
                 .param("id", v.viajeId())
                 .param("estado", v.estado().name())
@@ -78,6 +79,7 @@ class ViajeRepositorioJdbc implements ViajeRepositorio {
                 .param("chofer", a == null ? null : a.choferId())
                 .param("choferNombre", a == null ? null : a.choferNombre())
                 .param("choferSub", a == null ? null : a.choferUsuarioSub())
+                .param("iniciadoEn", v.iniciadoEn() == null ? null : Timestamp.from(v.iniciadoEn()))
                 .param("ahora", Timestamp.from(Instant.now()))
                 .update();
     }
@@ -86,6 +88,35 @@ class ViajeRepositorioJdbc implements ViajeRepositorio {
     private static BigDecimal toneladas(BigDecimal t) {
         var sin = t.stripTrailingZeros();
         return sin.scale() < 0 ? sin.setScale(0) : sin;
+    }
+
+    @Override
+    public boolean otroEnRuta(String choferUsuarioSub, UUID excepto) {
+        return jdbc.sql("SELECT EXISTS (SELECT 1 FROM viaje WHERE chofer_usuario_sub = :sub AND estado = 'EN_RUTA'"
+                        + " AND viaje_id <> :excepto)")
+                .param("sub", choferUsuarioSub)
+                .param("excepto", excepto)
+                .query(Boolean.class)
+                .single();
+    }
+
+    @Override
+    public List<Viaje> deChofer(String choferUsuarioSub, Instant terminadosDesde) {
+        return jdbc.sql("SELECT " + COLUMNAS + " FROM viaje v WHERE v.chofer_usuario_sub = :sub"
+                        + " AND (v.estado IN ('CONFIRMADO', 'EN_RUTA', 'ENTREGA_OBSERVADA') OR v.actualizado_en >= :desde)"
+                        + " ORDER BY v.fecha_viaje, v.viaje_id")
+                .param("sub", choferUsuarioSub)
+                .param("desde", Timestamp.from(terminadosDesde))
+                .query((rs, i) -> viaje(rs))
+                .list();
+    }
+
+    @Override
+    public Optional<Viaje> porId(UUID viajeId) {
+        return jdbc.sql("SELECT " + COLUMNAS + " FROM viaje v WHERE v.viaje_id = :id")
+                .param("id", viajeId)
+                .query((rs, i) -> viaje(rs))
+                .optional();
     }
 
     static Viaje viaje(ResultSet rs) throws SQLException {
@@ -113,6 +144,9 @@ class ViajeRepositorioJdbc implements ViajeRepositorio {
                 EstadoViaje.valueOf(rs.getString("estado")),
                 a,
                 rs.getString("motivo"),
-                rs.getString("detalle"));
+                rs.getString("detalle"),
+                rs.getTimestamp("iniciado_en") == null
+                        ? null
+                        : rs.getTimestamp("iniciado_en").toInstant());
     }
 }
