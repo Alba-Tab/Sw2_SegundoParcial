@@ -51,13 +51,14 @@ export function PantallaEntrega({ viajeId, alGuardar }: { viajeId: string; alGua
       />
       <Text variant="titleMedium">Fotos ({fotos.length} de 3)</Text>
       <View style={{ flexDirection: 'row', gap: 8, flexWrap: 'wrap' }}>
-        {fotos.map((f) => (
+        {fotos.map((f, i) => (
           <View key={f}>
             <Image source={{ uri: f }} style={{ width: 96, height: 96, borderRadius: 8 }} accessibilityLabel="Foto tomada" />
             <IconButton
               icon="close"
               size={16}
               mode="contained"
+              accessibilityLabel={`Quitar la foto ${i + 1}`}
               onPress={() => quitar(f)}
               style={{ position: 'absolute', top: -8, right: -8 }}
             />

@@ -30,10 +30,15 @@ export function PantallaFatiga({ viajeId, alAlertar }: { viajeId: string; alAler
   const alarma = useAudioPlayer(sonidoAlarma);
   const [recorte] = useState(() => createSynchronizable<Recorte | null>(null));
   const detector = useRef(new DetectorFatiga());
-  const [lectura, setLectura] = useState<Lectura | null>(null);
-  const [estado, setEstado] = useState({ ear: 0, bostezos: 0 });
+  // Un solo estado por cuadro (la lectura y lo que se dibuja con ella): un render por cuadro, no dos.
+  const [cuadro, setCuadro] = useState<{ lectura: Lectura; ear: number; bostezos: number } | null>(null);
   const [alerta, setAlerta] = useState<MotivoFatiga | null>(null);
   const [vista, setVista] = useState<LayoutRectangle | null>(null);
+  // El aviso de la pantalla de arriba va en una referencia: si cambia, no se recrea el *frame processor*.
+  const avisar = useRef(alAlertar);
+  useEffect(() => {
+    avisar.current = alAlertar;
+  }, [alAlertar]);
 
   useEffect(() => {
     if (!permiso.hasPermission) void permiso.requestPermission();
@@ -42,19 +47,18 @@ export function PantallaFatiga({ viajeId, alAlertar }: { viajeId: string; alAler
 
   const alLeer = useCallback(
     (l: Lectura) => {
-      setLectura(l);
       const ahora = Date.now();
       const m = l.caja ? medidas(mallaDe(l)) : null;
       const motivo = detector.current.muestra(ahora, m);
-      setEstado({ ear: m?.ear ?? 0, bostezos: detector.current.bostezosRecientes(ahora) });
+      setCuadro({ lectura: l, ear: m?.ear ?? 0, bostezos: detector.current.bostezosRecientes(ahora) });
       if (!motivo) return;
       setAlerta(motivo);
       alarma.seekTo(0);
       alarma.play();
       Vibration.vibrate([0, 600, 200, 600]);
-      alAlertar(casos.registrarFatiga(viajeId) !== null);
+      avisar.current(casos.registrarFatiga(viajeId) !== null);
     },
-    [alarma, alAlertar, viajeId],
+    [alarma, viajeId],
   );
 
   const onFrame = useCallback(
@@ -90,8 +94,9 @@ export function PantallaFatiga({ viajeId, alAlertar }: { viajeId: string; alAler
   }
   if (!camara) return <Text style={{ padding: 24 }}>Este celular no tiene cámara frontal.</Text>;
 
+  const lectura = cuadro?.lectura ?? null;
   const caja = lectura?.caja && vista ? enVista(lectura, lectura.caja, vista) : null;
-  const ojosCerrados = lectura?.caja != null && estado.ear < EAR_CERRADO;
+  const ojosCerrados = lectura?.caja != null && (cuadro?.ear ?? 0) < EAR_CERRADO;
   const color = alerta ? tema.colors.error : ojosCerrados ? tema.colors.tertiary : tema.colors.primary;
   return (
     <View style={{ flex: 1 }}>
@@ -103,7 +108,7 @@ export function PantallaFatiga({ viajeId, alAlertar }: { viajeId: string; alAler
             style={[estilos.caja, { left: caja.x, top: caja.y, width: caja.ancho, height: caja.alto, borderColor: color }]}
           >
             <Text style={[estilos.etiqueta, { backgroundColor: color, color: tema.colors.onPrimary }]}>
-              {ojosCerrados ? 'Ojos cerrados' : 'Ojos abiertos'} · EAR {estado.ear.toFixed(2)}
+              {ojosCerrados ? 'Ojos cerrados' : 'Ojos abiertos'} · EAR {(cuadro?.ear ?? 0).toFixed(2)}
             </Text>
           </View>
         )}
@@ -119,7 +124,7 @@ export function PantallaFatiga({ viajeId, alAlertar }: { viajeId: string; alAler
                 : 'Busca tu rostro en la cámara'}
         </Text>
         <Text variant="bodyMedium">
-          Bostezos en 2 minutos: {estado.bostezos} de {BOSTEZOS_ALERTA}. Las imágenes no se guardan.
+          Bostezos en 2 minutos: {cuadro?.bostezos ?? 0} de {BOSTEZOS_ALERTA}. Las imágenes no se guardan.
         </Text>
         {alerta && (
           <Button mode="contained-tonal" onPress={() => setAlerta(null)}>

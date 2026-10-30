@@ -93,6 +93,10 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
   const [aviso, setAviso] = useState<string | null>(null);
   const [confirmarSalida, setConfirmarSalida] = useState<SinEnviar | null>(null);
   const alCancelarse = useCallback(() => setAviso('Viaje cancelado; llama al despachador'), []);
+  const alAlertarFatiga = useCallback(
+    (enCola: boolean) => setAviso(enCola ? 'Alerta de fatiga registrada; detente a descansar' : 'Detente a descansar'),
+    [],
+  );
   // Lo que no llegó al servidor se borra al salir: antes se avisa y se pide confirmación.
   const pedirSalida = () => {
     const sinEnviar = cierre.sinEnviar();
@@ -106,7 +110,8 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
   const alFrenar = useCallback(() => setAviso('Frenada brusca registrada'), []);
   const gps = useViajeEnRuta(enRuta, alFrenar);
 
-  // D45: "Viaje asignado" o "Viaje cancelado" baja los viajes de nuevo; tocar la notificación abre el viaje.
+  // D45: "Viaje asignado" o "Viaje cancelado" baja los viajes de nuevo; tocar la notificación abre el viaje. Si FCM
+  // rota el token, se vuelve a registrar el dispositivo.
   useEffect(
     () =>
       escucharPush(
@@ -115,6 +120,7 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
           setPantalla({ nombre: 'viaje', viajeId });
         },
         () => void casos.descargarViajes().catch(() => {}),
+        (token) => void casos.registrarDispositivo(token).catch(() => {}),
       ),
     [],
   );
@@ -190,12 +196,7 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
           }}
         />
       )}
-      {pantalla.nombre === 'fatiga' && (
-        <PantallaFatiga
-          viajeId={pantalla.viajeId}
-          alAlertar={(enCola) => setAviso(enCola ? 'Alerta de fatiga registrada; detente a descansar' : 'Detente a descansar')}
-        />
-      )}
+      {pantalla.nombre === 'fatiga' && <PantallaFatiga viajeId={pantalla.viajeId} alAlertar={alAlertarFatiga} />}
       {pantalla.nombre === 'pendientes' && <PantallaPendientes />}
       <Snackbar visible={aviso !== null} onDismiss={() => setAviso(null)} duration={8000}>
         {aviso ?? ''}

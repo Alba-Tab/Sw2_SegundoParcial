@@ -72,6 +72,13 @@ export interface DatosDelChofer {
   borrar(): void;
 }
 
+/** La última posición del GPS guardada en el celular: sobrevive a un reinicio de la app. */
+export interface PosicionGuardada {
+  leer(): { lat: number; lng: number } | null;
+  guardar(p: { lat: number; lng: number }): void;
+  borrar(): void;
+}
+
 /** El refresh token ya no sirve (`invalid_grant`): hay que iniciar sesión otra vez, sin borrar la cola. */
 export class SesionVencida extends Error {
   constructor() {

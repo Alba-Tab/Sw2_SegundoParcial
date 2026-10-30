@@ -1,5 +1,5 @@
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
-import type { Cola, DatosDelChofer, Evidencias, PuntosGps, Viajes } from '../aplicacion/puertos';
+import type { Cola, DatosDelChofer, Evidencias, PosicionGuardada, PuntosGps, Viajes } from '../aplicacion/puertos';
 import type { EvidenciaLocal } from '../dominio/evidencia';
 import type { PuntoGps } from '../dominio/gps';
 import type { EstadoOperacion, Operacion, TipoOperacion } from '../dominio/operacion';
@@ -207,8 +207,31 @@ export class EvidenciasSqlite implements Evidencias {
   }
 }
 
+const CLAVE_POSICION = 'ultimaPosicion';
+
+/** La última posición del GPS en la tabla `ajuste` (JSON con lat y lng). */
+export class PosicionSqlite implements PosicionGuardada {
+  leer(): { lat: number; lng: number } | null {
+    try {
+      const f = bd.select().from(ajuste).where(eq(ajuste.clave, CLAVE_POSICION)).get();
+      return f ? (JSON.parse(f.valor) as { lat: number; lng: number }) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  guardar(p: { lat: number; lng: number }): void {
+    const valor = JSON.stringify({ lat: p.lat, lng: p.lng });
+    bd.insert(ajuste).values({ clave: CLAVE_POSICION, valor }).onConflictDoUpdate({ target: ajuste.clave, set: { valor } }).run();
+  }
+
+  borrar(): void {
+    bd.delete(ajuste).where(eq(ajuste.clave, CLAVE_POSICION)).run();
+  }
+}
+
 /**
- * Al cerrar sesión: viajes, cola, evidencias (filas y archivos) y puntos GPS. Quedan el
+ * Al cerrar sesión: viajes, cola, evidencias (filas y archivos), puntos GPS y la última posición. Quedan el
  * `dispositivoId` y el `seq` de cada viaje, que son del celular (D55) y no del chofer.
  */
 export class DatosDelChoferSqlite implements DatosDelChofer {
@@ -218,6 +241,7 @@ export class DatosDelChoferSqlite implements DatosDelChofer {
       tx.delete(evidenciaLocal).run();
       tx.delete(puntoGps).run();
       tx.delete(viaje).run();
+      tx.delete(ajuste).where(eq(ajuste.clave, CLAVE_POSICION)).run();
     });
     borrarEvidencias();
   }

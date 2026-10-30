@@ -11,6 +11,7 @@ import {
   type ApiEvidencias,
   type Cola,
   type Evidencias,
+  type PosicionGuardada,
   type PuntosGps,
   SesionVencida,
   type Subida,
@@ -93,6 +94,13 @@ class ApiFalsa implements Api {
   registrarDispositivo = async () => ({ estado: 200 });
 }
 
+class PosicionEnMemoria implements PosicionGuardada {
+  p: { lat: number; lng: number } | null = null;
+  leer = () => this.p;
+  guardar = (p: { lat: number; lng: number }) => void (this.p = p);
+  borrar = () => void (this.p = null);
+}
+
 class EvidenciasEnMemoria implements Evidencias {
   e = new Map<string, EvidenciaLocal>();
   agregar = (x: EvidenciaLocal) => void this.e.set(x.evidenciaId, x);
@@ -149,7 +157,7 @@ const viaje = (viajeId: string): ViajeLocal => ({
 describe('motor de sincronización (spec 005, CU-08)', () => {
   let cola: ColaEnMemoria, puntos: PuntosEnMemoria, viajes: ViajesEnMemoria, api: ApiFalsa;
   let ahora: Date, conRed: boolean, sesionVencida: boolean, n: number;
-  let evidencias: EvidenciasEnMemoria, apiEvidencias: ApiEvidenciasFalsa;
+  let evidencias: EvidenciasEnMemoria, apiEvidencias: ApiEvidenciasFalsa, posicion: PosicionEnMemoria;
   let motor: MotorSincronizacion, casos: CasosDeUso;
 
   beforeEach(() => {
@@ -179,7 +187,8 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     };
     const subida = new SubidaEvidencias(evidencias, apiEvidencias, archivos);
     motor = new MotorSincronizacion(cola, puntos, viajes, api, sesion, red, reloj, ids, dispositivo, subida, () => 0.5);
-    casos = new CasosDeUso(cola, puntos, viajes, api, sesion, reloj, ids, dispositivo, evidencias, archivos);
+    posicion = new PosicionEnMemoria();
+    casos = new CasosDeUso(cola, puntos, viajes, api, sesion, reloj, ids, dispositivo, evidencias, archivos, posicion);
     viajes.guardarDelServidor([viaje('v1')]);
   });
 
@@ -430,6 +439,22 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     sesionVencida = true;
     await expect(motor.recuperarCursor()).resolves.toBeUndefined();
     expect(puntos.contar()).toBe(1);
+  });
+
+  it('T7.7: sin GPS en esta sesión, la alerta de fatiga y la frenada salen con la última posición guardada', () => {
+    posicion.p = { lat: -17.75, lng: -63.17 };
+    const op = casos.registrarFatiga('v1')!;
+    expect(cola.ops.find((o) => o.opId === op)?.cuerpo).toMatchObject({ tipo: 'ALERTA_FATIGA', posicion: { lat: -17.75, lng: -63.17 } });
+    const frenada = casos.registrarFrenada('v1', 0.6)!;
+    expect(cola.ops.find((o) => o.opId === frenada)?.cuerpo).toMatchObject({ posicion: { lat: -17.75, lng: -63.17 } });
+  });
+
+  it('cada lectura del GPS queda guardada como última posición; olvidar limpia la memoria', () => {
+    casos.registrarLectura('v1', { lat: -17.71, lng: -63.18, velocidadMs: 10, precisionMetros: 5, en: ahora.getTime() });
+    expect(posicion.p).toEqual({ lat: -17.71, lng: -63.18 });
+    casos.olvidar();
+    expect(casos.ultimaPosicion()).toBeNull();
+    expect(casos.velocidadKmh()).toBe(0);
   });
 
   it('T7.6: el monto escrito con coma o sin decimales se normaliza como texto; uno inválido no entra a la cola', () => {

@@ -9,6 +9,8 @@ export const MAR_BOSTEZO = 0.6;
 export const BOSTEZO_MS = 1000;
 export const BOSTEZOS_ALERTA = 3;
 export const VENTANA_BOSTEZOS_MS = 120_000;
+/** Un hueco sin rostro más corto que esto (un cuadro perdido, la cabeza que se inclina) no corta el episodio. */
+export const HUECO_SIN_ROSTRO_MS = 500;
 
 /** Puntos de la malla: comisura externa, dos del párpado de arriba, comisura interna y dos del de abajo. */
 export const OJO_IZQUIERDO = [33, 160, 158, 133, 153, 144] as const;
@@ -43,7 +45,8 @@ export function medidas(malla: Malla): { ear: number; mar: number } {
 /**
  * Recibe una muestra por cuadro (`null` cuando no hay rostro) y avisa una sola vez por episodio: los ojos tienen que
  * abrirse antes de otra alerta por ojos cerrados, y los bostezos que ya dispararon una alerta no cuentan para la
- * siguiente.
+ * siguiente. Un hueco sin rostro de menos de 0,5 s no corta el episodio: el tiempo con los ojos cerrados sigue
+ * contando desde que se cerraron.
  */
 export class DetectorFatiga {
   private cerradosDesde: number | null = null;
@@ -51,17 +54,24 @@ export class DetectorFatiga {
   private bostezoDesde: number | null = null;
   private bostezoContado = false;
   private bostezos: number[] = [];
+  private ultimoRostro: number | null = null;
 
   muestra(en: number, m: { ear: number; mar: number } | null): MotivoFatiga | null {
     if (!m) {
-      // Sin rostro no se puede medir: se corta el episodio en curso, pero no se olvidan los bostezos de la ventana.
-      this.cerradosDesde = null;
-      this.avisoOjos = false;
-      this.bostezoDesde = null;
-      this.bostezoContado = false;
+      // Sin rostro no se puede medir. Si el hueco ya dura 0,5 s, se corta el episodio en curso (pero no se olvidan los
+      // bostezos de la ventana).
+      if (this.ultimoRostro === null || en - this.ultimoRostro >= HUECO_SIN_ROSTRO_MS) this.cortarEpisodio();
       return null;
     }
+    this.ultimoRostro = en;
     return this.ojos(en, m.ear) ?? this.boca(en, m.mar);
+  }
+
+  private cortarEpisodio() {
+    this.cerradosDesde = null;
+    this.avisoOjos = false;
+    this.bostezoDesde = null;
+    this.bostezoContado = false;
   }
 
   /** Cuántos bostezos lleva en la ventana de 2 minutos (para la etiqueta de la pantalla). */
