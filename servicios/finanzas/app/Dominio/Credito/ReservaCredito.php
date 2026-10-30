@@ -70,4 +70,13 @@ final class ReservaCredito
 
         return true;
     }
+
+    /** Spec 006: al facturar, ACTIVA → CONSUMIDA. Otra reserva no se factura (CONFLICTO_ESTADO, a la DLQ). */
+    public function consumir(): void
+    {
+        if ($this->estado !== 'ACTIVA') {
+            throw new ErrorDeDominio('CONFLICTO_ESTADO', "La reserva está {$this->estado} y no se puede facturar");
+        }
+        $this->estado = 'CONSUMIDA';
+    }
 }

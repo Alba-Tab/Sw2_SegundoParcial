@@ -45,7 +45,7 @@ final class Problemas
     public static function desde(\Throwable $e): JsonResponse
     {
         return match (true) {
-            $e instanceof ErrorDeDominio => self::respuesta($e->codigo, $e->codigo, $e->getMessage(), null, [],
+            $e instanceof ErrorDeDominio => self::respuesta($e->codigo, $e->codigo, $e->getMessage(), null, self::extensiones($e),
                 (self::ESTADOS[$e->codigo] ?? 422) === 503 ? ['Retry-After' => $e->codigo === 'CLIENTE_NO_REPLICADO' ? '2' : '10'] : []),
             $e instanceof ValidationException => self::respuesta('VALIDACION', 'Petición inválida', 'Revisa los campos indicados', 400,
                 ['errores' => collect($e->errors())->flatMap(fn ($m, $c) => array_map(fn ($x) => ['campo' => $c, 'mensaje' => $x], $m))->values()->all()]),
@@ -54,5 +54,21 @@ final class Problemas
                 'Error', $e->getMessage() ?: 'Error', $e->getStatusCode(), [], $e->getHeaders()),
             default => self::respuesta('DEPENDENCIA_NO_DISPONIBLE', 'Error interno', 'Ocurrió un error inesperado', 500),
         };
+    }
+
+    /**
+     * `datos` del error como extensiones del Problem Details; `campo` se convierte en `errores` (000 §5).
+     *
+     * @return array<string, mixed>
+     */
+    private static function extensiones(ErrorDeDominio $e): array
+    {
+        $extra = $e->datos;
+        if (isset($extra['campo'])) {
+            $extra['errores'] = [['campo' => $extra['campo'], 'mensaje' => $e->getMessage()]];
+            unset($extra['campo']);
+        }
+
+        return $extra;
     }
 }

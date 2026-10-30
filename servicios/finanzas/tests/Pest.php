@@ -3,8 +3,10 @@
 // DatabaseTruncation y no RefreshDatabase: el Outbox debe ver que no hay transacción abierta.
 
 use App\Aplicacion\Catalogo\AplicarCopias;
+use App\Aplicacion\Facturacion\FacturarEntrega;
 use App\Aplicacion\Puertos\Reloj;
 use App\Aplicacion\Saga\LiberarPorCancelacion;
+use App\Aplicacion\Saga\LiberarPorRechazo;
 use App\Infraestructura\Consola\ConsumirEventos;
 use App\Infraestructura\Http\Middleware\Autenticacion;
 use Illuminate\Foundation\Testing\DatabaseTruncation;
@@ -64,7 +66,8 @@ function rutaActualizada(string $rutaId, string $nombre, int $version, bool $act
 function consumidor(): ConsumirEventos
 {
     $c = app(ConsumirEventos::class);
-    $c->registrarManejadores(app(AplicarCopias::class), app(LiberarPorCancelacion::class));
+    $c->registrarManejadores(app(AplicarCopias::class), app(LiberarPorCancelacion::class), app(FacturarEntrega::class),
+        app(LiberarPorRechazo::class));
 
     return $c;
 }

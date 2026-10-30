@@ -1,6 +1,7 @@
 <?php
 
 use App\Infraestructura\Http\CotizacionesController;
+use App\Infraestructura\Http\FacturasController;
 use App\Infraestructura\Http\LineasCreditoController;
 use App\Infraestructura\Http\Middleware\Autenticacion;
 use App\Infraestructura\Http\Middleware\ValidarContrato;
@@ -18,6 +19,10 @@ Route::prefix('api')->middleware([Autenticacion::class, ValidarContrato::class])
     Route::get('v1/cotizaciones/{cotizacionId}', [CotizacionesController::class, 'obtener']);
     Route::get('v1/lineas-credito/mia', [LineasCreditoController::class, 'mia']);
     Route::get('v1/lineas-credito/{clienteId}', [LineasCreditoController::class, 'deCliente']);
+    Route::get('v1/facturas', [FacturasController::class, 'listar']);
+    Route::get('v1/facturas/{facturaId}', [FacturasController::class, 'obtener']);
+    Route::get('v1/facturas/{facturaId}/pagos', [FacturasController::class, 'pagos']);
+    Route::post('v1/facturas/{facturaId}/pagos', [FacturasController::class, 'pagar']);
     Route::get('v1/solicitudes-aprobacion', [SolicitudesAprobacionController::class, 'listar']);
     Route::get('v1/solicitudes-aprobacion/{servicioId}', [SolicitudesAprobacionController::class, 'obtener']);
 

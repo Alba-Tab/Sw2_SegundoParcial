@@ -14,6 +14,9 @@ interface CatalogoRepositorio
 
     public function razonSocial(string $clienteId): ?string;
 
+    /** @return array{razonSocial: string, correo: string}|null */
+    public function contacto(string $clienteId): ?array;
+
     public function tarifa(string $rutaId, TipoCarga $tipoCarga): ?Tarifa;
 
     /**

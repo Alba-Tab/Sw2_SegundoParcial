@@ -52,4 +52,20 @@ final class LineaCredito
 
         return new self($this->clienteId, $this->limite, $reservado, $this->utilizado, $this->version + 1);
     }
+
+    /** Spec 006: la factura consume la reserva; reservado baja y utilizado sube. */
+    public function consumir(Monto $monto): self
+    {
+        $reservado = $monto->esMayorQue($this->reservado) ? Monto::bob('0') : $this->reservado->menos($monto);
+
+        return new self($this->clienteId, $this->limite, $reservado, $this->utilizado->mas($monto), $this->version + 1);
+    }
+
+    /** Spec 008: un pago abona la línea; utilizado baja (nunca menos de 0) y el disponible sube. */
+    public function abonar(Monto $monto): self
+    {
+        $utilizado = $monto->esMayorQue($this->utilizado) ? Monto::bob('0') : $this->utilizado->menos($monto);
+
+        return new self($this->clienteId, $this->limite, $this->reservado, $utilizado, $this->version + 1);
+    }
 }
