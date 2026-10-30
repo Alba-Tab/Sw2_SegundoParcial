@@ -41,6 +41,14 @@ Dominio y aplicación son TypeScript puro y se prueban con Vitest y puertos fals
 - Antes de enviar, el motor sube sus evidencias por partes de 5 MB con URL firmadas de S3, de a 2 (D61), 60 s por parte (D62). Abrir la subida es idempotente por `evidenciaId` y devuelve las partes que S3 ya tiene: un corte retoma solo las que faltan.
 - La carga va a Flota con `Idempotency-Key` igual al `opId` del cuerpo (spec 009).
 
+## Detector de fatiga (T7.7, D60)
+
+- Pantalla "Detector de fatiga" del viaje en ruta: la cámara frontal **en primer plano** (iOS no la deja en segundo plano) con VisionCamera 5 y un *frame processor* (`react-native-worklets`).
+- Cada cuadro (VGA, RGB, ya rotado) se recorta alrededor del rostro, se escala a 192 × 192 y pasa por la malla facial de MediaPipe (`face_landmark.tflite`, 1 MB) con `react-native-fast-tflite`. `scripts/descargar-modelo.sh` baja el modelo junto con el de Whisper. El recorte sigue al rostro del cuadro anterior, como en MediaPipe.
+- Solo salen del hilo de la cámara 16 puntos (ojos y boca) y la caja del rostro; el cuadro se libera ahí mismo y ninguna imagen se guarda.
+- El dominio (`dominio/fatiga.ts`) calcula la apertura de los ojos (EAR < 0,2) y de la boca (MAR > 0,6): ojos cerrados 1,5 s o más, o 3 bostezos de al menos 1 s en 2 minutos → alarma (`assets/alarma.wav` y vibración) y un `EVENTO_CONDUCCION` `ALERTA_FATIGA` en la cola, con la última posición. Una alerta por episodio.
+- La pantalla dibuja la caja del rostro con la etiqueta de los ojos y el conteo de bostezos (FO6). La prueba con la cámara real queda para el iPhone (el simulador no tiene cámara).
+
 ## Notificaciones push (T7.8, D45)
 
 - Solo Android (con la cuenta gratuita de Apple no hay push en iPhone). Al iniciar sesión la app crea el canal `viajes`, pide permiso y registra su token nativo de FCM con `PUT /dispositivos/mio`.

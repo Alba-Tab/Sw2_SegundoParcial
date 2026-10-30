@@ -90,7 +90,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     [
       'expo-image-picker',
       {
-        cameraPermission: 'Para fotografiar la entrega y los recibos de combustible.',
+        cameraPermission: 'Para fotografiar la entrega y los recibos, y para el detector de fatiga (las imágenes no salen del celular).',
         photosPermission: 'Para elegir la foto de la entrega o del recibo.',
       },
     ],

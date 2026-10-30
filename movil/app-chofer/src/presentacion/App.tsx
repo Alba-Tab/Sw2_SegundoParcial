@@ -14,6 +14,7 @@ import { escucharPush, tokenPush } from '../datos/push';
 import { registrarTareaFondo } from '../datos/tareaFondo';
 import { BarraSincronizacion } from './BarraSincronizacion';
 import { PantallaCarga } from './pantallas/PantallaCarga';
+import { PantallaFatiga } from './pantallas/PantallaFatiga';
 import { PantallaEntrega } from './pantallas/PantallaEntrega';
 import { PantallaHito } from './pantallas/PantallaHito';
 import { PantallaPendientes } from './pantallas/PantallaPendientes';
@@ -24,7 +25,8 @@ import { temaClaro, temaOscuro } from './tema';
 import { useSincronizacion } from './useSincronizacion';
 import { useViajeEnRuta } from './useViajeEnRuta';
 
-type Pantalla = { nombre: 'viajes' } | { nombre: 'pendientes' } | { nombre: 'viaje' | 'hito' | 'entrega' | 'carga'; viajeId: string };
+type Pantalla =
+  { nombre: 'viajes' } | { nombre: 'pendientes' } | { nombre: 'viaje' | 'hito' | 'entrega' | 'carga' | 'fatiga'; viajeId: string };
 
 const TITULOS: Record<Pantalla['nombre'], string> = {
   viajes: 'Mis viajes',
@@ -32,6 +34,7 @@ const TITULOS: Record<Pantalla['nombre'], string> = {
   hito: 'Bitácora',
   entrega: 'Entrega',
   carga: 'Carga de combustible',
+  fatiga: 'Detector de fatiga',
   pendientes: 'Pendientes',
 };
 
@@ -112,7 +115,13 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
       <Appbar.Header>
         {pantalla.nombre !== 'viajes' && (
           <Appbar.BackAction
-            onPress={() => setPantalla(pantalla.nombre === 'hito' ? { nombre: 'viaje', viajeId: pantalla.viajeId } : { nombre: 'viajes' })}
+            onPress={() =>
+              setPantalla(
+                'viajeId' in pantalla && pantalla.nombre !== 'viaje'
+                  ? { nombre: 'viaje', viajeId: pantalla.viajeId }
+                  : { nombre: 'viajes' },
+              )
+            }
           />
         )}
         <Appbar.Content title={TITULOS[pantalla.nombre]} />
@@ -159,6 +168,12 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
             setPantalla({ nombre: 'viaje', viajeId: pantalla.viajeId });
             void sync.sincronizar();
           }}
+        />
+      )}
+      {pantalla.nombre === 'fatiga' && (
+        <PantallaFatiga
+          viajeId={pantalla.viajeId}
+          alAlertar={(enCola) => setAviso(enCola ? 'Alerta de fatiga registrada; detente a descansar' : 'Detente a descansar')}
         />
       )}
       {pantalla.nombre === 'pendientes' && <PantallaPendientes />}
