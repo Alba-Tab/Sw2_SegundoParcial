@@ -16,7 +16,7 @@ Clientes, cotizaciones confirmadas, servicios, viajes en ruta y la saga `Program
 | Interfaces REST y DTO generados desde `contratos/openapi/viajes.yaml` con openapi-generator 7.26 (`useSpringBoot4`, `useJackson3`); `SaludController` implementa `SaludApi` | `pom.xml`, `target/generated-sources/openapi` |
 
 ```bash
-./mvnw verify                                            # 48 pruebas (Testcontainers + Temporal en memoria)
+./mvnw verify                                            # 50 pruebas (Testcontainers + Temporal en memoria)
 docker compose -f ../../plataforma/compose/compose.yaml --profile core --profile plataforma up -d --build viajes   # contexto: raíz del repo
 curl localhost:8101/health/ready
 ```
@@ -81,3 +81,12 @@ curl localhost:8101/health/ready
 - `GET /api/v1/viajes/mios` (chofer): sus viajes `CONFIRMADO`, `EN_RUTA` o `ENTREGA_OBSERVADA` y los que cambiaron en los últimos 7 días (D50), con cliente y ruta y **sin montos** (D51).
 - `GET /api/v1/viajes/{viajeId}`: el chofer ve solo los suyos; despachador, comercial, gerente, jefe de flota y agente, todos.
 - `POST /api/v1/viajes/{viajeId}/inicio` (chofer asignado; `Idempotency-Key` = `opId` de la cola del celular): `CONFIRMADO` → `EN_RUTA` con `iniciadoEn` del celular (hasta 2 min en el futuro), auditoría `APP_CHOFER` y `ViajeIniciado` en el Outbox. Sin confirmación completa, `409 CONFIRMACION_EN_CURSO` (la app reintenta); cancelado u otro estado, `409 CONFLICTO_ESTADO`; un segundo viaje en ruta del mismo chofer, `409` (D11, también con un índice único parcial).
+
+## Evidencias por partes (T5.1, spec 006, D40a)
+
+- `POST /api/v1/viajes/{viajeId}/evidencias` abre una subida *multipart* en S3 (llave `viajes/{viajeId}/evidencias/{evidenciaId}`) y devuelve URL `PUT` firmadas de 15 min, una por parte de 5 MB. La autoridad de idempotencia es el `evidenciaId`: con los mismos datos devuelve la subida con URL nuevas; con otros, `422`.
+- `GET .../evidencias/{evidenciaId}/partes`: las partes que S3 ya tiene (`ListParts`) y URL nuevas solo para las que faltan, así la app reintenta una parte sin repetir las demás.
+- `POST .../completar`: completa la subida, verifica el tamaño y deja la evidencia `COMPLETA`.
+- `GET .../evidencias/{evidenciaId}`: URL `GET` de 5 min. Chofer propio, despachador, comercial y gerente; el cliente de ese viaje solo fotos de entrega o rechazo y firma; el jefe de flota solo recibos de combustible.
+- Fotos de entrega, firma y foto de rechazo solo con el viaje `EN_RUTA`; recibos de combustible desde `CONFIRMADO` hasta el cierre (spec 009).
+- Variables: `S3_ENDPOINT` (servidor), `S3_ENDPOINT_PUBLICO` (URL firmadas que alcanza el celular), `S3_BUCKET`, `AWS_REGION` y credenciales `AWS_*`. Sin `S3_ENDPOINT`, AWS con la cadena de credenciales por defecto.
