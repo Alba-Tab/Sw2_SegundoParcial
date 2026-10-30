@@ -27,7 +27,8 @@ declare module '@apollo/client' {
 
 /**
  * Apollo hacia el Gateway (spec 016): el token va en `Authorization` (HTTP) y en `connection_init` (WebSocket), nunca
- * en la URL. Con 401 renueva el token y repite una vez; la suscripción reconecta con un token renovado.
+ * en la URL. Con 401 renueva el token y repite una vez. Los cortes de red los reintenta graphql-ws con espera creciente;
+ * los cierres fatales (4401 al vencer el token o a los 3.600 s de Cloud Run) los reintenta `Alertas` con un token nuevo.
  */
 export function proveerApollo(): (Provider | EnvironmentProviders)[] {
   return [
@@ -65,12 +66,14 @@ export function proveerApollo(): (Provider | EnvironmentProviders)[] {
             return { authorization: `Bearer ${sesion.token() ?? ''}` };
           },
           retryAttempts: Number.POSITIVE_INFINITY,
-          // 4403: rol sin alertas (cliente o chofer); no tiene sentido reintentar. 4401 se reintenta con token nuevo.
+          // graphql-ws 6 trata 4401 como fatal y no lo reintenta: la suscripción termina con error y `Alertas` renueva el
+          // token y vuelve a suscribirse. 4403 (rol sin alertas: cliente o chofer) tampoco se reintenta aquí ni allí.
           shouldRetry: (e) => !(e && typeof e === 'object' && 'code' in e && (e as CloseEvent).code === 4403),
           retryWait: async (intento) => new Promise((ok) => setTimeout(ok, esperaReconexion(intento))),
           on: {
             connected: (_s, _p, reintento) => {
               conexion.conectado.set(true);
+              conexion.conexiones.update((n) => n + 1);
               if (reintento) conexion.reconexiones.update((n) => n + 1);
             },
             closed: () => conexion.conectado.set(false),

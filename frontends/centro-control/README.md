@@ -11,8 +11,8 @@ Cuatro apps Angular 22 independientes y la librería `ui-comun`, en un solo work
 
 ## `ui-comun`
 
-- **Sesión** (`oidc-client-ts`): Authorization Code + PKCE con el cliente de cada app. El token vive en memoria (D27) y se renueva con el refresh token 30 s antes de vencer y al volver a la pestaña. Si la sesión se cerró en otra app (`invalid_grant`), pide login (FK3). "Cerrar sesión" termina la sesión de Keycloak.
-- **Apollo** hacia el Gateway: el token va en `Authorization` y, en el WebSocket, en `connection_init`. Con 401 renueva y repite una vez. La suscripción reconecta con espera de 1, 2, 4… s hasta 30 s (D99) y no reintenta con `4403`.
+- **Sesión** (`oidc-client-ts`): Authorization Code + PKCE con el cliente de cada app. El token vive en memoria (D27) y se renueva con el refresh token 30 s antes de vencer y cada vez que se vuelve a la pestaña (como máximo una vez cada 10 s). Si la sesión se cerró en otra app (`invalid_grant` o `login_required`), pide login (FK3); con la red o Keycloak caídos conserva el token y reintenta. "Cerrar sesión" termina la sesión de Keycloak.
+- **Apollo** hacia el Gateway: el token va en `Authorization` y, en el WebSocket, en `connection_init`. Con 401 renueva y repite una vez. La suscripción reconecta con espera de 1, 2, 4… s hasta 30 s (D99) y no reintenta con `4403`. El cierre `4401` (token vencido o los 3.600 s de Cloud Run) es fatal para graphql-ws: lo reintenta la campana con un token renovado.
 - **Marco:** barra con las apps que el rol permite, que pide `/salud.json` de cada una cada 60 s y deshabilita el enlace si falla (FR3). Campana con las alertas por rol: al conectar y al reconectar pide `alertasPendientes(desde)` y descarta las repetidas. Enlaces por URL a la app de cada alerta.
 - **Acceso:** `cliente` y `chofer` ven "Sin acceso" (con enlace al portal para el cliente). Cada app exige sus roles; el Gateway y los servicios vuelven a validar.
 - Respuesta parcial: `servicioCaido(error, campo)` muestra "Finanzas no disponible" solo en su tarjeta (FR1, FR2). `nuevaClave()` da una `claveIdempotencia` por intento. Los montos se muestran como texto con `BobPipe`; nunca se calculan en float.
