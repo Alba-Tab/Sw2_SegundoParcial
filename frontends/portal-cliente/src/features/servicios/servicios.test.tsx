@@ -7,6 +7,8 @@ import { PaginaServicio } from './PaginaServicio';
 const navegar = vi.fn();
 const SERVICIO = '0193c000-0000-7000-8000-000000000001';
 const VIAJE = '0193c000-0000-7000-8000-000000000002';
+const clienteActivo = vi.hoisted(() => ({ actual: { modoComercial: false, clienteId: undefined as string | undefined } }));
+vi.mock('../../compartido/sesion/ClienteActivo', () => ({ useClienteActivo: () => ({ ...clienteActivo.actual, elegir: () => {} }) }));
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navegar,
   useParams: () => ({ servicioId: SERVICIO }),

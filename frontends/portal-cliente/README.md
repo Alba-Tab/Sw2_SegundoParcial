@@ -22,6 +22,10 @@ React 19 + Vite, PWA. Material 3 con **MUI v7** y el tema de `libs/design-tokens
 - Spec 003: "Confirmar servicio" con una clave por intento (un corte de red reintenta con la misma, FS7); el servicio se consulta cada 2 s mientras está `PROGRAMANDO`, con su etapa y "En aprobación".
 - Specs 004 a 006: cancelar con motivo (mensajes de `CONFIRMACION_EN_CURSO` y `CANCELACION_NO_PERMITIDA`), seguimiento con la última posición y el POD con las URL firmadas de la foto y la firma.
 
+- Specs 006 y 008: facturas con TanStack Table (orden por columna, "Solo con saldo", días vencida) y la línea de crédito (disponible, utilizado, reservado, mora).
+- **Modo comercial** (rol `comercial`, propuesta 7.6): primero se elige el cliente (o se registra uno sin cuenta, canal `TELEFONO`); un aviso fijo dice a quién se atiende y quién registra; cotizar, confirmar, servicios, facturas y crédito llevan ese `clienteId`. "Ver como cliente" abre el portal con `?clienteId=`.
+- **Sin conexión** (propuesta 6.4 y 6.6): `vite-plugin-pwa` guarda la app; TanStack Query persiste en `localStorage` solo las lecturas de servicios, facturas, crédito y rutas, y cada vista muestra la antigüedad de lo guardado. La caché se borra al salir y si entra otro usuario. Sin sesión ni conexión, se pueden ver servicios y facturas guardados.
+
 ## Estructura
 
 - `src/compartido/`: tema, componentes comunes (con su historia de Storybook y su prueba).

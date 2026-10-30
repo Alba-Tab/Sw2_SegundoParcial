@@ -14,6 +14,8 @@ import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from '
 import { useMemo } from 'react';
 import { getListarServiciosQueryKey, listarServicios, type Servicio, useListarRutas } from '../../api/generado/viajes';
 import { dinero, fecha, TIPOS_CARGA } from '../../compartido/formato/formato';
+import { Antiguedad } from '../../compartido/offline/Antiguedad';
+import { useClienteActivo } from '../../compartido/sesion/ClienteActivo';
 import { BotonEnlace } from '../../compartido/ui/BotonEnlace';
 import { EstadoServicio } from '../../compartido/ui/EstadoServicio';
 import { Problema } from '../../compartido/ui/Problema';
@@ -24,11 +26,14 @@ const col = createColumnHelper<Servicio>();
 export function PaginaServicios() {
   const navegar = useNavigate();
   const rutas = useListarRutas();
+  const activo = useClienteActivo();
+  const params = activo.modoComercial ? { clienteId: activo.clienteId } : undefined;
   const paginas = useInfiniteQuery({
-    queryKey: getListarServiciosQueryKey(),
-    queryFn: ({ pageParam, signal }) => listarServicios(pageParam ? { cursor: pageParam } : undefined, { signal }),
+    queryKey: getListarServiciosQueryKey(params),
+    queryFn: ({ pageParam, signal }) => listarServicios({ ...params, ...(pageParam ? { cursor: pageParam } : {}) }, { signal }),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (p) => p.siguienteCursor ?? undefined,
+    enabled: !activo.modoComercial || !!activo.clienteId,
   });
   const nombreRuta = useMemo(() => new Map((rutas.data ?? []).map((r) => [r.rutaId, r.nombre])), [rutas.data]);
   const columnas = useMemo(
@@ -47,13 +52,14 @@ export function PaginaServicios() {
   // eslint-disable-next-line react-hooks/incompatible-library
   const tabla = useReactTable({ data: datos, columns: columnas, getCoreRowModel: getCoreRowModel() });
 
-  if (paginas.isPending) return <CircularProgress aria-label="Cargando" />;
-  if (paginas.isError) return <Problema error={paginas.error} />;
+  if (paginas.isPending) return paginas.fetchStatus === 'fetching' ? <CircularProgress aria-label="Cargando" /> : null;
+  if (paginas.isError && !paginas.data) return <Problema error={paginas.error} />;
   return (
     <Stack spacing={2}>
       <Typography variant="h5" component="h2">
         Mis servicios
       </Typography>
+      <Antiguedad actualizadoEn={paginas.dataUpdatedAt} fallo={paginas.isError} />
       {datos.length === 0 ? (
         <Paper variant="outlined" sx={{ p: 3 }}>
           <Typography gutterBottom>Todavía no pediste servicios.</Typography>
