@@ -10,7 +10,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom, switchMap } from 'rxjs';
-import { AvisoServicios, BobPipe, completo, FechaPipe, Intentos, mensajeDe, Sesion } from 'ui-comun';
+import { AvisoServicios, BobPipe, completo, fechaLaPaz, FechaPipe, Intentos, mensajeDe, Sesion } from 'ui-comun';
 import { FacturaGQL, RegistrarPagoGQL, type FacturaQuery, type MedioPago } from '../graphql/generado';
 import { leerRecibo } from './ocr';
 
@@ -114,7 +114,7 @@ export class FacturaPagina {
   readonly medios: MedioPago[] = ['TRANSFERENCIA', 'DEPOSITO', 'EFECTIVO', 'CHEQUE'];
   readonly enviando = signal(false);
   readonly leyendo = signal(false);
-  pago = { monto: '', fecha: new Date().toISOString().slice(0, 10), medio: 'TRANSFERENCIA' as MedioPago, referencia: '' };
+  pago = { monto: '', fecha: fechaLaPaz(), medio: 'TRANSFERENCIA' as MedioPago, referencia: '' };
   /**
    * Una clave por intento (spec 008): si la persona reintenta después de un corte con los mismos datos, Finanzas no
    * registra dos pagos; si corrige el monto después de un error de negocio, la clave es nueva.

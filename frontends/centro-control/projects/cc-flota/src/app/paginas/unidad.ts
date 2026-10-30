@@ -10,7 +10,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom, switchMap, type Observable } from 'rxjs';
-import { AvisoServicios, completo, FechaPipe, Intentos, mensajeDe, Sesion } from 'ui-comun';
+import { AvisoServicios, completo, fechaLaPaz, FechaPipe, Intentos, mensajeDe, Sesion } from 'ui-comun';
 import {
   CerrarMantenimientoGQL,
   ProgramarMantenimientoGQL,
@@ -43,7 +43,7 @@ const CHECKLIST = 'Aceite y filtros\nFrenos\nNeumáticos\nLuces';
         {{ u.placa }} · <span class="chip-estado">{{ u.estado }}</span>
       </h1>
       <p>
-        {{ u.tipoUnidad }} {{ u.tipoRemolque ?? '' }} · {{ u.kilometraje ?? '—' | number }} km ·
+        {{ u.tipoUnidad }} {{ u.tipoRemolque ?? '' }} · {{ (u.kilometraje | number) ?? '—' }} km ·
         {{ u.kmDesdeUltimoMantenimiento | number }} km desde el último mantenimiento
       </p>
       <p class="secundario">
@@ -153,7 +153,7 @@ export class UnidadPagina {
   private readonly intentos = new Intentos();
   nuevo = {
     tipo: 'PREVENTIVO' as TipoMantenimiento,
-    fechaProgramada: new Date().toISOString().slice(0, 10),
+    fechaProgramada: fechaLaPaz(),
     taller: '',
     descripcion: '',
     checklist: CHECKLIST,

@@ -2,10 +2,10 @@ import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatTableModule } from '@angular/material/table';
-import { AvisoServicios, BobPipe, completo, FechaPipe } from 'ui-comun';
+import { AvisoServicios, BobPipe, completo, fechaLaPaz, FechaPipe } from 'ui-comun';
 import { CombustibleGQL, type CombustibleQuery } from '../graphql/generado';
 
-const hace = (dias: number) => new Date(Date.now() - dias * 86_400_000).toISOString().slice(0, 10);
+const hace = (dias: number) => fechaLaPaz(-dias);
 
 /** Anomalías de Isolation Forest (FF2) y las últimas cargas. Una alerta abre aquí con la carga marcada. */
 @Component({
