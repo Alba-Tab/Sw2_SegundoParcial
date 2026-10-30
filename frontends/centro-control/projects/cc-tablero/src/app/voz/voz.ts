@@ -7,7 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { firstValueFrom } from 'rxjs';
-import { codigoDe, mensajeDe, nuevaClave, TablaReporte, type Resultado } from 'ui-comun';
+import { codigoDe, Intentos, mensajeDe, TablaReporte, type Resultado } from 'ui-comun';
 import { ExportarReporteGQL, PreguntarGQL, ReporteGQL, type PreguntarMutation, type ReporteId } from '../graphql/generado';
 import { Grabadora } from './grabadora';
 
@@ -114,6 +114,7 @@ export class VozPagina implements OnDestroy {
   readonly respuesta = signal<Respuesta | null>(null);
   readonly resultado = signal<Resultado | null>(null);
   private ultimo: { id: ReporteId; params: Record<string, unknown> } | null = null;
+  private readonly intentos = new Intentos();
   texto = '';
   readonly reportes: { id: ReporteId; titulo: string }[] = [
     { id: 'CUENTAS_POR_COBRAR', titulo: 'Cuentas por cobrar' },
@@ -203,8 +204,9 @@ export class VozPagina implements OnDestroy {
   async exportar(): Promise<void> {
     if (!this.ultimo) return;
     try {
-      const r = await firstValueFrom(
-        this.exportarGql.mutate({ variables: { id: this.ultimo.id, params: this.ultimo.params, clave: nuevaClave() } }),
+      const { id, params } = this.ultimo;
+      const r = await this.intentos.enviar('exportarReporte', { id, params }, (clave) =>
+        this.exportarGql.mutate({ variables: { id, params, clave } }),
       );
       if (r.data?.exportarReporte.url) window.location.assign(r.data.exportarReporte.url);
     } catch (e) {

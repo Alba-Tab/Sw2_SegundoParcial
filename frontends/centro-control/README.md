@@ -15,7 +15,9 @@ Cuatro apps Angular 22 independientes y la librería `ui-comun`, en un solo work
 - **Apollo** hacia el Gateway: el token va en `Authorization` y, en el WebSocket, en `connection_init`. Con 401 renueva y repite una vez. La suscripción reconecta con espera de 1, 2, 4… s hasta 30 s (D99) y no reintenta con `4403`. El cierre `4401` (token vencido o los 3.600 s de Cloud Run) es fatal para graphql-ws: lo reintenta la campana con un token renovado.
 - **Marco:** barra con las apps que el rol permite, que pide `/salud.json` de cada una cada 60 s y deshabilita el enlace si falla (FR3). Campana con las alertas por rol: al conectar y al reconectar pide `alertasPendientes(desde)` y descarta las repetidas. Enlaces por URL a la app de cada alerta.
 - **Acceso:** `cliente` y `chofer` ven "Sin acceso" (con enlace al portal para el cliente). Cada app exige sus roles; el Gateway y los servicios vuelven a validar.
-- Respuesta parcial: `servicioCaido(error, campo)` muestra "Finanzas no disponible" solo en su tarjeta (FR1, FR2). `nuevaClave()` da una `claveIdempotencia` por intento. Los montos se muestran como texto con `BobPipe`; nunca se calculan en float.
+- Respuesta parcial: `servicioCaido(error, campo)` muestra "Finanzas no disponible" solo en su tarjeta del tablero, y `<cc-aviso-servicios>` pone el mismo aviso en las demás páginas (FR1, FR2).
+- Idempotencia: `Intentos` da una `claveIdempotencia` por intento. La conserva solo si se reenvían los mismos datos después de una red caída, un 5xx o un `409 IDEMPOTENCIA_EN_PROCESO`; con datos distintos o después de una respuesta definitiva, la clave es nueva.
+- Los montos se muestran como texto con `BobPipe`; nunca se calculan en float.
 
 ## Voz y agente en cc-tablero (T10.4)
 

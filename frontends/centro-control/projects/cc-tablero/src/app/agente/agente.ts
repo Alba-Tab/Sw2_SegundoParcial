@@ -3,8 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { firstValueFrom } from 'rxjs';
-import { AvisoServicios, codigoDe, completo, CONFIG_CENTRO, FechaPipe, mensajeDe, nuevaClave, Sesion } from 'ui-comun';
+import { AvisoServicios, codigoDe, completo, CONFIG_CENTRO, FechaPipe, Intentos, mensajeDe, Sesion } from 'ui-comun';
 import { DispararMisionGQL, MisionesGQL, type MisionesQuery } from '../graphql/generado';
 
 /**
@@ -81,12 +80,13 @@ export class AgentePagina {
   readonly error = computed(() => this.datos()?.error);
   readonly campos = { misionesAgente: 'Analítica' };
   readonly enviando = signal(false);
+  private readonly intentos = new Intentos();
   readonly json = (v: unknown) => JSON.stringify(v);
 
   async disparar(): Promise<void> {
     this.enviando.set(true);
     try {
-      await firstValueFrom(this.dispararGql.mutate({ variables: { clave: nuevaClave() } }));
+      await this.intentos.enviar('dispararMision', {}, (clave) => this.dispararGql.mutate({ variables: { clave } }));
       this.avisos.open('Misión disparada: los pasos aparecen aquí', undefined, { duration: 4000 });
     } catch (e) {
       const codigo = codigoDe(e);

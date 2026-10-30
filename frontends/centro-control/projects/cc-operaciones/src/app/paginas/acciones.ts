@@ -8,7 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { RouterLink } from '@angular/router';
 import { type Observable, firstValueFrom } from 'rxjs';
-import { AvisoServicios, completo, FechaPipe, mensajeDe, nuevaClave, Sesion } from 'ui-comun';
+import { AvisoServicios, completo, FechaPipe, Intentos, mensajeDe, Sesion } from 'ui-comun';
 import { AccionesGQL, AprobarAccionGQL, RechazarAccionGQL, type AccionesQuery } from '../graphql/generado';
 
 /**
@@ -108,26 +108,33 @@ export class AccionesPagina {
   readonly error = computed(() => this.datos()?.error);
   readonly campos = { accionesPropuestas: 'Analítica', viaje: 'Viajes' };
   readonly enviando = signal(false);
+  private readonly intentos = new Intentos();
   mensajes: Record<string, string> = {};
   motivos: Record<string, string> = {};
 
   aprobar(id: string) {
+    const mensaje = this.mensajes[id].trim();
     return this.enviar(
-      this.aprobarGql.mutate({ variables: { id, mensaje: this.mensajes[id].trim(), clave: nuevaClave() } }),
+      `aprobarAccion:${id}`,
+      { mensaje },
+      (clave) => this.aprobarGql.mutate({ variables: { id, mensaje, clave } }),
       'Aprobada: el correo sale por n8n',
     );
   }
   rechazar(id: string) {
+    const motivo = this.motivos[id]?.trim() || undefined;
     return this.enviar(
-      this.rechazarGql.mutate({ variables: { id, motivo: this.motivos[id]?.trim() || undefined, clave: nuevaClave() } }),
+      `rechazarAccion:${id}`,
+      { motivo },
+      (clave) => this.rechazarGql.mutate({ variables: { id, motivo, clave } }),
       'Acción rechazada',
     );
   }
 
-  private async enviar(peticion: Observable<unknown>, ok: string): Promise<void> {
+  private async enviar(operacion: string, datos: unknown, peticion: (clave: string) => Observable<unknown>, ok: string): Promise<void> {
     this.enviando.set(true);
     try {
-      await firstValueFrom(peticion);
+      await this.intentos.enviar(operacion, datos, peticion);
       this.avisos.open(ok, undefined, { duration: 5000 });
       await firstValueFrom(this.gql.fetch());
     } catch (e) {

@@ -7,7 +7,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { firstValueFrom } from 'rxjs';
-import { AvisoServicios, BobPipe, CONFIG_CENTRO, FechaPipe, mensajeDe, nuevaClave, Sesion } from 'ui-comun';
+import { AvisoServicios, BobPipe, CONFIG_CENTRO, FechaPipe, Intentos, mensajeDe, Sesion } from 'ui-comun';
 import { CancelarServicioGQL, ServiciosGQL } from '../graphql/generado';
 
 /**
@@ -90,6 +90,7 @@ export class ServiciosPagina {
       : ['cliente', 'carga', 'fecha', 'unidad', 'monto', 'acciones'],
   );
   readonly enviando = signal(false);
+  private readonly intentos = new Intentos();
   motivo = '';
 
   nombre(clienteId: string): string {
@@ -99,7 +100,10 @@ export class ServiciosPagina {
   async cancelar(servicioId: string): Promise<void> {
     this.enviando.set(true);
     try {
-      await firstValueFrom(this.cancelarGql.mutate({ variables: { servicioId, motivo: this.motivo.trim(), clave: nuevaClave() } }));
+      const motivo = this.motivo.trim();
+      await this.intentos.enviar(`cancelarServicio:${servicioId}`, { motivo }, (clave) =>
+        this.cancelarGql.mutate({ variables: { servicioId, motivo, clave } }),
+      );
       this.avisos.open('Servicio cancelado: se devolvieron el crédito y la unidad', undefined, { duration: 5000 });
       this.motivo = '';
       await firstValueFrom(this.gql.fetch({ variables: { estado: 'CONFIRMADO' } }));

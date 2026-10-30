@@ -10,7 +10,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom, map } from 'rxjs';
-import { mensajeDe, nuevaClave, Sesion, TablaReporte, type Resultado } from 'ui-comun';
+import { Intentos, mensajeDe, Sesion, TablaReporte, type Resultado } from 'ui-comun';
 import { CatalogoGQL, ExportarReporteGQL, ReporteGQL, type ReporteId, type ReporteParams } from '../graphql/generado';
 
 const hoy = () => new Date(Date.now() - 4 * 3600_000).toISOString().slice(0, 10);
@@ -142,6 +142,7 @@ export class ReportesPagina {
   readonly exportando = signal(false);
   readonly error = signal<string | null>(null);
   params: ReporteParams = {};
+  private readonly intentos = new Intentos();
 
   usa(campo: string): boolean {
     return campo in ((this.definicion()?.parametros as { properties?: object } | undefined)?.properties ?? {});
@@ -183,7 +184,10 @@ export class ReportesPagina {
     if (!id) return;
     this.exportando.set(true);
     try {
-      const r = await firstValueFrom(this.exportarGql.mutate({ variables: { id, params: this.limpios(), clave: nuevaClave() } }));
+      const params = this.limpios();
+      const r = await this.intentos.enviar('exportarReporte', { id, params }, (clave) =>
+        this.exportarGql.mutate({ variables: { id, params, clave } }),
+      );
       const url = r.data?.exportarReporte.url;
       if (url) window.location.assign(url);
     } catch (e) {

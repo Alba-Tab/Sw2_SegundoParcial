@@ -61,6 +61,9 @@ export const INTERVALO_SALUD_MS = 60_000;
           @if (!alertas.disponible()) {
             <p class="aviso">Alertas no disponibles</p>
           }
+          @if (alertas.errorAtencion(); as e) {
+            <p class="aviso no-atendida" role="alert">{{ e }}</p>
+          }
           @for (a of alertas.lista(); track a.alertaId) {
             <div class="alerta" [class.cerrada]="a.estado !== 'ABIERTA'" [attr.data-severidad]="a.severidad">
               <a [href]="alertas.url(a)" class="titulo">{{ a.titulo }}</a>
@@ -124,6 +127,9 @@ export const INTERVALO_SALUD_MS = 60_000;
       margin: 0;
       color: var(--mat-sys-on-surface-variant);
       font-size: 13px;
+    }
+    .no-atendida {
+      color: var(--mat-sys-error);
     }
     .alerta {
       display: flex;

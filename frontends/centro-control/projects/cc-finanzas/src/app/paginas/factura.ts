@@ -10,7 +10,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom, switchMap } from 'rxjs';
-import { AvisoServicios, BobPipe, completo, FechaPipe, mensajeDe, nuevaClave, Sesion } from 'ui-comun';
+import { AvisoServicios, BobPipe, completo, FechaPipe, Intentos, mensajeDe, Sesion } from 'ui-comun';
 import { FacturaGQL, RegistrarPagoGQL, type FacturaQuery, type MedioPago } from '../graphql/generado';
 import { leerRecibo } from './ocr';
 
@@ -115,8 +115,11 @@ export class FacturaPagina {
   readonly enviando = signal(false);
   readonly leyendo = signal(false);
   pago = { monto: '', fecha: new Date().toISOString().slice(0, 10), medio: 'TRANSFERENCIA' as MedioPago, referencia: '' };
-  /** Una clave por intento: si la persona reintenta después de un corte, Finanzas no registra dos pagos (spec 008). */
-  private clave = nuevaClave();
+  /**
+   * Una clave por intento (spec 008): si la persona reintenta después de un corte con los mismos datos, Finanzas no
+   * registra dos pagos; si corrige el monto después de un error de negocio, la clave es nueva.
+   */
+  private readonly intentos = new Intentos();
 
   valido(): boolean {
     return /^(0|[1-9]\d{0,11})\.\d{2}$/.test(this.pago.monto) && this.pago.referencia.trim().length > 0;
@@ -140,9 +143,11 @@ export class FacturaPagina {
   async registrar(facturaId: string): Promise<void> {
     this.enviando.set(true);
     try {
-      await firstValueFrom(this.pagarGql.mutate({ variables: { input: { facturaId, ...this.pago, claveIdempotencia: this.clave } } }));
+      const datos = { facturaId, ...this.pago };
+      await this.intentos.enviar(`registrarPago:${facturaId}`, datos, (clave) =>
+        this.pagarGql.mutate({ variables: { input: { ...datos, claveIdempotencia: clave } } }),
+      );
       this.avisos.open('Pago registrado: se liberó el crédito', undefined, { duration: 5000 });
-      this.clave = nuevaClave();
       this.pago = { ...this.pago, monto: '', referencia: '' };
       await firstValueFrom(this.gql.fetch({ variables: { id: this.id() } }));
     } catch (e) {

@@ -9,8 +9,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { firstValueFrom, switchMap } from 'rxjs';
-import { AvisoServicios, completo, FechaPipe, mensajeDe, nuevaClave, Sesion } from 'ui-comun';
+import { firstValueFrom, switchMap, type Observable } from 'rxjs';
+import { AvisoServicios, completo, FechaPipe, Intentos, mensajeDe, Sesion } from 'ui-comun';
 import {
   CerrarMantenimientoGQL,
   ProgramarMantenimientoGQL,
@@ -150,6 +150,7 @@ export class UnidadPagina {
     return lista;
   });
   readonly enviando = signal(false);
+  private readonly intentos = new Intentos();
   nuevo = {
     tipo: 'PREVENTIVO' as TipoMantenimiento,
     fechaProgramada: new Date().toISOString().slice(0, 10),
@@ -166,33 +167,34 @@ export class UnidadPagina {
       .split('\n')
       .map((l) => l.trim())
       .filter(Boolean);
+    const input = { unidadId, ...this.nuevo, checklist };
     return this.enviar(
-      this.programarGql.mutate({ variables: { input: { unidadId, ...this.nuevo, checklist, claveIdempotencia: nuevaClave() } } }),
+      `programarMantenimiento:${unidadId}`,
+      input,
+      (clave) => this.programarGql.mutate({ variables: { input: { ...input, claveIdempotencia: clave } } }),
       'Mantenimiento programado',
     );
   }
 
   cerrar(mantenimientoId: string) {
+    const input = {
+      mantenimientoId,
+      kilometraje: this.km[mantenimientoId],
+      checklist: this.cierres[mantenimientoId],
+      observaciones: this.observaciones[mantenimientoId] || undefined,
+    };
     return this.enviar(
-      this.cerrarGql.mutate({
-        variables: {
-          input: {
-            mantenimientoId,
-            kilometraje: this.km[mantenimientoId],
-            checklist: this.cierres[mantenimientoId],
-            observaciones: this.observaciones[mantenimientoId] || undefined,
-            claveIdempotencia: nuevaClave(),
-          },
-        },
-      }),
+      `cerrarMantenimiento:${mantenimientoId}`,
+      input,
+      (clave) => this.cerrarGql.mutate({ variables: { input: { ...input, claveIdempotencia: clave } } }),
       'Mantenimiento cerrado',
     );
   }
 
-  private async enviar(peticion: import('rxjs').Observable<unknown>, ok: string): Promise<void> {
+  private async enviar(operacion: string, datos: unknown, peticion: (clave: string) => Observable<unknown>, ok: string): Promise<void> {
     this.enviando.set(true);
     try {
-      await firstValueFrom(peticion);
+      await this.intentos.enviar(operacion, datos, peticion);
       this.avisos.open(ok, undefined, { duration: 4000 });
       await firstValueFrom(this.gql.fetch({ variables: { id: this.id() } }));
     } catch (e) {

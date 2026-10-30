@@ -1,8 +1,9 @@
 import { DestroyRef, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { firstValueFrom, type Subscription } from 'rxjs';
-import { nuevaClave } from './clave';
+import { Intentos } from './clave';
 import { CONFIG_CENTRO, type App } from './configuracion';
 import { EstadoConexion, esperaReconexion } from './conexion';
+import { mensajeDe } from './errores';
 import { AlertasNuevasGQL, AlertasPendientesGQL, AtenderAlertaGQL, type AlertaCamposFragment } from './graphql/generado';
 import { Sesion } from './sesion';
 
@@ -37,10 +38,13 @@ export class Alertas {
   private intento = 0;
   private iniciada = false;
   private terminada = false;
+  private readonly intentos = new Intentos();
 
   readonly lista = signal<AlertaCamposFragment[]>([]);
   readonly abiertas = signal(0);
   readonly disponible = signal(true);
+  /** El error del último "Marcar atendida", para mostrarlo en la campana. */
+  readonly errorAtencion = signal<string | null>(null);
 
   constructor() {
     inject(DestroyRef).onDestroy(() => {
@@ -128,11 +132,17 @@ export class Alertas {
     return `${base}/${resto.join('/')}`;
   }
 
-  atender(alerta: AlertaCamposFragment, nota?: string) {
-    return this.atenderGql.mutate({ variables: { alertaId: alerta.alertaId, nota, clave: nuevaClave() } }).subscribe(({ data }) => {
+  async atender(alerta: AlertaCamposFragment, nota?: string): Promise<void> {
+    this.errorAtencion.set(null);
+    try {
+      const { data } = await this.intentos.enviar(`atenderAlerta:${alerta.alertaId}`, { nota }, (clave) =>
+        this.atenderGql.mutate({ variables: { alertaId: alerta.alertaId, nota, clave } }),
+      );
       if (data?.atenderAlerta.estado !== 'ATENDIDA') return;
       this.lista.update((l) => l.map((a) => (a.alertaId === alerta.alertaId ? { ...a, estado: 'ATENDIDA' } : a)));
       this.abiertas.update((n) => Math.max(0, n - 1));
-    });
+    } catch (e) {
+      this.errorAtencion.set(mensajeDe(e));
+    }
   }
 }
