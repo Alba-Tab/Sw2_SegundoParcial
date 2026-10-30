@@ -40,7 +40,7 @@ export const ListarUnidadesQueryParams = zod.object({
   placa: zod.string().regex(listarUnidadesQueryPlacaRegExp).optional(),
   tipo: zod.enum(['TRACTO', 'REMOLQUE']).optional(),
   estado: zod.enum(['DISPONIBLE', 'RESERVADA', 'EN_VIAJE', 'MANTENIMIENTO_PENDIENTE', 'EN_MANTENIMIENTO', 'INACTIVA']).optional(),
-  limite: zod.int().min(1).max(listarUnidadesQueryLimiteMax).default(listarUnidadesQueryLimiteDefault),
+  limite: zod.coerce.number().int().min(1).max(listarUnidadesQueryLimiteMax).default(listarUnidadesQueryLimiteDefault),
   cursor: zod.string().max(listarUnidadesQueryCursorMax).optional().describe('Valor opaco devuelto en `siguienteCursor`.'),
 });
 
@@ -432,7 +432,7 @@ export const listarMantenimientosQueryCursorMax = 500;
 export const ListarMantenimientosQueryParams = zod.object({
   unidadId: zod.uuid().optional(),
   estado: zod.enum(['EN_CURSO', 'CERRADO']).optional(),
-  limite: zod.int().min(1).max(listarMantenimientosQueryLimiteMax).default(listarMantenimientosQueryLimiteDefault),
+  limite: zod.coerce.number().int().min(1).max(listarMantenimientosQueryLimiteMax).default(listarMantenimientosQueryLimiteDefault),
   cursor: zod.string().max(listarMantenimientosQueryCursorMax).optional().describe('Valor opaco devuelto en `siguienteCursor`.'),
 });
 
@@ -572,7 +572,7 @@ export const listarChoferesQueryCursorMax = 500;
 
 export const ListarChoferesQueryParams = zod.object({
   activo: zod.boolean().optional(),
-  limite: zod.int().min(1).max(listarChoferesQueryLimiteMax).default(listarChoferesQueryLimiteDefault),
+  limite: zod.coerce.number().int().min(1).max(listarChoferesQueryLimiteMax).default(listarChoferesQueryLimiteDefault),
   cursor: zod.string().max(listarChoferesQueryCursorMax).optional().describe('Valor opaco devuelto en `siguienteCursor`.'),
 });
 
@@ -624,7 +624,7 @@ export const ListarCargasCombustibleQueryParams = zod.object({
   tractoId: zod.uuid().optional(),
   desde: zod.iso.datetime({ offset: true }).optional(),
   hasta: zod.iso.datetime({ offset: true }).optional(),
-  limite: zod.int().min(1).max(listarCargasCombustibleQueryLimiteMax).default(listarCargasCombustibleQueryLimiteDefault),
+  limite: zod.coerce.number().int().min(1).max(listarCargasCombustibleQueryLimiteMax).default(listarCargasCombustibleQueryLimiteDefault),
   cursor: zod.string().max(listarCargasCombustibleQueryCursorMax).optional().describe('Valor opaco devuelto en `siguienteCursor`.'),
 });
 
