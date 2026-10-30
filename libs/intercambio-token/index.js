@@ -4,10 +4,27 @@
  * que lo usen igual el Gateway (NestJS) y el servidor MCP.
  *
  * Nunca reenvía el token del usuario: por cada servicio pide uno nuevo a nombre del mismo usuario con la audiencia de
- * ese servicio, y lo guarda en memoria por `sub` y audiencia hasta 30 s antes de que venza.
+ * ese servicio, y lo guarda en memoria por `sub`, audiencia y hash del token recibido hasta 30 s antes de que venza.
  */
 
+const { createHash } = require('node:crypto');
+
 const TIPO_ACCESS = 'urn:ietf:params:oauth:token-type:access_token';
+
+/** Mensajes propios: el texto crudo de Keycloak no sale hacia las apps ni hacia el LLM. */
+const SESION_NO_VALIDA = 'La sesión ya no es válida; vuelve a iniciar sesión';
+const INTERCAMBIO_RECHAZADO = 'El intercambio de token no está permitido';
+
+/**
+ * ¿Keycloak rechazó el *subject token* (vencido, revocado o de una sesión cerrada)? Además de `invalid_grant` e
+ * `invalid_token`, Keycloak responde `400 {"error":"invalid_request","error_description":"Invalid token"}` en el
+ * intercambio estándar (v2) cuando el token del usuario venció o su sesión se cerró.
+ */
+function subjectNoValido(status, datos) {
+  if (datos.error === 'invalid_grant' || datos.error === 'invalid_token') return true;
+  if (status !== 400) return false;
+  return /invalid token|subject|session|sesi[oó]n|expired|not active|inactive/i.test(String(datos.error_description ?? ''));
+}
 
 class ErrorIntercambio extends Error {
   constructor(codigo, mensaje, status) {
@@ -51,11 +68,12 @@ class IntercambioToken {
   }
 
   async tokenPara(tokenUsuario, audiencia) {
-    const { sub, exp } = payload(tokenUsuario);
+    const { sub } = payload(tokenUsuario);
     if (!sub) throw new ErrorIntercambio('NO_AUTENTICADO', 'El token no trae sub', 401);
-    // La clave incluye el vencimiento del token recibido: un token nuevo del mismo usuario (otra sesión) no reutiliza
-    // uno intercambiado a partir de una sesión que ya se cerró.
-    const clave = `${sub}|${audiencia}|${exp ?? ''}`;
+    // La clave incluye un hash del token recibido: un token intercambiado solo se reutiliza para ese mismo token, nunca
+    // para otro del mismo usuario (por ejemplo, de una sesión que ya se cerró). El token no queda en la caché.
+    const huella = createHash('sha256').update(String(tokenUsuario)).digest('base64url');
+    const clave = `${sub}|${audiencia}|${huella}`;
     return this.conCache(clave, () =>
       this.pedir({
         grant_type: 'urn:ietf:params:oauth:grant-type:token-exchange',
@@ -115,11 +133,9 @@ class IntercambioToken {
     if (respuesta.status >= 500) {
       throw new ErrorIntercambio('DEPENDENCIA_NO_DISPONIBLE', `Keycloak respondió ${respuesta.status}`, 503);
     }
-    // invalid_grant / invalid_token: el token del usuario venció o la sesión se cerró → el usuario debe renovar.
-    if (datos.error === 'invalid_grant' || datos.error === 'invalid_token') {
-      throw new ErrorIntercambio('NO_AUTENTICADO', datos.error_description ?? 'El token del usuario ya no es válido', 401);
-    }
-    throw new ErrorIntercambio('SIN_PERMISO', datos.error_description ?? datos.error ?? 'Intercambio rechazado', 403);
+    // El token del usuario venció, se revocó o su sesión se cerró → 401: la app renueva o pide login (spec 016).
+    if (subjectNoValido(respuesta.status, datos)) throw new ErrorIntercambio('NO_AUTENTICADO', SESION_NO_VALIDA, 401);
+    throw new ErrorIntercambio('SIN_PERMISO', INTERCAMBIO_RECHAZADO, 403);
   }
 }
 
