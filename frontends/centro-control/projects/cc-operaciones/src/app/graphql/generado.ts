@@ -59,19 +59,12 @@ export type ViajesQueryVariables = Exact<{
 export type ViajesQuery = {
   viajes: Array<{
     viajeId: string;
-    servicioId: string;
-    estado: EstadoViaje;
-    motivo: string | null;
     placa: string | null;
+    estado: EstadoViaje;
     choferNombre: string | null;
-    tipoCarga: TipoCarga;
-    toneladas: number;
     fechaViaje: string;
-    iniciadoEn: string | null;
-    ultimaPosicionEn: string | null;
-    ultimaPosicion: { lat: number; lng: number } | null;
-    cliente: { clienteId: string; razonSocial: string };
-    ruta: { rutaId: string; nombre: string; destino: string; distanciaKm: number };
+    cliente: { razonSocial: string };
+    ruta: { nombre: string };
   }> | null;
 };
 
@@ -80,20 +73,11 @@ export type MapaQueryVariables = Exact<{ [key: string]: never }>;
 export type MapaQuery = {
   viajesEnCurso: Array<{
     viajeId: string;
-    servicioId: string;
-    estado: EstadoViaje;
-    motivo: string | null;
     placa: string | null;
-    choferNombre: string | null;
-    tipoCarga: TipoCarga;
-    toneladas: number;
-    fechaViaje: string;
-    iniciadoEn: string | null;
-    ultimaPosicionEn: string | null;
-    riesgo: { probabilidad: number; enRiesgo: boolean } | null;
     ultimaPosicion: { lat: number; lng: number } | null;
-    cliente: { clienteId: string; razonSocial: string };
-    ruta: { rutaId: string; nombre: string; destino: string; distanciaKm: number };
+    cliente: { razonSocial: string };
+    ruta: { nombre: string };
+    riesgo: { probabilidad: number; enRiesgo: boolean } | null;
   }> | null;
 };
 
@@ -199,11 +183,7 @@ export type ServiciosQueryVariables = Exact<{
 export type ServiciosQuery = {
   servicios: Array<{
     servicioId: string;
-    viajeId: string | null;
     clienteId: string;
-    estado: EstadoServicio;
-    etapa: string | null;
-    motivo: string | null;
     tipoCarga: TipoCarga | null;
     toneladas: number | null;
     fechaViaje: string | null;
@@ -211,7 +191,6 @@ export type ServiciosQuery = {
     placa: string | null;
     choferNombre: string | null;
     confirmacionCompleta: boolean;
-    creadoEn: string | null;
   }> | null;
   clientes: Array<{ clienteId: string; razonSocial: string }> | null;
 };
@@ -318,11 +297,20 @@ export const ViajeFilaFragmentDoc = gql`
 `;
 export const ViajesDocument = gql`
   query Viajes($estado: EstadoViaje) {
-    viajes(estado: $estado, limite: 100) {
-      ...ViajeFila
+    viajes(estado: $estado, limite: 80) {
+      viajeId
+      placa
+      estado
+      choferNombre
+      fechaViaje
+      cliente {
+        razonSocial
+      }
+      ruta {
+        nombre
+      }
     }
   }
-  ${ViajeFilaFragmentDoc}
 `;
 
 @Injectable({
@@ -337,15 +325,25 @@ export class ViajesGQL extends Apollo.Query<ViajesQuery, ViajesQueryVariables> {
 }
 export const MapaDocument = gql`
   query Mapa {
-    viajesEnCurso(limite: 100) {
-      ...ViajeFila
+    viajesEnCurso(limite: 50) {
+      viajeId
+      placa
+      ultimaPosicion {
+        lat
+        lng
+      }
+      cliente {
+        razonSocial
+      }
+      ruta {
+        nombre
+      }
       riesgo {
         probabilidad
         enRiesgo
       }
     }
   }
-  ${ViajeFilaFragmentDoc}
 `;
 
 @Injectable({
@@ -460,13 +458,9 @@ export class IntervencionesGQL extends Apollo.Query<IntervencionesQuery, Interve
 }
 export const ServiciosDocument = gql`
   query Servicios($estado: EstadoServicio) {
-    servicios(estado: $estado, limite: 100) {
+    servicios(estado: $estado, limite: 80) {
       servicioId
-      viajeId
       clienteId
-      estado
-      etapa
-      motivo
       tipoCarga
       toneladas
       fechaViaje
@@ -474,7 +468,6 @@ export const ServiciosDocument = gql`
       placa
       choferNombre
       confirmacionCompleta
-      creadoEn
     }
     clientes {
       clienteId

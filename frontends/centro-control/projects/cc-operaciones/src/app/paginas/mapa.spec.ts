@@ -7,10 +7,11 @@ describe('mapa en vivo', () => {
       {
         viajeId: 'v1',
         placa: '4521KTR',
-        cliente: { clienteId: 'c1', razonSocial: malicioso },
-        ruta: { rutaId: 'r1', nombre: 'Santa Cruz → Cochabamba', destino: 'Cochabamba', distanciaKm: 470 },
+        ultimaPosicion: { lat: -17.78, lng: -63.18 },
+        cliente: { razonSocial: malicioso },
+        ruta: { nombre: 'Santa Cruz → Cochabamba' },
         riesgo: { probabilidad: 0.8, enRiesgo: true },
-      } as Parameters<typeof popupViaje>[0],
+      },
       'http://localhost:4202/viajes/v1',
     );
     expect(popup.querySelector('img')).toBeNull();

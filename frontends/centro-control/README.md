@@ -33,6 +33,8 @@ Tesseract.js lee el recibo en el navegador (spec 008, paso 2). El worker y el co
 
 Cada proyecto escribe sus operaciones en `*.graphql`. `npm run generar` produce los servicios tipados de Apollo Angular (`graphql/generado.ts`) desde `contratos/graphql/centro-control.graphql`. La CI falla si lo versionado no coincide (`npm run generar:verificar`).
 
+**Complejidad (D101).** El Gateway rechaza con `CONSULTA_DEMASIADO_COMPLEJA` toda operación de más de 1.000: cada campo vale 1, una lista con `limite` multiplica por él (1 a 100) y Apollo agrega `__typename` a cada objeto y a cada fragmento. `npm run complejidad` (dentro de `verificar`) cuenta cada operación con esa regla y falla si alguna se pasa. Por eso las listas piden solo lo que muestran y usan `limite: 80` (el mapa, 50): esas consultas no tienen `cursor` en el contrato.
+
 ## Configuración
 
 Cada app lee `/configuracion.json` del hosting antes de arrancar (issuer, cliente OIDC, URL del Gateway y de las demás apps). En la nube se cambia ese archivo sin recompilar. En local, el issuer `http://localhost:8080` redirige al `KC_HOSTNAME` del compose (`<mac>.local`), que es el emisor que valida el Gateway.
