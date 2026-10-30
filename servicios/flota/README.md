@@ -46,3 +46,9 @@ curl localhost:8102/health/ready
 - **Outbox**: valida cada evento contra `contratos/eventos` (ajv 2020, copiados en la imagen; `CONTRATOS_DIR`) y siempre completa `correlationId` y `traceparent`.
 - **`GET /api/v1/unidades`**, `/{unidadId}`, **`/choferes`** y `/{choferId}` (jefe de flota, despachador, gerente; el chofer se ve a sí mismo).
 - **CLI**: `node dist/cli.js choferes:actualizar <choferId> --licenciaVenceEl=… --activo=…` guarda el cambio, sube `versionAgregado` y deja `ChoferActualizado` (spec 010, sección D).
+
+## Combustible (T5.3b, spec 009)
+
+- **`POST /api/v1/cargas-combustible`** (chofer): `Idempotency-Key` igual al `opId`; el mismo `opId` con el mismo cuerpo devuelve la carga guardada y con otro cuerpo es `422 IDEMPOTENCIA_CUERPO_DISTINTO`. El tracto sale de la reserva del `viajeId` y el chofer debe ser el asignado. Rechaza litros sobre `capacidadTanqueLitros` (`CARGA_EXCEDE_TANQUE`), kilometraje menor al odómetro (`KILOMETRAJE_INVALIDO`), monto no positivo y hora futura. Sube el odómetro del tracto y deja `CargaCombustibleRegistrada` en el Outbox.
+- **`GET /api/v1/cargas-combustible`** y **`GET /api/v1/unidades/{unidadId}/lecturas-combustible?desde=…`** (como máximo 24 h).
+- **Sensor** (cola `flota.sensor`, la llena el puente MQTT): cada lectura se guarda una vez por `placa + medidoEn` (TTL 30 días). Detenido, una caída de 8 puntos o más en 10 minutos (D08) deja una detección por parada y `CaidaCombustibleDetectada`, con el `viajeId` si el tracto está `EN_VIAJE`. Un mensaje que no cumple el contrato va a la DLQ.

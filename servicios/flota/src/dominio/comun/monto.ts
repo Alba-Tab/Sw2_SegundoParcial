@@ -32,6 +32,10 @@ export class Monto {
     return Monto.bob(this.valor.times(factor));
   }
 
+  esPositivo(): boolean {
+    return this.valor.greaterThan(0);
+  }
+
   aContrato(): { monto: string; moneda: 'BOB' } {
     return { monto: this.valor.toFixed(2), moneda: this.moneda };
   }

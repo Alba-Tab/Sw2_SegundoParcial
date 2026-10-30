@@ -29,7 +29,9 @@ describe('Flota (Mongo rs0 + RabbitMQ)', () => {
     process.env.TEMPORAL_WORKER = 'false';
     // La topología real viene de plataforma/compose/rabbitmq; aquí basta la cola del consumidor.
     const admin = await amqp.connect(rabbit.getAmqpUrl());
-    await (await admin.createChannel()).assertQueue('flota.eventos', { durable: true });
+    const canalAdmin = await admin.createChannel();
+    await canalAdmin.assertQueue('flota.eventos', { durable: true });
+    await canalAdmin.assertQueue('flota.sensor', { durable: true });
     await admin.close();
     const { AppModule } = await import('../../src/app.module');
     const { WorkerModule } = await import('../../src/worker.module');

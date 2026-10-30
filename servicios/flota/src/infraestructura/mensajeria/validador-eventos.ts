@@ -28,6 +28,12 @@ export class ValidadorEventos {
     }
   }
 
+  /** Un mensaje sin sobre (LecturaSensorCombustible): true si cumple su esquema. */
+  mensajeValido(tipo: string, version: number, mensaje: unknown): boolean {
+    const v = this.ajv.getSchema(`${BASE}/eventos/flota/${tipo}.v${version}.schema.json`);
+    return !!v && (v(mensaje) as boolean);
+  }
+
   validar(tipo: string, version: number, sobre: unknown): void {
     const v = this.ajv.getSchema(`${BASE}/eventos/flota/${tipo}.v${version}.schema.json`);
     if (!v) throw new Error(`No hay contrato para ${tipo} v${version}`);

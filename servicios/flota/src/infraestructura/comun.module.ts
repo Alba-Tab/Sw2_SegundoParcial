@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { LoggerModule } from 'nestjs-pino';
 import { CHOFER_REPOSITORIO } from '../aplicacion/puertos/chofer-repositorio';
+import { COMBUSTIBLE_REPOSITORIO } from '../aplicacion/puertos/combustible-repositorio';
 import { INBOX } from '../aplicacion/puertos/inbox';
 import { REGISTRO_DE_EVENTOS } from '../aplicacion/puertos/registro-de-eventos';
 import { RELOJ } from '../aplicacion/puertos/reloj';
@@ -13,6 +14,7 @@ import { ConexionAmqp } from './mensajeria/conexion-amqp';
 import { ValidadorEventos } from './mensajeria/validador-eventos';
 import { opcionesLog } from './observabilidad/logger';
 import { ChoferRepositorioMongo, ReservaUnidadRepositorioMongo, UnidadRepositorioMongo } from './persistencia/colecciones-flota';
+import { CombustibleRepositorioMongo } from './persistencia/combustible-mongo';
 import { InboxMongo } from './persistencia/inbox-mongo';
 import { MongoUnidadDeTrabajo } from './persistencia/mongo-unidad-de-trabajo';
 import { RegistroDeEventosMongo } from './persistencia/registro-de-eventos-mongo';
@@ -26,6 +28,7 @@ const PUERTOS = [
   { provide: RESERVA_UNIDAD_REPOSITORIO, useClass: ReservaUnidadRepositorioMongo },
   { provide: INBOX, useClass: InboxMongo },
   { provide: RELOJ, useClass: RelojSistema },
+  { provide: COMBUSTIBLE_REPOSITORIO, useClass: CombustibleRepositorioMongo },
 ];
 
 /** Lo que comparten la API, el worker y la CLI: logs, Mongo, AMQP, la validación de eventos y los adaptadores de los puertos. */
@@ -35,6 +38,6 @@ const PUERTOS = [
     MongooseModule.forRootAsync({ useFactory: () => ({ uri: entorno().MONGO_URI, serverSelectionTimeoutMS: 5000 }) }),
   ],
   providers: [ConexionAmqp, ValidadorEventos, ...PUERTOS],
-  exports: [ConexionAmqp, ...PUERTOS.map((p) => p.provide)],
+  exports: [ConexionAmqp, ValidadorEventos, ...PUERTOS.map((p) => p.provide)],
 })
 export class ComunModule {}

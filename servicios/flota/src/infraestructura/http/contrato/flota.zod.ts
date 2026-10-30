@@ -164,3 +164,164 @@ export const ObtenerChoferResponse = zod.object({
   activo: zod.boolean(),
   disponible: zod.boolean().describe('false si tiene una reserva activa (D11).'),
 });
+
+/**
+ * @summary Cargas de combustible (jefe_flota, gerente, despachador; el chofer solo las suyas). Spec 009.
+ */
+export const listarCargasCombustibleQueryLimiteDefault = 20;
+export const listarCargasCombustibleQueryLimiteMax = 100;
+
+export const listarCargasCombustibleQueryCursorMax = 500;
+
+export const ListarCargasCombustibleQueryParams = zod.object({
+  tractoId: zod.uuid().optional(),
+  desde: zod.iso.datetime({ offset: true }).optional(),
+  hasta: zod.iso.datetime({ offset: true }).optional(),
+  limite: zod.int().min(1).max(listarCargasCombustibleQueryLimiteMax).default(listarCargasCombustibleQueryLimiteDefault),
+  cursor: zod.string().max(listarCargasCombustibleQueryCursorMax).optional().describe('Valor opaco devuelto en `siguienteCursor`.'),
+});
+
+export const listarCargasCombustibleResponseItemsItemPlacaRegExp = new RegExp('^[0-9]{3,4}[A-Z]{3}$');
+export const listarCargasCombustibleResponseItemsItemMontoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+export const listarCargasCombustibleResponseItemsItemPosicionLatMin = -90;
+export const listarCargasCombustibleResponseItemsItemPosicionLatMax = 90;
+
+export const listarCargasCombustibleResponseItemsItemPosicionLngMin = -180;
+export const listarCargasCombustibleResponseItemsItemPosicionLngMax = 180;
+
+export const ListarCargasCombustibleResponse = zod.object({
+  items: zod.array(
+    zod.object({
+      cargaId: zod.uuid(),
+      opId: zod.uuid(),
+      viajeId: zod.uuid(),
+      tractoId: zod.uuid(),
+      placa: zod.string().regex(listarCargasCombustibleResponseItemsItemPlacaRegExp),
+      choferId: zod.uuid(),
+      litros: zod.number(),
+      monto: zod.object({
+        monto: zod.string().regex(listarCargasCombustibleResponseItemsItemMontoMontoRegExp),
+        moneda: zod.enum(['BOB']),
+      }),
+      kilometraje: zod.number(),
+      registradaEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+      posicion: zod
+        .object({
+          lat: zod
+            .number()
+            .min(listarCargasCombustibleResponseItemsItemPosicionLatMin)
+            .max(listarCargasCombustibleResponseItemsItemPosicionLatMax),
+          lng: zod
+            .number()
+            .min(listarCargasCombustibleResponseItemsItemPosicionLngMin)
+            .max(listarCargasCombustibleResponseItemsItemPosicionLngMax),
+        })
+        .optional(),
+      fotoReciboEvidenciaId: zod.uuid().optional(),
+    }),
+  ),
+  siguienteCursor: zod.string().nullable(),
+});
+
+/**
+ * `Idempotency-Key` debe ser igual a `opId` (la autoridad es el índice único de opId). Un reenvío con el mismo cuerpo
+ * responde 201 con la carga existente; con otro cuerpo, 422 IDEMPOTENCIA_CUERPO_DISTINTO.
+ * @summary El chofer registra una carga de su viaje (spec 009); actualiza el odómetro y publica CargaCombustibleRegistrada.
+ */
+export const RegistrarCargaCombustibleHeader = zod.object({
+  'Idempotency-Key': zod.uuid().describe('UUID generado por el cliente, uno por intento (000 §4.1).'),
+});
+
+export const registrarCargaCombustibleBodyLitrosExclusiveMin = 0;
+
+export const registrarCargaCombustibleBodyMontoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+export const registrarCargaCombustibleBodyKilometrajeMin = 0;
+
+export const registrarCargaCombustibleBodyPosicionLatMin = -90;
+export const registrarCargaCombustibleBodyPosicionLatMax = 90;
+
+export const registrarCargaCombustibleBodyPosicionLngMin = -180;
+export const registrarCargaCombustibleBodyPosicionLngMax = 180;
+
+export const RegistrarCargaCombustibleBody = zod.object({
+  opId: zod.uuid(),
+  viajeId: zod.uuid(),
+  litros: zod
+    .number()
+    .gt(registrarCargaCombustibleBodyLitrosExclusiveMin)
+    .describe('Más que la capacidad del tanque responde 422 CARGA_EXCEDE_TANQUE.'),
+  monto: zod.object({
+    monto: zod.string().regex(registrarCargaCombustibleBodyMontoMontoRegExp),
+    moneda: zod.enum(['BOB']),
+  }),
+  kilometraje: zod
+    .number()
+    .min(registrarCargaCombustibleBodyKilometrajeMin)
+    .describe('Odómetro del tracto; menor que el actual responde 422 KILOMETRAJE_INVALIDO.'),
+  registradaEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+  posicion: zod
+    .object({
+      lat: zod.number().min(registrarCargaCombustibleBodyPosicionLatMin).max(registrarCargaCombustibleBodyPosicionLatMax),
+      lng: zod.number().min(registrarCargaCombustibleBodyPosicionLngMin).max(registrarCargaCombustibleBodyPosicionLngMax),
+    })
+    .optional(),
+  fotoReciboEvidenciaId: zod.uuid().optional(),
+});
+
+export const registrarCargaCombustibleResponsePlacaRegExp = new RegExp('^[0-9]{3,4}[A-Z]{3}$');
+export const registrarCargaCombustibleResponseMontoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+export const registrarCargaCombustibleResponsePosicionLatMin = -90;
+export const registrarCargaCombustibleResponsePosicionLatMax = 90;
+
+export const registrarCargaCombustibleResponsePosicionLngMin = -180;
+export const registrarCargaCombustibleResponsePosicionLngMax = 180;
+
+export const RegistrarCargaCombustibleResponse = zod.object({
+  cargaId: zod.uuid(),
+  opId: zod.uuid(),
+  viajeId: zod.uuid(),
+  tractoId: zod.uuid(),
+  placa: zod.string().regex(registrarCargaCombustibleResponsePlacaRegExp),
+  choferId: zod.uuid(),
+  litros: zod.number(),
+  monto: zod.object({
+    monto: zod.string().regex(registrarCargaCombustibleResponseMontoMontoRegExp),
+    moneda: zod.enum(['BOB']),
+  }),
+  kilometraje: zod.number(),
+  registradaEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+  posicion: zod
+    .object({
+      lat: zod.number().min(registrarCargaCombustibleResponsePosicionLatMin).max(registrarCargaCombustibleResponsePosicionLatMax),
+      lng: zod.number().min(registrarCargaCombustibleResponsePosicionLngMin).max(registrarCargaCombustibleResponsePosicionLngMax),
+    })
+    .optional(),
+  fotoReciboEvidenciaId: zod.uuid().optional(),
+});
+
+/**
+ * @summary Lecturas del sensor del tracto (jefe_flota, gerente); como máximo 24 h por consulta. Spec 009.
+ */
+export const ListarLecturasCombustibleParams = zod.object({
+  unidadId: zod.uuid(),
+});
+
+export const ListarLecturasCombustibleQueryParams = zod.object({
+  desde: zod.iso.datetime({ offset: true }),
+  hasta: zod.iso.datetime({ offset: true }).optional(),
+});
+
+export const listarLecturasCombustibleResponsePlacaRegExp = new RegExp('^[0-9]{3,4}[A-Z]{3}$');
+
+export const ListarLecturasCombustibleResponse = zod.object({
+  unidadId: zod.uuid(),
+  placa: zod.string().regex(listarLecturasCombustibleResponsePlacaRegExp),
+  capacidadLitros: zod.number().optional(),
+  items: zod.array(
+    zod.object({
+      nivelPct: zod.number(),
+      velocidadKmh: zod.number(),
+      medidoEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+    }),
+  ),
+});

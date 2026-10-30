@@ -10,6 +10,13 @@ import { LiberarPorCancelacion } from '../../src/aplicacion/reserva/liberar-por-
 import { LiberarPorEntrega } from '../../src/aplicacion/reserva/liberar-por-entrega';
 import { PonerEnViaje } from '../../src/aplicacion/reserva/poner-en-viaje';
 import { ActualizarChofer } from '../../src/aplicacion/chofer/actualizar-chofer';
+import { ProcesarLectura } from '../../src/aplicacion/combustible/procesar-lectura';
+import { RegistrarCarga } from '../../src/aplicacion/combustible/registrar-carga';
+import { COMBUSTIBLE_REPOSITORIO } from '../../src/aplicacion/puertos/combustible-repositorio';
+import { RELOJ } from '../../src/aplicacion/puertos/reloj';
+import { RESERVA_UNIDAD_REPOSITORIO } from '../../src/aplicacion/puertos/reserva-unidad-repositorio';
+import { UNIDAD_REPOSITORIO } from '../../src/aplicacion/puertos/unidad-repositorio';
+import { CARGAS, DETECCIONES, LECTURAS } from '../../src/infraestructura/persistencia/combustible-mongo';
 import { CHOFER_REPOSITORIO } from '../../src/aplicacion/puertos/chofer-repositorio';
 import { REGISTRO_DE_EVENTOS } from '../../src/aplicacion/puertos/registro-de-eventos';
 import { UNIDAD_DE_TRABAJO } from '../../src/aplicacion/puertos/unidad-de-trabajo';
@@ -81,6 +88,8 @@ describe('Reservas de la saga (Mongo rs0)', () => {
   let enViaje: PonerEnViaje;
   let finDeViaje: LiberarPorEntrega;
   let actualizarChofer: ActualizarChofer;
+  let registrarCarga: RegistrarCarga;
+  let lecturas: ProcesarLectura;
 
   const reservar = (servicioId: string, tipoCarga = 'GRANOS', toneladas = 28) =>
     flota['Flota.reservarUnidad']({ servicioId, viajeId: uuid7(), tipoCarga: tipoCarga as never, toneladas, fechaViaje: '2026-11-10' });
@@ -111,6 +120,16 @@ describe('Reservas de la saga (Mongo rs0)', () => {
     enViaje = app.get(PonerEnViaje);
     finDeViaje = app.get(LiberarPorEntrega);
     actualizarChofer = new ActualizarChofer(app.get(UNIDAD_DE_TRABAJO), app.get(CHOFER_REPOSITORIO), app.get(REGISTRO_DE_EVENTOS));
+    registrarCarga = new RegistrarCarga(
+      app.get(UNIDAD_DE_TRABAJO),
+      app.get(COMBUSTIBLE_REPOSITORIO),
+      app.get(RESERVA_UNIDAD_REPOSITORIO),
+      app.get(UNIDAD_REPOSITORIO),
+      app.get(CHOFER_REPOSITORIO),
+      app.get(REGISTRO_DE_EVENTOS),
+      app.get(RELOJ),
+    );
+    lecturas = app.get(ProcesarLectura);
     cerrar = () => app.close();
   }, 180_000);
 
@@ -120,7 +139,11 @@ describe('Reservas de la saga (Mongo rs0)', () => {
   }, 60_000);
 
   beforeEach(async () => {
-    await Promise.all([UNIDADES, CHOFERES, RESERVAS, INBOX_EVENTOS, 'outboxEventos'].map((c) => conexion.collection(c).deleteMany({})));
+    await Promise.all(
+      [UNIDADES, CHOFERES, RESERVAS, INBOX_EVENTOS, 'outboxEventos', CARGAS, LECTURAS, DETECCIONES].map((c) =>
+        conexion.collection(c).deleteMany({}),
+      ),
+    );
     await conexion
       .collection(UNIDADES)
       .insertMany([
@@ -276,5 +299,98 @@ describe('Reservas de la saga (Mongo rs0)', () => {
     expect((await conexion.collection(CHOFERES).findOne({ _id: ID.ch3 as never }))?.licenciaVenceEl).toBe('2028-06-30');
     const e = await conexion.collection('outboxEventos').findOne({ tipo: 'ChoferActualizado' });
     expect(e?.sobre).toMatchObject({ productor: 'flota', datos: { choferId: ID.ch3, versionAgregado: 2, licenciaVenceEl: '2028-06-30' } });
+  });
+
+  it('la carga actualiza el odómetro, publica el evento y es idempotente por opId (spec 009)', async () => {
+    const servicio = uuid7();
+    const viajeId = uuid7();
+    const r = await flota['Flota.reservarUnidad']({
+      servicioId: servicio,
+      viajeId,
+      tipoCarga: 'GRANOS',
+      toneladas: 28,
+      fechaViaje: '2026-11-10',
+    });
+    const chofer1 = { sub: `sub-${ID.ch1}`, roles: ['chofer'] };
+    const opId = uuid7();
+    const cuerpo = {
+      opId,
+      viajeId,
+      litros: 180.5,
+      monto: { monto: '675.07', moneda: 'BOB' },
+      kilometraje: 184320,
+      registradaEn: new Date().toISOString(),
+    };
+    const c = await registrarCarga.ejecutar(chofer1, opId, cuerpo, 'h1');
+    expect(c).toMatchObject({ tractoId: r.tractoId, placa: '4521KTR', choferId: ID.ch1, litros: 180.5 });
+    expect(await registrarCarga.ejecutar(chofer1, opId, cuerpo, 'h1')).toEqual(c);
+    expect(await conexion.collection(CARGAS).countDocuments()).toBe(1);
+    expect((await conexion.collection(UNIDADES).findOne({ _id: ID.t2 as never }))?.kilometraje).toBe(184320);
+    expect(await conexion.collection('outboxEventos').countDocuments({ tipo: 'CargaCombustibleRegistrada' })).toBe(1);
+
+    const codigo = (p: Promise<unknown>) =>
+      p.then(
+        () => 'OK',
+        (e: { codigo: string }) => e.codigo,
+      );
+    expect(await codigo(registrarCarga.ejecutar(chofer1, opId, { ...cuerpo, litros: 10 }, 'h2'))).toBe('IDEMPOTENCIA_CUERPO_DISTINTO');
+    const otro = uuid7();
+    expect(await codigo(registrarCarga.ejecutar(chofer1, otro, { ...cuerpo, opId: otro, kilometraje: 184100 }, 'h3'))).toBe(
+      'KILOMETRAJE_INVALIDO',
+    );
+    expect(await codigo(registrarCarga.ejecutar(chofer1, otro, { ...cuerpo, opId: otro, litros: 650 }, 'h4'))).toBe('CARGA_EXCEDE_TANQUE');
+    expect(await codigo(registrarCarga.ejecutar({ sub: 'otro', roles: ['chofer'] }, otro, { ...cuerpo, opId: otro }, 'h5'))).toBe(
+      'SIN_PERMISO',
+    );
+    expect(await codigo(registrarCarga.ejecutar(chofer1, uuid7(), { ...cuerpo, opId: otro }, 'h6'))).toBe('VALIDACION');
+  });
+
+  it('el sensor detecta una sola caída por parada (robo) con el viaje del tracto (FF1)', async () => {
+    const servicio = uuid7();
+    const viajeId = uuid7();
+    const r = await flota['Flota.reservarUnidad']({
+      servicioId: servicio,
+      viajeId,
+      tipoCarga: 'GRANOS',
+      toneladas: 28,
+      fechaViaje: '2026-11-10',
+    });
+    await enViaje.ejecutar({
+      id: uuid7(),
+      tipo: 'ViajeIniciado',
+      datos: { servicioId: servicio, tractoId: r.tractoId, remolqueId: r.remolqueId },
+    });
+    const t0 = Date.now() - 120_000;
+    const lectura = (seg: number, nivelPct: number, velocidadKmh = 0) => ({
+      placa: '4521KTR',
+      nivelPct,
+      velocidadKmh,
+      medidoEn: new Date(t0 + seg * 1000).toISOString(),
+    });
+    const resultados = [];
+    for (const [seg, nivel, vel] of [
+      [0, 52, 50],
+      [10, 50, 0],
+      [20, 48, 0],
+      [30, 46, 0],
+      [40, 44, 0],
+      [50, 42, 0],
+      [60, 40, 0],
+    ] as const) {
+      resultados.push(await lecturas.ejecutar(lectura(seg, nivel, vel)));
+    }
+    expect(resultados).toEqual(['GUARDADA', 'GUARDADA', 'GUARDADA', 'GUARDADA', 'GUARDADA', 'CAIDA', 'GUARDADA']);
+    expect(await lecturas.ejecutar(lectura(60, 40))).toBe('REPETIDA');
+    expect(await lecturas.ejecutar({ ...lectura(70, 40), placa: '9999ZZZ' })).toBe('PLACA_DESCONOCIDA');
+    const e = await conexion.collection('outboxEventos').findOne({ tipo: 'CaidaCombustibleDetectada' });
+    expect(e?.sobre.datos).toMatchObject({
+      placa: '4521KTR',
+      viajeId,
+      nivelAnteriorPct: 50,
+      nivelActualPct: 42,
+      caidaPct: 8,
+      velocidadKmh: 0,
+    });
+    expect(await conexion.collection('outboxEventos').countDocuments({ tipo: 'CaidaCombustibleDetectada' })).toBe(1);
   });
 });
