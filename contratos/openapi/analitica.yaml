@@ -1,0 +1,1301 @@
+openapi: 3.0.3
+info:
+  title: API de Analítica
+  version: 1.0.0
+  description: |
+    Servicio de apoyo (Python, FastAPI): modelo de lectura (CQRS) alimentado por eventos, alertas del Centro de
+    Control (spec 013), predicción de retraso y anomalías de combustible, reportes y Excel (spec 015), acciones
+    propuestas y misiones del agente (spec 014) y consulta por voz. Lo llaman el Gateway (token intercambiado con
+    audiencia `analitica`) y el servidor MCP. Toda escritura lleva `Idempotency-Key`; la autoridad es la tabla
+    `operacion_idempotente` (000 §4.1). `preguntar` no cambia estado y no lleva clave (spec 015).
+servers:
+  - url: http://localhost:8104
+    description: Local
+security:
+  - bearer: []
+tags:
+  - name: salud
+  - name: alertas
+  - name: predicciones
+  - name: conduccion
+  - name: reportes
+  - name: exportaciones
+  - name: voz
+  - name: acciones
+  - name: agente
+paths:
+  /health:
+    get:
+      tags: [salud]
+      operationId: salud
+      summary: El proceso está vivo.
+      security: []
+      responses:
+        '200':
+          $ref: './comun.yaml#/components/responses/Salud'
+  /health/ready:
+    get:
+      tags: [salud]
+      operationId: saludLista
+      summary: PostgreSQL y RabbitMQ listos; informa si los modelos de ML están cargados. No depende de Keycloak (P10).
+      security: []
+      responses:
+        '200':
+          $ref: './comun.yaml#/components/responses/Salud'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+
+  # ------------------------------------------------------------------ alertas (spec 013)
+  /api/v1/alertas:
+    get:
+      tags: [alertas]
+      operationId: listarAlertas
+      summary: Alertas cuyos roles comparten al menos uno con el token, en orden de secuencia (despachador, jefe_flota, administracion, gerente).
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/Cursor'
+        - $ref: './comun.yaml#/components/parameters/Limite'
+        - name: estado
+          in: query
+          required: false
+          description: Sin estado, las abiertas y las cerradas en las últimas 24 h (D83).
+          schema:
+            $ref: '#/components/schemas/EstadoAlerta'
+      responses:
+        '200':
+          description: Página de alertas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaAlertas'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/alertas/{alertaId}/atencion:
+    post:
+      tags: [alertas]
+      operationId: atenderAlerta
+      summary: Marca la alerta ATENDIDA. Solo un rol de la alerta, salvo gerente (solo lectura).
+      parameters:
+        - $ref: '#/components/parameters/AlertaId'
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+        - $ref: './comun.yaml#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AtencionAlerta'
+      responses:
+        '200':
+          description: Alerta atendida.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Alerta'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+
+  # ------------------------------------------------------------------ ML (spec 013)
+  /api/v1/predicciones/retraso/{viajeId}:
+    get:
+      tags: [predicciones]
+      operationId: obtenerRiesgoRetraso
+      summary: Probabilidad de retraso del viaje (despachador, gerente, agente_lectura). Recalcula si tiene más de 5 min.
+      parameters:
+        - name: viajeId
+          in: path
+          required: true
+          schema:
+            $ref: './comun.yaml#/components/schemas/Uuid'
+      responses:
+        '200':
+          description: Predicción vigente.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RiesgoRetraso'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/anomalias-combustible:
+    get:
+      tags: [predicciones]
+      operationId: listarAnomaliasCombustible
+      summary: Cargas marcadas como anomalía por Isolation Forest (jefe_flota, gerente, agente_lectura).
+      parameters:
+        - name: desde
+          in: query
+          required: true
+          schema:
+            $ref: './comun.yaml#/components/schemas/Fecha'
+        - name: hasta
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/Fecha'
+        - name: limite
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+      responses:
+        '200':
+          description: Anomalías, de la más nueva a la más vieja.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [anomalias]
+                properties:
+                  anomalias:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/AnomaliaCombustible'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/conduccion:
+    get:
+      tags: [conduccion]
+      operationId: listarPuntajesConduccion
+      summary: Puntaje de conducción por chofer en la semana y por viaje (jefe_flota, gerente; D84).
+      parameters:
+        - name: choferId
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/Uuid'
+        - name: desde
+          in: query
+          required: false
+          description: Inicio de la semana; por defecto hoy − 6 días.
+          schema:
+            $ref: './comun.yaml#/components/schemas/Fecha'
+      responses:
+        '200':
+          description: Puntajes.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PuntajesConduccion'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+
+  # ------------------------------------------------------------------ reportes (spec 015)
+  /api/v1/reportes:
+    get:
+      tags: [reportes]
+      operationId: listarReportes
+      summary: Catálogo de los 5 reportes con sus parámetros y roles (todo rol interno).
+      responses:
+        '200':
+          description: Catálogo.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [reportes]
+                properties:
+                  reportes:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/DescripcionReporte'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+  /api/v1/reportes/{reporteId}:
+    get:
+      tags: [reportes]
+      operationId: ejecutarReporte
+      summary: Corre el reporte con los parámetros por consulta; números calculados en código (roles de cada reporte).
+      parameters:
+        - $ref: '#/components/parameters/ReporteId'
+        - $ref: '#/components/parameters/Desde'
+        - $ref: '#/components/parameters/Hasta'
+        - name: clienteId
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/Uuid'
+        - name: rutaId
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/Uuid'
+        - name: placa
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/Placa'
+        - name: umbral
+          in: query
+          required: false
+          description: Solo VIAJES_EN_RIESGO.
+          schema:
+            type: number
+            minimum: 0.5
+            maximum: 0.95
+            default: 0.7
+        - name: agrupar
+          in: query
+          required: false
+          description: Solo RENTABILIDAD.
+          schema:
+            type: string
+            enum: [VIAJE, RUTA]
+            default: VIAJE
+        - name: incluirVencidas
+          in: query
+          required: false
+          description: Solo CUENTAS_POR_COBRAR.
+          schema:
+            type: boolean
+            default: true
+      responses:
+        '200':
+          description: Resultado del reporte (máximo 500 filas, D93).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReporteResultado'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+
+  /api/v1/exportaciones:
+    post:
+      tags: [exportaciones]
+      operationId: crearExportacion
+      summary: Genera el Excel del reporte (hojas "Datos" y "Parámetros") y lo guarda 10 min (D21, D96).
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+        - $ref: './comun.yaml#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ExportacionNueva'
+      responses:
+        '201':
+          description: Exportación lista.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Exportacion'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/exportaciones/{exportacionId}/archivo:
+    get:
+      tags: [exportaciones]
+      operationId: obtenerArchivoExportacion
+      summary: El archivo, solo con el token de servicio del gateway y el sub de quien la creó en X-Solicitante-Sub.
+      parameters:
+        - name: exportacionId
+          in: path
+          required: true
+          schema:
+            $ref: './comun.yaml#/components/schemas/Uuid'
+        - name: X-Solicitante-Sub
+          in: header
+          required: true
+          schema:
+            $ref: './comun.yaml#/components/schemas/Sub'
+      responses:
+        '200':
+          description: Libro de Excel.
+          headers:
+            Content-Disposition:
+              description: '`attachment; filename="<reporte>-<fecha>.xlsx"`'
+              schema:
+                type: string
+          content:
+            application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          description: No existe o venció (`EXPORTACION_VENCIDA`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: './comun.yaml#/components/schemas/Problema'
+
+  # ------------------------------------------------------------------ voz (spec 015)
+  /api/v1/voz/preguntas:
+    post:
+      tags: [voz]
+      operationId: preguntar
+      summary: Pregunta en lenguaje natural → intención validada en código → reporte por el MCP → respuesta redactada. Sin Idempotency-Key (no cambia estado).
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Pregunta'
+      responses:
+        '200':
+          description: Respuesta o aclaración.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaVoz'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/voz/interpretaciones:
+    post:
+      tags: [voz]
+      operationId: interpretarPregunta
+      summary: Plan B de K1 (VOZ_CADENA=DOS_SALTOS) — solo la intención validada, o la aclaración.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Pregunta'
+      responses:
+        '200':
+          description: Intención validada o aclaración.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Interpretacion'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/voz/redacciones:
+    post:
+      tags: [voz]
+      operationId: redactarRespuesta
+      summary: Plan B de K1 — redacta el texto con el resultado del reporte; cada número debe estar en filas o totales.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Redaccion'
+      responses:
+        '200':
+          description: Respuesta completa.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RespuestaVoz'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+
+  # ------------------------------------------------------------------ acciones y agente (spec 014)
+  /api/v1/acciones:
+    get:
+      tags: [acciones]
+      operationId: listarAcciones
+      summary: Acciones propuestas por el agente (despachador, gerente).
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/EstadoAccion'
+        - $ref: './comun.yaml#/components/parameters/Cursor'
+        - $ref: './comun.yaml#/components/parameters/Limite'
+      responses:
+        '200':
+          description: Página de acciones, de la más nueva a la más vieja.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaAcciones'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+    post:
+      tags: [acciones]
+      operationId: crearAccionPropuesta
+      summary: Solo agente_lectura (por el MCP). Una por (tipo, viajeId) salvo ARCHIVADA; repetida → la existente con creada = false.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+        - $ref: './comun.yaml#/components/parameters/CorrelationId'
+        - name: X-Mision-Id
+          in: header
+          required: false
+          description: Misión que la propone (para el límite de 3 por misión, D86).
+          schema:
+            $ref: './comun.yaml#/components/schemas/Uuid'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccionNueva'
+      responses:
+        '200':
+          description: Ya existía una acción para ese viaje.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultadoPropuesta'
+        '201':
+          description: Acción creada PENDIENTE con su alerta ACCION_PROPUESTA.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResultadoPropuesta'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+  /api/v1/acciones/{accionId}:
+    get:
+      tags: [acciones]
+      operationId: obtenerAccion
+      summary: Detalle de una acción con su evidencia (despachador, gerente).
+      parameters:
+        - $ref: '#/components/parameters/AccionId'
+      responses:
+        '200':
+          description: Acción.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccionPropuesta'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+  /api/v1/acciones/{accionId}/aprobacion:
+    post:
+      tags: [acciones]
+      operationId: aprobarAccion
+      summary: Solo despachador. PENDIENTE → APROBADA y AvisoClienteAprobado en el Outbox, en una transacción.
+      parameters:
+        - $ref: '#/components/parameters/AccionId'
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+        - $ref: './comun.yaml#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AprobacionAccion'
+      responses:
+        '200':
+          description: Acción aprobada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccionPropuesta'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+  /api/v1/acciones/{accionId}/rechazo:
+    post:
+      tags: [acciones]
+      operationId: rechazarAccion
+      summary: Solo despachador. PENDIENTE → RECHAZADA.
+      parameters:
+        - $ref: '#/components/parameters/AccionId'
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+        - $ref: './comun.yaml#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RechazoAccion'
+      responses:
+        '200':
+          description: Acción rechazada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccionPropuesta'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+
+  /api/v1/agente/misiones:
+    get:
+      tags: [agente]
+      operationId: listarMisiones
+      summary: Misiones del agente, de la más nueva a la más vieja (despachador, gerente).
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/Limite'
+      responses:
+        '200':
+          description: Misiones.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [misiones]
+                properties:
+                  misiones:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Mision'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+    post:
+      tags: [agente]
+      operationId: dispararMision
+      summary: Dispara "vigilar viajes" a mano (despachador, gerente). 409 si hay una EN_CURSO; 503 LLM_NO_DISPONIBLE si el LLM no responde.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+        - $ref: './comun.yaml#/components/parameters/CorrelationId'
+      responses:
+        '202':
+          description: Misión aceptada.
+          headers:
+            Location:
+              $ref: './comun.yaml#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [misionId]
+                properties:
+                  misionId:
+                    $ref: './comun.yaml#/components/schemas/Uuid'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/agente/misiones/{misionId}:
+    get:
+      tags: [agente]
+      operationId: obtenerMision
+      summary: Una misión con sus pasos (despachador, gerente).
+      parameters:
+        - name: misionId
+          in: path
+          required: true
+          schema:
+            $ref: './comun.yaml#/components/schemas/Uuid'
+      responses:
+        '200':
+          description: Misión.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mision'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+
+components:
+  securitySchemes:
+    bearer:
+      $ref: './comun.yaml#/components/securitySchemes/bearer'
+
+  parameters:
+    AlertaId:
+      name: alertaId
+      in: path
+      required: true
+      schema:
+        $ref: './comun.yaml#/components/schemas/Uuid'
+    AccionId:
+      name: accionId
+      in: path
+      required: true
+      schema:
+        $ref: './comun.yaml#/components/schemas/Uuid'
+    ReporteId:
+      name: reporteId
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/ReporteId'
+    Desde:
+      name: desde
+      in: query
+      required: false
+      description: Obligatorio salvo en VIAJES_EN_RIESGO.
+      schema:
+        $ref: './comun.yaml#/components/schemas/Fecha'
+    Hasta:
+      name: hasta
+      in: query
+      required: false
+      description: Obligatorio salvo en VIAJES_EN_RIESGO. Rango ≤ 92 días (≤ 366 en facturación y rentabilidad).
+      schema:
+        $ref: './comun.yaml#/components/schemas/Fecha'
+
+  schemas:
+    Rol:
+      type: string
+      enum: [despachador, jefe_flota, administracion, gerente]
+
+    # --- alertas
+    TipoAlerta:
+      type: string
+      enum:
+        - ENTREGA_OBSERVADA
+        - ENTREGA_RECHAZADA
+        - VIAJE_REQUIERE_INTERVENCION
+        - MANTENIMIENTO_REQUERIDO
+        - CAIDA_COMBUSTIBLE
+        - ANOMALIA_COMBUSTIBLE
+        - RIESGO_RETRASO
+        - ACCION_PROPUESTA
+    EstadoAlerta:
+      type: string
+      enum: [ABIERTA, ATENDIDA, RESUELTA]
+    Alerta:
+      type: object
+      required: [alertaId, secuencia, tipo, severidad, roles, titulo, detalle, entidad, enlace, estado, creadaEn, origen]
+      properties:
+        alertaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        secuencia:
+          type: integer
+          format: int64
+        tipo:
+          $ref: '#/components/schemas/TipoAlerta'
+        severidad:
+          type: string
+          enum: [MEDIA, ALTA, CRITICA]
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Rol'
+        titulo:
+          type: string
+        detalle:
+          type: string
+        entidad:
+          type: object
+          required: [tipo, id]
+          properties:
+            tipo:
+              type: string
+              enum: [VIAJE, UNIDAD, CARGA, ACCION]
+            id:
+              type: string
+        enlace:
+          type: string
+          description: Ruta en la app que corresponde (cc-operaciones, cc-flota, cc-finanzas), por URL (propuesta 6.1).
+        estado:
+          $ref: '#/components/schemas/EstadoAlerta'
+        creadaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        actualizadaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        origen:
+          type: string
+          description: Evento, modelo o misión que la creó.
+        atendidaPor:
+          $ref: './comun.yaml#/components/schemas/Sub'
+        nota:
+          type: string
+          maxLength: 300
+    PaginaAlertas:
+      type: object
+      required: [alertas, datosAl]
+      properties:
+        alertas:
+          type: array
+          items:
+            $ref: '#/components/schemas/Alerta'
+        siguienteCursor:
+          type: string
+          nullable: true
+        abiertas:
+          type: integer
+          description: Total de alertas ABIERTA visibles para el token (la cifra de la campana).
+        datosAl:
+          $ref: '#/components/schemas/DatosAl'
+    AtencionAlerta:
+      type: object
+      additionalProperties: false
+      properties:
+        nota:
+          type: string
+          maxLength: 300
+    DatosAl:
+      type: string
+      format: date-time
+      nullable: true
+      description: Mayor `ocurridoEn` procesado por el modelo de lectura (propuesta 4.2).
+
+    # --- ML
+    RiesgoRetraso:
+      type: object
+      required: [viajeId, probabilidad, umbral, enRiesgo, calculadaEn, modeloVersion, factores]
+      properties:
+        viajeId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        probabilidad:
+          type: number
+          minimum: 0
+          maximum: 1
+        umbral:
+          type: number
+          example: 0.7
+        enRiesgo:
+          type: boolean
+        calculadaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        modeloVersion:
+          type: string
+        factores:
+          type: array
+          maxItems: 3
+          items:
+            type: object
+            required: [nombre, aporte]
+            properties:
+              nombre:
+                type: string
+              aporte:
+                type: number
+    AnomaliaCombustible:
+      type: object
+      required: [cargaId, placa, litros, kmPorLitro, puntaje, registradaEn]
+      properties:
+        cargaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        placa:
+          $ref: './comun.yaml#/components/schemas/Placa'
+        viajeId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        litros:
+          type: number
+        kmPorLitro:
+          type: number
+        puntaje:
+          type: number
+        registradaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+    PuntajesConduccion:
+      type: object
+      required: [desde, hasta, choferes, viajes, datosAl]
+      properties:
+        desde:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+        hasta:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+        choferes:
+          type: array
+          items:
+            $ref: '#/components/schemas/PuntajeConduccion'
+        viajes:
+          type: array
+          items:
+            allOf:
+              - $ref: '#/components/schemas/PuntajeConduccion'
+              - type: object
+                required: [viajeId]
+                properties:
+                  viajeId:
+                    $ref: './comun.yaml#/components/schemas/Uuid'
+        datosAl:
+          $ref: '#/components/schemas/DatosAl'
+    PuntajeConduccion:
+      type: object
+      required: [choferId, frenadas, fatigas, km, puntaje]
+      properties:
+        choferId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        nombre:
+          type: string
+        frenadas:
+          type: integer
+        fatigas:
+          type: integer
+        km:
+          type: number
+        puntaje:
+          type: number
+          minimum: 0
+          maximum: 100
+          description: max(0, 100 − 10 × (frenadas + 2 × fatigas) × 100 / km) (D84).
+
+    # --- reportes
+    ReporteId:
+      type: string
+      enum: [CUENTAS_POR_COBRAR, VIAJES_EN_RIESGO, FACTURACION_POR_CLIENTE, CONSUMO_COMBUSTIBLE, RENTABILIDAD]
+    ParametrosReporte:
+      type: object
+      additionalProperties: false
+      properties:
+        desde:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+        hasta:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+        clienteId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        rutaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        placa:
+          $ref: './comun.yaml#/components/schemas/Placa'
+        umbral:
+          type: number
+          minimum: 0.5
+          maximum: 0.95
+        agrupar:
+          type: string
+          enum: [VIAJE, RUTA]
+        incluirVencidas:
+          type: boolean
+    DescripcionReporte:
+      type: object
+      required: [reporteId, titulo, descripcion, roles, parametros]
+      properties:
+        reporteId:
+          $ref: '#/components/schemas/ReporteId'
+        titulo:
+          type: string
+        descripcion:
+          type: string
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Rol'
+        maxDias:
+          type: integer
+          nullable: true
+        parametros:
+          type: object
+          description: JSON Schema de los parámetros.
+    Columna:
+      type: object
+      required: [clave, titulo, tipo]
+      properties:
+        clave:
+          type: string
+        titulo:
+          type: string
+        tipo:
+          type: string
+          enum: [TEXTO, MONTO, NUMERO, PORCENTAJE, FECHA, INSTANTE, BOOLEANO]
+    ReporteResultado:
+      type: object
+      required: [reporteId, titulo, parametros, columnas, filas, totales, grafico, datosAl]
+      properties:
+        reporteId:
+          $ref: '#/components/schemas/ReporteId'
+        titulo:
+          type: string
+        parametros:
+          $ref: '#/components/schemas/ParametrosReporte'
+        columnas:
+          type: array
+          items:
+            $ref: '#/components/schemas/Columna'
+        filas:
+          type: array
+          maxItems: 500
+          items:
+            type: object
+            description: Una propiedad por `clave` de columna. Los montos van como texto con 2 decimales.
+            additionalProperties: true
+        totales:
+          type: object
+          additionalProperties: true
+        grafico:
+          type: object
+          required: [tipo, ejeX, series]
+          properties:
+            tipo:
+              type: string
+              enum: [BARRAS, BARRAS_APILADAS]
+            ejeX:
+              type: string
+              description: Clave de la columna del eje X.
+            series:
+              type: array
+              items:
+                type: object
+                required: [clave, titulo]
+                properties:
+                  clave:
+                    type: string
+                  titulo:
+                    type: string
+        datosAl:
+          $ref: '#/components/schemas/DatosAl'
+    ExportacionNueva:
+      type: object
+      required: [reporteId]
+      additionalProperties: false
+      properties:
+        reporteId:
+          $ref: '#/components/schemas/ReporteId'
+        parametros:
+          $ref: '#/components/schemas/ParametrosReporte'
+    Exportacion:
+      type: object
+      required: [exportacionId, nombreArchivo, expiraEn]
+      properties:
+        exportacionId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        nombreArchivo:
+          type: string
+          example: cuentas-por-cobrar-2026-11-03.xlsx
+        expiraEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+
+    # --- voz
+    Pregunta:
+      type: object
+      required: [texto]
+      additionalProperties: false
+      properties:
+        texto:
+          type: string
+          minLength: 3
+          maxLength: 300
+    Opcion:
+      type: object
+      required: [etiqueta, reporteId, parametros]
+      properties:
+        etiqueta:
+          type: string
+        reporteId:
+          $ref: '#/components/schemas/ReporteId'
+        parametros:
+          $ref: '#/components/schemas/ParametrosReporte'
+    Interpretacion:
+      type: object
+      required: [tipo]
+      properties:
+        tipo:
+          type: string
+          enum: [INTENCION, ACLARACION]
+        reporteId:
+          $ref: '#/components/schemas/ReporteId'
+        parametros:
+          $ref: '#/components/schemas/ParametrosReporte'
+        texto:
+          type: string
+          description: Solo en ACLARACION.
+        opciones:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/Opcion'
+    Redaccion:
+      type: object
+      required: [pregunta, resultado]
+      additionalProperties: false
+      properties:
+        pregunta:
+          type: string
+          minLength: 3
+          maxLength: 300
+        resultado:
+          $ref: '#/components/schemas/ReporteResultado'
+    RespuestaVoz:
+      type: object
+      required: [tipo, texto]
+      properties:
+        tipo:
+          type: string
+          enum: [RESPUESTA, ACLARACION]
+        texto:
+          type: string
+        reporteId:
+          $ref: '#/components/schemas/ReporteId'
+        parametros:
+          $ref: '#/components/schemas/ParametrosReporte'
+        resultado:
+          $ref: '#/components/schemas/ReporteResultado'
+        opciones:
+          type: array
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/Opcion'
+        exportable:
+          type: boolean
+
+    # --- acciones y agente
+    EstadoAccion:
+      type: string
+      enum: [PENDIENTE, APROBADA, EJECUTADA, RECHAZADA, ARCHIVADA]
+    Evidencia:
+      type: object
+      required: [fuente, referencia, resumen]
+      additionalProperties: false
+      properties:
+        fuente:
+          type: string
+          maxLength: 60
+        referencia:
+          type: string
+          maxLength: 100
+        resumen:
+          type: string
+          maxLength: 300
+    AccionNueva:
+      type: object
+      required: [tipo, viajeId, destinatario, mensaje, evidencia]
+      additionalProperties: false
+      properties:
+        tipo:
+          type: string
+          enum: [AVISAR_CLIENTE_RETRASO]
+        viajeId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        destinatario:
+          type: object
+          required: [clienteId]
+          additionalProperties: false
+          properties:
+            clienteId:
+              $ref: './comun.yaml#/components/schemas/Uuid'
+        mensaje:
+          type: string
+          minLength: 20
+          maxLength: 600
+        evidencia:
+          type: array
+          minItems: 1
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/Evidencia'
+    ResultadoPropuesta:
+      type: object
+      required: [accionId, estado, creada]
+      properties:
+        accionId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        estado:
+          $ref: '#/components/schemas/EstadoAccion'
+        creada:
+          type: boolean
+        alertaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    AccionPropuesta:
+      type: object
+      required: [accionId, tipo, viajeId, clienteId, mensaje, evidencia, estado, creadaEn]
+      properties:
+        accionId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        tipo:
+          type: string
+          enum: [AVISAR_CLIENTE_RETRASO]
+        viajeId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        servicioId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        clienteId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        razonSocial:
+          type: string
+        mensaje:
+          type: string
+        evidencia:
+          type: array
+          items:
+            $ref: '#/components/schemas/Evidencia'
+        estado:
+          $ref: '#/components/schemas/EstadoAccion'
+        misionId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        creadaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        decididaPor:
+          $ref: './comun.yaml#/components/schemas/Sub'
+        decididaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        motivoRechazo:
+          type: string
+    PaginaAcciones:
+      type: object
+      required: [acciones]
+      properties:
+        acciones:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccionPropuesta'
+        siguienteCursor:
+          type: string
+          nullable: true
+    AprobacionAccion:
+      type: object
+      required: [mensaje]
+      additionalProperties: false
+      properties:
+        mensaje:
+          type: string
+          minLength: 10
+          maxLength: 1000
+    RechazoAccion:
+      type: object
+      additionalProperties: false
+      properties:
+        motivo:
+          type: string
+          maxLength: 300
+    Mision:
+      type: object
+      required: [misionId, estado, origen, iniciadaEn, pasos]
+      properties:
+        misionId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        estado:
+          type: string
+          enum: [EN_CURSO, COMPLETADA, AGOTADA, SALTADA, FALLIDA]
+        origen:
+          type: string
+          enum: [PROGRAMADA, MANUAL]
+        disparadaPor:
+          $ref: './comun.yaml#/components/schemas/Sub'
+        iniciadaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        terminadaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        codigo:
+          type: string
+          description: Motivo de SALTADA o FALLIDA (por ejemplo LLM_NO_DISPONIBLE).
+        traceId:
+          type: string
+        accionesCreadas:
+          type: integer
+        pasos:
+          type: array
+          items:
+            type: object
+            required: [numero, herramienta, ms]
+            properties:
+              numero:
+                type: integer
+              herramienta:
+                type: string
+              argumentos:
+                type: object
+                additionalProperties: true
+              resumen:
+                type: string
+              error:
+                type: boolean
+              ms:
+                type: integer
+        conclusion:
+          type: string
