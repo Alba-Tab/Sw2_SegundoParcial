@@ -6,7 +6,7 @@ import * as amqp from 'amqplib';
 import type { Connection } from 'mongoose';
 import request from 'supertest';
 import type { StartedTestContainer } from 'testcontainers';
-import { iniciarMongoRs0 } from './contenedores';
+import { choferActualizado, iniciarMongoRs0 } from './contenedores';
 import { REGISTRO_DE_EVENTOS, RegistroDeEventos } from '../../src/aplicacion/puertos/registro-de-eventos';
 import { UNIDAD_DE_TRABAJO, UnidadDeTrabajo } from '../../src/aplicacion/puertos/unidad-de-trabajo';
 import { SaludListaResponse, SaludResponse } from '../../src/infraestructura/http/contrato/flota.zod';
@@ -73,12 +73,18 @@ describe('Flota (Mongo rs0 + RabbitMQ)', () => {
     const registro = worker.get<RegistroDeEventos>(REGISTRO_DE_EVENTOS);
     await expect(
       uow.ejecutar(async () => {
-        await registro.registrar('ChoferActualizado', 'flota.chofer-actualizado.v1', { choferId: 'revertido' });
+        await registro.registrar(
+          'ChoferActualizado',
+          'flota.chofer-actualizado.v1',
+          choferActualizado('0193a000-0000-7000-8000-0000000c4f01'),
+        );
         throw new Error('falla después de registrar');
       }),
     ).rejects.toThrow('falla');
     const conexion = worker.get<Connection>(getConnectionToken());
-    expect(await conexion.collection('outboxEventos').countDocuments({ 'sobre.datos.choferId': 'revertido' })).toBe(0);
+    expect(
+      await conexion.collection('outboxEventos').countDocuments({ 'sobre.datos.choferId': '0193a000-0000-7000-8000-0000000c4f01' }),
+    ).toBe(0);
   });
 
   it('el relay publica el sobre con confirmación y marca publicadoEn', async () => {
@@ -91,7 +97,7 @@ describe('Flota (Mongo rs0 + RabbitMQ)', () => {
     const uow = worker.get<UnidadDeTrabajo>(UNIDAD_DE_TRABAJO);
     const registro = worker.get<RegistroDeEventos>(REGISTRO_DE_EVENTOS);
     await uow.ejecutar(() =>
-      registro.registrar('ChoferActualizado', 'flota.chofer-actualizado.v1', { choferId: 'c1', versionAgregado: 1 }),
+      registro.registrar('ChoferActualizado', 'flota.chofer-actualizado.v1', choferActualizado('0193a000-0000-7000-8000-0000000c4f02')),
     );
 
     const mensaje = await new Promise<amqp.ConsumeMessage>((resolver, rechazar) => {
@@ -108,7 +114,13 @@ describe('Flota (Mongo rs0 + RabbitMQ)', () => {
       );
     });
     const sobre = JSON.parse(mensaje.content.toString());
-    expect(sobre).toMatchObject({ tipo: 'ChoferActualizado', version: 1, productor: 'flota', datos: { choferId: 'c1' } });
+    expect(sobre).toMatchObject({
+      tipo: 'ChoferActualizado',
+      version: 1,
+      productor: 'flota',
+      datos: { choferId: '0193a000-0000-7000-8000-0000000c4f02' },
+    });
+    expect(sobre.traceparent).toMatch(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/);
     expect(mensaje.properties.messageId).toBe(sobre.id);
     await new Promise((r) => setTimeout(r, 300));
     const mongoConexion = worker.get<Connection>(getConnectionToken());

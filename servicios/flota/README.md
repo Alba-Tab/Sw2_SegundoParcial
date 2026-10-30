@@ -13,7 +13,7 @@ Unidades (tractos y remolques), choferes, reservas de la saga, combustible y man
 | Dos procesos: `main.ts` (API) y `worker.ts` (relay y actividades de Temporal; consumidores en F5) | `src/` |
 
 ```bash
-npm ci && npm run verificar     # 22 pruebas + tipos + capas + formato
+npm ci && npm run verificar     # 27 pruebas + tipos + capas + formato
 docker compose -f ../../plataforma/compose/compose.yaml --profile core --profile plataforma up -d --build flota-api flota-worker
 curl localhost:8102/health/ready
 ```
@@ -38,3 +38,11 @@ curl localhost:8102/health/ready
 - **Mensajes sin manejador o que no son JSON:** van a la DLQ (nack sin reencolar). Si el manejador falla por algo técnico, el mensaje se reencola.
 - **`ViajeCancelado`** (de un usuario o de la saga): `LiberarPorCancelacion` libera la reserva del servicio en la misma transacción que el Inbox (`inboxEventos`, con el `eventId` como `_id`). Así se liberan solas las reservas de una intervención resuelta a mano (spec 011).
 - **Inbox:** primero consulta y después inserta. Una clave duplicada dentro de una transacción de Mongo la aborta, y mongoose la reintentaba sin fin.
+
+## Unidades en viaje, liberación y mantenimiento (T5.3, specs 005, 006, 007 y 010)
+
+- **`ViajeIniciado`** (D20): tracto y remolque `RESERVADA` → `EN_VIAJE`, solo si la reserva sigue activa; uno tardío sobre una reserva `LIBERADA` se ignora.
+- **`EntregaConfirmada` y `EntregaRechazada`**: reserva `LIBERADA`; tracto y remolque suman `kmRecorridos` a `kmDesdeUltimoMantenimiento` (D07; el odómetro no cambia) y pasan a `DISPONIBLE` o `MANTENIMIENTO_PENDIENTE` según la regla C (≥ 10.000 km, SOAT o inspección que vencen en 15 días o menos), con `MantenimientoRequerido` en el Outbox; el chofer queda disponible. También desde `RESERVADA` si la entrega llegó antes que `ViajeIniciado`.
+- **Outbox**: valida cada evento contra `contratos/eventos` (ajv 2020, copiados en la imagen; `CONTRATOS_DIR`) y siempre completa `correlationId` y `traceparent`.
+- **`GET /api/v1/unidades`**, `/{unidadId}`, **`/choferes`** y `/{choferId}` (jefe de flota, despachador, gerente; el chofer se ve a sí mismo).
+- **CLI**: `node dist/cli.js choferes:actualizar <choferId> --licenciaVenceEl=… --activo=…` guarda el cambio, sube `versionAgregado` y deja `ChoferActualizado` (spec 010, sección D).

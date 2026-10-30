@@ -1,6 +1,9 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import * as amqp from 'amqplib';
 import { LiberarPorCancelacion, type SobreViajeCancelado } from '../../aplicacion/reserva/liberar-por-cancelacion';
+import { LiberarPorEntrega, type SobreFinDeViaje } from '../../aplicacion/reserva/liberar-por-entrega';
+import { PonerEnViaje, type SobreViajeIniciado } from '../../aplicacion/reserva/poner-en-viaje';
+import { ErrorDeDominio } from '../../dominio/comun/error-de-dominio';
 import { entorno } from '../configuracion/entorno';
 
 const COLA = 'flota.eventos';
@@ -8,7 +11,7 @@ const COLA = 'flota.eventos';
 /**
  * Consumidor de flota.eventos (topología en plataforma/compose/rabbitmq). Un mensaje sin manejador o que no es JSON va
  * a la DLQ (nack sin reencolar); si el manejador falla por algo técnico se reencola y la cola de quórum lo manda a la
- * DLQ al pasar su límite de entregas. Los manejadores de ViajeIniciado y las entregas llegan en F5.
+ * DLQ al pasar su límite de entregas. Un error de negocio (ErrorDeDominio) también va a la DLQ: reintentar no lo arregla.
  */
 @Injectable()
 export class ConsumidorEventos implements OnApplicationBootstrap, OnApplicationShutdown {
@@ -17,9 +20,12 @@ export class ConsumidorEventos implements OnApplicationBootstrap, OnApplicationS
   private apagando = false;
   private readonly manejadores: Record<string, (sobre: never) => Promise<boolean>>;
 
-  constructor(cancelaciones: LiberarPorCancelacion) {
+  constructor(cancelaciones: LiberarPorCancelacion, enViaje: PonerEnViaje, finDeViaje: LiberarPorEntrega) {
     this.manejadores = {
       ViajeCancelado: (s: SobreViajeCancelado) => cancelaciones.ejecutar(s),
+      ViajeIniciado: (s: SobreViajeIniciado) => enViaje.ejecutar(s),
+      EntregaConfirmada: (s: SobreFinDeViaje) => finDeViaje.ejecutar(s),
+      EntregaRechazada: (s: SobreFinDeViaje) => finDeViaje.ejecutar(s),
     };
   }
 
@@ -61,8 +67,9 @@ export class ConsumidorEventos implements OnApplicationBootstrap, OnApplicationS
       await manejador(sobre as never);
       canal.ack(m);
     } catch (e) {
-      this.log.warn(`${sobre.tipo} ${sobre.id} falló, se reencola: ${(e as Error).message}`);
-      canal.nack(m, false, true);
+      const negocio = e instanceof ErrorDeDominio || e instanceof TypeError;
+      this.log.warn(`${sobre.tipo} ${sobre.id} falló (${negocio ? 'a la DLQ' : 'se reencola'}): ${(e as Error).message}`);
+      canal.nack(m, false, !negocio);
     }
   }
 
