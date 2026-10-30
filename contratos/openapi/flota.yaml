@@ -15,6 +15,7 @@ tags:
   - name: salud
   - name: unidades
   - name: choferes
+  - name: combustible
 paths:
   /health:
     get:
@@ -140,6 +141,114 @@ paths:
         '404':
           $ref: './comun.yaml#/components/responses/NoEncontrado'
 
+  /api/v1/cargas-combustible:
+    get:
+      tags: [combustible]
+      operationId: listarCargasCombustible
+      summary: Cargas de combustible (jefe_flota, gerente, despachador; el chofer solo las suyas). Spec 009.
+      parameters:
+        - name: tractoId
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/Uuid'
+        - name: desde
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/Instante'
+        - name: hasta
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/Instante'
+        - $ref: './comun.yaml#/components/parameters/Limite'
+        - $ref: './comun.yaml#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Página de cargas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaCargas'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+    post:
+      tags: [combustible]
+      operationId: registrarCargaCombustible
+      summary: El chofer registra una carga de su viaje (spec 009); actualiza el odómetro y publica CargaCombustibleRegistrada.
+      description: |
+        `Idempotency-Key` debe ser igual a `opId` (la autoridad es el índice único de opId). Un reenvío con el mismo cuerpo
+        responde 201 con la carga existente; con otro cuerpo, 422 IDEMPOTENCIA_CUERPO_DISTINTO.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CargaNueva'
+      responses:
+        '201':
+          description: Carga registrada (también en el reenvío).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CargaCombustible'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/unidades/{unidadId}/lecturas-combustible:
+    parameters:
+      - name: unidadId
+        in: path
+        required: true
+        schema:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    get:
+      tags: [combustible]
+      operationId: listarLecturasCombustible
+      summary: Lecturas del sensor del tracto (jefe_flota, gerente); como máximo 24 h por consulta. Spec 009.
+      parameters:
+        - name: desde
+          in: query
+          required: true
+          schema:
+            $ref: './comun.yaml#/components/schemas/Instante'
+        - name: hasta
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/Instante'
+      responses:
+        '200':
+          description: Lecturas en orden de tiempo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaLecturas'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+
 components:
   securitySchemes:
     bearer:
@@ -243,3 +352,92 @@ components:
         siguienteCursor:
           type: string
           nullable: true
+    CargaNueva:
+      type: object
+      required: [opId, viajeId, litros, monto, kilometraje, registradaEn]
+      additionalProperties: false
+      properties:
+        opId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        viajeId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        litros:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          description: Más que la capacidad del tanque responde 422 CARGA_EXCEDE_TANQUE.
+        monto:
+          $ref: './comun.yaml#/components/schemas/Monto'
+        kilometraje:
+          type: number
+          minimum: 0
+          description: Odómetro del tracto; menor que el actual responde 422 KILOMETRAJE_INVALIDO.
+        registradaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        posicion:
+          $ref: './comun.yaml#/components/schemas/Coordenadas'
+        fotoReciboEvidenciaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    CargaCombustible:
+      type: object
+      required: [cargaId, opId, viajeId, tractoId, placa, choferId, litros, monto, kilometraje, registradaEn]
+      properties:
+        cargaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        opId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        viajeId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        tractoId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        placa:
+          $ref: './comun.yaml#/components/schemas/Placa'
+        choferId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        litros:
+          type: number
+        monto:
+          $ref: './comun.yaml#/components/schemas/Monto'
+        kilometraje:
+          type: number
+        registradaEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        posicion:
+          $ref: './comun.yaml#/components/schemas/Coordenadas'
+        fotoReciboEvidenciaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    PaginaCargas:
+      type: object
+      required: [items, siguienteCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/CargaCombustible'
+        siguienteCursor:
+          type: string
+          nullable: true
+    LecturaCombustible:
+      type: object
+      required: [nivelPct, velocidadKmh, medidoEn]
+      properties:
+        nivelPct:
+          type: number
+        velocidadKmh:
+          type: number
+        medidoEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+    ListaLecturas:
+      type: object
+      required: [unidadId, placa, items]
+      properties:
+        unidadId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        placa:
+          $ref: './comun.yaml#/components/schemas/Placa'
+        capacidadLitros:
+          type: number
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LecturaCombustible'

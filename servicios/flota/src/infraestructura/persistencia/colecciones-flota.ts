@@ -7,6 +7,7 @@ import type { UnidadRepositorio } from '../../aplicacion/puertos/unidad-reposito
 import type { ReservaUnidad } from '../../dominio/reserva/reserva-unidad';
 import type { Chofer } from '../../dominio/unidad/chofer';
 import type { Unidad } from '../../dominio/unidad/unidad';
+import { crearIndicesCombustible } from './combustible-mongo';
 import { sesionActual } from './mongo-unidad-de-trabajo';
 
 /** Colecciones de Flota en camelCase plural (000 §9); el id de negocio va en `_id`. */
@@ -23,6 +24,8 @@ export async function crearIndicesFlota(conexion: Connection): Promise<void> {
   await conexion.collection(UNIDADES).createIndex({ placa: 1 }, { unique: true });
   await conexion.collection(UNIDADES).createIndex({ estado: 1, tipoUnidad: 1 });
   await conexion.collection(RESERVAS).createIndex({ servicioId: 1 }, { unique: true });
+  await conexion.collection(RESERVAS).createIndex({ viajeId: 1 });
+  await crearIndicesCombustible(conexion);
 }
 
 @Injectable()
@@ -40,6 +43,11 @@ export class UnidadRepositorioMongo implements UnidadRepositorio {
 
   async disponibles(): Promise<Unidad[]> {
     return (await this.col.find({ estado: 'DISPONIBLE' }, opciones()).toArray()).map(aUnidad);
+  }
+
+  async porPlaca(placa: string): Promise<Unidad | null> {
+    const d = await this.col.findOne({ placa }, opciones());
+    return d ? aUnidad(d) : null;
   }
 
   async tomar(unidadId: string): Promise<boolean> {
@@ -135,6 +143,23 @@ export class ReservaUnidadRepositorioMongo implements ReservaUnidadRepositorio {
 
   async porServicio(servicioId: string): Promise<ReservaUnidad | null> {
     const d = await this.col.findOne({ servicioId }, opciones());
+    if (!d) return null;
+    const { _id, ...resto } = d;
+    return { reservaUnidadId: _id, ...resto };
+  }
+
+  async porViaje(viajeId: string): Promise<ReservaUnidad | null> {
+    const d = await this.col.findOne({ viajeId }, opciones());
+    if (!d) return null;
+    const { _id, ...resto } = d;
+    return { reservaUnidadId: _id, ...resto };
+  }
+
+  async activaDeUnidad(unidadId: string): Promise<ReservaUnidad | null> {
+    const d = await this.col.findOne(
+      { estado: { $in: ['PROVISIONAL', 'CONFIRMADA'] }, $or: [{ tractoId: unidadId }, { remolqueId: unidadId }] },
+      opciones(),
+    );
     if (!d) return null;
     const { _id, ...resto } = d;
     return { reservaUnidadId: _id, ...resto };

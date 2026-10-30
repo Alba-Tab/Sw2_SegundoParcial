@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
+import { ProcesarLectura } from './aplicacion/combustible/procesar-lectura';
 import { CHOFER_REPOSITORIO, type ChoferRepositorio } from './aplicacion/puertos/chofer-repositorio';
+import { COMBUSTIBLE_REPOSITORIO, type CombustibleRepositorio } from './aplicacion/puertos/combustible-repositorio';
 import { INBOX, type Inbox } from './aplicacion/puertos/inbox';
 import { REGISTRO_DE_EVENTOS, type RegistroDeEventos } from './aplicacion/puertos/registro-de-eventos';
 import { RELOJ, type Reloj } from './aplicacion/puertos/reloj';
@@ -65,6 +67,17 @@ const DEPENDENCIAS = [UNIDAD_DE_TRABAJO, UNIDAD_REPOSITORIO, CHOFER_REPOSITORIO,
         e: RegistroDeEventos,
         reloj: Reloj,
       ) => new LiberarPorEntrega(tx, inbox, r, u, c, e, reloj),
+    },
+    {
+      provide: ProcesarLectura,
+      inject: [UNIDAD_DE_TRABAJO, COMBUSTIBLE_REPOSITORIO, UNIDAD_REPOSITORIO, RESERVA_UNIDAD_REPOSITORIO, REGISTRO_DE_EVENTOS],
+      useFactory: (
+        tx: UnidadDeTrabajo,
+        k: CombustibleRepositorio,
+        u: UnidadRepositorio,
+        r: ReservaUnidadRepositorio,
+        e: RegistroDeEventos,
+      ) => new ProcesarLectura(tx, k, u, r, e),
     },
     ActividadesFlota,
     TrabajadorTemporal,

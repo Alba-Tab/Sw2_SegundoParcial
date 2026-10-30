@@ -2,6 +2,7 @@ import type { Unidad } from '../../dominio/unidad/unidad';
 
 export interface UnidadRepositorio {
   porId(unidadId: string): Promise<Unidad | null>;
+  porPlaca(placa: string): Promise<Unidad | null>;
   /** Tractos y remolques en DISPONIBLE (la saga filtra después por documentos, tipo y capacidad). */
   disponibles(): Promise<Unidad[]>;
   /** Actualización condicional DISPONIBLE → RESERVADA, releyendo el estado en la misma operación (spec 003). */

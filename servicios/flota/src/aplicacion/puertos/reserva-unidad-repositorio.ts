@@ -2,6 +2,9 @@ import type { ReservaUnidad } from '../../dominio/reserva/reserva-unidad';
 
 export interface ReservaUnidadRepositorio {
   porServicio(servicioId: string): Promise<ReservaUnidad | null>;
+  porViaje(viajeId: string): Promise<ReservaUnidad | null>;
+  /** La reserva PROVISIONAL o CONFIRMADA que tiene a la unidad como tracto o remolque. */
+  activaDeUnidad(unidadId: string): Promise<ReservaUnidad | null>;
   /** Índice único por servicioId: dos reservas del mismo servicio no pueden existir. */
   insertar(reserva: ReservaUnidad): Promise<void>;
   actualizar(reserva: ReservaUnidad): Promise<void>;
