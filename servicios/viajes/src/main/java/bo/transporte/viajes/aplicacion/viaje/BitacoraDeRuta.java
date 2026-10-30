@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Supplier;
 
@@ -27,6 +28,10 @@ public class BitacoraDeRuta {
     public static final String HITO = "REGISTRAR_HITO";
     public static final String EVENTO = "REGISTRAR_EVENTO_CONDUCCION";
     private static final Duration DESFASE_DE_RELOJ = Duration.ofMinutes(2);
+    /** Contrato listarHitos: chofer propio, despachador, comercial, gerente y agente_lectura (sin jefe_flota). */
+    private static final Set<String> LEEN_HITOS =
+            Set.of("chofer", "despachador", "comercial", "gerente", "agente_lectura");
+
     private static final int HITOS_RECIENTES = 20;
     private static final int HITOS_BUSCADOS = 50;
 
@@ -96,6 +101,9 @@ public class BitacoraDeRuta {
 
     /** GET /viajes/{id}/hitos: sin texto, los 20 más nuevos; con texto, los que lo contienen (spec 014). */
     public List<Hito> hitos(Solicitante quien, UUID viajeId, String texto) {
+        if (!quien.tieneAlguno(LEEN_HITOS)) {
+            throw new ErrorDeDominio("SIN_PERMISO", "Tu rol no lee la bitácora");
+        }
         consulta.legible(quien, viajeId);
         boolean busca = texto != null && !texto.isBlank();
         return bitacora.hitos(viajeId, busca ? texto.strip() : null, busca ? HITOS_BUSCADOS : HITOS_RECIENTES);

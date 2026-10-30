@@ -36,7 +36,7 @@ class ConsumidorOutboxPush {
     public void avisar() {
         List<Evento> eventos = jdbc.sql("""
                         SELECT o.id, o.tipo, o.sobre::text FROM outbox_eventos o
-                        WHERE o.publicado_en IS NOT NULL AND o.tipo IN (:tipos)
+                        WHERE o.publicado_en > now() - interval '1 day' AND o.tipo IN (:tipos)
                           AND NOT EXISTS (SELECT 1 FROM notificacion_push n WHERE n.evento_id = o.id)
                         ORDER BY o.publicado_en LIMIT 50""")
                 .param("tipos", AvisosPush.TIPOS)

@@ -68,7 +68,12 @@ public class ProgramacionDeViaje {
      * Compensación del paso 1 (o cierre de una intervención): CANCELADO y ViajeCancelado con origen SAGA (D18). Si el
      * paso 1 nunca llegó a crear el viaje, se crea ya cancelado para que el servicio no quede en PROGRAMANDO.
      */
-    public void cancelarViaje(UUID viajeId, String motivo, String detalle) {
+    public void cancelarViaje(UUID viajeId, String motivo, String detalleCompleto) {
+        // El detalle de un fallo técnico puede traer un mensaje largo (SQL incluido): la columna y el contrato admiten
+        // 600.
+        String detalle = detalleCompleto == null || detalleCompleto.length() <= 600
+                ? detalleCompleto
+                : detalleCompleto.substring(0, 600);
         tx.enTransaccion(() -> {
             Viaje v = viajes.paraActualizar(viajeId).orElse(null);
             if (v == null) {
@@ -96,8 +101,11 @@ public class ProgramacionDeViaje {
                 v = Viaje.programar(servicio(servicioId, viajeId), reloj.instant());
                 viajes.insertarSiNoExiste(v);
             }
-            if (!v.requerirIntervencion()) return null;
-            viajes.actualizar(v);
+            // Una ronda nueva de "reintentar compensación" que vuelve a agotarse publica otra vez el evento (spec 011:
+            // "regresa al paso 1"); el estado ya era REQUIERE_INTERVENCION. Un viaje en otro estado final no cambia.
+            boolean cambio = v.requerirIntervencion();
+            if (!cambio && v.estado() != EstadoViaje.REQUIERE_INTERVENCION) return null;
+            if (cambio) viajes.actualizar(v);
             String corto = mensaje == null ? "" : mensaje.length() > 500 ? mensaje.substring(0, 500) : mensaje;
             eventos.registrar(
                     "ViajeRequiereIntervencion",

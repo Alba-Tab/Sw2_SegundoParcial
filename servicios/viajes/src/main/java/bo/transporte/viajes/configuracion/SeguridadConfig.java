@@ -15,6 +15,7 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2Error;
+import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
@@ -98,12 +99,15 @@ class SeguridadConfig {
         NimbusJwtDecoder decoder = NimbusJwtDecoder.withJwkSetUri(issuer + "/protocol/openid-connect/certs")
                 .build();
         decoder.setJwtValidator(new DelegatingOAuth2TokenValidator<>(
-                JwtValidators.createDefaultWithIssuer(issuer),
-                jwt -> jwt.getAudience() != null && jwt.getAudience().contains(props.audiencia())
-                        ? OAuth2TokenValidatorResult.success()
-                        : OAuth2TokenValidatorResult.failure(
-                                new OAuth2Error("invalid_token", "Audiencia incorrecta", null))));
+                JwtValidators.createDefaultWithIssuer(issuer), audiencia(props.audiencia())));
         return decoder;
+    }
+
+    /** Un token emitido para otro servicio (otra audiencia) no sirve aquí: se intercambia (RFC 8693). */
+    static OAuth2TokenValidator<Jwt> audiencia(String esperada) {
+        return jwt -> jwt.getAudience() != null && jwt.getAudience().contains(esperada)
+                ? OAuth2TokenValidatorResult.success()
+                : OAuth2TokenValidatorResult.failure(new OAuth2Error("invalid_token", "Audiencia incorrecta", null));
     }
 
     static JwtAuthenticationConverter conversor() {
