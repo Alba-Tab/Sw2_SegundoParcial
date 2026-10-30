@@ -51,6 +51,12 @@ class RegistroIdempotenteJdbc implements RegistroIdempotente {
     @Override
     @Transactional(propagation = Propagation.MANDATORY)
     public Optional<Operacion> buscar(UUID clave) {
+        // Serializa las peticiones con la misma clave: el FOR UPDATE no bloquea una fila que todavía no existe, y la
+        // segunda petición vería el estado nuevo (409) en vez de la respuesta guardada. Se libera con la transacción.
+        jdbc.sql("SELECT pg_advisory_xact_lock(hashtextextended(:clave, 0))")
+                .param("clave", clave.toString())
+                .query(Object.class)
+                .single();
         return jdbc.sql(
                         "SELECT clave, tipo_operacion, hash_cuerpo, estado, codigo_http, cuerpo_respuesta::text AS cuerpo"
                                 + " FROM operacion_idempotente WHERE clave = :clave FOR UPDATE")
