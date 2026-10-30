@@ -1,3 +1,4 @@
+import type { ApolloServerPlugin } from '@apollo/server';
 import { ApolloDriver, type ApolloDriverConfig } from '@nestjs/apollo';
 import { Controller, Get, Inject, type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
 import { GraphQLModule } from '@nestjs/graphql';
@@ -8,12 +9,14 @@ import type { Context as ContextoWs } from 'graphql-ws';
 import type { WebSocket } from 'ws';
 import { Autenticador, correlationId, TokenInvalido, traceparent, type Contexto, type Usuario } from './autenticacion';
 import { configuracion } from './configuracion';
+import { cuerpoProblema } from './errores';
 import { ExportacionesController } from './exportaciones.controller';
 import { crearCargadores } from './graphql/cargadores';
 import { limiteComplejidad, limiteProfundidad } from './graphql/limites';
 import { crearResolvers } from './graphql/resolvers';
 import { aplicarRoles } from './graphql/roles';
 import { DURACION_MAXIMA_MS } from './graphql/suscripcion';
+import { registrar, traceIdDe } from './log';
 import { ClienteServicios } from './servicios';
 import { AUTENTICADOR, HMAC_SECRETO, INTERCAMBIO } from './tokens-inyeccion';
 
@@ -33,13 +36,7 @@ const problema = (res: Response, e: TokenInvalido) => {
   res
     .status(e.status)
     .type('application/problem+json')
-    .json({
-      type: `https://transporte.local/errores/${e.codigo.toLowerCase()}`,
-      title: e.codigo,
-      status: e.status,
-      codigo: e.codigo,
-      detail: e.message,
-    });
+    .json(cuerpoProblema(e.status, e.codigo, e.message));
 };
 
 /** `POST /graphql` sin token → 401; con rol `cliente` o `chofer` → 403 (FK1). Antes de que Apollo ejecute nada. */
@@ -59,18 +56,34 @@ function autenticarHttp(req: Request & { contexto?: Contexto }, res: Response, s
 }
 
 function contextoCompleto(base: Contexto) {
-  return { ...base, cargadores: crearCargadores(servicios, base) };
+  return { ...base, cargadores: crearCargadores(servicios, base), avisos: [] };
 }
+
+/** Errores de Apollo que son culpa de la petición: consulta mal escrita, variables, operación inexistente. */
+const ERRORES_DE_CLIENTE = new Set([
+  'GRAPHQL_PARSE_FAILED',
+  'GRAPHQL_VALIDATION_FAILED',
+  'BAD_USER_INPUT',
+  'BAD_REQUEST',
+  'OPERATION_RESOLUTION_FAILURE',
+]);
+
+/** El error con nuestro `codigo` (el que lanzó un resolver o el cliente REST), si lo hay. */
+const conCodigo = (error: unknown): GraphQLError | undefined =>
+  error instanceof GraphQLError ? (error.originalError instanceof GraphQLError ? error.originalError : error) : undefined;
+
+const esInterno = (error: unknown, code: unknown) => !conCodigo(error)?.extensions['codigo'] && !ERRORES_DE_CLIENTE.has(String(code));
 
 /** Errores con `codigo` y `status` de 000 §5; sin trazas internas hacia las apps. */
 function formatearError(formateado: GraphQLFormattedError, error: unknown): GraphQLFormattedError {
-  const original = error instanceof GraphQLError ? (error.originalError instanceof GraphQLError ? error.originalError : error) : undefined;
+  const original = conCodigo(error);
   const extensiones = { ...(original?.extensions ?? formateado.extensions ?? {}) } as Record<string, unknown>;
+  const code = formateado.extensions?.['code'];
   delete extensiones['stacktrace'];
   delete extensiones['http'];
   if (!extensiones['codigo']) {
-    const code = formateado.extensions?.['code'];
-    extensiones['codigo'] = code === 'GRAPHQL_VALIDATION_FAILED' || code === 'BAD_USER_INPUT' ? 'VALIDACION' : 'ERROR_INTERNO';
+    if (ERRORES_DE_CLIENTE.has(String(code))) Object.assign(extensiones, { codigo: 'VALIDACION', status: 400 });
+    else extensiones['codigo'] = 'ERROR_INTERNO';
   }
   const interno = extensiones['codigo'] === 'ERROR_INTERNO';
   return {
@@ -80,6 +93,36 @@ function formatearError(formateado: GraphQLFormattedError, error: unknown): Grap
     extensions: extensiones,
   };
 }
+
+/**
+ * Registra en el log JSON (000 §10), con `correlationId` y `traceId`, cada error interno antes de que `formatError` lo
+ * enmascare; y pone los avisos de la operación en `extensions.avisos` de la respuesta.
+ */
+const registroYAvisos: ApolloServerPlugin<Contexto> = {
+  async requestDidStart() {
+    return {
+      async didEncounterErrors({ contextValue, errors }) {
+        for (const e of errors) {
+          if (!esInterno(e, e.extensions?.['code'])) continue;
+          const causa = e.originalError ?? e;
+          registrar('ERROR', 'Error interno en una operación GraphQL', {
+            correlationId: contextValue?.correlationId,
+            traceId: traceIdDe(contextValue?.traceparent),
+            path: e.path,
+            error: causa.message,
+            pila: causa.stack,
+          });
+        }
+      },
+      async willSendResponse({ contextValue, response }) {
+        const avisos = contextValue?.avisos;
+        if (avisos?.length && response.body.kind === 'single') {
+          response.body.singleResult.extensions = { ...response.body.singleResult.extensions, avisos };
+        }
+      },
+    };
+  },
+};
 
 @Controller()
 class SaludController {
@@ -113,10 +156,12 @@ class SaludController {
       resolvers: crearResolvers({ servicios, hmacSecreto: config.hmacSecreto, gatewayUrl: config.gatewayUrl }),
       transformSchema: (s) => (esquema = aplicarRoles(s)),
       introspection: config.introspeccion,
+      // Sin "¿quisiste decir…?" en los errores de validación: no revelan el esquema con la introspección apagada.
+      hideSchemaDetailsFromClientErrors: true,
       playground: false,
       csrfPrevention: false,
       validationRules: [limiteProfundidad()],
-      plugins: [limiteComplejidad(() => esquema)],
+      plugins: [limiteComplejidad(() => esquema), registroYAvisos as ApolloServerPlugin],
       formatError: formatearError,
       context: ({ req, extra }: { req?: Request & { contexto?: Contexto }; extra?: { contexto?: Contexto } }) =>
         contextoCompleto((req?.contexto ?? extra?.contexto) as Contexto),

@@ -31,8 +31,8 @@ export function configuracion(env: NodeJS.ProcessEnv = process.env): Configuraci
       .map((o) => o.trim())
       .filter(Boolean),
     hmacSecreto: env.EXPORTACION_HMAC_SECRETO ?? '',
-    // Introspección apagada en la nube (spec 016); en local sirve para el Code Generator de las apps.
-    introspeccion: (env.GRAPHQL_INTROSPECCION ?? 'true') === 'true',
+    // Introspección apagada salvo que se pida (spec 016). El Code Generator de las apps lee el archivo del esquema.
+    introspeccion: env.GRAPHQL_INTROSPECCION === 'true',
     esquema: env.ESQUEMA_GRAPHQL ?? `${__dirname}/../../../contratos/graphql/centro-control.graphql`,
   };
 }

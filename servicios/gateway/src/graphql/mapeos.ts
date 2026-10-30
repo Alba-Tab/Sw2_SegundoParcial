@@ -81,8 +81,11 @@ export function unidad(u: Json): Json {
 
 export const mantenimiento = (m: Json): Json => ({ ...m, checklist: m['checklist'] ?? [] });
 
-/** El cuerpo de las listas paginadas: `items` en Viajes, Flota y Finanzas. */
-export const items = <T = Json>(r: Json | undefined): T[] => (r?.['items'] ?? []) as T[];
+/**
+ * Los elementos de una lista REST: `{items}` en las páginas de Viajes, Flota y Finanzas, o un arreglo plano como el de
+ * `listarRutas` (contratos/openapi/viajes.yaml).
+ */
+export const items = <T = Json>(r: Json | Json[] | undefined): T[] => (Array.isArray(r) ? r : (r?.['items'] ?? [])) as T[];
 
 /** Suma de montos en centavos con BigInt: el dinero nunca pasa por float (000 §3). */
 export function sumar(montos: (string | null | undefined)[]): string {

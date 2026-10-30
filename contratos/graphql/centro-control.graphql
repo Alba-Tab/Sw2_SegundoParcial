@@ -9,6 +9,9 @@ Reglas:
   `extensions.codigo = DEPENDENCIA_NO_DISPONIBLE`. Por eso los campos raíz de Query y los que dependen de otro servicio
   son anulables: un servicio caído deja en null solo lo suyo.
 - Mutaciones de negocio: `claveIdempotencia: ID!` (un UUID por intento) que el Gateway reenvía como `Idempotency-Key`.
+  Si la escritura se aplicó pero no se pudo releer el recurso, el campo que lo trae sale en `null` sin error y la
+  respuesta lleva `extensions.avisos: [{mensaje, codigo, servicio, path}]`.
+- `limite`: de 1 a 100 (000 §4); fuera de rango → `VALIDACION`.
 - Profundidad máxima 8 y complejidad máxima 1.000 (D101) → `CONSULTA_DEMASIADO_COMPLEJA`.
 """
 directive @roles(permitidos: [Rol!]!) on FIELD_DEFINITION
@@ -678,7 +681,8 @@ type Mutation {
     @roles(permitidos: [despachador, comercial])
   aprobarCredito(servicioId: ID!, aprobado: Boolean!, motivo: String, claveIdempotencia: ID!): ResultadoAprobacion!
     @roles(permitidos: [administracion])
-  resolverIntervencion(viajeId: ID!, opcion: OpcionIntervencion!, nota: String, claveIdempotencia: ID!): Viaje!
+  "Viajes responde 202 sin cuerpo: el viaje se relee y sale en null, con un aviso, si la relectura falla."
+  resolverIntervencion(viajeId: ID!, opcion: OpcionIntervencion!, nota: String, claveIdempotencia: ID!): Viaje
     @roles(permitidos: [despachador])
   aprobarEntregaObservada(viajeId: ID!, nota: String, claveIdempotencia: ID!): Viaje! @roles(permitidos: [despachador])
   rechazarEntregaObservada(viajeId: ID!, motivo: String!, claveIdempotencia: ID!): Viaje!

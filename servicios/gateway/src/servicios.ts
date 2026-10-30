@@ -2,7 +2,7 @@ import { ErrorIntercambio, IntercambioToken } from '@transporte/intercambio-toke
 import { GraphQLError } from 'graphql';
 import type { Contexto } from './autenticacion';
 import type { Configuracion } from './configuracion';
-import { errorGraphql } from './errores';
+import { errorGraphql, validacion } from './errores';
 
 export type Servicio = 'viajes' | 'flota' | 'finanzas' | 'analitica';
 
@@ -10,6 +10,27 @@ export type Servicio = 'viajes' | 'flota' | 'finanzas' | 'analitica';
 export const ESPERA = { consulta: 3000, mutacion: 10_000, exportar: 30_000, preguntar: 60_000 } as const;
 
 const NOMBRES: Record<Servicio, string> = { viajes: 'Viajes', flota: 'Flota', finanzas: 'Finanzas', analitica: 'Analítica' };
+
+/** Un segmento variable de una ruta REST: un UUID o un valor de enum. Nada de `/`, `.`, `?`, `#` ni `%`. */
+const SEGMENTO = /^[A-Za-z0-9_-]{1,64}$/;
+
+/** Ruta REST armada con {@link rutaRest}: el cliente no acepta un texto cualquiera. */
+export type RutaRest = string & { readonly __rutaRest: true };
+
+/**
+ * Arma la ruta de una llamada REST validando cada valor interpolado (ids que vienen de la app): sin esto,
+ * `viaje(id: "../rutas")` o `"x?y=1"` cambiaban la operación que el Gateway llamaba. Un valor inválido → `VALIDACION`
+ * sin llamar al servicio.
+ */
+export function rutaRest(partes: TemplateStringsArray, ...valores: unknown[]): RutaRest {
+  let ruta = partes[0];
+  valores.forEach((v, i) => {
+    const texto = String(v ?? '');
+    if (!SEGMENTO.test(texto)) throw validacion('El identificador no es válido', { valor: texto.slice(0, 64) });
+    ruta += texto + partes[i + 1];
+  });
+  return ruta as RutaRest;
+}
 
 export interface Llamada {
   query?: Record<string, string | number | boolean | undefined | null>;
@@ -40,15 +61,15 @@ export class ClienteServicios {
     this.bases = { viajes: config.viajesUrl, flota: config.flotaUrl, finanzas: config.finanzasUrl, analitica: config.analiticaUrl };
   }
 
-  get<T>(ctx: Contexto, servicio: Servicio, ruta: string, llamada: Llamada = {}): Promise<T> {
+  get<T>(ctx: Contexto, servicio: Servicio, ruta: RutaRest, llamada: Llamada = {}): Promise<T> {
     return this.llamar<T>(ctx, servicio, 'GET', ruta, { tiempoMs: ESPERA.consulta, ...llamada });
   }
 
-  post<T>(ctx: Contexto, servicio: Servicio, ruta: string, llamada: Llamada = {}): Promise<T> {
+  post<T>(ctx: Contexto, servicio: Servicio, ruta: RutaRest, llamada: Llamada = {}): Promise<T> {
     return this.llamar<T>(ctx, servicio, 'POST', ruta, { tiempoMs: ESPERA.mutacion, ...llamada });
   }
 
-  async llamar<T>(ctx: Contexto, servicio: Servicio, metodo: string, ruta: string, llamada: Llamada): Promise<T> {
+  async llamar<T>(ctx: Contexto, servicio: Servicio, metodo: string, ruta: RutaRest, llamada: Llamada): Promise<T> {
     let token: string;
     try {
       token = llamada.token ?? (await this.intercambio.tokenPara(ctx.usuario.token, servicio));
@@ -78,7 +99,8 @@ export class ClienteServicios {
       });
     } catch (e) {
       const lento = e instanceof Error && (e.name === 'TimeoutError' || e.name === 'AbortError');
-      throw this.noDisponible(servicio, lento ? `no respondió en ${(llamada.tiempoMs ?? ESPERA.consulta) / 1000} s` : 'no responde');
+      const segundos = Math.round((llamada.tiempoMs ?? ESPERA.consulta) / 100) / 10;
+      throw this.noDisponible(servicio, lento ? `no respondió en ${segundos} s` : 'no responde');
     }
     if (respuesta.status >= 500) throw this.noDisponible(servicio, `respondió ${respuesta.status}`);
     if (!respuesta.ok) {
@@ -100,6 +122,11 @@ export class ClienteServicios {
   }
 
   private noDisponible(servicio: Servicio, detalle: string): GraphQLError {
-    return errorGraphql('DEPENDENCIA_NO_DISPONIBLE', `${NOMBRES[servicio]} no disponible (${detalle})`, 503, { servicio });
+    return noDisponible(servicio, detalle);
   }
+}
+
+/** 5xx, tiempo de espera o red caída: el campo sale en null con DEPENDENCIA_NO_DISPONIBLE y el resto sigue. */
+export function noDisponible(servicio: Servicio, detalle: string): GraphQLError {
+  return errorGraphql('DEPENDENCIA_NO_DISPONIBLE', `${NOMBRES[servicio]} no disponible (${detalle})`, 503, { servicio });
 }

@@ -2,10 +2,11 @@ import 'reflect-metadata';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { configuracion } from './configuracion';
+import { LoggerJson } from './log';
 
 async function main() {
   const config = configuracion();
-  const app = await NestFactory.create(AppModule, { logger: ['log', 'warn', 'error'] });
+  const app = await NestFactory.create(AppModule, { logger: new LoggerJson() });
   if (config.corsOrigenes.length) {
     app.enableCors({
       origin: config.corsOrigenes,

@@ -261,7 +261,7 @@ export type ResolverIntervencionMutationVariables = Exact<{
   clave: string | number;
 }>;
 
-export type ResolverIntervencionMutation = { resolverIntervencion: { viajeId: string; estado: EstadoViaje } };
+export type ResolverIntervencionMutation = { resolverIntervencion: { viajeId: string; estado: EstadoViaje } | null };
 
 export type CancelarServicioMutationVariables = Exact<{
   servicioId: string | number;
