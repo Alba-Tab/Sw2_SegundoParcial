@@ -14,6 +14,9 @@ usuario() { # nombre clave configure write read
 for s in viajes finanzas flota analitica n8n; do
   clave=$(printenv "RABBITMQ_CLAVE_$(echo $s | tr '[:lower:]' '[:upper:]')")
   usuario "$s" "$clave" "^$" "^transporte\\.events$" "^$s\\.(eventos|sensor)(\\.dlq)?$"
+  # Cada productor publica solo sus propias claves de enrutamiento (<servicio>.*); n8n solo consume.
+  escribe="^$s\\..+"; [ "$s" = n8n ] && escribe="^$"
+  api "topic-permissions/%2F/$s" -X PUT -d "$(jq -nc --arg w "$escribe" '{exchange: "transporte.events", write: $w, read: ".*"}')"
 done
 # D73: el simulador solo publica en camion.*.combustible por MQTT.
 usuario sensor-sim "$RABBITMQ_CLAVE_SENSOR" "^(amq\\.topic|mqtt-subscription-.*)$" "^amq\\.topic$" "^(amq\\.topic|mqtt-subscription-.*)$"

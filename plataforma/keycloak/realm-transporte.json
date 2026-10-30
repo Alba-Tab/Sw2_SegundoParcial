@@ -3,6 +3,7 @@
   "displayName": "Transporte de Carga",
   "enabled": true,
   "registrationAllowed": true,
+  "passwordPolicy": "length(8) and digits(1) and upperCase(1) and lowerCase(1) and notUsername(undefined)",
   "registrationEmailAsUsername": false,
   "verifyEmail": false,
   "loginWithEmailAllowed": true,

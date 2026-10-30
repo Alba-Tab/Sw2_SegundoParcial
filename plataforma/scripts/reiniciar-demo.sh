@@ -50,5 +50,6 @@ if [ -n "$GRUPO" ]; then
 fi
 
 echo "5. Encendiendo relays y consumidores"
-dc start $SERVICIOS >/dev/null
+# up -d (no start): si la imagen cambió desde la última vez, recrea el contenedor con la nueva.
+dc up -d $SERVICIOS >/dev/null
 echo "Demo reiniciada: semilla de plataforma/semilla en todos los servicios, colas vacías y sin workflows abiertos."
