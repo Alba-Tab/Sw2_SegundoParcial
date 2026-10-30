@@ -37,10 +37,8 @@ final class Cotizacion
     public static function calcular(string $clienteId, string $rutaId, TipoCarga $tipoCarga, string $toneladas, string $fechaViaje,
         Monto $tarifa, string $canal, DateTimeImmutable $ahora, DateInterval $vigencia): self
     {
-        if (! is_numeric($toneladas) || bccomp($toneladas, '0', 3) <= 0) {
-            throw new ErrorDeDominio('VALIDACION', 'toneladas: debe ser mayor que 0');
-        }
-        if (bccomp($toneladas, self::MAXIMO_TONELADAS, 3) > 0) {
+        $toneladas = self::toneladas($toneladas);
+        if (bccomp($toneladas, self::MAXIMO_TONELADAS, 2) > 0) {
             throw new ErrorDeDominio('TONELAJE_EXCEDIDO', 'El máximo por servicio es 30 t');
         }
         $hoy = $ahora->setTimezone(new DateTimeZone('America/La_Paz'))->format('Y-m-d');
@@ -51,6 +49,28 @@ final class Cotizacion
 
         return new self(Uuid7::nuevo(), $clienteId, $rutaId, $tipoCarga, $toneladas, $fechaViaje, $tarifa, $tarifa->por($toneladas),
             'VIGENTE', $ahora->add($vigencia), $canal, $ahora);
+    }
+
+    /**
+     * Toneladas en decimal sin exponente, mayores que 0 y con 2 decimales como máximo: lo que se calcula es lo mismo que
+     * guarda `cotizacion.toneladas` (numeric(5,2)). Los ceros finales no cuentan ("20.10" es "20.1").
+     */
+    private static function toneladas(string $valor): string
+    {
+        if (! preg_match('/^\d+(\.\d+)?$/', $valor)) {
+            throw new ErrorDeDominio('VALIDACION', 'toneladas: debe ser un número decimal', ['campo' => 'toneladas']);
+        }
+        $normal = str_contains($valor, '.') ? rtrim(rtrim($valor, '0'), '.') : $valor;
+        $normal = ltrim($normal, '0');
+        $normal = $normal === '' || $normal[0] === '.' ? '0'.$normal : $normal;
+        if (str_contains($normal, '.') && strlen(substr($normal, strpos($normal, '.') + 1)) > 2) {
+            throw new ErrorDeDominio('VALIDACION', 'toneladas: como máximo 2 decimales', ['campo' => 'toneladas']);
+        }
+        if (bccomp($normal, '0', 2) <= 0) {
+            throw new ErrorDeDominio('VALIDACION', 'toneladas: debe ser mayor que 0', ['campo' => 'toneladas']);
+        }
+
+        return $normal;
     }
 
     public static function reconstruir(string $id, string $clienteId, string $rutaId, TipoCarga $tipoCarga, string $toneladas,

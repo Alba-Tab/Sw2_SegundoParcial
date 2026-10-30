@@ -40,6 +40,20 @@ it('rechaza más de 30 t con 422 TONELAJE_EXCEDIDO', function () use ($laPaz20) 
     cotizar($this, 'sub-1~cliente~'.CLIENTE, ['toneladas' => 31] + $laPaz20)->assertStatus(422)->assertJsonPath('codigo', 'TONELAJE_EXCEDIDO');
 });
 
+it('toneladas: como máximo 2 decimales, sin exponente y el tope de 30 t con escala 2', function () use ($laPaz20) {
+    $u = 'sub-1~cliente~'.CLIENTE;
+    foreach ([20.125, 30.0004, 1e-7, 1e-9, 0.001] as $t) {
+        cotizar($this, $u, ['toneladas' => $t] + $laPaz20)->assertStatus(400)->assertJsonPath('codigo', 'VALIDACION')
+            ->assertJsonPath('errores.0.campo', 'toneladas');
+    }
+    cotizar($this, $u, ['toneladas' => 30.01] + $laPaz20)->assertStatus(422)->assertJsonPath('codigo', 'TONELAJE_EXCEDIDO');
+    $r = cotizar($this, $u, ['toneladas' => 20.1] + $laPaz20)->assertStatus(201)
+        ->assertJsonPath('toneladas', 20.1)->assertJsonPath('monto.monto', '7638.00');
+    cotizar($this, $u, ['toneladas' => 30.0] + $laPaz20)->assertStatus(201)->assertJsonPath('monto.monto', '11400.00');
+    expect(DB::table('cotizacion')->where('cotizacion_id', $r->json('cotizacionId'))->first())
+        ->toMatchObject(['toneladas' => '20.10', 'monto' => '7638.00']);
+});
+
 it('con rol cliente ignora el clienteId del cuerpo; comercial lo exige y registra TELEFONO', function () use ($laPaz20) {
     cotizar($this, 'sub-1~cliente~'.CLIENTE, ['clienteId' => OTRO_CLIENTE] + $laPaz20)->assertStatus(201)->assertJsonPath('clienteId', CLIENTE);
     cotizar($this, 'sub-c~comercial~', $laPaz20)->assertStatus(400)->assertJsonPath('codigo', 'VALIDACION');

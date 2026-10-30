@@ -20,9 +20,14 @@ final class CotizacionesController
 
     public function crear(Request $req): JsonResponse
     {
-        return $this->idempotencia->ejecutar($req, 'CREAR_COTIZACION', function () use ($req) {
+        // El número JSON tal como llegó (json_encode da la forma más corta que lo representa): 30.0000001 no se
+        // redondea a "30" antes de que el dominio revise los decimales.
+        $toneladas = $req->json('toneladas');
+        $toneladas = is_int($toneladas) || is_float($toneladas) ? (string) json_encode($toneladas) : (string) $toneladas;
+
+        return $this->idempotencia->ejecutar($req, 'CREAR_COTIZACION', function () use ($req, $toneladas) {
             $c = $this->crear->ejecutar(SolicitanteHttp::de($req), $req->json('rutaId'), $req->json('tipoCarga'),
-                (string) $req->json('toneladas'), $req->json('fechaViaje'), $req->json('clienteId'));
+                $toneladas, $req->json('fechaViaje'), $req->json('clienteId'));
 
             return new JsonResponse(Formato::cotizacion($c, $this->reloj->ahora()), 201, ['Location' => "/api/v1/cotizaciones/{$c->id}"]);
         });
