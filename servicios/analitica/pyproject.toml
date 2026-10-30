@@ -21,6 +21,7 @@ dependencies = [
   "pyjwt[crypto]==2.15.1",
   "apscheduler==3.11.3",
   "jsonschema[format]==4.26.0",
+  "mcp==2.3.0",
 ]
 
 [dependency-groups]
@@ -42,7 +43,8 @@ extend-exclude = ["notebooks"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF"]
-ignore = ["RUF001", "RUF002", "RUF003"]
+# E501: el formateador ya controla el ancho del código; las líneas largas que quedan son textos de prompts.
+ignore = ["RUF001", "RUF002", "RUF003", "E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

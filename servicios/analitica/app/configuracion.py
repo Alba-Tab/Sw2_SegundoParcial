@@ -25,6 +25,8 @@ class Configuracion(BaseSettings):
     # LLM compatible con OpenAI (Ollama, D36) y servidor MCP (specs 014 y 015).
     llm_base_url: str = "http://host.docker.internal:11434"
     llm_model: str = "qwen3:4b-instruct"
+    # D85: 20 s por turno; en una Mac sin GPU dedicada se puede alargar en el .env local.
+    llm_turno_s: float = 20.0
     mcp_url: str = "http://localhost:8106/mcp"
     modelos_dir: str = "modelos"
     contratos_dir: str = "../../contratos"

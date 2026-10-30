@@ -14,17 +14,22 @@ from sqlalchemy import text
 
 from app.api import errores
 from app.api.rutas_acciones import rutas as rutas_acciones
+from app.api.rutas_agente import rutas as rutas_agente
 from app.api.rutas_lectura import rutas as rutas_lectura
 from app.api.rutas_reportes import rutas as rutas_reportes
 from app.api.seguridad import usuario_actual
+from app.aplicacion.agente import Agente
 from app.aplicacion.proyecciones import Proyecciones
+from app.aplicacion.voz import Voz
 from app.configuracion import configuracion
 from app.dominio.errores import ErrorDeDominio
 from app.infraestructura import programador
 from app.infraestructura.bd import motor
+from app.infraestructura.llm import Llm
 from app.infraestructura.mensajeria import ConsumidorEventos
 from app.infraestructura.ml import cargar_modelos
 from app.infraestructura.relay import RelayOutbox
+from app.infraestructura.tokens import Tokens
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
 # 000 §3: instantes en UTC con Z.
@@ -34,6 +39,9 @@ ENCODERS_BY_TYPE[datetime] = lambda d: d.astimezone(UTC).isoformat().replace("+0
 @asynccontextmanager
 async def ciclo(app: FastAPI) -> AsyncIterator[None]:
     app.state.modelos = cargar_modelos(configuracion().modelos_dir)
+    app.state.llm, tokens = Llm(), Tokens()
+    app.state.agente = Agente(app.state.llm, tokens)
+    app.state.voz = Voz(app.state.llm, tokens)
     consumidor = ConsumidorEventos(Proyecciones(app.state.modelos))
     app.state.consumidor = consumidor
     tarea = asyncio.create_task(consumidor.iniciar()) if configuracion().consumir_eventos else None
@@ -101,3 +109,4 @@ def salud_lista(request: Request) -> JSONResponse:
 app.include_router(rutas_lectura)
 app.include_router(rutas_reportes)
 app.include_router(rutas_acciones)
+app.include_router(rutas_agente)
