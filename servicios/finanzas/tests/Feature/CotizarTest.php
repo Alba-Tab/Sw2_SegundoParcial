@@ -1,5 +1,6 @@
 <?php
 
+use App\Infraestructura\Http\Idempotencia;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -66,6 +67,51 @@ it('el reenvío con la misma clave devuelve lo mismo y otro cuerpo da 422', func
     expect($b->json('cotizacionId'))->toBe($a->json('cotizacionId'))->and(DB::table('cotizacion')->count())->toBe(1);
     $b->assertHeader('Location', $a->headers->get('Location'));
     cotizar($this, $u, ['toneladas' => 10] + $laPaz20, $clave)->assertStatus(422)->assertJsonPath('codigo', 'IDEMPOTENCIA_CUERPO_DISTINTO');
+});
+
+it('la clave de otro usuario con el mismo cuerpo no devuelve su cotización', function () use ($laPaz20) {
+    $clave = (string) Str::uuid();
+    $a = cotizar($this, 'sub-1~cliente~'.CLIENTE, $laPaz20, $clave)->assertStatus(201);
+    $b = cotizar($this, 'sub-2~cliente~'.OTRO_CLIENTE, $laPaz20, $clave)->assertStatus(422)
+        ->assertJsonPath('codigo', 'IDEMPOTENCIA_CUERPO_DISTINTO');
+    expect($b->json('cotizacionId'))->toBeNull()->and($b->getContent())->not->toContain($a->json('cotizacionId'));
+});
+
+it('un reenvío simultáneo espera a la primera petición y recibe su respuesta guardada', function () use ($laPaz20) {
+    // Otro proceso hace de "primera petición": registra la clave EN_PROCESO y la completa 1 s después.
+    $clave = (string) Str::uuid();
+    $huella = Idempotencia::huella('POST', '/api/v1/cotizaciones', 'sub-1', $laPaz20);
+    $guardada = ['cotizacionId' => '01933b5a-1f00-7a20-8b11-0c2d3e4f5aff', 'estado' => 'VIGENTE'];
+    $db = config('database.connections.pgsql');
+    $codigo = <<<'PHP'
+        [$dsn, $u, $p, $clave, $huella, $cuerpo] = array_slice($argv, 1);
+        $pdo = new PDO($dsn, $u, $p, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+        $pdo->beginTransaction();
+        $pdo->prepare("INSERT INTO operacion_idempotente (clave, tipo_operacion, hash_cuerpo, estado) VALUES (?, 'CREAR_COTIZACION', ?, 'EN_PROCESO')")
+            ->execute([$clave, $huella]);
+        echo "listo\n";
+        usleep(1_000_000);
+        $pdo->prepare("UPDATE operacion_idempotente SET estado = 'COMPLETADA', codigo_http = 201, cuerpo_respuesta = ? WHERE clave = ?")
+            ->execute([$cuerpo, $clave]);
+        $pdo->commit();
+        PHP;
+    $proceso = proc_open(['php', '-r', $codigo, '--', "pgsql:host={$db['host']};port={$db['port']};dbname={$db['database']}",
+        $db['username'], $db['password'], $clave, $huella, json_encode($guardada)], [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $tubos);
+    expect(trim((string) fgets($tubos[1])))->toBe('listo');
+
+    $inicio = microtime(true);
+    $r = cotizar($this, 'sub-1~cliente~'.CLIENTE, $laPaz20, $clave)->assertStatus(201);
+    expect($r->json())->toEqual($guardada)
+        ->and(microtime(true) - $inicio)->toBeGreaterThan(0.5)
+        ->and(DB::table('cotizacion')->count())->toBe(0)
+        ->and(proc_close($proceso))->toBe(0);
+});
+
+it('una clave que quedó EN_PROCESO responde 409 IDEMPOTENCIA_EN_PROCESO', function () use ($laPaz20) {
+    $clave = (string) Str::uuid();
+    DB::table('operacion_idempotente')->insert(['clave' => $clave, 'tipo_operacion' => 'CREAR_COTIZACION',
+        'hash_cuerpo' => Idempotencia::huella('POST', '/api/v1/cotizaciones', 'sub-1', $laPaz20), 'estado' => 'EN_PROCESO']);
+    cotizar($this, 'sub-1~cliente~'.CLIENTE, $laPaz20, $clave)->assertStatus(409)->assertJsonPath('codigo', 'IDEMPOTENCIA_EN_PROCESO');
 });
 
 it('con vigencia PT2M la cotización aparece vencida después de 2 minutos', function () {

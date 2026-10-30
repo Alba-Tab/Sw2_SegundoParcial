@@ -1,5 +1,9 @@
 <?php
 
+use App\Aplicacion\Puertos\LineaCreditoRepositorio;
+use App\Aplicacion\Puertos\VersionDesactualizada;
+use App\Dominio\Credito\LineaCredito;
+use App\Infraestructura\Persistencia\LineaCreditoRepositorioDb;
 use App\Infraestructura\Temporal\FinanzasActividades;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -90,6 +94,72 @@ it('cobro parcial y total: saldo, estado, línea abonada y PagoRegistrado', func
     expect(linea()->utilizado)->toBe('0.00')
         ->and(DB::table('pago')->count())->toBe(2)
         ->and(DB::table('outbox_eventos')->where('tipo', 'PagoRegistrado')->count())->toBe(2);
+});
+
+it('la misma clave y el mismo cuerpo en otra factura no devuelven el pago de la primera', function () {
+    consumidor()->aplicar(entregaConfirmada(reservaActiva($this)['servicio'], (string) Str::uuid7()));
+    consumidor()->aplicar(entregaConfirmada(reservaActiva($this)['servicio'], (string) Str::uuid7()));
+    [$a, $b] = DB::table('factura')->orderBy('numero')->pluck('factura_id')->all();
+    $clave = (string) Str::uuid();
+
+    pagar($this, $a, '100.00', 'BNB-500001', $clave)->assertStatus(201)->assertJsonPath('facturaId', $a);
+    pagar($this, $b, '100.00', 'BNB-500001', $clave)->assertStatus(422)->assertJsonPath('codigo', 'IDEMPOTENCIA_CUERPO_DISTINTO');
+    pagar($this, $a, '100.00', 'BNB-500001', $clave, 'sub-otra~administracion~')->assertStatus(422);
+    expect(DB::table('pago')->where('factura_id', $b)->count())->toBe(0)
+        ->and(DB::table('factura')->where('factura_id', $b)->value('saldo'))->toBe('2800.00')
+        ->and(DB::table('pago')->count())->toBe(1);
+});
+
+/** La línea de crédito real, pero `actualizar` pierde el bloqueo optimista las primeras $fallas veces. */
+function lineaQueChoca(int $fallas): object
+{
+    $linea = new class(app(LineaCreditoRepositorioDb::class), $fallas) implements LineaCreditoRepositorio
+    {
+        public int $intentos = 0;
+
+        public function __construct(private LineaCreditoRepositorioDb $real, public int $fallas) {}
+
+        public function porCliente(string $clienteId): ?LineaCredito
+        {
+            return $this->real->porCliente($clienteId);
+        }
+
+        public function paraActualizar(string $clienteId): ?LineaCredito
+        {
+            return $this->real->paraActualizar($clienteId);
+        }
+
+        public function crear(LineaCredito $linea): void
+        {
+            $this->real->crear($linea);
+        }
+
+        public function actualizar(LineaCredito $linea): void
+        {
+            if (++$this->intentos <= $this->fallas) {
+                throw new VersionDesactualizada('otro cambio ganó');
+            }
+            $this->real->actualizar($linea);
+        }
+    };
+    app()->instance(LineaCreditoRepositorio::class, $linea);
+
+    return $linea;
+}
+
+it('VersionDesactualizada repite la transacción del pago hasta 3 veces y después responde 409', function () {
+    consumidor()->aplicar(entregaConfirmada(reservaActiva($this)['servicio'], (string) Str::uuid7()));
+    $id = DB::table('factura')->value('factura_id');
+
+    $linea = lineaQueChoca(2);
+    pagar($this, $id, '100.00', 'BNB-600001')->assertStatus(201)->assertJsonPath('saldo.monto', '2700.00');
+    expect($linea->intentos)->toBe(3)->and(DB::table('pago')->count())->toBe(1);
+
+    $linea->intentos = 0;
+    $linea->fallas = 3;
+    pagar($this, $id, '100.00', 'BNB-600002')->assertStatus(409)->assertJsonPath('codigo', 'VERSION_DESACTUALIZADA');
+    expect($linea->intentos)->toBe(3)->and(DB::table('pago')->count())->toBe(1)
+        ->and(DB::table('factura')->where('factura_id', $id)->value('saldo'))->toBe('2700.00');
 });
 
 it('el cliente ve solo sus facturas, con mora calculada; administración filtra por saldo y vencimiento', function () {

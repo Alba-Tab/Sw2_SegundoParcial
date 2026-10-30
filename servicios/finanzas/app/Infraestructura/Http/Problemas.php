@@ -2,6 +2,7 @@
 
 namespace App\Infraestructura\Http;
 
+use App\Aplicacion\Puertos\VersionDesactualizada;
 use App\Dominio\Comun\ErrorDeDominio;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Http\JsonResponse;
@@ -50,6 +51,9 @@ final class Problemas
             $e instanceof ValidationException => self::respuesta('VALIDACION', 'Petición inválida', 'Revisa los campos indicados', 400,
                 ['errores' => collect($e->errors())->flatMap(fn ($m, $c) => array_map(fn ($x) => ['campo' => $c, 'mensaje' => $x], $m))->values()->all()]),
             $e instanceof AuthenticationException => self::respuesta('NO_AUTENTICADO', 'No autenticado', $e->getMessage(), 401),
+            // Idempotencia ya repitió la transacción 3 veces (spec 008).
+            $e instanceof VersionDesactualizada => self::respuesta('VERSION_DESACTUALIZADA', 'Versión desactualizada',
+                'Otro cambio modificó los mismos datos; vuelve a intentarlo', 409),
             $e instanceof HttpExceptionInterface => self::respuesta(self::POR_ESTADO[$e->getStatusCode()] ?? 'CONFLICTO_ESTADO',
                 'Error', $e->getMessage() ?: 'Error', $e->getStatusCode(), [], $e->getHeaders()),
             default => self::respuesta('DEPENDENCIA_NO_DISPONIBLE', 'Error interno', 'Ocurrió un error inesperado', 500),
