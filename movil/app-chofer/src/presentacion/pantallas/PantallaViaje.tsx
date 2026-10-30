@@ -4,22 +4,30 @@ import { ScrollView } from 'react-native';
 import { Banner, Button, Card, Text } from 'react-native-paper';
 import { estadoVisible, puedeIniciar } from '../../dominio/viaje';
 import { bd } from '../../datos/bd';
-import { casos, viajes } from '../../datos/contenedor';
-import { viaje } from '../../datos/esquema';
+import { casos, puntos, viajes } from '../../datos/contenedor';
+import { type EstadoGps, posicionActual } from '../../datos/gps';
+import { puntoGps, viaje } from '../../datos/esquema';
 import { CARGAS, ESTADOS } from '../textos';
 
 /** Spec 005, paso 2: "Iniciar viaje" va a la cola con su opId y la hora del celular; funciona sin señal. */
-export function PantallaViaje({ viajeId, sincronizar }: { viajeId: string; sincronizar: () => void }) {
+const GPS: Record<EstadoGps, string> = {
+  activo: 'GPS activo',
+  'sin-permiso': 'Sin permiso de ubicación: actívalo en Ajustes',
+  'sin-permiso-fondo': 'Permite la ubicación "Siempre" para registrar el viaje con la pantalla apagada',
+  detenido: 'GPS detenido',
+};
+
+export function PantallaViaje({ viajeId, gps, sincronizar }: { viajeId: string; gps: EstadoGps; sincronizar: () => void }) {
   useLiveQuery(bd.select().from(viaje));
+  useLiveQuery(bd.select().from(puntoGps));
   const v = viajes.porId(viajeId);
   const [error, setError] = useState<string | null>(null);
   if (!v) return <Text style={{ padding: 16 }}>El viaje ya no está en este celular.</Text>;
   const estado = estadoVisible(v);
 
-  const iniciar = () => {
+  const iniciar = async () => {
     try {
-      // La posición del inicio llega con el GPS (T7.3).
-      casos.iniciarViaje(viajeId, null);
+      casos.iniciarViaje(viajeId, await posicionActual());
       sincronizar();
     } catch (e) {
       setError((e as Error).message);
@@ -45,9 +53,14 @@ export function PantallaViaje({ viajeId, sincronizar }: { viajeId: string; sincr
       {v.iniciadoLocal && estado === 'EN_RUTA' && v.estado === 'CONFIRMADO' && (
         <Text variant="bodyMedium">Inicio registrado en el celular; se envía al recuperar la señal.</Text>
       )}
+      {estado === 'EN_RUTA' && (
+        <Text variant="bodyMedium">
+          {GPS[gps]} · {puntos.pendientes(viajeId, 10_000).length} puntos por enviar
+        </Text>
+      )}
       {error && <Text variant="bodyMedium">{error}</Text>}
       {puedeIniciar(v, viajes.todos()) && (
-        <Button mode="contained" icon="truck-fast" onPress={iniciar} contentStyle={{ paddingVertical: 8 }}>
+        <Button mode="contained" icon="truck-fast" onPress={() => void iniciar()} contentStyle={{ paddingVertical: 8 }}>
           Iniciar viaje
         </Button>
       )}

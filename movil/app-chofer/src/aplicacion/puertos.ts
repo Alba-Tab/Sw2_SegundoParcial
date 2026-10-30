@@ -17,6 +17,8 @@ export interface Cola {
 
 export interface PuntosGps {
   agregar(p: PuntoGps): void;
+  /** El siguiente `seq` del viaje en este celular (crece aunque los puntos ya enviados se borren). */
+  siguienteSeq(viajeId: string): number;
   pendientes(viajeId: string, limite: number): PuntoGps[];
   viajes(): string[];
   borrar(viajeId: string, seqs: number[]): void;

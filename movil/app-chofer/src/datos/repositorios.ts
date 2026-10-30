@@ -4,7 +4,7 @@ import type { PuntoGps } from '../dominio/gps';
 import type { EstadoOperacion, Operacion, TipoOperacion } from '../dominio/operacion';
 import type { EstadoViaje, ViajeLocal } from '../dominio/viaje';
 import { bd } from './bd';
-import { operacionPendiente, puntoGps, viaje } from './esquema';
+import { ajuste, operacionPendiente, puntoGps, viaje } from './esquema';
 
 /** Adaptadores SQLite (Drizzle) de los puertos de la cola, el GPS y los viajes. Síncronos: SQLite está en el celular. */
 export class ColaSqlite implements Cola {
@@ -72,6 +72,16 @@ function aOperacion(f: typeof operacionPendiente.$inferSelect): Operacion {
 }
 
 export class PuntosSqlite implements PuntosGps {
+  siguienteSeq(viajeId: string): number {
+    const clave = `seq:${viajeId}`;
+    const actual = Number(bd.select().from(ajuste).where(eq(ajuste.clave, clave)).get()?.valor ?? -1) + 1;
+    bd.insert(ajuste)
+      .values({ clave, valor: String(actual) })
+      .onConflictDoUpdate({ target: ajuste.clave, set: { valor: String(actual) } })
+      .run();
+    return actual;
+  }
+
   agregar(p: PuntoGps): void {
     bd.insert(puntoGps).values(p).onConflictDoNothing().run();
   }

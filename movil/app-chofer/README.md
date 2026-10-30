@@ -21,6 +21,12 @@ Dominio y aplicación son TypeScript puro y se prueban con Vitest y puertos fals
 - El GPS sale después del inicio confirmado, en lotes de hasta 100, uno a la vez; un 503 con `Retry-After` (FO4) solo hace crecer "Pendientes". Al abrir, el cursor del dispositivo (D55) borra lo que el servidor ya aceptó.
 - Disparadores: cambio de conectividad, app al frente, cada 90 s y la tarea en segundo plano.
 
+## GPS y frenadas (T7.3)
+
+- `expo-location` en segundo plano (servicio en primer plano en Android, indicador azul en iOS) mientras haya un viaje en ruta, aunque el inicio siga en la cola. Cada lectura pasa por el muestreo de D52 (un punto cada 20 s o cada 100 m) y se guarda con un `seq` creciente por viaje que no se reinicia al borrar lo enviado.
+- `expo-sensors` (DeviceMotion a 10 Hz, con la app al frente): una frenada es brusca desde 0,4 g sostenida 300 ms a más de 20 km/h, como mucho una cada 10 s (D08, D59). Va a la cola como `EVENTO_CONDUCCION` con la última posición del GPS.
+- El inicio del viaje lleva la última posición conocida.
+
 ## Correr
 
 ```bash
