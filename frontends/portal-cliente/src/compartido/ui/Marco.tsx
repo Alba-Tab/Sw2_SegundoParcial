@@ -12,6 +12,7 @@ import { BotonEnlace } from './BotonEnlace';
 
 const MENU = [
   { a: '/cotizar', texto: 'Cotizar' },
+  { a: '/servicios', texto: 'Mis servicios' },
   { a: '/empresa', texto: 'Mi empresa' },
 ] as const;
 

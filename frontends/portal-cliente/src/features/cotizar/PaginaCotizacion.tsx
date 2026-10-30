@@ -12,8 +12,9 @@ import { dinero, fecha, TIPOS_CARGA } from '../../compartido/formato/formato';
 import { BotonEnlace } from '../../compartido/ui/BotonEnlace';
 import { CuentaRegresiva } from '../../compartido/ui/CuentaRegresiva';
 import { Problema } from '../../compartido/ui/Problema';
+import { ConfirmarServicio } from '../servicios/ConfirmarServicio';
 
-/** Spec 002, paso 6: el monto y la cuenta regresiva hasta venceEn. */
+/** Spec 002, paso 6: el monto, la cuenta regresiva hasta venceEn y "Confirmar servicio" (spec 003). */
 export function PaginaCotizacion() {
   const { cotizacionId } = useParams({ from: '/cotizaciones/$cotizacionId' });
   const cotizacion = useObtenerCotizacion(cotizacionId);
@@ -49,6 +50,7 @@ export function PaginaCotizacion() {
         ) : (
           <CuentaRegresiva hasta={c.venceEn} alVencer={() => setVencioAqui(true)} color="text.secondary" />
         )}
+        {c.estado === 'VIGENTE' && !vencida && <ConfirmarServicio cotizacionId={c.cotizacionId} />}
         <Stack direction="row" spacing={1}>
           <BotonEnlace to="/cotizar" variant={vencida ? 'contained' : 'text'}>
             Nueva cotización
