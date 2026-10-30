@@ -24,7 +24,9 @@ import { TableroGQL, type Periodo } from '../graphql/generado';
         <mat-button-toggle value="ESTA_SEMANA">Esta semana</mat-button-toggle>
         <mat-button-toggle value="ESTE_MES">Este mes</mat-button-toggle>
       </mat-button-toggle-group>
-      <a routerLink="/reportes" class="enlace">Reportes →</a>
+      <span class="enlace"
+        ><a routerLink="/reportes">Reportes</a> · <a routerLink="/voz">Pregunta por voz</a> · <a routerLink="/agente">Agente</a></span
+      >
     </div>
     @if (cargando()) {
       <mat-progress-bar mode="indeterminate" />

@@ -42,3 +42,6 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# Whisper tiny: lo baja scripts/descargar-whisper.sh (no se versiona)
+/projects/cc-tablero/public/modelos/
