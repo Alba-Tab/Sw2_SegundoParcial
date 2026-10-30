@@ -1,3 +1,4 @@
+import { existsSync, readFileSync } from 'node:fs';
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
 /**
@@ -5,6 +6,24 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
  * de iOS resuelven mDNS) o `nube` (F11). Las URL viajan en `extra` y las lee src/configuracion.ts.
  */
 const entorno = process.env.APP_ENTORNO ?? 'local';
+/** El paquete de Android; APP_ANDROID_PACKAGE permite probar con otra app ya registrada en Firebase. */
+const paqueteAndroid = process.env.APP_ANDROID_PACKAGE ?? 'bo.transporte.chofer';
+
+/**
+ * D45: google-services.json no se versiona; se genera en el build desde un secreto (o se copia en local). Solo se usa si
+ * Firebase tiene registrada esta app; si no, la app compila sin push.
+ */
+function firebaseAndroid(): string | null {
+  const archivo = process.env.APP_GOOGLE_SERVICES ?? './google-services.json';
+  if (!existsSync(archivo)) return null;
+  const config = JSON.parse(readFileSync(archivo, 'utf8')) as {
+    client?: { client_info?: { android_client_info?: { package_name?: string } } }[];
+  };
+  const registrada = config.client?.some((c) => c.client_info?.android_client_info?.package_name === paqueteAndroid);
+  if (!registrada) console.warn(`google-services.json no tiene la app ${paqueteAndroid}: el build de Android va sin push.`);
+  return registrada ? archivo : null;
+}
+const firebase = firebaseAndroid();
 const mac = process.env.APP_MAC_LOCAL ?? 'mac.local';
 const servicios =
   entorno === 'nube'
@@ -40,7 +59,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
   },
   android: {
-    package: 'bo.transporte.chofer',
+    package: paqueteAndroid,
     adaptiveIcon: {
       backgroundColor: '#3c6090',
       foregroundImage: './assets/android-icon-foreground.png',
@@ -49,6 +68,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     },
     permissions: ['POST_NOTIFICATIONS'],
     predictiveBackGestureEnabled: false,
+    ...(firebase ? { googleServicesFile: firebase } : {}),
   },
   plugins: [
     'expo-sqlite',
@@ -74,6 +94,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         photosPermission: 'Para elegir la foto de la entrega o del recibo.',
       },
     ],
+    ['expo-notifications', { defaultChannel: 'viajes' }],
     ['expo-sensors', { motionPermission: 'Para detectar frenadas bruscas durante el viaje.' }],
     ['expo-build-properties', { android: { usesCleartextTraffic: entorno === 'local' } }],
   ],

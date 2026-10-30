@@ -10,6 +10,7 @@ import { casos, sesion, viajes } from '../datos/contenedor';
 import { viaje } from '../datos/esquema';
 import { estadoVisible } from '../dominio/viaje';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
+import { escucharPush, tokenPush } from '../datos/push';
 import { registrarTareaFondo } from '../datos/tareaFondo';
 import { BarraSincronizacion } from './BarraSincronizacion';
 import { PantallaCarga } from './pantallas/PantallaCarga';
@@ -63,7 +64,7 @@ function ConSesion() {
     if (!(await sesion.iniciar())) return;
     setEstado('activa');
     // Con señal recién entrado: el celular se registra y baja sus viajes (spec 005, paso 1).
-    await Promise.allSettled([casos.registrarDispositivo(), casos.descargarViajes(), registrarTareaFondo()]);
+    await Promise.allSettled([tokenPush().then((t) => casos.registrarDispositivo(t)), casos.descargarViajes(), registrarTareaFondo()]);
   };
 
   if (estado === 'cargando') return <ActivityIndicator style={{ flex: 1 }} />;
@@ -81,6 +82,19 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
   const enRuta = viajes.todos().find((v) => estadoVisible(v) === 'EN_RUTA')?.viajeId ?? null;
   const alFrenar = useCallback(() => setAviso('Frenada brusca registrada'), []);
   const gps = useViajeEnRuta(enRuta, alFrenar);
+
+  // D45: "Viaje asignado" o "Viaje cancelado" baja los viajes de nuevo; tocar la notificación abre el viaje.
+  useEffect(
+    () =>
+      escucharPush(
+        (viajeId) => {
+          void casos.descargarViajes().catch(() => {});
+          setPantalla({ nombre: 'viaje', viajeId });
+        },
+        () => void casos.descargarViajes().catch(() => {}),
+      ),
+    [],
+  );
 
   useEffect(() => {
     const atras = BackHandler.addEventListener('hardwareBackPress', () => {
