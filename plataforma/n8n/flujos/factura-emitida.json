@@ -14,6 +14,7 @@
         "queue": "n8n.eventos",
         "options": {
           "acknowledge": "executionFinishesSuccessfully",
+          "parallelMessages": 1,
           "assertQueue": false,
           "jsonParseBody": true,
           "onlyContent": true
