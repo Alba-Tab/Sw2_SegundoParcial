@@ -23,6 +23,13 @@ final class CatalogoRepositorioDb implements CatalogoRepositorio
         return $r === null ? null : (string) $r;
     }
 
+    public function contacto(string $clienteId): ?array
+    {
+        $c = DB::table('cliente_copia')->where('cliente_id', $clienteId)->first(['razon_social', 'correo']);
+
+        return $c ? ['razonSocial' => (string) $c->razon_social, 'correo' => (string) $c->correo] : null;
+    }
+
     public function rutaActiva(string $rutaId): bool
     {
         return DB::table('ruta_copia')->where('ruta_id', $rutaId)->where('activa', true)->exists();

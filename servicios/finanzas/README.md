@@ -15,7 +15,7 @@ Cotizaciones, líneas de crédito, reservas de la saga, facturas y pagos. Larave
 | API: Octane con 4 workers (`.rr.octane.yaml`). Worker: `.rr.yaml` con Temporal (cola `finanzas`) y el plugin `service` (D29) | raíz del servicio |
 
 ```bash
-./probar.sh                       # Pint, 32 pruebas, Deptrac y Larastan (necesita el compose levantado)
+./probar.sh                       # Pint, 40 pruebas, Deptrac y Larastan (necesita el compose levantado)
 docker compose -f ../../plataforma/compose/compose.yaml --profile core --profile plataforma up -d --build finanzas-api finanzas-worker
 curl localhost:8103/health/ready
 ```
@@ -37,3 +37,12 @@ curl localhost:8103/health/ready
 - **`liberarCredito`:** la reserva queda `LIBERADA`, el monto vuelve al disponible y la cotización vuelve a `VIGENTE` si sigue en plazo. Sin reserva, no hace nada.
 - **Errores (S9):** cada `ErrorDeDominio` sale como `ApplicationFailure`, con `type` igual al código y un `DetalleFallo`. Son reintentables `CLIENTE_NO_REPLICADO` y `DEPENDENCIA_NO_DISPONIBLE`.
 - **Endpoints:** `GET /api/v1/solicitudes-aprobacion` y `/{servicioId}`, este último con las facturas vencidas, para administración y gerente.
+
+## Factura, liberación por rechazo y cobros (T5.2, specs 006, 007 y 008)
+
+- **`EntregaConfirmada`** (Inbox): una factura por viaje (`FAC-` + secuencia) por el monto de la reserva, vence a los 30 días (D04); la reserva pasa a `CONSUMIDA`, la línea consume el monto (`reservado` baja, `utilizado` sube) y queda `FacturaEmitida` con razón social, correo y `enlacePortal` (`PORTAL_URL`). Una reserva que no está `ACTIVA` va a la DLQ.
+- **`EntregaRechazada`**: libera la reserva y la cotización sigue `ACEPTADA`.
+- **`POST /api/v1/facturas/{id}/pagos`** (administración, idempotente): saldo, `PAGADA_PARCIAL` o `PAGADA`, la línea se abona y `PagoRegistrado`. `PAGO_EXCEDE_SALDO`, `PAGO_DUPLICADO` (con `pagoId`) y monto no positivo `400`.
+- **`GET /api/v1/facturas`** (filtros de estado, saldo y vencimiento; el cliente ve solo las suyas), `/{id}` con pagos y `/{id}/pagos`.
+- **Outbox**: valida cada evento contra `contratos/eventos` (opis/json-schema, copiados en la imagen) y siempre completa `correlationId` y `traceparent`.
+- Los `datos` de un `ErrorDeDominio` salen como extensiones del Problem Details; `campo` se vuelve `errores`.

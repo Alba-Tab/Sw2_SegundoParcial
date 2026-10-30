@@ -53,6 +53,11 @@ final class Monto
         return new self($this->valor->multipliedBy($factor, RoundingMode::HalfUp));
     }
 
+    public function esCero(): bool
+    {
+        return $this->valor->isZero();
+    }
+
     public function esMayorQue(self $otro): bool
     {
         return $this->valor->isGreaterThan($otro->valor);

@@ -15,6 +15,7 @@ tags:
   - name: salud
   - name: cotizaciones
   - name: credito
+  - name: facturas
 paths:
   /health:
     get:
@@ -224,7 +225,142 @@ paths:
         '404':
           $ref: './comun.yaml#/components/responses/NoEncontrado'
 
+  /api/v1/facturas:
+    get:
+      tags: [facturas]
+      operationId: listarFacturas
+      summary: Facturas (spec 006 y 008). Con rol cliente solo las suyas (el clienteId del parámetro se ignora, 000 §8).
+      description: |
+        administracion y gerente ven todas; comercial solo con clienteId. `conSaldo=true` deja las que tienen saldo; `venceDesde`
+        y `venceHasta` filtran por `venceEl` (cuentas por cobrar de la semana, spec 015).
+      parameters:
+        - name: estado
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/EstadoFactura'
+        - name: conSaldo
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: venceDesde
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/Fecha'
+        - name: venceHasta
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/Fecha'
+        - name: clienteId
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/Uuid'
+        - $ref: './comun.yaml#/components/parameters/Limite'
+        - $ref: './comun.yaml#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Página de facturas.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaFacturas'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+  /api/v1/facturas/{facturaId}:
+    parameters:
+      - $ref: '#/components/parameters/FacturaId'
+    get:
+      tags: [facturas]
+      operationId: obtenerFactura
+      summary: Una factura con sus pagos.
+      responses:
+        '200':
+          description: Factura.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Factura'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+  /api/v1/facturas/{facturaId}/pagos:
+    parameters:
+      - $ref: '#/components/parameters/FacturaId'
+    get:
+      tags: [facturas]
+      operationId: listarPagos
+      summary: Los pagos de una factura.
+      responses:
+        '200':
+          description: Pagos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaPagos'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+    post:
+      tags: [facturas]
+      operationId: registrarPago
+      summary: Administración registra un pago (spec 008); baja el saldo, abona la línea y publica PagoRegistrado.
+      description: |
+        Monto > 0 y ≤ saldo (si no, 400 VALIDACION o 422 PAGO_EXCEDE_SALDO). La misma referencia y medio en la misma factura
+        con otra clave responde 409 PAGO_DUPLICADO con la extensión `pagoId` del pago existente.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PagoNuevo'
+      responses:
+        '201':
+          description: Pago registrado; la factura actualizada.
+          headers:
+            Location:
+              $ref: './comun.yaml#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Factura'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
 components:
+  parameters:
+    FacturaId:
+      name: facturaId
+      in: path
+      required: true
+      schema:
+        $ref: './comun.yaml#/components/schemas/Uuid'
   securitySchemes:
     bearer:
       type: http
@@ -366,6 +502,117 @@ components:
           $ref: './comun.yaml#/components/schemas/Instante'
         motivoDecision:
           type: string
+    EstadoFactura:
+      type: string
+      enum: [EMITIDA, PAGADA_PARCIAL, PAGADA]
+    MedioPago:
+      type: string
+      enum: [TRANSFERENCIA, DEPOSITO, EFECTIVO, CHEQUE]
+    PagoNuevo:
+      type: object
+      required: [monto, fecha, medio, referencia]
+      additionalProperties: false
+      properties:
+        monto:
+          $ref: './comun.yaml#/components/schemas/Monto'
+        fecha:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+        medio:
+          $ref: '#/components/schemas/MedioPago'
+        referencia:
+          type: string
+          minLength: 3
+          maxLength: 40
+        nota:
+          type: string
+          maxLength: 300
+    Pago:
+      type: object
+      required: [pagoId, facturaId, monto, fecha, medio, referencia, registradoPor, registradoEn]
+      properties:
+        pagoId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        facturaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        monto:
+          $ref: './comun.yaml#/components/schemas/Monto'
+        fecha:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+        medio:
+          $ref: '#/components/schemas/MedioPago'
+        referencia:
+          type: string
+        nota:
+          type: string
+        registradoPor:
+          $ref: './comun.yaml#/components/schemas/Sub'
+        registradoEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+    ListaPagos:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Pago'
+    Factura:
+      type: object
+      required: [facturaId, numero, viajeId, servicioId, clienteId, razonSocial, monto, saldo, estado, emitidaEl, venceEl, vencida, diasVencida]
+      properties:
+        facturaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        numero:
+          type: string
+          pattern: '^FAC-[0-9]{6}$'
+        viajeId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        servicioId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        clienteId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        razonSocial:
+          type: string
+        monto:
+          $ref: './comun.yaml#/components/schemas/Monto'
+        saldo:
+          $ref: './comun.yaml#/components/schemas/Monto'
+        estado:
+          $ref: '#/components/schemas/EstadoFactura'
+        emitidaEl:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+        venceEl:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+        vencida:
+          type: boolean
+          description: saldo > 0 y hoy > venceEl (se calcula al leer).
+        diasVencida:
+          type: integer
+          minimum: 0
+        rutaId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        tipoCarga:
+          $ref: './comun.yaml#/components/schemas/TipoCarga'
+        toneladas:
+          type: number
+        fechaViaje:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+        pagos:
+          type: array
+          description: Solo en obtenerFactura y registrarPago.
+          items:
+            $ref: '#/components/schemas/Pago'
+    PaginaFacturas:
+      type: object
+      required: [items, siguienteCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Factura'
+        siguienteCursor:
+          type: string
+          nullable: true
     PaginaSolicitudes:
       type: object
       required: [items, siguienteCursor]

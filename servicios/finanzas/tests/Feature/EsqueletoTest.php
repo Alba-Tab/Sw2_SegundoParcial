@@ -26,12 +26,30 @@ it('con OIDC_ISSUER y sin token responde 401 NO_AUTENTICADO', function () {
     $this->getJson('/api/v1/lineas-credito')->assertStatus(401)->assertJson(['codigo' => 'NO_AUTENTICADO']);
 });
 
+/** Un PagoRegistrado válido según contratos/eventos (el Outbox valida cada sobre). */
+function pagoDePrueba(string $pagoId): array
+{
+    return ['pagoId' => $pagoId, 'facturaId' => '01933f00-0000-7000-8000-000000000001', 'numeroFactura' => 'FAC-000001',
+        'clienteId' => '0193a000-0000-7000-8000-0000000c0002', 'monto' => ['monto' => '100.00', 'moneda' => 'BOB'],
+        'fecha' => '2026-11-03', 'medio' => 'TRANSFERENCIA', 'referencia' => 'BNB-1', 'saldoFactura' => ['monto' => '4900.00', 'moneda' => 'BOB'],
+        'estadoFactura' => 'PAGADA_PARCIAL'];
+}
+
+it('el Outbox valida cada evento contra su contrato', function () {
+    expect(fn () => DB::transaction(fn () => app(RegistroDeEventos::class)->registrar('PagoRegistrado', 'finanzas.pago-registrado.v1',
+        ['pagoId' => 'no-es-uuid'])))->toThrow(LogicException::class, 'no cumple su contrato');
+    DB::transaction(fn () => app(RegistroDeEventos::class)->registrar('PagoRegistrado', 'finanzas.pago-registrado.v1',
+        pagoDePrueba('01933f10-0000-7000-8000-000000000001')));
+    $sobre = json_decode(DB::table('outbox_eventos')->value('sobre'), true);
+    expect($sobre['correlationId'])->toMatch('/^[0-9a-f-]{36}$/')->and($sobre['traceparent'])->toMatch('/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/');
+});
+
 it('el Outbox solo se escribe dentro de una transacción y se revierte con ella', function () {
     $registro = app(RegistroDeEventos::class);
     expect(fn () => $registro->registrar('PagoRegistrado', 'finanzas.prueba-esqueleto.v1', []))->toThrow(LogicException::class);
     try {
         DB::transaction(function () use ($registro) {
-            $registro->registrar('PagoRegistrado', 'finanzas.prueba-esqueleto.v1', ['pagoId' => 'revertido']);
+            $registro->registrar('PagoRegistrado', 'finanzas.prueba-esqueleto.v1', pagoDePrueba('01933f10-0000-7000-8000-000000000002'));
             throw new RuntimeException('falla después de registrar');
         });
     } catch (RuntimeException) {
@@ -49,7 +67,8 @@ it('el relay publica el sobre con confirmación y marca publicado_en', function 
     [$cola] = $canal->queue_declare('', false, false, true, true);
     $canal->queue_bind($cola, RelayOutbox::EXCHANGE, 'finanzas.prueba-esqueleto.v1');
 
-    DB::transaction(fn () => app(RegistroDeEventos::class)->registrar('PagoRegistrado', 'finanzas.prueba-esqueleto.v1', ['pagoId' => 'p1']));
+    DB::transaction(fn () => app(RegistroDeEventos::class)->registrar('PagoRegistrado', 'finanzas.prueba-esqueleto.v1',
+        pagoDePrueba('01933f10-0000-7000-8000-000000000003')));
     expect(app(RelayOutbox::class)->publicarPendientes())->toBe(1);
 
     $mensaje = null;
@@ -59,7 +78,7 @@ it('el relay publica el sobre con confirmación y marca publicado_en', function 
     }
     expect($mensaje)->not->toBeNull();
     $sobre = json_decode($mensaje->getBody(), true);
-    expect($sobre)->toMatchArray(['tipo' => 'PagoRegistrado', 'version' => 1, 'productor' => 'finanzas', 'datos' => ['pagoId' => 'p1']])
+    expect($sobre)->toMatchArray(['tipo' => 'PagoRegistrado', 'version' => 1, 'productor' => 'finanzas', 'datos' => pagoDePrueba('01933f10-0000-7000-8000-000000000003')])
         ->and($mensaje->get('message_id'))->toBe($sobre['id'])
         ->and(DB::table('outbox_eventos')->whereNull('publicado_en')->count())->toBe(0);
     $conexion->close();
