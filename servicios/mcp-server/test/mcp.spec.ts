@@ -15,6 +15,7 @@ import request from 'supertest';
 import { crearModulo } from '../src/app.module';
 import { Autenticador } from '../src/autenticacion';
 import { LimitePeticiones } from '../src/limite';
+import { LoggerJson } from '../src/log';
 import { ClienteServicios } from '../src/servicios';
 
 const ISSUER = 'http://kc.prueba/realms/transporte';
@@ -25,6 +26,7 @@ let servicios: Server;
 const auditoria: Record<string, unknown>[] = [];
 const pedidos: { ruta: string; cabeceras: Record<string, unknown>; cuerpo: string }[] = [];
 const VIAJE = '01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02';
+const VIAJE_LARGO = '01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d99';
 const CLIENTE = '0193a000-0000-7000-8000-0000000c0001';
 
 const respuestas: Partial<Record<string, (q: URLSearchParams) => unknown>> = {
@@ -55,6 +57,16 @@ const respuestas: Partial<Record<string, (q: URLSearchParams) => unknown>> = {
         registradoEn: '2026-11-03T11:00:00Z',
       },
     ],
+  }),
+  // 20 entradas de 500 caracteres de 2 bytes: unos 21 KB, más que los 16 KB de una salida (D88).
+  [`GET /api/v1/viajes/${VIAJE_LARGO}/hitos`]: () => ({
+    items: Array.from({ length: 20 }, (_, i) => ({
+      hitoId: `01933c60-0000-7000-8000-0000000000${String(i).padStart(2, '0')}`,
+      tipo: 'PARADA',
+      descripcion: 'ñ'.repeat(500),
+      posicion: { lat: -17.4, lng: -63.9 },
+      registradoEn: `2026-11-03T${String(23 - i).padStart(2, '0')}:00:00Z`,
+    })),
   }),
   'GET /api/v1/unidades': (q) => ({
     items:
@@ -152,15 +164,27 @@ describe('servidor MCP (spec 014)', () => {
     const ok = await agente.callTool({ name: 'obtener_estado_unidad', arguments: { placa: '4521KTR' } });
     expect(ok.isError).toBeFalsy();
     expect(ok.structuredContent).toMatchObject({ placa: '4521KTR', estado: 'EN_VIAJE', kmDesdeUltimoMantenimiento: 8200 });
-    const inyeccion = await agente.callTool({ name: 'obtener_estado_unidad', arguments: { placa: { $ne: '' } } }).catch((e: Error) => e);
-    const texto = inyeccion instanceof Error ? inyeccion.message : JSON.stringify(inyeccion);
-    expect(texto).toMatch(/VALIDACION|Invalid|placa/i);
+    const inyeccion = await agente.callTool({ name: 'obtener_estado_unidad', arguments: { placa: { $ne: '' } } });
+    expect(inyeccion.isError).toBe(true);
+    expect(inyeccion.structuredContent).toMatchObject({ codigo: 'VALIDACION', mensaje: expect.stringContaining('placa') });
     expect(pedidos.some((p) => p.ruta.includes('%24ne'))).toBe(false);
+    const extra = await agente.callTool({ name: 'obtener_estado_unidad', arguments: { placa: '4521KTR', $where: '1' } });
+    expect(extra.structuredContent).toMatchObject({ codigo: 'VALIDACION' });
+    // Una fecha con la forma pero que no existe.
+    const fecha = await agente.callTool({ name: 'obtener_anomalias_combustible', arguments: { desde: '2026-13-45' } });
+    expect(fecha.structuredContent).toMatchObject({ codigo: 'VALIDACION', mensaje: expect.stringContaining('desde') });
+    const linea = auditoria.filter((l) => l['accion'] === 'mcp.obtener_estado_unidad' && l['resultado'] === 'VALIDACION')[0];
+    expect(linea).toMatchObject({ datos: {}, entidad: 'Unidad', entidadId: null });
     await expect(
       agente.callTool({ name: 'cuentas_por_cobrar', arguments: { rango: { desde: '2026-11-01', hasta: '2026-11-07' } } }),
     ).rejects.toMatchObject({
       code: -32602,
     });
+    await expect(agente.callTool({ name: 'borrar_todo', arguments: {} })).rejects.toMatchObject({ code: -32602 });
+    // D91: la llamada rechazada también deja su línea, sin argumentos; un nombre inventado no entra al log tal cual.
+    expect(auditoria.find((l) => l['accion'] === 'mcp.cuentas_por_cobrar')).toMatchObject({ resultado: '-32602', datos: {} });
+    expect(auditoria.find((l) => l['accion'] === 'mcp.desconocida')).toMatchObject({ resultado: '-32602', actorSub: 'agente-sa' });
+    expect(JSON.stringify(auditoria)).not.toContain('borrar_todo');
     await agente.close();
   });
 
@@ -173,8 +197,17 @@ describe('servidor MCP (spec 014)', () => {
     const aServicios = pedidos.filter((p) => p.ruta.includes('/hitos'));
     expect(aServicios[0].cabeceras['authorization']).toBe('Bearer intercambiado-viajes');
     // Solo letras, números y espacios en el filtro: nada de comodines u operadores.
-    const raro = await agente.callTool({ name: 'buscar_bitacora', arguments: { viajeId: VIAJE, texto: '.*' } }).catch((e: Error) => e);
-    expect(JSON.stringify(raro instanceof Error ? raro.message : raro)).toMatch(/VALIDACION|letras|Invalid/i);
+    const raro = await agente.callTool({ name: 'buscar_bitacora', arguments: { viajeId: VIAJE, texto: '.*' } });
+    expect(raro).toMatchObject({ isError: true, structuredContent: { codigo: 'VALIDACION' } });
+    // D88: si la bitácora no cabe en 16 KB, se recortan las entradas más viejas en vez de fallar.
+    const larga = await agente.callTool({ name: 'buscar_bitacora', arguments: { viajeId: VIAJE_LARGO } });
+    expect(larga.isError).toBeFalsy();
+    const contenido = larga.structuredContent as { entradas: { registradoEn: string }[]; truncado?: boolean };
+    expect(contenido.truncado).toBe(true);
+    expect(contenido.entradas.length).toBeGreaterThan(0);
+    expect(contenido.entradas.length).toBeLessThan(20);
+    expect(contenido.entradas[0].registradoEn).toBe('2026-11-03T23:00:00Z');
+    expect(Buffer.byteLength(JSON.stringify(contenido))).toBeLessThanOrEqual(16 * 1024);
     await agente.close();
   });
 
@@ -195,7 +228,15 @@ describe('servidor MCP (spec 014)', () => {
     expect(post.cabeceras['x-mision-id']).toBe('01933c50-0000-7000-8000-0000000000ff');
     expect(post.cabeceras['idempotency-key']).toMatch(/^[0-9a-f-]{36}$/);
     const linea = auditoria.find((l) => l['accion'] === 'mcp.proponer_accion')!;
-    expect(linea).toMatchObject({ canal: 'SISTEMA', actorSub: 'agente-sa', actorRol: 'agente_lectura', resultado: 'OK' });
+    expect(linea).toMatchObject({
+      canal: 'SISTEMA',
+      actorSub: 'agente-sa',
+      actorRol: 'agente_lectura',
+      resultado: 'OK',
+      entidad: 'AccionPropuesta',
+      entidadId: VIAJE,
+    });
+    expect(linea['id']).toMatch(/^[0-9a-f-]{36}$/);
     expect(JSON.stringify(linea['datos'])).not.toContain('Yapacaní');
     await agente.close();
   });
@@ -208,7 +249,7 @@ describe('servidor MCP (spec 014)', () => {
     await agente.close();
   });
 
-  it('seguridad HTTP: sin token 401 con WWW-Authenticate; otro azp 403; 31 llamadas por minuto → 429', async () => {
+  it('seguridad HTTP: sin token 401 con WWW-Authenticate; otro azp 403; 31 llamadas a herramientas por minuto → 429', async () => {
     const sin = await request(app.getHttpServer()).post('/mcp').send({});
     expect(sin.status).toBe(401);
     expect(sin.headers['www-authenticate']).toContain('Bearer');
@@ -218,20 +259,60 @@ describe('servidor MCP (spec 014)', () => {
       .send({});
     expect(otro.status).toBe(403);
     const t = await token(['agente_lectura'], 'agente', 'rafaga');
+    const enviar = async (mensaje: Record<string, unknown>) =>
+      (
+        await request(app.getHttpServer())
+          .post('/mcp')
+          .set('Authorization', `Bearer ${t}`)
+          .set('Content-Type', 'application/json')
+          .set('Accept', 'application/json, text/event-stream')
+          .send({ jsonrpc: '2.0', ...mensaje })
+      ).status;
+    // ping, tools/list y la inicialización no cuentan.
+    for (let i = 0; i < 40; i++) expect(await enviar({ id: i, method: 'ping' })).not.toBe(429);
+    const llamada = (id: number) => ({
+      id,
+      method: 'tools/call',
+      params: { name: 'obtener_estado_unidad', arguments: { placa: '4521KTR' } },
+    });
     const codigos: number[] = [];
-    for (let i = 0; i < 31; i++) {
-      codigos.push(
-        (
-          await request(app.getHttpServer())
-            .post('/mcp')
-            .set('Authorization', `Bearer ${t}`)
-            .set('Content-Type', 'application/json')
-            .send({ jsonrpc: '2.0', id: i, method: 'ping' })
-        ).status,
-      );
-    }
+    for (let i = 0; i < 31; i++) codigos.push(await enviar(llamada(100 + i)));
     expect(codigos.slice(0, 30).every((c) => c !== 429)).toBe(true);
     expect(codigos[30]).toBe(429);
+    expect(auditoria.find((l) => l['actorSub'] === 'rafaga' && l['resultado'] === 'LIMITE_PETICIONES')).toMatchObject({
+      accion: 'mcp.obtener_estado_unidad',
+      datos: {},
+    });
+  });
+
+  it('un JSON roto responde Problem Details', async () => {
+    const r = await request(app.getHttpServer())
+      .post('/mcp')
+      .set('Authorization', `Bearer ${await token(['agente_lectura'], 'agente')}`)
+      .set('Content-Type', 'application/json')
+      .send('{roto');
+    expect(r.status).toBe(400);
+    expect(r.headers['content-type']).toContain('application/problem+json');
+    expect(r.body).toMatchObject({
+      codigo: 'VALIDACION',
+      type: 'https://transporte.local/errores/validacion',
+      detail: 'El cuerpo no es un JSON válido',
+    });
+  });
+
+  it('X-Correlation-Id del cliente (UUID) en la auditoría y hacia los servicios; si no es UUID, uno nuevo', async () => {
+    const id = '0193a000-0000-7000-8000-0000000c0aaa';
+    const conId = await cliente(['agente_lectura'], 'agente', { 'X-Correlation-Id': id });
+    await conId.callTool({ name: 'obtener_estado_unidad', arguments: { placa: '4521KTR' } });
+    await conId.close();
+    expect(auditoria.filter((l) => l['correlationId'] === id).map((l) => l['accion'])).toContain('mcp.obtener_estado_unidad');
+    expect(pedidos.some((p) => p.cabeceras['x-correlation-id'] === id)).toBe(true);
+    const raro = await cliente(['agente_lectura'], 'agente', { 'X-Correlation-Id': 'no-es-uuid' });
+    const antes = auditoria.length;
+    await raro.callTool({ name: 'obtener_estado_unidad', arguments: { placa: '4521KTR' } });
+    await raro.close();
+    expect(auditoria[antes]['correlationId']).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-/);
+    expect(auditoria[antes]['correlationId']).not.toBe('no-es-uuid');
   });
 
   it('recursos y prompts: vocabulario y misión sin valores de ejemplo', async () => {
@@ -244,5 +325,34 @@ describe('servidor MCP (spec 014)', () => {
     expect(texto).toContain('FIN');
     expect(texto).not.toMatch(/4521KTR|Agroexport/);
     await agente.close();
+  });
+});
+
+describe('límite y logs', () => {
+  it('el Map del límite borra las claves vencidas', () => {
+    let reloj = 0;
+    const limite = new LimitePeticiones(2, 60_000, () => reloj);
+    for (let i = 0; i < 50; i++) limite.tomar(`sub-${i}|agente`);
+    expect(limite.tamano).toBe(50);
+    expect(limite.tomar('sub-0|agente')).toBe(0);
+    expect(limite.tomar('sub-0|agente')).toBeGreaterThan(0);
+    reloj += 61_000;
+    expect(limite.tomar('nuevo|agente')).toBe(0);
+    expect(limite.tamano).toBe(1);
+  });
+
+  it('los logs de Nest salen en JSON (000 §10)', () => {
+    const lineas: string[] = [];
+    const espia = jest.spyOn(process.stdout, 'write').mockImplementation((t) => (lineas.push(String(t)), true));
+    new LoggerJson().log('Nest application successfully started', 'NestApplication');
+    espia.mockRestore();
+    expect(JSON.parse(lineas[0])).toMatchObject({
+      nivel: 'INFO',
+      servicio: 'mcp-server',
+      mensaje: 'Nest application successfully started',
+      contexto: 'NestApplication',
+      correlationId: null,
+      traceId: null,
+    });
   });
 });
