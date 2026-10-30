@@ -2,7 +2,7 @@ import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatTableModule } from '@angular/material/table';
-import { BobPipe, completo, FechaPipe } from 'ui-comun';
+import { AvisoServicios, BobPipe, completo, FechaPipe } from 'ui-comun';
 import { CombustibleGQL, type CombustibleQuery } from '../graphql/generado';
 
 const hace = (dias: number) => new Date(Date.now() - dias * 86_400_000).toISOString().slice(0, 10);
@@ -10,9 +10,10 @@ const hace = (dias: number) => new Date(Date.now() - dias * 86_400_000).toISOStr
 /** Anomalías de Isolation Forest (FF2) y las últimas cargas. Una alerta abre aquí con la carga marcada. */
 @Component({
   selector: 'app-combustible',
-  imports: [MatTableModule, DecimalPipe, BobPipe, FechaPipe],
+  imports: [MatTableModule, DecimalPipe, BobPipe, FechaPipe, AvisoServicios],
   template: `
     <h1>Combustible</h1>
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!anomalias().length && !cargas().length" />
     <h2>Anomalías de los últimos 30 días</h2>
     <div class="tabla-ancha">
       <table mat-table [dataSource]="anomalias()">
@@ -79,6 +80,8 @@ export class CombustiblePagina {
   private readonly datos = toSignal(inject(CombustibleGQL).watch({ variables: { desde: hace(30) }, pollInterval: 30_000 }).valueChanges);
   readonly anomalias = computed(() => completo<CombustibleQuery>(this.datos())?.anomaliasCombustible ?? []);
   readonly cargas = computed(() => completo<CombustibleQuery>(this.datos())?.cargasCombustible ?? []);
+  readonly error = computed(() => this.datos()?.error);
+  readonly campos = { anomaliasCombustible: 'Analítica', cargasCombustible: 'Flota' };
   readonly columnasA = ['placa', 'litros', 'kmPorLitro', 'puntaje', 'fecha'];
   readonly columnasC = ['placa', 'litros', 'monto', 'km', 'fecha'];
 }

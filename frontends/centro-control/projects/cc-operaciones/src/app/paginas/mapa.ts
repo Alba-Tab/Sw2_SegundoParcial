@@ -1,7 +1,7 @@
-import { afterNextRender, Component, effect, ElementRef, inject, OnDestroy, viewChild } from '@angular/core';
+import { afterNextRender, Component, computed, effect, ElementRef, inject, OnDestroy, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import * as L from 'leaflet';
-import { completo, CONFIG_CENTRO, pct } from 'ui-comun';
+import { AvisoServicios, completo, CONFIG_CENTRO, pct } from 'ui-comun';
 import { MapaGQL, type MapaQuery } from '../graphql/generado';
 
 type ViajeMapa = NonNullable<MapaQuery['viajesEnCurso']>[number];
@@ -34,7 +34,9 @@ export function popupViaje(v: ViajeMapa, urlViaje: string): HTMLElement {
 /** Mapa en vivo (spec 005): la última posición de cada viaje en ruta, cada 15 s; en rojo los que tienen riesgo. */
 @Component({
   selector: 'app-mapa',
+  imports: [AvisoServicios],
   template: `<h1>Mapa en vivo</h1>
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!viajes().length" />
     <div #mapa class="mapa" role="application" aria-label="Mapa de viajes en ruta"></div>`,
   styles: `
     .mapa {
@@ -48,6 +50,9 @@ export class MapaPagina implements OnDestroy {
   private readonly contenedor = viewChild.required<ElementRef<HTMLDivElement>>('mapa');
   private readonly config = inject(CONFIG_CENTRO);
   private readonly datos = toSignal(inject(MapaGQL).watch({ pollInterval: 15_000 }).valueChanges);
+  readonly viajes = computed(() => completo<MapaQuery>(this.datos())?.viajesEnCurso ?? []);
+  readonly error = computed(() => this.datos()?.error);
+  readonly campos = { viajesEnCurso: 'Viajes', riesgo: 'Analítica' };
   private mapa?: L.Map;
   private capa = L.layerGroup();
 
@@ -58,7 +63,7 @@ export class MapaPagina implements OnDestroy {
       this.capa.addTo(this.mapa);
     });
     effect(() => {
-      const viajes = completo<MapaQuery>(this.datos())?.viajesEnCurso ?? [];
+      const viajes = this.viajes();
       this.capa.clearLayers();
       for (const v of viajes) {
         const lat = v.ultimaPosicion?.lat;

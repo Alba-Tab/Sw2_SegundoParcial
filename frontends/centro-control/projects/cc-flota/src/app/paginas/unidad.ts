@@ -10,7 +10,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom, switchMap } from 'rxjs';
-import { completo, FechaPipe, mensajeDe, nuevaClave, Sesion } from 'ui-comun';
+import { AvisoServicios, completo, FechaPipe, mensajeDe, nuevaClave, Sesion } from 'ui-comun';
 import {
   CerrarMantenimientoGQL,
   ProgramarMantenimientoGQL,
@@ -34,8 +34,10 @@ const CHECKLIST = 'Aceite y filtros\nFrenos\nNeumáticos\nLuces';
     MatSelectModule,
     MatCheckboxModule,
     FechaPipe,
+    AvisoServicios,
   ],
   template: `
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!unidad()" />
     @if (unidad(); as u) {
       <h1>
         {{ u.placa }} · <span class="chip-estado">{{ u.estado }}</span>
@@ -140,6 +142,8 @@ export class UnidadPagina {
   readonly id = input.required<string>();
   private readonly datos = toSignal(toObservable(this.id).pipe(switchMap((id) => this.gql.watch({ variables: { id } }).valueChanges)));
   readonly unidad = computed(() => completo<UnidadQuery>(this.datos())?.unidad);
+  readonly error = computed(() => this.datos()?.error);
+  readonly campos = { unidad: 'Flota', mantenimientos: 'Flota' };
   readonly mantenimientos = computed(() => {
     const lista = completo<UnidadQuery>(this.datos())?.mantenimientos ?? [];
     for (const m of lista) this.cierres[m.mantenimientoId] ??= m.checklist.map((i) => ({ item: i.item, ok: true }));

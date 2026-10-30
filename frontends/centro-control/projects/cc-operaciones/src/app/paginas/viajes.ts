@@ -5,7 +5,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import { switchMap } from 'rxjs';
-import { FechaPipe, mensajeDe } from 'ui-comun';
+import { AvisoServicios, FechaPipe } from 'ui-comun';
 import { ViajesGQL, type EstadoViaje } from '../graphql/generado';
 
 const ESTADOS: EstadoViaje[] = [
@@ -21,7 +21,7 @@ const ESTADOS: EstadoViaje[] = [
 
 @Component({
   selector: 'app-viajes',
-  imports: [MatTableModule, MatSelectModule, MatProgressBarModule, RouterLink, FechaPipe],
+  imports: [MatTableModule, MatSelectModule, MatProgressBarModule, RouterLink, FechaPipe, AvisoServicios],
   template: `
     <div class="fila-acciones">
       <h1>Viajes</h1>
@@ -36,9 +36,7 @@ const ESTADOS: EstadoViaje[] = [
     @if (r?.loading) {
       <mat-progress-bar mode="indeterminate" />
     }
-    @if (r?.error && !r?.data?.viajes) {
-      <p class="no-disponible">{{ mensaje(r?.error) }}</p>
-    }
+    <cc-aviso-servicios [error]="r?.error" [campos]="campos" [sinDatos]="!r?.data?.viajes?.length" />
     <div class="tabla-ancha">
       <table mat-table [dataSource]="r?.data?.viajes ?? []">
         <ng-container matColumnDef="placa"
@@ -88,5 +86,5 @@ export class ViajesPagina {
   readonly datos = toSignal(
     toObservable(this.estado).pipe(switchMap((estado) => this.gql.watch({ variables: { estado }, pollInterval: 15_000 }).valueChanges)),
   );
-  readonly mensaje = mensajeDe;
+  readonly campos = { viajes: 'Viajes' };
 }

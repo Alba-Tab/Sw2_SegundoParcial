@@ -7,7 +7,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { firstValueFrom } from 'rxjs';
-import { BobPipe, CONFIG_CENTRO, FechaPipe, mensajeDe, nuevaClave, Sesion } from 'ui-comun';
+import { AvisoServicios, BobPipe, CONFIG_CENTRO, FechaPipe, mensajeDe, nuevaClave, Sesion } from 'ui-comun';
 import { CancelarServicioGQL, ServiciosGQL } from '../graphql/generado';
 
 /**
@@ -16,9 +16,10 @@ import { CancelarServicioGQL, ServiciosGQL } from '../graphql/generado';
  */
 @Component({
   selector: 'app-servicios',
-  imports: [FormsModule, MatTableModule, MatButtonModule, MatFormFieldModule, MatInputModule, BobPipe, FechaPipe],
+  imports: [FormsModule, MatTableModule, MatButtonModule, MatFormFieldModule, MatInputModule, BobPipe, FechaPipe, AvisoServicios],
   template: `
     <h1>Servicios confirmados</h1>
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!servicios().length" />
     @if (puedeCancelar()) {
       <div class="fila-acciones">
         <mat-form-field class="ancho"
@@ -80,6 +81,8 @@ export class ServiciosPagina {
   readonly config = inject(CONFIG_CENTRO);
   readonly datos = toSignal(this.gql.watch({ variables: { estado: 'CONFIRMADO' }, pollInterval: 20_000 }).valueChanges);
   readonly servicios = computed(() => this.datos()?.data?.servicios ?? []);
+  readonly error = computed(() => this.datos()?.error);
+  readonly campos = { servicios: 'Viajes', clientes: 'Viajes' };
   readonly puedeCancelar = computed(() => this.sesion.tiene('despachador', 'comercial'));
   readonly columnas = computed(() =>
     this.sesion.tiene('despachador')

@@ -3,7 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
-import { completo, FechaPipe } from 'ui-comun';
+import { AvisoServicios, completo, FechaPipe } from 'ui-comun';
 import { UnidadesGQL, type UnidadesQuery } from '../graphql/generado';
 
 /** D11: el aviso de mantenimiento es a los 10.000 km; aquí se marca desde los 9.000. */
@@ -11,9 +11,10 @@ const AVISO_KM = 9000;
 
 @Component({
   selector: 'app-unidades',
-  imports: [MatTableModule, RouterLink, FechaPipe, DecimalPipe],
+  imports: [MatTableModule, RouterLink, FechaPipe, DecimalPipe, AvisoServicios],
   template: `
     <h1>Unidades</h1>
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!unidades().length" />
     <div class="tabla-ancha">
       <table mat-table [dataSource]="unidades()">
         <ng-container matColumnDef="placa"
@@ -55,6 +56,8 @@ const AVISO_KM = 9000;
 export class UnidadesPagina {
   private readonly datos = toSignal(inject(UnidadesGQL).watch({ pollInterval: 30_000 }).valueChanges);
   readonly unidades = computed(() => completo<UnidadesQuery>(this.datos())?.unidades ?? []);
+  readonly error = computed(() => this.datos()?.error);
+  readonly campos = { unidades: 'Flota' };
   readonly columnas = ['placa', 'tipo', 'estado', 'km', 'documentos'];
   readonly avisoKm = AVISO_KM;
 }

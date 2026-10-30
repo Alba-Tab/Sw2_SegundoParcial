@@ -8,7 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { RouterLink } from '@angular/router';
 import { type Observable, firstValueFrom } from 'rxjs';
-import { completo, FechaPipe, mensajeDe, nuevaClave, Sesion } from 'ui-comun';
+import { AvisoServicios, completo, FechaPipe, mensajeDe, nuevaClave, Sesion } from 'ui-comun';
 import { AccionesGQL, AprobarAccionGQL, RechazarAccionGQL, type AccionesQuery } from '../graphql/generado';
 
 /**
@@ -17,9 +17,10 @@ import { AccionesGQL, AprobarAccionGQL, RechazarAccionGQL, type AccionesQuery } 
  */
 @Component({
   selector: 'app-acciones',
-  imports: [FormsModule, MatCardModule, MatButtonModule, MatFormFieldModule, MatInputModule, RouterLink, FechaPipe],
+  imports: [FormsModule, MatCardModule, MatButtonModule, MatFormFieldModule, MatInputModule, RouterLink, FechaPipe, AvisoServicios],
   template: `
     <h1>Acciones propuestas por el agente</h1>
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!visibles().length" />
     <div class="lista">
       @for (a of visibles(); track a.accionId) {
         <mat-card [class.elegida]="a.accionId === id()">
@@ -104,6 +105,8 @@ export class AccionesPagina {
     const id = this.id();
     return id ? [...todas.filter((a) => a.accionId === id), ...todas.filter((a) => a.accionId !== id)] : todas;
   });
+  readonly error = computed(() => this.datos()?.error);
+  readonly campos = { accionesPropuestas: 'Analítica', viaje: 'Viajes' };
   readonly enviando = signal(false);
   mensajes: Record<string, string> = {};
   motivos: Record<string, string> = {};

@@ -4,7 +4,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom } from 'rxjs';
-import { codigoDe, completo, CONFIG_CENTRO, FechaPipe, mensajeDe, nuevaClave, Sesion } from 'ui-comun';
+import { AvisoServicios, codigoDe, completo, CONFIG_CENTRO, FechaPipe, mensajeDe, nuevaClave, Sesion } from 'ui-comun';
 import { DispararMisionGQL, MisionesGQL, type MisionesQuery } from '../graphql/generado';
 
 /**
@@ -13,13 +13,14 @@ import { DispararMisionGQL, MisionesGQL, type MisionesQuery } from '../graphql/g
  */
 @Component({
   selector: 'app-agente',
-  imports: [MatButtonModule, MatExpansionModule, FechaPipe],
+  imports: [MatButtonModule, MatExpansionModule, FechaPipe, AvisoServicios],
   template: `
     <div class="fila-acciones">
       <h1>Agente "vigilar viajes"</h1>
       <button mat-flat-button (click)="disparar()" [disabled]="enviando()">Disparar misión</button>
       <a mat-button [href]="config.urls['cc-operaciones'] + '/acciones'">Ver acciones propuestas →</a>
     </div>
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!misiones().length" />
     <mat-accordion>
       @for (m of misiones(); track m.misionId) {
         <mat-expansion-panel [expanded]="$first">
@@ -77,6 +78,8 @@ export class AgentePagina {
   readonly config = inject(CONFIG_CENTRO);
   private readonly datos = toSignal(this.gql.watch({ pollInterval: 5_000 }).valueChanges);
   readonly misiones = computed(() => completo<MisionesQuery>(this.datos())?.misionesAgente ?? []);
+  readonly error = computed(() => this.datos()?.error);
+  readonly campos = { misionesAgente: 'Analítica' };
   readonly enviando = signal(false);
   readonly json = (v: unknown) => JSON.stringify(v);
 

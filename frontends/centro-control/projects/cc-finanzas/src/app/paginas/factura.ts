@@ -10,7 +10,7 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom, switchMap } from 'rxjs';
-import { BobPipe, completo, FechaPipe, mensajeDe, nuevaClave, Sesion } from 'ui-comun';
+import { AvisoServicios, BobPipe, completo, FechaPipe, mensajeDe, nuevaClave, Sesion } from 'ui-comun';
 import { FacturaGQL, RegistrarPagoGQL, type FacturaQuery, type MedioPago } from '../graphql/generado';
 import { leerRecibo } from './ocr';
 
@@ -31,8 +31,10 @@ import { leerRecibo } from './ocr';
     MatProgressBarModule,
     BobPipe,
     FechaPipe,
+    AvisoServicios,
   ],
   template: `
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!factura()" />
     @if (factura(); as f) {
       <h1>
         {{ f.numero }} · <span class="chip-estado">{{ f.estado }}</span>
@@ -107,6 +109,8 @@ export class FacturaPagina {
   readonly id = input.required<string>();
   private readonly datos = toSignal(toObservable(this.id).pipe(switchMap((id) => this.gql.watch({ variables: { id } }).valueChanges)));
   readonly factura = computed(() => completo<FacturaQuery>(this.datos())?.factura);
+  readonly error = computed(() => this.datos()?.error);
+  readonly campos = { factura: 'Finanzas' };
   readonly medios: MedioPago[] = ['TRANSFERENCIA', 'DEPOSITO', 'EFECTIVO', 'CHEQUE'];
   readonly enviando = signal(false);
   readonly leyendo = signal(false);

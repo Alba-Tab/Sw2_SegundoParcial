@@ -1,4 +1,5 @@
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { avisosServicio } from './aviso-servicios';
 import { esperaReconexion } from './conexion';
 import { APPS_POR_ROL, DESTINO_POR_ROL } from './configuracion';
 import { codigoDe, mensajeDe, servicioCaido } from './errores';
@@ -55,5 +56,23 @@ describe('ui-comun', () => {
     expect(fechaLaPaz(-61, noche)).toBe('2026-08-30');
     expect(fechaLaPaz(2, noche)).toBe('2026-11-01');
     expect(fechaLaPaz(1, new Date('2026-12-31T12:00:00Z'))).toBe('2027-01-01');
+  });
+
+  it('FR1: avisa "<Servicio> no disponible" por cada campo caído y, sin datos, el mensaje del error', () => {
+    const parcial = new CombinedGraphQLErrors({
+      errors: [
+        { message: 'Flota no disponible (no responde)', path: ['viaje', 'unidad'], extensions: { codigo: 'DEPENDENCIA_NO_DISPONIBLE' } },
+        { message: 'Tu rol no tiene acceso a este dato', path: ['viaje', 'monto'], extensions: { codigo: 'SIN_PERMISO' } },
+      ],
+    });
+    const campos = { viaje: 'Viajes', unidad: 'Flota', riesgo: 'Analítica' };
+    expect(avisosServicio(parcial, campos)).toEqual(['Flota no disponible']);
+    // Un SIN_PERMISO de un campo (despachador y monto) no es un servicio caído: no se avisa si la página tiene datos.
+    const soloPermiso = new CombinedGraphQLErrors({
+      errors: [{ message: 'Tu rol no tiene acceso a este dato', path: ['viaje', 'monto'], extensions: { codigo: 'SIN_PERMISO' } }],
+    });
+    expect(avisosServicio(soloPermiso, campos)).toEqual([]);
+    expect(avisosServicio(new TypeError('Failed to fetch'), campos, true)).toEqual(['Failed to fetch']);
+    expect(avisosServicio(undefined, campos, true)).toEqual([]);
   });
 });
