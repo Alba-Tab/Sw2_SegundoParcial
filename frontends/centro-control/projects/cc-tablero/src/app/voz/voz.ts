@@ -38,22 +38,30 @@ type Respuesta = PreguntarMutation['preguntar'];
         extended
         (pointerdown)="hablar()"
         (pointerup)="soltar()"
-        (pointerleave)="grabando() && soltar()"
+        (pointercancel)="soltar()"
+        (pointerleave)="soltar()"
+        (keydown.space)="teclaAbajo($event)"
+        (keydown.enter)="teclaAbajo($event)"
+        (keyup.space)="teclaArriba($event)"
+        (keyup.enter)="teclaArriba($event)"
+        (blur)="soltar()"
         [disabled]="transcribiendo() || enviando()"
         [attr.aria-pressed]="grabando()"
+        aria-describedby="ayuda-microfono"
       >
         <mat-icon>{{ grabando() ? 'mic' : 'mic_none' }}</mat-icon>
         {{ grabando() ? 'Escuchando… suelta para terminar' : 'Mantén pulsado para hablar' }}
       </button>
+      <span id="ayuda-microfono" class="secundario">Con el teclado, mantén Espacio o Enter sobre el botón.</span>
       @if (transcribiendo()) {
         <span class="secundario">Transcribiendo en el navegador…</span>
       }
     </div>
     <mat-form-field class="pregunta">
       <mat-label>Tu pregunta (puedes corregirla antes de enviar)</mat-label>
-      <input matInput [(ngModel)]="texto" (keyup.enter)="enviar()" maxlength="300" />
+      <input matInput [(ngModel)]="texto" (keyup.enter)="enviar()" minlength="3" maxlength="300" />
     </mat-form-field>
-    <button mat-flat-button (click)="enviar()" [disabled]="texto.trim().length < 3 || enviando()">Preguntar</button>
+    <button mat-flat-button (click)="enviar()" [disabled]="!puedeEnviar()">Preguntar</button>
     @if (enviando()) {
       <mat-progress-bar mode="indeterminate" />
     }
@@ -116,6 +124,8 @@ export class VozPagina implements OnDestroy {
   private ultimo: { id: ReporteId; params: Record<string, unknown> } | null = null;
   private readonly intentos = new Intentos();
   texto = '';
+  /** El botón está pulsado (puntero o tecla), aunque el micrófono todavía no haya llegado. */
+  private pulsado = false;
   readonly reportes: { id: ReporteId; titulo: string }[] = [
     { id: 'CUENTAS_POR_COBRAR', titulo: 'Cuentas por cobrar' },
     { id: 'VIAJES_EN_RIESGO', titulo: 'Viajes en riesgo' },
@@ -130,31 +140,70 @@ export class VozPagina implements OnDestroy {
       if (data.error) this.error.set('No se pudo transcribir; escribe la pregunta');
       else this.texto = data.texto ?? '';
     };
+    // Si el worker no carga o se cae, "Transcribiendo…" no puede quedar para siempre.
+    this.trabajador.onerror = () => {
+      this.transcribiendo.set(false);
+      this.error.set('No se pudo transcribir; escribe la pregunta');
+    };
   }
 
   ngOnDestroy(): void {
+    this.grabadora.cancelar();
     this.trabajador.terminate();
   }
 
+  puedeEnviar(): boolean {
+    return this.texto.trim().length >= 3 && !this.enviando();
+  }
+
+  teclaAbajo(evento: Event): void {
+    evento.preventDefault();
+    if (!(evento as KeyboardEvent).repeat) void this.hablar();
+  }
+
+  teclaArriba(evento: Event): void {
+    evento.preventDefault();
+    void this.soltar();
+  }
+
   async hablar(): Promise<void> {
+    if (this.pulsado || this.transcribiendo() || this.enviando()) return;
+    this.pulsado = true;
     this.error.set(null);
     try {
-      await this.grabadora.empezar(() => void this.soltar());
-      this.grabando.set(true);
+      // false: se soltó (o se volvió a pulsar) antes de que llegara el micrófono; la grabadora ya lo cerró.
+      if (await this.grabadora.empezar(() => void this.soltar())) this.grabando.set(true);
     } catch {
+      this.pulsado = false;
       this.error.set('Sin permiso de micrófono: escribe la pregunta');
     }
   }
 
   async soltar(): Promise<void> {
-    if (!this.grabando()) return;
+    if (!this.pulsado) return;
+    this.pulsado = false;
+    if (!this.grabando()) {
+      this.grabadora.cancelar(); // todavía esperaba el permiso del micrófono
+      return;
+    }
     this.grabando.set(false);
     this.transcribiendo.set(true);
-    const audio = await this.grabadora.terminar();
-    this.trabajador.postMessage({ audio }, [audio.buffer]);
+    let enviado = false;
+    try {
+      const audio = await this.grabadora.terminar();
+      if (audio.length) {
+        this.trabajador.postMessage({ audio }, [audio.buffer]);
+        enviado = true;
+      }
+    } catch {
+      this.error.set('No se pudo leer el audio; escribe la pregunta');
+    } finally {
+      if (!enviado) this.transcribiendo.set(false);
+    }
   }
 
   async enviar(): Promise<void> {
+    if (!this.puedeEnviar()) return;
     this.enviando.set(true);
     this.error.set(null);
     this.catalogo.set(false);
