@@ -8,6 +8,7 @@ import bo.transporte.viajes.aplicacion.puerto.salida.NotificadorPush.Resultado;
 import com.sun.net.httpserver.HttpServer;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +22,7 @@ class NotificadorFcmTest {
     HttpServer fcm;
     final List<String> pedidos = new ArrayList<>();
     int estado = 200;
+    int fallas;
 
     @BeforeEach
     void iniciar() throws Exception {
@@ -28,8 +30,10 @@ class NotificadorFcmTest {
         fcm.createContext("/", e -> {
             pedidos.add(e.getRequestURI() + " " + e.getRequestHeaders().getFirst("Authorization") + " "
                     + new String(e.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
-            byte[] r = (estado == 404 ? "{\"error\":{\"status\":\"NOT_FOUND\"}}" : "{\"name\":\"m/1\"}").getBytes();
-            e.sendResponseHeaders(estado, r.length);
+            int responder = fallas > 0 ? 503 : estado;
+            if (fallas > 0) fallas--;
+            byte[] r = (responder == 404 ? "{\"error\":{\"status\":\"NOT_FOUND\"}}" : "{\"name\":\"m/1\"}").getBytes();
+            e.sendResponseHeaders(responder, r.length);
             e.getResponseBody().write(r);
             e.close();
         });
@@ -46,7 +50,8 @@ class NotificadorFcmTest {
                 proyecto,
                 "http://localhost:" + fcm.getAddress().getPort(),
                 () -> "token-google",
-                JsonMapper.builder().build());
+                JsonMapper.builder().build(),
+                Duration.ofMillis(1));
     }
 
     final Mensaje mensaje = new Mensaje("Viaje asignado", "Tienes un viaje", Map.of("viajeId", "v1"), "v1");
@@ -66,6 +71,24 @@ class NotificadorFcmTest {
         estado = 404;
         assertEquals(Resultado.TOKEN_INVALIDO, notificador("transporte-fcm").enviar("t", mensaje));
         assertEquals(Resultado.OMITIDO, notificador("").enviar("t", mensaje));
+        assertEquals(1, pedidos.size());
+    }
+
+    @Test
+    void d69ReintentaHasta5VecesAnteUnaFallaDeFcm() {
+        fallas = 2;
+        assertEquals(Resultado.ENVIADO, notificador("transporte-fcm").enviar("t", mensaje));
+        assertEquals(3, pedidos.size());
+        pedidos.clear();
+        fallas = 10;
+        assertEquals(Resultado.ERROR, notificador("transporte-fcm").enviar("t", mensaje));
+        assertEquals(NotificadorFcm.INTENTOS, pedidos.size());
+    }
+
+    @Test
+    void unErrorDeCredencialNoBorraElTokenNiSeReintenta() {
+        estado = 401;
+        assertEquals(Resultado.ERROR, notificador("transporte-fcm").enviar("t", mensaje));
         assertEquals(1, pedidos.size());
     }
 }
