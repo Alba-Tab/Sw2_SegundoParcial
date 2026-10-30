@@ -13,4 +13,4 @@ export const sesion = new SesionKeycloak();
 const api = new ApiViajes();
 
 export const motor = new MotorSincronizacion(cola, puntos, viajes, api, sesion, red, reloj, ids, dispositivo);
-export const casos = new CasosDeUso(cola, viajes, api, sesion, reloj, ids, dispositivo);
+export const casos = new CasosDeUso(cola, puntos, viajes, api, sesion, reloj, ids, dispositivo);

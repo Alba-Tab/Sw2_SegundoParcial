@@ -21,6 +21,12 @@ class ColaEnMemoria implements Cola {
 class PuntosEnMemoria implements PuntosGps {
   p: PuntoGps[] = [];
   agregar = (x: PuntoGps) => void this.p.push(x);
+  seqs = new Map<string, number>();
+  siguienteSeq = (v: string) => {
+    const s = this.seqs.get(v) ?? 0;
+    this.seqs.set(v, s + 1);
+    return s;
+  };
   pendientes = (v: string, n: number) => this.p.filter((x) => x.viajeId === v).slice(0, n);
   viajes = () => [...new Set(this.p.map((x) => x.viajeId))];
   borrar = (v: string, seqs: number[]) => void (this.p = this.p.filter((x) => x.viajeId !== v || !seqs.includes(x.seq)));
@@ -104,7 +110,7 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     const red = { hayConexion: async () => conRed };
     const dispositivo = { id: () => 'celular', plataforma: () => 'IOS' as const };
     motor = new MotorSincronizacion(cola, puntos, viajes, api, sesion, red, reloj, ids, dispositivo, () => 0.5);
-    casos = new CasosDeUso(cola, viajes, api, sesion, reloj, ids, dispositivo);
+    casos = new CasosDeUso(cola, puntos, viajes, api, sesion, reloj, ids, dispositivo);
     viajes.guardarDelServidor([viaje('v1')]);
   });
 
@@ -209,5 +215,23 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     casos.iniciarViaje('v1', null);
     await Promise.all([motor.sincronizar(), motor.sincronizar()]);
     expect(api.enviadas).toHaveLength(1);
+  });
+
+  it('T7.3: las lecturas pasan por el muestreo con seq creciente y la frenada sale con la última posición', async () => {
+    const t0 = ahora.getTime();
+    const lectura = (en: number, lat: number) => ({ lat, lng: -63.18, velocidadMs: 16.7, precisionMetros: 5, en: t0 + en });
+    expect(casos.registrarFrenada('v1', 0.5)).toBeNull();
+    expect([0, 5000, 21_000, 22_000].map((t, i) => casos.registrarLectura('v1', lectura(t, -17.7 - i * 0.00001)))).toEqual([
+      true,
+      false,
+      true,
+      false,
+    ]);
+    expect(puntos.p.map((p) => p.seq)).toEqual([0, 1]);
+    expect(puntos.p[0].velocidadKmh).toBe(60.1);
+    const op = casos.registrarFrenada('v1', 0.55)!;
+    const frenada = cola.ops.find((o) => o.opId === op)!;
+    expect(frenada.cuerpo).toMatchObject({ tipo: 'FRENADA_BRUSCA', magnitudG: 0.55, posicion: { lng: -63.18 } });
+    expect((frenada.cuerpo.posicion as { lat: number }).lat).toBeCloseTo(-17.70003, 8);
   });
 });

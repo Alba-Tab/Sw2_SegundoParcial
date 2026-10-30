@@ -6,7 +6,10 @@ import { ActivityIndicator, Appbar, PaperProvider, Snackbar, Text } from 'react-
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import migraciones from '../../drizzle/migrations';
 import { bd } from '../datos/bd';
-import { casos, sesion } from '../datos/contenedor';
+import { casos, sesion, viajes } from '../datos/contenedor';
+import { viaje } from '../datos/esquema';
+import { estadoVisible } from '../dominio/viaje';
+import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
 import { registrarTareaFondo } from '../datos/tareaFondo';
 import { BarraSincronizacion } from './BarraSincronizacion';
 import { PantallaPendientes } from './pantallas/PantallaPendientes';
@@ -15,6 +18,7 @@ import { PantallaViaje } from './pantallas/PantallaViaje';
 import { PantallaViajes } from './pantallas/PantallaViajes';
 import { temaClaro, temaOscuro } from './tema';
 import { useSincronizacion } from './useSincronizacion';
+import { useViajeEnRuta } from './useViajeEnRuta';
 
 type Pantalla = { nombre: 'viajes' } | { nombre: 'viaje'; viajeId: string } | { nombre: 'pendientes' };
 
@@ -60,6 +64,11 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
   const [aviso, setAviso] = useState<string | null>(null);
   const alCancelarse = useCallback(() => setAviso('Viaje cancelado; llama al despachador'), []);
   const sync = useSincronizacion(alCancelarse, alVencerSesion);
+  // Con un viaje en ruta (aunque el inicio siga en la cola): GPS y detección de frenadas.
+  useLiveQuery(bd.select().from(viaje));
+  const enRuta = viajes.todos().find((v) => estadoVisible(v) === 'EN_RUTA')?.viajeId ?? null;
+  const alFrenar = useCallback(() => setAviso('Frenada brusca registrada'), []);
+  const gps = useViajeEnRuta(enRuta, alFrenar);
 
   useEffect(() => {
     const atras = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -82,7 +91,7 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
       {pantalla.nombre === 'viajes' && (
         <PantallaViajes enLinea={sync.enLinea} abrir={(viajeId) => setPantalla({ nombre: 'viaje', viajeId })} />
       )}
-      {pantalla.nombre === 'viaje' && <PantallaViaje viajeId={pantalla.viajeId} sincronizar={() => void sync.sincronizar()} />}
+      {pantalla.nombre === 'viaje' && <PantallaViaje viajeId={pantalla.viajeId} gps={gps} sincronizar={() => void sync.sincronizar()} />}
       {pantalla.nombre === 'pendientes' && <PantallaPendientes />}
       <Snackbar visible={aviso !== null} onDismiss={() => setAviso(null)} duration={8000}>
         {aviso ?? ''}

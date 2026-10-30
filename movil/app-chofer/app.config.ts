@@ -56,6 +56,17 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     'expo-web-browser',
     'expo-background-task',
     'expo-status-bar',
+    [
+      'expo-location',
+      {
+        locationWhenInUsePermission: 'Para registrar la posición del viaje.',
+        locationAlwaysAndWhenInUsePermission: 'Para registrar la posición del viaje aunque la app esté en segundo plano.',
+        isIosBackgroundLocationEnabled: true,
+        isAndroidBackgroundLocationEnabled: true,
+        isAndroidForegroundServiceEnabled: true,
+      },
+    ],
+    ['expo-sensors', { motionPermission: 'Para detectar frenadas bruscas durante el viaje.' }],
     ['expo-build-properties', { android: { usesCleartextTraffic: entorno === 'local' } }],
   ],
 });
