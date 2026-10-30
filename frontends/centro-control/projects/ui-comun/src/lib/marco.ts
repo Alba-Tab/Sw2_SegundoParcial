@@ -53,6 +53,7 @@ export const INTERVALO_SALUD_MS = 60_000;
           [matMenuTriggerFor]="menuAlertas"
           aria-label="Alertas"
           [matBadge]="alertas.abiertas() || null"
+          [matBadgeDescription]="descripcionAlertas()"
           matBadgeColor="warn"
         >
           <mat-icon>{{ alertas.disponible() ? 'notifications' : 'notifications_off' }}</mat-icon>
@@ -64,17 +65,24 @@ export const INTERVALO_SALUD_MS = 60_000;
           @if (alertas.errorAtencion(); as e) {
             <p class="aviso no-atendida" role="alert">{{ e }}</p>
           }
+          <!-- Cada alerta y su "Marcar atendida" son mat-menu-item: se recorren con las flechas y se abren con Enter. -->
           @for (a of alertas.lista(); track a.alertaId) {
-            <div class="alerta" [class.cerrada]="a.estado !== 'ABIERTA'" [attr.data-severidad]="a.severidad">
-              <a [href]="alertas.url(a)" class="titulo">{{ a.titulo }}</a>
+            <a
+              mat-menu-item
+              class="alerta"
+              [href]="alertas.url(a)"
+              [class.cerrada]="a.estado !== 'ABIERTA'"
+              [attr.data-severidad]="a.severidad"
+            >
+              <span class="titulo">{{ a.titulo }}</span>
               <span class="detalle">{{ a.detalle }}</span>
-              <span class="pie">
-                {{ a.creadaEn | fecha: true }} · {{ a.estado }}
-                @if (a.estado === 'ABIERTA' && puedeAtender()) {
-                  <button mat-button (click)="$event.stopPropagation(); alertas.atender(a)">Marcar atendida</button>
-                }
-              </span>
-            </div>
+              <span class="pie">{{ a.creadaEn | fecha: true }} · {{ a.estado }}</span>
+            </a>
+            @if (a.estado === 'ABIERTA' && puedeAtender()) {
+              <button mat-menu-item class="atender" (click)="$event.stopPropagation(); alertas.atender(a)">
+                <mat-icon>done</mat-icon> Marcar atendida: {{ a.titulo }}
+              </button>
+            }
           } @empty {
             <p class="aviso">Sin alertas</p>
           }
@@ -132,11 +140,19 @@ export const INTERVALO_SALUD_MS = 60_000;
       color: var(--mat-sys-error);
     }
     .alerta {
-      display: flex;
-      flex-direction: column;
-      padding: 8px 16px;
+      height: auto;
+      min-height: 56px;
+      padding-block: 8px;
       max-width: 420px;
       border-left: 4px solid var(--mat-sys-primary);
+    }
+    .alerta span {
+      display: block;
+      white-space: normal;
+    }
+    .atender {
+      font-size: 13px;
+      min-height: 36px;
     }
     .alerta[data-severidad='ALTA'] {
       border-color: var(--mat-sys-tertiary);
@@ -171,6 +187,11 @@ export class Marco implements OnInit {
   /** comercial no recibe alertas (la suscripción cerraría con 4403). */
   readonly recibeAlertas = computed(() => this.sesion.tiene('gerente', 'despachador', 'jefe_flota', 'administracion'));
   readonly puedeAtender = computed(() => this.sesion.tiene('despachador', 'jefe_flota', 'administracion'));
+  /** El número del badge no se lee solo: los lectores de pantalla anuncian esta descripción con el botón. */
+  readonly descripcionAlertas = computed(() => {
+    const n = this.alertas.abiertas();
+    return n === 1 ? '1 alerta abierta' : `${n} alertas abiertas`;
+  });
 
   ngOnInit(): void {
     if (this.recibeAlertas()) void this.alertas.iniciar();
