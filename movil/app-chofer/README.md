@@ -41,6 +41,13 @@ Dominio y aplicación son TypeScript puro y se prueban con Vitest y puertos fals
 - Antes de enviar, el motor sube sus evidencias por partes de 5 MB con URL firmadas de S3, de a 2 (D61), 60 s por parte (D62). Abrir la subida es idempotente por `evidenciaId` y devuelve las partes que S3 ya tiene: un corte retoma solo las que faltan.
 - La carga va a Flota con `Idempotency-Key` igual al `opId` del cuerpo (spec 009).
 
+## Notificaciones push (T7.8, D45)
+
+- Solo Android (con la cuenta gratuita de Apple no hay push en iPhone). Al iniciar sesión la app crea el canal `viajes`, pide permiso y registra su token nativo de FCM con `PUT /dispositivos/mio`.
+- "Viaje asignado" o "Viaje cancelado" baja los viajes de nuevo; tocar la notificación abre el viaje (también con la app cerrada, `getLastNotificationResponseAsync`).
+- `google-services.json` no se versiona y solo se usa si Firebase tiene registrada la app (`APP_ANDROID_PACKAGE`, por defecto `bo.transporte.chofer`); si no, el build de Android va sin push. Para probar con la app de la PoC: `APP_ANDROID_PACKAGE=bo.transporte.poc.chofer`.
+- El emulador de Android no resuelve `<mac>.local` (PoC-4): para iniciar sesión ahí hace falta otra forma de llegar a Keycloak con el mismo issuer.
+
 ## Correr
 
 ```bash
