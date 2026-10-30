@@ -1,8 +1,35 @@
 import { afterNextRender, Component, effect, ElementRef, inject, OnDestroy, viewChild } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import * as L from 'leaflet';
-import { CONFIG_CENTRO, pct } from 'ui-comun';
-import { MapaGQL } from '../graphql/generado';
+import { completo, CONFIG_CENTRO, pct } from 'ui-comun';
+import { MapaGQL, type MapaQuery } from '../graphql/generado';
+
+type ViajeMapa = NonNullable<MapaQuery['viajesEnCurso']>[number];
+
+/**
+ * Contenido del popup armado con nodos y `textContent`: la razón social la escribe el cliente al registrarse, así que
+ * nunca se interpreta como HTML (Leaflet usa innerHTML si recibe un texto).
+ */
+export function popupViaje(v: ViajeMapa, urlViaje: string): HTMLElement {
+  const caja = document.createElement('div');
+  const placa = document.createElement('b');
+  placa.textContent = v.placa ?? '';
+  const enlace = document.createElement('a');
+  enlace.href = urlViaje;
+  enlace.textContent = 'Ver viaje';
+  const salto = () => document.createElement('br');
+  caja.append(
+    placa,
+    ` · ${v.cliente?.razonSocial ?? ''}`,
+    salto(),
+    v.ruta?.nombre ?? '',
+    salto(),
+    `Riesgo ${pct(v.riesgo?.probabilidad)}`,
+    salto(),
+    enlace,
+  );
+  return caja;
+}
 
 /** Mapa en vivo (spec 005): la última posición de cada viaje en ruta, cada 15 s; en rojo los que tienen riesgo. */
 @Component({
@@ -31,18 +58,15 @@ export class MapaPagina implements OnDestroy {
       this.capa.addTo(this.mapa);
     });
     effect(() => {
-      const viajes = this.datos()?.data?.viajesEnCurso ?? [];
+      const viajes = completo<MapaQuery>(this.datos())?.viajesEnCurso ?? [];
       this.capa.clearLayers();
       for (const v of viajes) {
-        const lat = v?.ultimaPosicion?.lat;
-        const lng = v?.ultimaPosicion?.lng;
+        const lat = v.ultimaPosicion?.lat;
+        const lng = v.ultimaPosicion?.lng;
         if (lat === undefined || lng === undefined) continue;
         const riesgo = v.riesgo?.enRiesgo;
         L.circleMarker([lat, lng], { radius: 9, color: riesgo ? '#ba1a1a' : '#3c6090', fillOpacity: 0.8 })
-          .bindPopup(
-            `<b>${v.placa}</b> · ${v.cliente?.razonSocial ?? ''}<br>${v.ruta?.nombre ?? ''}<br>Riesgo ${pct(v.riesgo?.probabilidad)}<br>` +
-              `<a href="${this.config.urls['cc-operaciones']}/viajes/${v.viajeId}">Ver viaje</a>`,
-          )
+          .bindPopup(popupViaje(v, `${this.config.urls['cc-operaciones']}/viajes/${encodeURIComponent(v.viajeId)}`))
           .addTo(this.capa);
       }
     });

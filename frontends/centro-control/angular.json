@@ -196,6 +196,12 @@
           "options": {
             "port": 4202
           }
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "projects/cc-operaciones/tsconfig.spec.json"
+          }
         }
       }
     },
