@@ -1,5 +1,6 @@
 package bo.transporte.viajes.aplicacion.puerto.salida;
 
+import bo.transporte.viajes.dominio.viaje.EstadoViaje;
 import bo.transporte.viajes.dominio.viaje.Viaje;
 import java.time.Instant;
 import java.util.List;
@@ -22,4 +23,7 @@ public interface ViajeRepositorio {
 
     /** Spec 005 (D50): sus viajes CONFIRMADO, EN_RUTA o ENTREGA_OBSERVADA y los que cambiaron desde la fecha dada. */
     List<Viaje> deChofer(String choferUsuarioSub, Instant terminadosDesde);
+
+    /** Spec 005, paso 9: viajes con asignación, opcionalmente por estado, ordenados por id (cursor). */
+    List<Viaje> listar(EstadoViaje estado, UUID despuesDe, int limite);
 }

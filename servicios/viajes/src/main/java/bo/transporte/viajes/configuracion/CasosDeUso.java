@@ -3,9 +3,13 @@ package bo.transporte.viajes.configuracion;
 import bo.transporte.viajes.aplicacion.cliente.AltaDeCliente;
 import bo.transporte.viajes.aplicacion.cliente.ConsultaDeClientes;
 import bo.transporte.viajes.aplicacion.cliente.VinculacionDeCliente;
+import bo.transporte.viajes.aplicacion.dispositivo.DispositivosDelChofer;
 import bo.transporte.viajes.aplicacion.puerto.salida.AlmacenEvidencias;
+import bo.transporte.viajes.aplicacion.puerto.salida.AlmacenGps;
 import bo.transporte.viajes.aplicacion.puerto.salida.Auditoria;
+import bo.transporte.viajes.aplicacion.puerto.salida.BitacoraRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.ClienteRepositorio;
+import bo.transporte.viajes.aplicacion.puerto.salida.DispositivoRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.EntregaRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.EvidenciaRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.Inbox;
@@ -15,6 +19,7 @@ import bo.transporte.viajes.aplicacion.puerto.salida.RegistroIdempotente;
 import bo.transporte.viajes.aplicacion.puerto.salida.RutaRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.ServicioRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.Transacciones;
+import bo.transporte.viajes.aplicacion.puerto.salida.UltimaPosicionRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.ViajeRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.VinculadorIdentidad;
 import bo.transporte.viajes.aplicacion.ruta.ConsultaDeRutas;
@@ -24,11 +29,14 @@ import bo.transporte.viajes.aplicacion.servicio.CancelacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ConfirmacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ConsultaDeServicios;
 import bo.transporte.viajes.aplicacion.servicio.ParametrosSaga;
+import bo.transporte.viajes.aplicacion.viaje.BitacoraDeRuta;
 import bo.transporte.viajes.aplicacion.viaje.CierreDeViaje;
 import bo.transporte.viajes.aplicacion.viaje.ConsultaDeViajes;
 import bo.transporte.viajes.aplicacion.viaje.EntregaDeViaje;
 import bo.transporte.viajes.aplicacion.viaje.InicioDeViaje;
 import bo.transporte.viajes.aplicacion.viaje.ProgramacionDeViaje;
+import bo.transporte.viajes.aplicacion.viaje.RecorridoDeViaje;
+import bo.transporte.viajes.aplicacion.viaje.RegistroDeGps;
 import bo.transporte.viajes.aplicacion.viaje.SubidaDeEvidencia;
 import java.time.Clock;
 import java.time.Duration;
@@ -96,8 +104,9 @@ class CasosDeUso {
     }
 
     @Bean
-    ConsultaDeServicios consultaDeServicios(ServicioRepositorio servicios, Orquestador orquestador) {
-        return new ConsultaDeServicios(servicios, orquestador);
+    ConsultaDeServicios consultaDeServicios(
+            ServicioRepositorio servicios, Orquestador orquestador, UltimaPosicionRepositorio posiciones) {
+        return new ConsultaDeServicios(servicios, orquestador, posiciones);
     }
 
     @Bean
@@ -143,8 +152,45 @@ class CasosDeUso {
 
     @Bean
     ConsultaDeViajes consultaDeViajes(
-            ViajeRepositorio viajes, ClienteRepositorio clientes, RutaRepositorio rutas, Clock reloj) {
-        return new ConsultaDeViajes(viajes, clientes, rutas, reloj);
+            ViajeRepositorio viajes,
+            ClienteRepositorio clientes,
+            RutaRepositorio rutas,
+            UltimaPosicionRepositorio posiciones,
+            Clock reloj) {
+        return new ConsultaDeViajes(viajes, clientes, rutas, posiciones, reloj);
+    }
+
+    @Bean
+    RegistroDeGps registroDeGps(
+            ViajeRepositorio viajes,
+            AlmacenGps almacen,
+            UltimaPosicionRepositorio posiciones,
+            RegistroDeEventos eventos,
+            Transacciones tx,
+            Clock reloj) {
+        return new RegistroDeGps(viajes, almacen, posiciones, eventos, tx, reloj);
+    }
+
+    @Bean
+    BitacoraDeRuta bitacoraDeRuta(
+            ViajeRepositorio viajes,
+            ConsultaDeViajes consulta,
+            BitacoraRepositorio bitacora,
+            RegistroDeEventos eventos,
+            RegistroIdempotente idempotencia,
+            Transacciones tx,
+            Clock reloj) {
+        return new BitacoraDeRuta(viajes, consulta, bitacora, eventos, idempotencia, tx, reloj);
+    }
+
+    @Bean
+    RecorridoDeViaje recorridoDeViaje(ConsultaDeViajes consulta, AlmacenGps almacen) {
+        return new RecorridoDeViaje(consulta, almacen);
+    }
+
+    @Bean
+    DispositivosDelChofer dispositivosDelChofer(DispositivoRepositorio dispositivos, AlmacenGps almacen, Clock reloj) {
+        return new DispositivosDelChofer(dispositivos, almacen, reloj);
     }
 
     @Bean

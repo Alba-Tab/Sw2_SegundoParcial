@@ -3,6 +3,7 @@ package bo.transporte.viajes.aplicacion.servicio;
 import bo.transporte.viajes.aplicacion.comun.Solicitante;
 import bo.transporte.viajes.aplicacion.puerto.salida.Orquestador;
 import bo.transporte.viajes.aplicacion.puerto.salida.ServicioRepositorio;
+import bo.transporte.viajes.aplicacion.puerto.salida.UltimaPosicionRepositorio;
 import bo.transporte.viajes.dominio.comun.ErrorDeDominio;
 import bo.transporte.viajes.dominio.viaje.EstadoViaje;
 import java.util.List;
@@ -27,10 +28,13 @@ public class ConsultaDeServicios {
 
     private final ServicioRepositorio servicios;
     private final Orquestador orquestador;
+    private final UltimaPosicionRepositorio posiciones;
 
-    public ConsultaDeServicios(ServicioRepositorio servicios, Orquestador orquestador) {
+    public ConsultaDeServicios(
+            ServicioRepositorio servicios, Orquestador orquestador, UltimaPosicionRepositorio posiciones) {
         this.servicios = servicios;
         this.orquestador = orquestador;
+        this.posiciones = posiciones;
     }
 
     public ServicioVista porId(Solicitante quien, UUID servicioId) {
@@ -47,7 +51,11 @@ public class ConsultaDeServicios {
                     .filter(ETAPAS::contains)
                     .orElse("DESCONOCIDA");
         }
-        return ServicioVista.de(f, etapa);
+        // Spec 005: el cliente sigue su viaje en ruta con la última posición del mapa.
+        var ultima = f.estado() == EstadoViaje.EN_RUTA
+                ? posiciones.de(f.servicio().viajeId()).orElse(null)
+                : null;
+        return ServicioVista.de(f, etapa, ultima);
     }
 
     public Pagina listar(Solicitante quien, UUID clienteId, EstadoViaje estado, UUID antesDe, int limite) {

@@ -172,6 +172,16 @@ export type Fecha = string;
  */
 export type Placa = string;
 
+export interface UltimaPosicion {
+  posicion: Coordenadas;
+  /**
+   * @minimum 0
+   * @maximum 200
+   */
+  velocidadKmh: number;
+  registradaEn: Instante;
+}
+
 /**
  * La operación, sin montos (D51).
  */
@@ -189,6 +199,176 @@ export interface Viaje {
   placa: Placa;
   choferNombre: string;
   iniciadoEn?: Instante;
+  ultimaPosicion?: UltimaPosicion;
+}
+
+export interface PaginaViajes {
+  items: Viaje[];
+  /** @nullable */
+  siguienteCursor: string | null;
+}
+
+export interface PuntoGps {
+  /**
+   * Creciente por dispositivo y viaje.
+   * @minimum 0
+   */
+  seq: number;
+  registradaEn: Instante;
+  /**
+   * @minimum -90
+   * @maximum 90
+   */
+  lat: number;
+  /**
+   * @minimum -180
+   * @maximum 180
+   */
+  lng: number;
+  /**
+   * @minimum 0
+   * @maximum 200
+   */
+  velocidadKmh: number;
+  /** @minimum 0 */
+  precisionMetros?: number;
+}
+
+/**
+ * `seq` sin repetir; `registradaEn` ≤ ahora + 2 min y ≥ iniciadoEn − 10 min (D56, D57).
+ */
+export interface LoteGps {
+  dispositivoId: Uuid;
+  /**
+   * @minItems 1
+   * @maxItems 100
+   */
+  puntos: PuntoGps[];
+}
+
+export interface ResultadoLoteGps {
+  /** @minimum 0 */
+  aceptados: number;
+  /**
+   * El seq más alto del lote; la app borra de SQLite hasta ahí.
+   * @minimum 0
+   */
+  ultimaSecuencia: number;
+  ultimaPosicionActualizada: boolean;
+}
+
+export interface PuntoRecorrido {
+  seq: number;
+  registradaEn: Instante;
+  lat: number;
+  lng: number;
+  velocidadKmh: number;
+  precisionMetros?: number;
+  dispositivoId: Uuid;
+}
+
+export interface PaginaRecorrido {
+  items: PuntoRecorrido[];
+  /** @nullable */
+  siguienteCursor: string | null;
+}
+
+export type TipoHito = (typeof TipoHito)[keyof typeof TipoHito];
+
+export const TipoHito = {
+  BLOQUEO: 'BLOQUEO',
+  PARADA: 'PARADA',
+  PUNTO_CONTROL: 'PUNTO_CONTROL',
+  FALLA_MECANICA: 'FALLA_MECANICA',
+  OTRO: 'OTRO',
+} as const;
+
+/**
+ * El audio nunca sale del celular (D53); solo viaja el texto revisado por el chofer.
+ */
+export type HitoNuevoOrigen = (typeof HitoNuevoOrigen)[keyof typeof HitoNuevoOrigen];
+
+export const HitoNuevoOrigen = {
+  VOZ: 'VOZ',
+  TEXTO: 'TEXTO',
+} as const;
+
+export interface HitoNuevo {
+  hitoId: Uuid;
+  tipo: TipoHito;
+  /**
+   * @minLength 3
+   * @maxLength 500
+   */
+  descripcion: string;
+  posicion: Coordenadas;
+  registradoEn: Instante;
+  /** El audio nunca sale del celular (D53); solo viaja el texto revisado por el chofer. */
+  origen: HitoNuevoOrigen;
+}
+
+export type Hito = HitoNuevo & {
+  viajeId: Uuid;
+};
+
+export interface ListaHitos {
+  items: Hito[];
+}
+
+export type EventoConduccionNuevoTipo = (typeof EventoConduccionNuevoTipo)[keyof typeof EventoConduccionNuevoTipo];
+
+export const EventoConduccionNuevoTipo = {
+  FRENADA_BRUSCA: 'FRENADA_BRUSCA',
+  ALERTA_FATIGA: 'ALERTA_FATIGA',
+} as const;
+
+export interface EventoConduccionNuevo {
+  eventoId: Uuid;
+  tipo: EventoConduccionNuevoTipo;
+  /**
+   * Obligatoria en FRENADA_BRUSCA y ≥ 0,4 (D08).
+   * @minimum 0
+   * @maximum 5
+   */
+  magnitudG?: number;
+  posicion: Coordenadas;
+  registradoEn: Instante;
+}
+
+export type EventoConduccion = EventoConduccionNuevo & {
+  viajeId: Uuid;
+};
+
+export type DispositivoNuevoPlataforma = (typeof DispositivoNuevoPlataforma)[keyof typeof DispositivoNuevoPlataforma];
+
+export const DispositivoNuevoPlataforma = {
+  ANDROID: 'ANDROID',
+  IOS: 'IOS',
+} as const;
+
+export interface DispositivoNuevo {
+  dispositivoId: Uuid;
+  plataforma: DispositivoNuevoPlataforma;
+  /**
+   * Token de FCM; solo Android (D45).
+   * @minLength 10
+   * @maxLength 4096
+   */
+  tokenPush?: string;
+}
+
+export type Dispositivo = DispositivoNuevo & {
+  actualizadoEn: Instante;
+};
+
+export interface CursorSincronizacion {
+  dispositivoId: Uuid;
+  viajeId: Uuid;
+  /**
+   * null si todavía no se aceptó ningún punto.
+   * @nullable
+   */
+  ultimaSecuencia: number | null;
 }
 
 export interface ListaViajes {
@@ -592,6 +772,39 @@ export type ListarServiciosParams = {
    * @maxLength 500
    */
   cursor?: string;
+};
+
+export type ListarViajesParams = {
+  estado?: EstadoViaje;
+  /**
+   * @minimum 1
+   * @maximum 100
+   */
+  limite?: number;
+  /**
+   * Valor opaco devuelto en `siguienteCursor`.
+   * @maxLength 500
+   */
+  cursor?: string;
+};
+
+export type ObtenerRecorridoParams = {
+  /**
+   * @maxLength 500
+   */
+  cursor?: string;
+};
+
+export type ListarHitosParams = {
+  /**
+   * @minLength 2
+   * @maxLength 100
+   */
+  texto?: string;
+};
+
+export type ObtenerCursorSincronizacionParams = {
+  viajeId: Uuid;
 };
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -1975,6 +2188,107 @@ export function useDecidirAprobacionCredito<TData = Awaited<ReturnType<typeof de
   return withQueryKey(query, queryOptions.queryKey);
 }
 
+export const getListarViajesUrl = (params?: ListarViajesParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/viajes?${stringifiedParams}` : `/api/v1/viajes`;
+};
+
+/**
+ * @summary Viajes con su última posición para el mapa en vivo (despachador, comercial, gerente, jefe_flota, agente_lectura). Spec 005.
+ */
+export const listarViajes = async (params?: ListarViajesParams, options?: Parameters<typeof pedirViajes>[1]): Promise<PaginaViajes> => {
+  return pedirViajes<PaginaViajes>(getListarViajesUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export const getListarViajesQueryKey = (params?: ListarViajesParams) => {
+  return [`/api/v1/viajes`, ...(params ? [params] : [])] as const;
+};
+
+export const getListarViajesQueryOptions = <TData = Awaited<ReturnType<typeof listarViajes>>, TError = Problema>(
+  params?: ListarViajesParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarViajes>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListarViajesQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listarViajes>>> = ({ signal }) =>
+    listarViajes(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<Awaited<ReturnType<typeof listarViajes>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListarViajesQueryResult = NonNullable<Awaited<ReturnType<typeof listarViajes>>>;
+export type ListarViajesQueryError = Problema;
+
+export function useListarViajes<TData = Awaited<ReturnType<typeof listarViajes>>, TError = Problema>(
+  params: undefined | ListarViajesParams,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarViajes>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<Awaited<ReturnType<typeof listarViajes>>, TError, Awaited<ReturnType<typeof listarViajes>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListarViajes<TData = Awaited<ReturnType<typeof listarViajes>>, TError = Problema>(
+  params?: ListarViajesParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarViajes>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<Awaited<ReturnType<typeof listarViajes>>, TError, Awaited<ReturnType<typeof listarViajes>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListarViajes<TData = Awaited<ReturnType<typeof listarViajes>>, TError = Problema>(
+  params?: ListarViajesParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarViajes>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Viajes con su última posición para el mapa en vivo (despachador, comercial, gerente, jefe_flota, agente_lectura). Spec 005.
+ */
+
+export function useListarViajes<TData = Awaited<ReturnType<typeof listarViajes>>, TError = Problema>(
+  params?: ListarViajesParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarViajes>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListarViajesQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
 export const getListarMisViajesUrl = () => {
   return `/api/v1/viajes/mios`;
 };
@@ -2266,6 +2580,831 @@ export function useIniciarViaje<TData = Awaited<ReturnType<typeof iniciarViaje>>
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getIniciarViajeQueryOptions(viajeId, inicioViaje, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getRegistrarLoteGpsUrl = (viajeId: string) => {
+  return `/api/v1/viajes/${viajeId}/gps/lotes`;
+};
+
+/**
+ * Excepción de 000 §4.1: `Idempotency-Key` es el `loteId` y va a los logs, pero la autoridad es la llave de
+ * DynamoDB (`viajeId` + `ts#seq`); un reenvío reescribe los mismos puntos y responde 200 sin otro
+ * PosicionActualizada. Si DynamoDB sigue con *throttling* después de 5 reintentos, 503 con `Retry-After: 10`.
+ * Acepta puntos tardíos después de la entrega; en CONFIRMADO, PROGRAMANDO o CANCELADO responde 409.
+ * @summary Lote de 1 a 100 puntos GPS de la cola del celular (spec 005, pasos 5 y 6).
+ */
+export const registrarLoteGps = async (
+  viajeId: string,
+  loteGps: LoteGps,
+  options?: Parameters<typeof pedirViajes>[1],
+): Promise<ResultadoLoteGps> => {
+  const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]));
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return pedirViajes<ResultadoLoteGps>(getRegistrarLoteGpsUrl(viajeId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(loteGps),
+  });
+};
+
+export const getRegistrarLoteGpsQueryKey = (viajeId: string, loteGps?: LoteGps) => {
+  return ['POST', `/api/v1/viajes/${viajeId}/gps/lotes`, loteGps] as const;
+};
+
+export const getRegistrarLoteGpsQueryOptions = <TData = Awaited<ReturnType<typeof registrarLoteGps>>, TError = Problema>(
+  viajeId: string,
+  loteGps: LoteGps,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarLoteGps>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getRegistrarLoteGpsQueryKey(viajeId, loteGps);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof registrarLoteGps>>> = ({ signal }) =>
+    registrarLoteGps(viajeId, loteGps, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, enabled: viajeId !== null && viajeId !== undefined, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof registrarLoteGps>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type RegistrarLoteGpsQueryResult = NonNullable<Awaited<ReturnType<typeof registrarLoteGps>>>;
+export type RegistrarLoteGpsQueryError = Problema;
+
+export function useRegistrarLoteGps<TData = Awaited<ReturnType<typeof registrarLoteGps>>, TError = Problema>(
+  viajeId: string,
+  loteGps: LoteGps,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarLoteGps>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<Awaited<ReturnType<typeof registrarLoteGps>>, TError, Awaited<ReturnType<typeof registrarLoteGps>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useRegistrarLoteGps<TData = Awaited<ReturnType<typeof registrarLoteGps>>, TError = Problema>(
+  viajeId: string,
+  loteGps: LoteGps,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarLoteGps>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<Awaited<ReturnType<typeof registrarLoteGps>>, TError, Awaited<ReturnType<typeof registrarLoteGps>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useRegistrarLoteGps<TData = Awaited<ReturnType<typeof registrarLoteGps>>, TError = Problema>(
+  viajeId: string,
+  loteGps: LoteGps,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarLoteGps>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Lote de 1 a 100 puntos GPS de la cola del celular (spec 005, pasos 5 y 6).
+ */
+
+export function useRegistrarLoteGps<TData = Awaited<ReturnType<typeof registrarLoteGps>>, TError = Problema>(
+  viajeId: string,
+  loteGps: LoteGps,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarLoteGps>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getRegistrarLoteGpsQueryOptions(viajeId, loteGps, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getObtenerRecorridoUrl = (viajeId: string, params?: ObtenerRecorridoParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/viajes/${viajeId}/recorrido?${stringifiedParams}` : `/api/v1/viajes/${viajeId}/recorrido`;
+};
+
+/**
+ * Chofer propio, despachador, comercial, gerente, jefe_flota y agente_lectura.
+ * @summary Los puntos del viaje en orden de tiempo, hasta 1.000 por página (consulta por viajeId en DynamoDB, nunca un scan).
+ */
+export const obtenerRecorrido = async (
+  viajeId: string,
+  params?: ObtenerRecorridoParams,
+  options?: Parameters<typeof pedirViajes>[1],
+): Promise<PaginaRecorrido> => {
+  return pedirViajes<PaginaRecorrido>(getObtenerRecorridoUrl(viajeId, params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export const getObtenerRecorridoQueryKey = (viajeId: string, params?: ObtenerRecorridoParams) => {
+  return [`/api/v1/viajes/${viajeId}/recorrido`, ...(params ? [params] : [])] as const;
+};
+
+export const getObtenerRecorridoQueryOptions = <TData = Awaited<ReturnType<typeof obtenerRecorrido>>, TError = Problema>(
+  viajeId: string,
+  params?: ObtenerRecorridoParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof obtenerRecorrido>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getObtenerRecorridoQueryKey(viajeId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof obtenerRecorrido>>> = ({ signal }) =>
+    obtenerRecorrido(viajeId, params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, enabled: viajeId !== null && viajeId !== undefined, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof obtenerRecorrido>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ObtenerRecorridoQueryResult = NonNullable<Awaited<ReturnType<typeof obtenerRecorrido>>>;
+export type ObtenerRecorridoQueryError = Problema;
+
+export function useObtenerRecorrido<TData = Awaited<ReturnType<typeof obtenerRecorrido>>, TError = Problema>(
+  viajeId: string,
+  params: undefined | ObtenerRecorridoParams,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof obtenerRecorrido>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<Awaited<ReturnType<typeof obtenerRecorrido>>, TError, Awaited<ReturnType<typeof obtenerRecorrido>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useObtenerRecorrido<TData = Awaited<ReturnType<typeof obtenerRecorrido>>, TError = Problema>(
+  viajeId: string,
+  params?: ObtenerRecorridoParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof obtenerRecorrido>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<Awaited<ReturnType<typeof obtenerRecorrido>>, TError, Awaited<ReturnType<typeof obtenerRecorrido>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useObtenerRecorrido<TData = Awaited<ReturnType<typeof obtenerRecorrido>>, TError = Problema>(
+  viajeId: string,
+  params?: ObtenerRecorridoParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof obtenerRecorrido>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Los puntos del viaje en orden de tiempo, hasta 1.000 por página (consulta por viajeId en DynamoDB, nunca un scan).
+ */
+
+export function useObtenerRecorrido<TData = Awaited<ReturnType<typeof obtenerRecorrido>>, TError = Problema>(
+  viajeId: string,
+  params?: ObtenerRecorridoParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof obtenerRecorrido>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getObtenerRecorridoQueryOptions(viajeId, params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getRegistrarHitoUrl = (viajeId: string) => {
+  return `/api/v1/viajes/${viajeId}/hitos`;
+};
+
+/**
+ * Solo con el viaje EN_RUTA o después de la entrega (llega tarde); si no, 409 CONFLICTO_ESTADO.
+ * @summary Hito de la bitácora (voz o texto) del chofer asignado; publica HitoRegistrado (spec 005, paso 7).
+ */
+export const registrarHito = async (viajeId: string, hitoNuevo: HitoNuevo, options?: Parameters<typeof pedirViajes>[1]): Promise<Hito> => {
+  const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]));
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return pedirViajes<Hito>(getRegistrarHitoUrl(viajeId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(hitoNuevo),
+  });
+};
+
+export const getRegistrarHitoQueryKey = (viajeId: string, hitoNuevo?: HitoNuevo) => {
+  return ['POST', `/api/v1/viajes/${viajeId}/hitos`, hitoNuevo] as const;
+};
+
+export const getRegistrarHitoQueryOptions = <TData = Awaited<ReturnType<typeof registrarHito>>, TError = Problema>(
+  viajeId: string,
+  hitoNuevo: HitoNuevo,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarHito>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getRegistrarHitoQueryKey(viajeId, hitoNuevo);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof registrarHito>>> = ({ signal }) =>
+    registrarHito(viajeId, hitoNuevo, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, enabled: viajeId !== null && viajeId !== undefined, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof registrarHito>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type RegistrarHitoQueryResult = NonNullable<Awaited<ReturnType<typeof registrarHito>>>;
+export type RegistrarHitoQueryError = Problema;
+
+export function useRegistrarHito<TData = Awaited<ReturnType<typeof registrarHito>>, TError = Problema>(
+  viajeId: string,
+  hitoNuevo: HitoNuevo,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarHito>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<Awaited<ReturnType<typeof registrarHito>>, TError, Awaited<ReturnType<typeof registrarHito>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useRegistrarHito<TData = Awaited<ReturnType<typeof registrarHito>>, TError = Problema>(
+  viajeId: string,
+  hitoNuevo: HitoNuevo,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarHito>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<Awaited<ReturnType<typeof registrarHito>>, TError, Awaited<ReturnType<typeof registrarHito>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useRegistrarHito<TData = Awaited<ReturnType<typeof registrarHito>>, TError = Problema>(
+  viajeId: string,
+  hitoNuevo: HitoNuevo,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarHito>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Hito de la bitácora (voz o texto) del chofer asignado; publica HitoRegistrado (spec 005, paso 7).
+ */
+
+export function useRegistrarHito<TData = Awaited<ReturnType<typeof registrarHito>>, TError = Problema>(
+  viajeId: string,
+  hitoNuevo: HitoNuevo,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarHito>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getRegistrarHitoQueryOptions(viajeId, hitoNuevo, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getListarHitosUrl = (viajeId: string, params?: ListarHitosParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/viajes/${viajeId}/hitos?${stringifiedParams}` : `/api/v1/viajes/${viajeId}/hitos`;
+};
+
+/**
+ * Chofer propio, despachador, comercial, gerente y agente_lectura. `texto` se busca sin distinguir mayúsculas.
+ * @summary Bitácora del viaje, del más nuevo al más viejo; sin texto, los 20 más nuevos (spec 005 y 014).
+ */
+export const listarHitos = async (
+  viajeId: string,
+  params?: ListarHitosParams,
+  options?: Parameters<typeof pedirViajes>[1],
+): Promise<ListaHitos> => {
+  return pedirViajes<ListaHitos>(getListarHitosUrl(viajeId, params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export const getListarHitosQueryKey = (viajeId: string, params?: ListarHitosParams) => {
+  return [`/api/v1/viajes/${viajeId}/hitos`, ...(params ? [params] : [])] as const;
+};
+
+export const getListarHitosQueryOptions = <TData = Awaited<ReturnType<typeof listarHitos>>, TError = Problema>(
+  viajeId: string,
+  params?: ListarHitosParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarHitos>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListarHitosQueryKey(viajeId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listarHitos>>> = ({ signal }) =>
+    listarHitos(viajeId, params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, enabled: viajeId !== null && viajeId !== undefined, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof listarHitos>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ListarHitosQueryResult = NonNullable<Awaited<ReturnType<typeof listarHitos>>>;
+export type ListarHitosQueryError = Problema;
+
+export function useListarHitos<TData = Awaited<ReturnType<typeof listarHitos>>, TError = Problema>(
+  viajeId: string,
+  params: undefined | ListarHitosParams,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarHitos>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<Awaited<ReturnType<typeof listarHitos>>, TError, Awaited<ReturnType<typeof listarHitos>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListarHitos<TData = Awaited<ReturnType<typeof listarHitos>>, TError = Problema>(
+  viajeId: string,
+  params?: ListarHitosParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarHitos>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<Awaited<ReturnType<typeof listarHitos>>, TError, Awaited<ReturnType<typeof listarHitos>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListarHitos<TData = Awaited<ReturnType<typeof listarHitos>>, TError = Problema>(
+  viajeId: string,
+  params?: ListarHitosParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarHitos>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Bitácora del viaje, del más nuevo al más viejo; sin texto, los 20 más nuevos (spec 005 y 014).
+ */
+
+export function useListarHitos<TData = Awaited<ReturnType<typeof listarHitos>>, TError = Problema>(
+  viajeId: string,
+  params?: ListarHitosParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarHitos>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListarHitosQueryOptions(viajeId, params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getRegistrarEventoConduccionUrl = (viajeId: string) => {
+  return `/api/v1/viajes/${viajeId}/eventos-conduccion`;
+};
+
+/**
+ * FRENADA_BRUSCA exige magnitudG ≥ 0,4 (D08). Mismos estados válidos que los hitos.
+ * @summary Frenada brusca o alerta de fatiga detectada en el celular; publica EventoConduccionRegistrado (spec 005, paso 8).
+ */
+export const registrarEventoConduccion = async (
+  viajeId: string,
+  eventoConduccionNuevo: EventoConduccionNuevo,
+  options?: Parameters<typeof pedirViajes>[1],
+): Promise<EventoConduccion> => {
+  const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]));
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return pedirViajes<EventoConduccion>(getRegistrarEventoConduccionUrl(viajeId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(eventoConduccionNuevo),
+  });
+};
+
+export const getRegistrarEventoConduccionQueryKey = (viajeId: string, eventoConduccionNuevo?: EventoConduccionNuevo) => {
+  return ['POST', `/api/v1/viajes/${viajeId}/eventos-conduccion`, eventoConduccionNuevo] as const;
+};
+
+export const getRegistrarEventoConduccionQueryOptions = <TData = Awaited<ReturnType<typeof registrarEventoConduccion>>, TError = Problema>(
+  viajeId: string,
+  eventoConduccionNuevo: EventoConduccionNuevo,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarEventoConduccion>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getRegistrarEventoConduccionQueryKey(viajeId, eventoConduccionNuevo);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof registrarEventoConduccion>>> = ({ signal }) =>
+    registrarEventoConduccion(viajeId, eventoConduccionNuevo, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, enabled: viajeId !== null && viajeId !== undefined, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof registrarEventoConduccion>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type RegistrarEventoConduccionQueryResult = NonNullable<Awaited<ReturnType<typeof registrarEventoConduccion>>>;
+export type RegistrarEventoConduccionQueryError = Problema;
+
+export function useRegistrarEventoConduccion<TData = Awaited<ReturnType<typeof registrarEventoConduccion>>, TError = Problema>(
+  viajeId: string,
+  eventoConduccionNuevo: EventoConduccionNuevo,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarEventoConduccion>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof registrarEventoConduccion>>,
+          TError,
+          Awaited<ReturnType<typeof registrarEventoConduccion>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useRegistrarEventoConduccion<TData = Awaited<ReturnType<typeof registrarEventoConduccion>>, TError = Problema>(
+  viajeId: string,
+  eventoConduccionNuevo: EventoConduccionNuevo,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarEventoConduccion>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof registrarEventoConduccion>>,
+          TError,
+          Awaited<ReturnType<typeof registrarEventoConduccion>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useRegistrarEventoConduccion<TData = Awaited<ReturnType<typeof registrarEventoConduccion>>, TError = Problema>(
+  viajeId: string,
+  eventoConduccionNuevo: EventoConduccionNuevo,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarEventoConduccion>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Frenada brusca o alerta de fatiga detectada en el celular; publica EventoConduccionRegistrado (spec 005, paso 8).
+ */
+
+export function useRegistrarEventoConduccion<TData = Awaited<ReturnType<typeof registrarEventoConduccion>>, TError = Problema>(
+  viajeId: string,
+  eventoConduccionNuevo: EventoConduccionNuevo,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarEventoConduccion>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getRegistrarEventoConduccionQueryOptions(viajeId, eventoConduccionNuevo, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getRegistrarDispositivoUrl = () => {
+  return `/api/v1/dispositivos/mio`;
+};
+
+/**
+ * @summary El celular del chofer (reemplazo completo; sin Idempotency-Key). tokenPush solo en Android (D45).
+ */
+export const registrarDispositivo = async (
+  dispositivoNuevo: DispositivoNuevo,
+  options?: Parameters<typeof pedirViajes>[1],
+): Promise<Dispositivo> => {
+  const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]));
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return pedirViajes<Dispositivo>(getRegistrarDispositivoUrl(), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(dispositivoNuevo),
+  });
+};
+
+export const getRegistrarDispositivoQueryKey = (dispositivoNuevo?: DispositivoNuevo) => {
+  return ['PUT', `/api/v1/dispositivos/mio`, dispositivoNuevo] as const;
+};
+
+export const getRegistrarDispositivoQueryOptions = <TData = Awaited<ReturnType<typeof registrarDispositivo>>, TError = Problema>(
+  dispositivoNuevo: DispositivoNuevo,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarDispositivo>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getRegistrarDispositivoQueryKey(dispositivoNuevo);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof registrarDispositivo>>> = ({ signal }) =>
+    registrarDispositivo(dispositivoNuevo, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<Awaited<ReturnType<typeof registrarDispositivo>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type RegistrarDispositivoQueryResult = NonNullable<Awaited<ReturnType<typeof registrarDispositivo>>>;
+export type RegistrarDispositivoQueryError = Problema;
+
+export function useRegistrarDispositivo<TData = Awaited<ReturnType<typeof registrarDispositivo>>, TError = Problema>(
+  dispositivoNuevo: DispositivoNuevo,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarDispositivo>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof registrarDispositivo>>,
+          TError,
+          Awaited<ReturnType<typeof registrarDispositivo>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useRegistrarDispositivo<TData = Awaited<ReturnType<typeof registrarDispositivo>>, TError = Problema>(
+  dispositivoNuevo: DispositivoNuevo,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarDispositivo>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof registrarDispositivo>>,
+          TError,
+          Awaited<ReturnType<typeof registrarDispositivo>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useRegistrarDispositivo<TData = Awaited<ReturnType<typeof registrarDispositivo>>, TError = Problema>(
+  dispositivoNuevo: DispositivoNuevo,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarDispositivo>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary El celular del chofer (reemplazo completo; sin Idempotency-Key). tokenPush solo en Android (D45).
+ */
+
+export function useRegistrarDispositivo<TData = Awaited<ReturnType<typeof registrarDispositivo>>, TError = Problema>(
+  dispositivoNuevo: DispositivoNuevo,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof registrarDispositivo>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getRegistrarDispositivoQueryOptions(dispositivoNuevo, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getObtenerCursorSincronizacionUrl = (dispositivoId: Uuid, params: ObtenerCursorSincronizacionParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/dispositivos/${dispositivoId}/cursor?${stringifiedParams}`
+    : `/api/v1/dispositivos/${dispositivoId}/cursor`;
+};
+
+/**
+ * @summary Último seq de GPS aceptado de ese dispositivo y viaje; solo el chofer que registró el dispositivo (spec 005).
+ */
+export const obtenerCursorSincronizacion = async (
+  dispositivoId: Uuid,
+  params: ObtenerCursorSincronizacionParams,
+  options?: Parameters<typeof pedirViajes>[1],
+): Promise<CursorSincronizacion> => {
+  return pedirViajes<CursorSincronizacion>(getObtenerCursorSincronizacionUrl(dispositivoId, params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export const getObtenerCursorSincronizacionQueryKey = (dispositivoId: Uuid, params?: ObtenerCursorSincronizacionParams) => {
+  return [`/api/v1/dispositivos/${dispositivoId}/cursor`, ...(params ? [params] : [])] as const;
+};
+
+export const getObtenerCursorSincronizacionQueryOptions = <
+  TData = Awaited<ReturnType<typeof obtenerCursorSincronizacion>>,
+  TError = Problema,
+>(
+  dispositivoId: Uuid,
+  params: ObtenerCursorSincronizacionParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof obtenerCursorSincronizacion>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getObtenerCursorSincronizacionQueryKey(dispositivoId, params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof obtenerCursorSincronizacion>>> = ({ signal }) =>
+    obtenerCursorSincronizacion(dispositivoId, params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, enabled: dispositivoId !== null && dispositivoId !== undefined, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof obtenerCursorSincronizacion>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ObtenerCursorSincronizacionQueryResult = NonNullable<Awaited<ReturnType<typeof obtenerCursorSincronizacion>>>;
+export type ObtenerCursorSincronizacionQueryError = Problema;
+
+export function useObtenerCursorSincronizacion<TData = Awaited<ReturnType<typeof obtenerCursorSincronizacion>>, TError = Problema>(
+  dispositivoId: Uuid,
+  params: ObtenerCursorSincronizacionParams,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof obtenerCursorSincronizacion>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof obtenerCursorSincronizacion>>,
+          TError,
+          Awaited<ReturnType<typeof obtenerCursorSincronizacion>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useObtenerCursorSincronizacion<TData = Awaited<ReturnType<typeof obtenerCursorSincronizacion>>, TError = Problema>(
+  dispositivoId: Uuid,
+  params: ObtenerCursorSincronizacionParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof obtenerCursorSincronizacion>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof obtenerCursorSincronizacion>>,
+          TError,
+          Awaited<ReturnType<typeof obtenerCursorSincronizacion>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useObtenerCursorSincronizacion<TData = Awaited<ReturnType<typeof obtenerCursorSincronizacion>>, TError = Problema>(
+  dispositivoId: Uuid,
+  params: ObtenerCursorSincronizacionParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof obtenerCursorSincronizacion>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Último seq de GPS aceptado de ese dispositivo y viaje; solo el chofer que registró el dispositivo (spec 005).
+ */
+
+export function useObtenerCursorSincronizacion<TData = Awaited<ReturnType<typeof obtenerCursorSincronizacion>>, TError = Problema>(
+  dispositivoId: Uuid,
+  params: ObtenerCursorSincronizacionParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof obtenerCursorSincronizacion>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getObtenerCursorSincronizacionQueryOptions(dispositivoId, params, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

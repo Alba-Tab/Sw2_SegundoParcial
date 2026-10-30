@@ -1,15 +1,21 @@
 package bo.transporte.viajes.adaptadores.entrada.web;
 
 import bo.transporte.viajes.adaptadores.entrada.web.api.ViajesApi;
+import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.CoordenadasDto;
 import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.EstadoViajeDto;
 import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.InicioViajeDto;
 import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.ListaViajesDto;
+import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.PaginaViajesDto;
 import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.TipoCargaDto;
+import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.UltimaPosicionDto;
 import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.ViajeClienteDto;
 import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.ViajeDto;
+import bo.transporte.viajes.aplicacion.puerto.salida.UltimaPosicionRepositorio.UltimaPosicion;
 import bo.transporte.viajes.aplicacion.viaje.ConsultaDeViajes;
 import bo.transporte.viajes.aplicacion.viaje.InicioDeViaje;
 import bo.transporte.viajes.aplicacion.viaje.ViajeVista;
+import bo.transporte.viajes.dominio.viaje.EstadoViaje;
+import java.math.BigDecimal;
 import java.time.ZoneOffset;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
@@ -34,6 +40,18 @@ class ViajesController implements ViajesApi {
         return ResponseEntity.ok(new ListaViajesDto(consulta.mios(SolicitanteActual.obtener()).stream()
                 .map(ViajesController::dto)
                 .toList()));
+    }
+
+    @Override
+    public ResponseEntity<PaginaViajesDto> listarViajes(EstadoViajeDto estado, Integer limite, String cursor) {
+        var p = consulta.listar(
+                SolicitanteActual.obtener(),
+                estado == null ? null : EstadoViaje.valueOf(estado.getValue()),
+                ServiciosController.desdeCursor(cursor),
+                limite == null ? 20 : limite);
+        return ResponseEntity.ok(new PaginaViajesDto(
+                p.items().stream().map(ViajesController::dto).toList(),
+                p.ultimo() == null ? null : ServiciosController.aCursor(p.ultimo())));
     }
 
     @Override
@@ -71,6 +89,17 @@ class ViajesController implements ViajesApi {
                         v.choferNombre())
                 .motivo(v.motivo());
         if (v.iniciadoEn() != null) d.iniciadoEn(v.iniciadoEn().atOffset(ZoneOffset.UTC));
+        var u = v.ultimaPosicion();
+        if (u != null) {
+            d.ultimaPosicion(new UltimaPosicionDto(
+                    coordenadas(u),
+                    BigDecimal.valueOf(u.velocidadKmh()),
+                    u.registradaEn().atOffset(ZoneOffset.UTC)));
+        }
         return d;
+    }
+
+    static CoordenadasDto coordenadas(UltimaPosicion u) {
+        return new CoordenadasDto(BigDecimal.valueOf(u.lat()), BigDecimal.valueOf(u.lng()));
     }
 }

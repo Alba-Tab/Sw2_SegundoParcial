@@ -99,3 +99,11 @@ curl localhost:8101/health/ready
 - `GET .../entrega` (POD): chofer propio, cliente del viaje, despachador, comercial y gerente.
 - **Consumidor de `viajes.eventos`** (`adaptadores/entrada/mensajeria/ConsumidorEventos`): `FacturaEmitida` cierra el viaje (`ENTREGADO` → `CERRADO` con `facturaId` y número) en la misma transacción que el Inbox; un repetido no cambia nada; lo inválido o sin manejador va a la DLQ (FC3). `consumidor.habilitado=false` lo apaga.
 - `Servicio` suma `entregadoEn`, `facturaId` y `numeroFactura`.
+
+## Viaje en ruta (T7.1, spec 005)
+
+- **`POST /api/v1/viajes/{viajeId}/gps/lotes`**: 1 a 100 puntos a DynamoDB (`gps_puntos`, llave `viajeId` + `ts#seq`, TTL de 90 días). `BatchWriteItem` de 25 con hasta 5 reintentos de `UnprocessedItems` (100 a 1.600 ms con variación); si no alcanza, `503` con `Retry-After: 10` (FO4). La llave de DynamoDB es la autoridad de idempotencia (excepción de 000 §4.1): un reenvío no mueve `ultima_posicion` ni repite `PosicionActualizada` (uno por lote que avanzó, D19). Después, `sync_cursor` (condicional, solo avanza).
+- **`GET /api/v1/viajes/{viajeId}/recorrido`** (1.000 puntos por página, consulta por `viajeId`), **`GET /api/v1/viajes?estado=`** (mapa en vivo con `ultimaPosicion`; también la trae `GET /servicios/{id}` en ruta).
+- **Hitos y eventos de conducción** con `operacion_idempotente`, `HitoRegistrado` y `EventoConduccionRegistrado`; frenada desde 0,4 g (D08); en ruta o después de la entrega. `GET .../hitos?texto=` busca con `ILIKE` escapado.
+- **`PUT /api/v1/dispositivos/mio`** (token push solo en Android, D45) y **`GET /api/v1/dispositivos/{id}/cursor?viajeId=`** (solo el dueño).
+- Local: `GPS_DYNAMODB_ENDPOINT` (DynamoDB Local del compose, tablas de `plataforma/compose/iniciar/aws-local.sh`). Pruebas: `AlmacenGpsDynamoIT` simula el *throttling* con `UnprocessedItems`.

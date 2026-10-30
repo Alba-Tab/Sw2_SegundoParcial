@@ -35,7 +35,7 @@ import tools.jackson.databind.json.JsonMapper;
             "outbox.intervalo=PT1H",
             "saga.compensacion.maximo-intentos=2"
         })
-@Import({TestcontainersConfiguration.class, TokensDePrueba.class, AlmacenDePrueba.class})
+@Import({TestcontainersConfiguration.class, TokensDePrueba.class, AlmacenDePrueba.class, DynamoDePrueba.class})
 class ServiciosIT {
     static final String CLIENTE = "01933b5a-1f00-7a20-8b11-0c2d3e4f5a01";
     static final String OTRO_CLIENTE = "01933b5a-1f00-7a20-8b11-0c2d3e4f5a02";
@@ -66,7 +66,7 @@ class ServiciosIT {
     @BeforeEach
     void preparar() {
         jdbc.sql(
-                        "TRUNCATE entrega, evidencia, viaje, servicio, cliente, ruta, operacion_idempotente, outbox_eventos, auditoria")
+                        "TRUNCATE hito, evento_conduccion, ultima_posicion, dispositivo, entrega, evidencia, viaje, servicio, cliente, ruta, operacion_idempotente, outbox_eventos, auditoria")
                 .update();
         for (String id : List.of(CLIENTE, OTRO_CLIENTE)) {
             jdbc.sql("""
@@ -932,5 +932,190 @@ class ServiciosIT {
         JsonNode d = sobre("EntregaRechazada").get("datos");
         assertEquals("RECEPTOR", d.get("origenRechazo").asString());
         assertEquals("Carga húmeda", d.get("motivo").asString());
+    }
+
+    // ---------------------------------------------------------------- spec 005: el viaje en ruta (T7.1)
+
+    static final String CELULAR = "0193a000-0000-7000-8000-0000000d0001";
+
+    private long contar(String tipo) {
+        return jdbc.sql("SELECT count(*) FROM outbox_eventos WHERE tipo = :tipo")
+                .param("tipo", tipo)
+                .query(Long.class)
+                .single();
+    }
+
+    private String lote(java.time.Instant hasta, int... seqs) {
+        var puntos = new java.util.StringJoiner(",");
+        for (int i = 0; i < seqs.length; i++) {
+            var en = hasta.minusSeconds(20L * (seqs.length - 1 - i));
+            puntos.add(
+                    "{\"seq\":%d,\"registradaEn\":\"%s\",\"lat\":%s,\"lng\":-63.18,\"velocidadKmh\":62.5,\"precisionMetros\":6}"
+                            .formatted(seqs[i], en, -17.70 - seqs[i] / 1000.0));
+        }
+        return "{\"dispositivoId\":\"" + CELULAR + "\",\"puntos\":[" + puntos + "]}";
+    }
+
+    @Test
+    void enRutaLosLotesDeGpsMuevenElMapaUnaVezYElCursorQueda() throws Exception {
+        String viajeId = enRuta();
+        var despacho = TokensDePrueba.token("d", "despachador", null);
+        assertEquals(
+                200,
+                pedir(
+                                "PUT",
+                                "/api/v1/dispositivos/mio",
+                                CHOFER,
+                                null,
+                                "{\"dispositivoId\":\"" + CELULAR
+                                        + "\",\"plataforma\":\"ANDROID\",\"tokenPush\":\"token-fcm-de-prueba\"}")
+                        .estado());
+
+        var ahora = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        String cuerpo = lote(ahora, 0, 1, 2);
+        UUID loteId = UUID.randomUUID();
+        var r = pedir("POST", "/api/v1/viajes/" + viajeId + "/gps/lotes", CHOFER, loteId, cuerpo);
+        assertEquals(200, r.estado(), r.cruda().body());
+        assertEquals(3, r.cuerpo().get("aceptados").asInt());
+        assertEquals(2, r.cuerpo().get("ultimaSecuencia").asInt());
+        assertTrue(r.cuerpo().get("ultimaPosicionActualizada").asBoolean());
+        assertEquals(1, contar("PosicionActualizada"));
+        var evento = sobre("PosicionActualizada").get("datos");
+        assertEquals(3, evento.get("puntosEnLote").asInt());
+        assertEquals(-17.702, evento.get("posicion").get("lat").asDouble(), 1e-9);
+
+        // Reenvío con la misma clave: 200, los mismos puntos, sin mover el mapa ni repetir el evento (D19).
+        var otra = pedir("POST", "/api/v1/viajes/" + viajeId + "/gps/lotes", CHOFER, loteId, cuerpo);
+        assertEquals(200, otra.estado());
+        assertFalse(otra.cuerpo().get("ultimaPosicionActualizada").asBoolean());
+        assertEquals(1, contar("PosicionActualizada"));
+
+        var mapa = pedir("GET", "/api/v1/viajes?estado=EN_RUTA", despacho, null, null);
+        assertEquals(200, mapa.estado());
+        var fila = mapa.cuerpo().get("items").get(0);
+        assertEquals(viajeId, fila.get("viajeId").asString());
+        assertEquals(62.5, fila.get("ultimaPosicion").get("velocidadKmh").asDouble());
+        String servicioId = fila.get("servicioId").asString();
+        assertEquals(
+                -17.702,
+                pedir("GET", "/api/v1/servicios/" + servicioId, cliente(CLIENTE), null, null)
+                        .cuerpo()
+                        .get("ultimaPosicion")
+                        .get("lat")
+                        .asDouble(),
+                1e-9);
+
+        var recorrido = pedir("GET", "/api/v1/viajes/" + viajeId + "/recorrido", despacho, null, null);
+        assertEquals(3, recorrido.cuerpo().get("items").size());
+        assertEquals(
+                CELULAR,
+                recorrido.cuerpo().get("items").get(0).get("dispositivoId").asString());
+
+        var cursor = pedir("GET", "/api/v1/dispositivos/" + CELULAR + "/cursor?viajeId=" + viajeId, CHOFER, null, null);
+        assertEquals(2, cursor.cuerpo().get("ultimaSecuencia").asInt());
+        var ajeno = TokensDePrueba.token("otro-chofer", "chofer", null);
+        assertEquals(
+                403,
+                pedir("GET", "/api/v1/dispositivos/" + CELULAR + "/cursor?viajeId=" + viajeId, ajeno, null, null)
+                        .estado());
+        assertEquals(
+                403,
+                pedir("POST", "/api/v1/viajes/" + viajeId + "/gps/lotes", ajeno, UUID.randomUUID(), cuerpo)
+                        .estado());
+        var futuro = pedir(
+                "POST",
+                "/api/v1/viajes/" + viajeId + "/gps/lotes",
+                CHOFER,
+                UUID.randomUUID(),
+                lote(ahora.plusSeconds(600), 3));
+        assertEquals(400, futuro.estado());
+    }
+
+    @Test
+    void hitosYEventosLleganUnaSolaVezAunqueLaColaLosReenvie() throws Exception {
+        String viajeId = enRuta();
+        var ahora = java.time.Instant.now().truncatedTo(java.time.temporal.ChronoUnit.SECONDS);
+        UUID opId = UUID.randomUUID();
+        String hito = "{\"hitoId\":\"" + UUID.randomUUID() + "\",\"tipo\":\"BLOQUEO\",\"descripcion\":\"Bloqueo en el"
+                + " puente de 50%, tránsito detenido\",\"posicion\":{\"lat\":-17.7,\"lng\":-63.1},\"registradoEn\":\""
+                + ahora + "\",\"origen\":\"VOZ\"}";
+        var r = pedir("POST", "/api/v1/viajes/" + viajeId + "/hitos", CHOFER, opId, hito);
+        assertEquals(200, r.estado(), r.cruda().body());
+        assertEquals(
+                r.cuerpo(),
+                pedir("POST", "/api/v1/viajes/" + viajeId + "/hitos", CHOFER, opId, hito)
+                        .cuerpo());
+        assertEquals(
+                422,
+                pedir("POST", "/api/v1/viajes/" + viajeId + "/hitos", CHOFER, opId, hito.replace("BLOQUEO", "PARADA"))
+                        .estado());
+        assertEquals(1, contar("HitoRegistrado"));
+        assertEquals(
+                1,
+                jdbc.sql("SELECT count(*) FROM operacion_idempotente WHERE clave = :c")
+                        .param("c", opId)
+                        .query(Long.class)
+                        .single());
+
+        var despacho = TokensDePrueba.token("d", "despachador", null);
+        assertEquals(
+                1,
+                pedir("GET", "/api/v1/viajes/" + viajeId + "/hitos?texto=50%25", despacho, null, null)
+                        .cuerpo()
+                        .get("items")
+                        .size());
+        assertEquals(
+                0,
+                pedir("GET", "/api/v1/viajes/" + viajeId + "/hitos?texto=_x", despacho, null, null)
+                        .cuerpo()
+                        .get("items")
+                        .size());
+
+        String frenada = "{\"eventoId\":\"" + UUID.randomUUID()
+                + "\",\"tipo\":\"FRENADA_BRUSCA\",\"magnitudG\":%s,\"posicion\":{\"lat\":-17.7,\"lng\":-63.1},"
+                + "\"registradoEn\":\"" + ahora + "\"}";
+        assertEquals(
+                400,
+                pedir(
+                                "POST",
+                                "/api/v1/viajes/" + viajeId + "/eventos-conduccion",
+                                CHOFER,
+                                UUID.randomUUID(),
+                                frenada.formatted("0.3"))
+                        .estado());
+        UUID evento = UUID.randomUUID();
+        assertEquals(
+                200,
+                pedir(
+                                "POST",
+                                "/api/v1/viajes/" + viajeId + "/eventos-conduccion",
+                                CHOFER,
+                                evento,
+                                frenada.formatted("0.55"))
+                        .estado());
+        pedir("POST", "/api/v1/viajes/" + viajeId + "/eventos-conduccion", CHOFER, evento, frenada.formatted("0.55"));
+        assertEquals(1, contar("EventoConduccionRegistrado"));
+        assertEquals(
+                0.55,
+                sobre("EventoConduccionRegistrado")
+                        .get("datos")
+                        .get("magnitudG")
+                        .asDouble());
+    }
+
+    @Test
+    void antesDeIniciarNoSeAceptanGpsNiHitos() throws Exception {
+        String viajeId = viajeDe(confirmado());
+        var ahora = java.time.Instant.now();
+        assertEquals(
+                409,
+                pedir("POST", "/api/v1/viajes/" + viajeId + "/gps/lotes", CHOFER, UUID.randomUUID(), lote(ahora, 0))
+                        .estado());
+        String hito = "{\"hitoId\":\"" + UUID.randomUUID() + "\",\"tipo\":\"OTRO\",\"descripcion\":\"Esperando carga\","
+                + "\"posicion\":{\"lat\":-17.7,\"lng\":-63.1},\"registradoEn\":\"" + ahora + "\",\"origen\":\"TEXTO\"}";
+        assertEquals(
+                409,
+                pedir("POST", "/api/v1/viajes/" + viajeId + "/hitos", CHOFER, UUID.randomUUID(), hito)
+                        .estado());
     }
 }

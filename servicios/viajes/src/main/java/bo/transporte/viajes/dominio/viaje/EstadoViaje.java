@@ -26,4 +26,16 @@ public enum EstadoViaje {
     public boolean puedePasarA(EstadoViaje destino) {
         return SIGUIENTES.getOrDefault(this, Set.of()).contains(destino);
     }
+
+    /**
+     * Spec 005: GPS, hitos y eventos de conducción se aceptan en ruta y también después de la entrega (llegan tarde
+     * por falta de señal). Antes de salir o cancelado, no.
+     */
+    public boolean aceptaRegistrosDeRuta() {
+        return this == EN_RUTA
+                || this == ENTREGA_OBSERVADA
+                || this == ENTREGADO
+                || this == CERRADO
+                || this == ENTREGA_RECHAZADA;
+    }
 }
