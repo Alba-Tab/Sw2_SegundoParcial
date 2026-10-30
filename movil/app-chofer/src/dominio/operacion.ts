@@ -19,6 +19,8 @@ export interface Operacion {
   codigoError: string | null;
   /** Cuándo quedó CONFIRMADA, FALLIDA o DESCARTADA (las descartadas se guardan 7 días, D54). */
   cerradaEn: string | null;
+  /** Evidencias que deben estar completas en S3 antes de enviar la operación (entrega, rechazo, carga con foto). */
+  evidencias: string[];
 }
 
 /** Orden por viaje: el inicio primero; luego hitos, eventos y cargas en orden de creación; la entrega al final. */

@@ -8,6 +8,7 @@ export const viaje = sqliteTable('viaje', {
   datos: text('datos').notNull(),
   iniciadoLocal: integer('iniciado_local', { mode: 'boolean' }).notNull().default(false),
   canceladoAlSincronizar: integer('cancelado_al_sincronizar', { mode: 'boolean' }).notNull().default(false),
+  entregaLocal: text('entrega_local'),
   actualizadoEn: text('actualizado_en').notNull(),
 });
 
@@ -22,6 +23,19 @@ export const operacionPendiente = sqliteTable('operacion_pendiente', {
   estado: text('estado').notNull(),
   codigoError: text('codigo_error'),
   cerradaEn: text('cerrada_en'),
+  /** JSON: ids de las evidencias que deben estar completas antes de enviar. */
+  evidencias: text('evidencias').notNull().default('[]'),
+});
+
+/** Fotos y firmas guardadas en el celular hasta completar su subida (spec 006). */
+export const evidenciaLocal = sqliteTable('evidencia_local', {
+  evidenciaId: text('evidencia_id').primaryKey(),
+  viajeId: text('viaje_id').notNull(),
+  tipo: text('tipo').notNull(),
+  archivo: text('archivo').notNull(),
+  contentType: text('content_type').notNull(),
+  tamanoBytes: integer('tamano_bytes').notNull(),
+  estado: text('estado').notNull(),
 });
 
 export const puntoGps = sqliteTable(

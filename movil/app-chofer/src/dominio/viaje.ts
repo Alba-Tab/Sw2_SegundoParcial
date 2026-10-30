@@ -17,6 +17,8 @@ export interface ViajeLocal {
   iniciadoLocal: boolean;
   /** Se canceló mientras el inicio esperaba sin señal (plan F7). */
   canceladoAlSincronizar: boolean;
+  /** El chofer registró la entrega o el rechazo y espera en la cola. */
+  entregaLocal: 'ENTREGA' | 'RECHAZO' | null;
   cliente: string;
   ruta: string;
   destino: { lat: number; lng: number; radioMetros: number };
@@ -29,6 +31,8 @@ export interface ViajeLocal {
 /** Lo que ve el chofer: en ruta desde que pulsa iniciar, aunque el servidor todavía no lo sepa. */
 export function estadoVisible(v: ViajeLocal): EstadoViaje {
   if (v.canceladoAlSincronizar) return 'CANCELADO';
+  const sinSalir = v.estado === 'CONFIRMADO' || v.estado === 'EN_RUTA';
+  if (v.entregaLocal && sinSalir) return v.entregaLocal === 'ENTREGA' ? 'ENTREGADO' : 'ENTREGA_RECHAZADA';
   if (v.iniciadoLocal && v.estado === 'CONFIRMADO') return 'EN_RUTA';
   return v.estado;
 }

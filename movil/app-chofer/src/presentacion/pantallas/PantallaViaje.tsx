@@ -21,12 +21,12 @@ export function PantallaViaje({
   viajeId,
   gps,
   sincronizar,
-  abrirHito,
+  abrir,
 }: {
   viajeId: string;
   gps: EstadoGps;
   sincronizar: () => void;
-  abrirHito: () => void;
+  abrir: (pantalla: 'hito' | 'entrega' | 'carga') => void;
 }) {
   useLiveQuery(bd.select().from(viaje));
   useLiveQuery(bd.select().from(puntoGps));
@@ -60,6 +60,12 @@ export function PantallaViaje({
           <Text variant="bodySmall">Geocerca del destino: {v.destino.radioMetros} m</Text>
         </Card.Content>
       </Card>
+      {v.entregaLocal && (v.estado === 'EN_RUTA' || v.estado === 'CONFIRMADO') && (
+        <Text variant="bodyMedium">
+          {v.entregaLocal === 'ENTREGA' ? 'Entrega registrada' : 'Rechazo registrado'} en el celular; se envía con las fotos al recuperar la
+          señal.
+        </Text>
+      )}
       {v.iniciadoLocal && estado === 'EN_RUTA' && v.estado === 'CONFIRMADO' && (
         <Text variant="bodyMedium">Inicio registrado en el celular; se envía al recuperar la señal.</Text>
       )}
@@ -69,9 +75,22 @@ export function PantallaViaje({
         </Text>
       )}
       {estado === 'EN_RUTA' && (
-        <Button mode="contained-tonal" icon="notebook-edit" onPress={abrirHito} contentStyle={{ paddingVertical: 8 }}>
-          Registrar hito
-        </Button>
+        <>
+          <Button mode="contained-tonal" icon="notebook-edit" onPress={() => abrir('hito')} contentStyle={{ paddingVertical: 8 }}>
+            Registrar hito
+          </Button>
+          <Button mode="contained-tonal" icon="gas-station" onPress={() => abrir('carga')} contentStyle={{ paddingVertical: 8 }}>
+            Carga de combustible
+          </Button>
+          <Button
+            mode="contained"
+            icon="package-variant-closed-check"
+            onPress={() => abrir('entrega')}
+            contentStyle={{ paddingVertical: 8 }}
+          >
+            Entregar
+          </Button>
+        </>
       )}
       {error && <Text variant="bodyMedium">{error}</Text>}
       {puedeIniciar(v, viajes.todos()) && (

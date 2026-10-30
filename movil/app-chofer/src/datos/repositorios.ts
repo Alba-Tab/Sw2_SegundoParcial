@@ -1,10 +1,11 @@
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
-import type { Cola, PuntosGps, Viajes } from '../aplicacion/puertos';
+import type { Cola, Evidencias, PuntosGps, Viajes } from '../aplicacion/puertos';
+import type { EvidenciaLocal } from '../dominio/evidencia';
 import type { PuntoGps } from '../dominio/gps';
 import type { EstadoOperacion, Operacion, TipoOperacion } from '../dominio/operacion';
 import type { EstadoViaje, ViajeLocal } from '../dominio/viaje';
 import { bd } from './bd';
-import { ajuste, operacionPendiente, puntoGps, viaje } from './esquema';
+import { ajuste, evidenciaLocal, operacionPendiente, puntoGps, viaje } from './esquema';
 
 /** Adaptadores SQLite (Drizzle) de los puertos de la cola, el GPS y los viajes. Síncronos: SQLite está en el celular. */
 export class ColaSqlite implements Cola {
@@ -31,7 +32,7 @@ export class ColaSqlite implements Cola {
 
   agregar(op: Operacion): void {
     bd.insert(operacionPendiente)
-      .values({ ...op, cuerpo: JSON.stringify(op.cuerpo) })
+      .values({ ...op, cuerpo: JSON.stringify(op.cuerpo), evidencias: JSON.stringify(op.evidencias) })
       .run();
   }
 
@@ -68,6 +69,7 @@ function aOperacion(f: typeof operacionPendiente.$inferSelect): Operacion {
     tipo: f.tipo as TipoOperacion,
     estado: f.estado as EstadoOperacion,
     cuerpo: JSON.parse(f.cuerpo) as Record<string, unknown>,
+    evidencias: JSON.parse(f.evidencias) as string[],
   };
 }
 
@@ -121,7 +123,7 @@ export class PuntosSqlite implements PuntosGps {
   }
 }
 
-type DatosViaje = Omit<ViajeLocal, 'viajeId' | 'estado' | 'iniciadoLocal' | 'canceladoAlSincronizar'>;
+type DatosViaje = Omit<ViajeLocal, 'viajeId' | 'estado' | 'iniciadoLocal' | 'canceladoAlSincronizar' | 'entregaLocal'>;
 
 export class ViajesSqlite implements Viajes {
   todos(): ViajeLocal[] {
@@ -137,7 +139,7 @@ export class ViajesSqlite implements Viajes {
     const ahora = new Date().toISOString();
     bd.transaction((tx) => {
       for (const v of viajes) {
-        const { viajeId, estado, iniciadoLocal: _i, canceladoAlSincronizar: _c, ...datos } = v;
+        const { viajeId, estado, iniciadoLocal: _i, canceladoAlSincronizar: _c, entregaLocal: _e, ...datos } = v;
         tx.insert(viaje)
           .values({ viajeId, estado, datos: JSON.stringify(datos), actualizadoEn: ahora })
           // El servidor manda en el estado; "iniciado sin señal" se conserva hasta que el inicio se confirme.
@@ -154,6 +156,10 @@ export class ViajesSqlite implements Viajes {
   marcarCanceladoAlSincronizar(viajeId: string): void {
     bd.update(viaje).set({ canceladoAlSincronizar: true }).where(eq(viaje.viajeId, viajeId)).run();
   }
+
+  marcarEntregaLocal(viajeId: string, tipo: 'ENTREGA' | 'RECHAZO'): void {
+    bd.update(viaje).set({ entregaLocal: tipo }).where(eq(viaje.viajeId, viajeId)).run();
+  }
 }
 
 function aViaje(f: typeof viaje.$inferSelect): ViajeLocal {
@@ -162,6 +168,22 @@ function aViaje(f: typeof viaje.$inferSelect): ViajeLocal {
     estado: f.estado as EstadoViaje,
     iniciadoLocal: f.iniciadoLocal,
     canceladoAlSincronizar: f.canceladoAlSincronizar,
+    entregaLocal: f.entregaLocal as ViajeLocal['entregaLocal'],
     ...(JSON.parse(f.datos) as DatosViaje),
   };
+}
+
+export class EvidenciasSqlite implements Evidencias {
+  agregar(e: EvidenciaLocal): void {
+    bd.insert(evidenciaLocal).values(e).run();
+  }
+
+  porId(evidenciaId: string): EvidenciaLocal | null {
+    const f = bd.select().from(evidenciaLocal).where(eq(evidenciaLocal.evidenciaId, evidenciaId)).get();
+    return f ? (f as EvidenciaLocal) : null;
+  }
+
+  marcarCompleta(evidenciaId: string): void {
+    bd.update(evidenciaLocal).set({ estado: 'COMPLETA' }).where(eq(evidenciaLocal.evidenciaId, evidenciaId)).run();
+  }
 }

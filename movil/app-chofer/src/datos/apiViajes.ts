@@ -13,10 +13,15 @@ import {
   obtenerViaje,
   registrarDispositivo,
   registrarEventoConduccion,
+  registrarEntrega,
   registrarHito,
   registrarLoteGps,
+  registrarRechazoReceptor,
+  type EntregaNueva,
+  type RechazoReceptor,
   type Viaje,
 } from './api/generado/viajes';
+import { type CargaNueva, registrarCargaCombustible } from './api/generado/flota';
 
 type Crudo = { data: unknown; status: number; headers: Headers };
 
@@ -31,9 +36,13 @@ export class ApiViajes implements Api {
         return respuesta(() => registrarHito(op.viajeId, op.cuerpo as unknown as HitoNuevo, init));
       case 'EVENTO_CONDUCCION':
         return respuesta(() => registrarEventoConduccion(op.viajeId, op.cuerpo as unknown as EventoConduccionNuevo, init));
-      default:
-        // Cargas y entregas llegan con T7.5 y T7.6.
-        return { estado: 400, codigo: 'TIPO_NO_SOPORTADO' };
+      case 'ENTREGA':
+        return respuesta(() => registrarEntrega(op.viajeId, op.cuerpo as unknown as EntregaNueva, init));
+      case 'RECHAZO':
+        return respuesta(() => registrarRechazoReceptor(op.viajeId, op.cuerpo as unknown as RechazoReceptor, init));
+      case 'CARGA_COMBUSTIBLE':
+        // Flota exige Idempotency-Key = opId del cuerpo (spec 009); la cola usa el mismo opId.
+        return respuesta(() => registrarCargaCombustible(op.cuerpo as unknown as CargaNueva, init));
     }
   }
 
@@ -84,7 +93,7 @@ export class ApiViajes implements Api {
 }
 
 /** Convierte la respuesta cruda en la del dominio; si la petición no llegó (o pasó 15 s), SIN_RED. */
-async function respuesta(llamar: () => Promise<unknown>): Promise<Respuesta> {
+export async function respuesta(llamar: () => Promise<unknown>): Promise<Respuesta> {
   try {
     const r = (await llamar()) as Crudo;
     const problema = r.status >= 400 ? (r.data as { codigo?: string } | undefined) : undefined;
@@ -106,6 +115,7 @@ function aLocal(v: Viaje): ViajeLocal {
     estado: v.estado,
     iniciadoLocal: false,
     canceladoAlSincronizar: false,
+    entregaLocal: null,
     cliente: v.cliente.razonSocial,
     ruta: v.ruta.nombre,
     destino: { lat: v.ruta.destino.coordenadas.lat, lng: v.ruta.destino.coordenadas.lng, radioMetros: v.ruta.destino.radioMetros },

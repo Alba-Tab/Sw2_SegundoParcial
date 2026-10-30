@@ -37,6 +37,7 @@
     "expo-crypto": "~57.0.4",
     "expo-dev-client": "~57.0.20",
     "expo-file-system": "~57.0.7",
+    "expo-image-picker": "~57.0.20",
     "expo-location": "~57.0.22",
     "expo-network": "~57.0.3",
     "expo-secure-store": "~57.0.4",
@@ -49,6 +50,8 @@
     "react-native": "0.86.3",
     "react-native-paper": "5.15.3",
     "react-native-safe-area-context": "~5.7.0",
+    "react-native-svg": "15.15.4",
+    "react-native-view-shot": "5.1.0",
     "whisper.rn": "0.7.4"
   },
   "devDependencies": {
