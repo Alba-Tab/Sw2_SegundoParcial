@@ -10,8 +10,8 @@ const servicio = await intercambio.tokenDeServicio('analitica');      // client 
 ```
 
 - Pide `audience=<servicio>` y `scope=aud-<servicio>` (los *client scopes* `aud-*` del realm).
-- Guarda el token en una caché en memoria por `sub` y audiencia hasta 30 s antes de que venza (spec 016, paso 7). Si llegan dos pedidos iguales al mismo tiempo, se hace un solo intercambio.
-- Errores con el código de 000 §5: `invalid_grant` → `NO_AUTENTICADO` (401; el usuario renueva). Intercambio no permitido → `SIN_PERMISO` (403). Keycloak caído o lento (5 s) → `DEPENDENCIA_NO_DISPONIBLE` (503).
+- Guarda el token en una caché en memoria por `sub` y audiencia hasta 30 s antes de que venza (spec 016, paso 7). La clave lleva además un hash SHA-256 del token recibido: lo intercambiado solo se reutiliza para ese mismo token, y el token no queda guardado. Si llegan dos pedidos iguales al mismo tiempo, se hace un solo intercambio.
+- Errores con el código de 000 §5 y mensajes propios (el texto de Keycloak no sale): token del usuario vencido, revocado o de una sesión cerrada (`invalid_grant`, `invalid_token` o un `400` que habla del *subject token*, como `invalid_request` "Invalid token") → `NO_AUTENTICADO` (401; el usuario renueva). Intercambio no permitido → `SIN_PERMISO` (403). Keycloak caído o lento (5 s) → `DEPENDENCIA_NO_DISPONIBLE` (503).
 - CommonJS sin dependencias, con tipos en `index.d.ts`. Se enlaza con `"@transporte/intercambio-token": "file:../../libs/intercambio-token"`.
 
 ```bash

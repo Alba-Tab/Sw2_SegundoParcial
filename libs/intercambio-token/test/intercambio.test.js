@@ -67,6 +67,41 @@ test('errores con el código de 000 §5', async () => {
   assert.equal(await codigo(it.tokenPara('no-es-jwt', 'd')), 'NO_AUTENTICADO 401');
 });
 
+test('subject token vencido o de una sesión cerrada → NO_AUTENTICADO 401, sin el texto de Keycloak', async () => {
+  const kc = keycloak([
+    // Lo que responde Keycloak en el intercambio estándar cuando el token del usuario venció o la sesión se cerró.
+    { status: 400, json: { error: 'invalid_request', error_description: 'Invalid token' } },
+    { status: 400, json: { error: 'invalid_request', error_description: 'Invalid subject_token' } },
+    { status: 400, json: { error: 'invalid_token', error_description: 'Token is not active' } },
+    // Un 400 que no habla del subject token sigue siendo un intercambio no permitido.
+    { status: 400, json: { error: 'invalid_request', error_description: 'Requested audience not available: x' } },
+  ]);
+  const it = new IntercambioToken({ issuer: 'http://kc/r', clienteId: 'g', clienteSecreto: 's', fetch: kc.fetch });
+  const u = jwt({ sub: 'u1' });
+  const error = (p) => p.then(() => null, (e) => e);
+  for (const aud of ['a', 'b', 'c']) {
+    const e = await error(it.tokenPara(u, aud));
+    assert.equal(`${e.codigo} ${e.status}`, 'NO_AUTENTICADO 401');
+    assert.doesNotMatch(e.message, /Invalid|token is not active/i);
+  }
+  const otro = await error(it.tokenPara(u, 'd'));
+  assert.equal(`${otro.codigo} ${otro.status}`, 'SIN_PERMISO 403');
+  assert.doesNotMatch(otro.message, /audience/);
+});
+
+test('la caché es por token: otro token del mismo usuario no reutiliza lo intercambiado', async () => {
+  const kc = keycloak([]);
+  const it = new IntercambioToken({ issuer: 'http://kc/r', clienteId: 'g', clienteSecreto: 's', fetch: kc.fetch });
+  const sesionA = jwt({ sub: 'u1', exp: 500, sid: 'a' });
+  const sesionB = jwt({ sub: 'u1', exp: 500, sid: 'b' });
+  assert.equal(await it.tokenPara(sesionA, 'viajes'), 't1');
+  assert.equal(await it.tokenPara(sesionB, 'viajes'), 't2');
+  assert.equal(await it.tokenPara(sesionA, 'viajes'), 't1');
+  assert.equal(kc.pedidos.length, 2);
+  // La clave no guarda el token del usuario.
+  assert.ok([...it.cache.keys()].every((k) => !k.includes(sesionA) && !k.includes(sesionB)));
+});
+
 test('token de servicio por client credentials', async () => {
   const kc = keycloak([]);
   const it = new IntercambioToken({ issuer: 'http://kc/r', clienteId: 'gateway', clienteSecreto: 's', fetch: kc.fetch });
