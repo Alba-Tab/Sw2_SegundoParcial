@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatExpansionModule } from '@angular/material/expansion';
@@ -22,7 +22,7 @@ import { DispararMisionGQL, MisionesGQL, type MisionesQuery } from '../graphql/g
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!misiones().length" />
     <mat-accordion>
       @for (m of misiones(); track m.misionId) {
-        <mat-expansion-panel [expanded]="$first">
+        <mat-expansion-panel [expanded]="mision() ? m.misionId === mision() : $first" [class.elegida]="m.misionId === mision()">
           <mat-expansion-panel-header>
             <mat-panel-title>
               <span class="chip-estado" [attr.data-alerta]="m.estado === 'FALLIDA' || m.estado === 'SALTADA'">{{ m.estado }}</span>
@@ -43,7 +43,14 @@ import { DispararMisionGQL, MisionesGQL, type MisionesQuery } from '../graphql/g
             <p class="secundario">Conclusión: {{ m.conclusion }}</p>
           }
           @if (m.traceId) {
-            <p class="secundario">Traza: {{ m.traceId }}</p>
+            <p class="secundario">
+              Traza:
+              @if (urlTraza(m.traceId); as url) {
+                <a [href]="url" target="_blank" rel="noopener">{{ m.traceId }} en Jaeger</a>
+              } @else {
+                {{ m.traceId }}
+              }
+            </p>
           }
         </mat-expansion-panel>
       } @empty {
@@ -58,6 +65,9 @@ import { DispararMisionGQL, MisionesGQL, type MisionesQuery } from '../graphql/g
       gap: 2px;
       padding: 8px 0;
       border-bottom: 1px solid var(--mat-sys-outline-variant);
+    }
+    .elegida {
+      outline: 2px solid var(--mat-sys-primary);
     }
     .paso.error b {
       color: var(--mat-sys-error);
@@ -75,6 +85,8 @@ export class AgentePagina {
   private readonly avisos = inject(MatSnackBar);
   readonly sesion = inject(Sesion);
   readonly config = inject(CONFIG_CENTRO);
+  /** `?mision=<id>`: el enlace de una acción en cc-operaciones abre esa misión. */
+  readonly mision = input<string>();
   private readonly datos = toSignal(this.gql.watch({ pollInterval: 5_000 }).valueChanges);
   readonly misiones = computed(() => completo<MisionesQuery>(this.datos())?.misionesAgente ?? []);
   readonly error = computed(() => this.datos()?.error);
@@ -82,6 +94,11 @@ export class AgentePagina {
   readonly enviando = signal(false);
   private readonly intentos = new Intentos();
   readonly json = (v: unknown) => JSON.stringify(v);
+
+  urlTraza(traceId: string): string | null {
+    const base = this.config.jaegerUrl?.replace(/\/$/, '');
+    return base ? `${base}/trace/${encodeURIComponent(traceId)}` : null;
+  }
 
   async disparar(): Promise<void> {
     this.enviando.set(true);

@@ -48,7 +48,7 @@ import { TableroGQL, type Periodo } from '../graphql/generado';
                 <a [href]="config.urls['cc-operaciones'] + '/viajes/' + v.viajeId">{{ v.placa }}</a>
                 · {{ v.cliente?.razonSocial }} · {{ v.ruta?.nombre }}
                 @if (v.riesgo?.enRiesgo) {
-                  <span class="chip-estado" data-alerta="true">riesgo {{ pct(v.riesgo?.probabilidad) }}</span>
+                  <span class="chip-estado" data-alerta="true">riesgo {{ pct(v.riesgo.probabilidad) }}</span>
                 }
               </p>
             }

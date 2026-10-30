@@ -3,6 +3,7 @@
   "oidcIssuer": "http://localhost:8080/realms/transporte",
   "clienteOidc": "cc-tablero",
   "gatewayUrl": "http://localhost:8105",
+  "jaegerUrl": "http://localhost:16686",
   "urls": {
     "cc-tablero": "http://localhost:4201",
     "cc-operaciones": "http://localhost:4202",

@@ -10,11 +10,11 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { firstValueFrom, map } from 'rxjs';
-import { Intentos, mensajeDe, Sesion, TablaReporte, type Resultado } from 'ui-comun';
+import { fechaLaPaz, Intentos, mensajeDe, Sesion, TablaReporte, type Resultado } from 'ui-comun';
 import { CatalogoGQL, ExportarReporteGQL, ReporteGQL, type ReporteId, type ReporteParams } from '../graphql/generado';
 
-const hoy = () => new Date(Date.now() - 4 * 3600_000).toISOString().slice(0, 10);
-const dias = (n: number) => new Date(Date.now() - 4 * 3600_000 + n * 86_400_000).toISOString().slice(0, 10);
+const hoy = () => fechaLaPaz();
+const dias = (n: number) => fechaLaPaz(n);
 
 /**
  * Los 5 reportes del catálogo con botones (spec 015): sin LLM ni MCP, `reporte(id, params)` va directo a Analítica.
@@ -91,7 +91,7 @@ const dias = (n: number) => new Date(Date.now() - 4 * 3600_000 + n * 86_400_000)
               </mat-form-field>
             }
             <button mat-flat-button (click)="ver()">Ver</button>
-            <button mat-stroked-button (click)="exportar()" [disabled]="!resultado() || exportando()">
+            <button mat-stroked-button (click)="exportar()" [disabled]="!mostrado || exportando()">
               <mat-icon>download</mat-icon> Exportar a Excel
             </button>
           </div>
@@ -142,6 +142,8 @@ export class ReportesPagina {
   readonly exportando = signal(false);
   readonly error = signal<string | null>(null);
   params: ReporteParams = {};
+  /** El reporte y los parámetros del resultado que se ve: "Exportar" usa estos, no lo que se editó después sin "Ver". */
+  mostrado: { id: ReporteId; params: ReporteParams } | null = null;
   private readonly intentos = new Intentos();
 
   usa(campo: string): boolean {
@@ -151,6 +153,7 @@ export class ReportesPagina {
   elegir(id: ReporteId): void {
     this.elegido.set(id);
     this.resultado.set(null);
+    this.mostrado = null;
     // Cuentas por cobrar mira vencimientos: "esta semana" hacia adelante; los demás, el último mes.
     this.params =
       id === 'CUENTAS_POR_COBRAR'
@@ -168,11 +171,15 @@ export class ReportesPagina {
     this.cargando.set(true);
     this.error.set(null);
     try {
-      const r = await firstValueFrom(this.reporteGql.fetch({ variables: { id, params: this.limpios() } }));
+      const params = this.limpios();
+      const r = await firstValueFrom(this.reporteGql.fetch({ variables: { id, params } }));
       if (r.error) throw r.error;
-      this.resultado.set((r.data?.reporte as Resultado | undefined) ?? null);
+      const resultado = (r.data?.reporte as Resultado | undefined) ?? null;
+      this.resultado.set(resultado);
+      this.mostrado = resultado ? { id, params } : null;
     } catch (e) {
       this.resultado.set(null);
+      this.mostrado = null;
       this.error.set(mensajeDe(e));
     } finally {
       this.cargando.set(false);
@@ -180,11 +187,10 @@ export class ReportesPagina {
   }
 
   async exportar(): Promise<void> {
-    const id = this.elegido();
-    if (!id) return;
+    if (!this.mostrado) return;
+    const { id, params } = this.mostrado;
     this.exportando.set(true);
     try {
-      const params = this.limpios();
       const r = await this.intentos.enviar('exportarReporte', { id, params }, (clave) =>
         this.exportarGql.mutate({ variables: { id, params, clave } }),
       );
