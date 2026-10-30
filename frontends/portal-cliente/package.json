@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Portal del cliente (React, PWA): cuenta, cotizar, confirmar, seguir el viaje, POD y facturas",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -15,16 +17,25 @@
     "test": "vitest run",
     "storybook": "storybook dev -p 6006 --no-open",
     "storybook:build": "storybook build -o storybook-static --quiet",
-    "verificar": "npm run tipos && npm run lint && npm run formato && npm test"
+    "verificar": "npm run tipos && npm run lint && npm run formato && npm test",
+    "generar:contratos": "orval --config orval.config.ts && prettier --write src/api/generado --log-level warn",
+    "generar:contratos:verificar": "npm run generar:contratos && test -z \"$(git status --porcelain -- src/api/generado)\" || (echo 'src/api/generado no coincide con contratos/openapi: corre npm run generar:contratos y súbelo' && git status --porcelain -- src/api/generado && exit 1)"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
     "@emotion/styled": "11.14.1",
+    "@hookform/resolvers": "5.9.1",
     "@mui/icons-material": "7.3.11",
     "@mui/material": "7.3.11",
+    "@tanstack/react-query": "5.104.3",
+    "@tanstack/react-router": "1.170.44",
     "@transporte/design-tokens": "file:../../libs/design-tokens",
+    "oidc-client-ts": "3.5.0",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "react-hook-form": "7.90.0",
+    "react-oidc-context": "3.3.1",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@eslint/js": "9.39.5",
@@ -40,6 +51,7 @@
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.13.0",
     "jsdom": "30.1.3",
+    "orval": "8.45.0",
     "prettier": "3.9.10",
     "storybook": "10.6.2",
     "typescript": "5.9.3",
