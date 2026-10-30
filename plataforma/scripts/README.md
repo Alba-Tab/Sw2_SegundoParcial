@@ -46,6 +46,7 @@ Cada uno imprime ✔ o ✘ por cada resultado esperado y termina con código 1 s
 | `fc2-evento-repetido.sh` | FC2 | Republicar el último `FacturaEmitida` no manda otro correo |
 | `fc3-mensaje-invalido.sh` | FC3 | Un `EntregaConfirmada` sin `viajeId` termina en `finanzas.eventos.dlq` |
 | `fc4-cancelacion.sh` | FC4 | Cancelar un `CONFIRMADO` devuelve el disponible y la unidad |
+| `ff1-robo-combustible.sh [placa]` | FF1 (hasta el evento) | Corre el simulador en escenario `robo` (1 s por lectura; `INTERVALO=10` para el ritmo real) y verifica un solo `CaidaCombustibleDetectada` con caída ≥ 8 y velocidad 0, ya publicado |
 | `fc5-broker-caido.sh` | FC5 | Sin RabbitMQ la entrega responde `200` y queda en el Outbox; al volver, `CERRADO` |
 
 ## `fallos/` (interruptores)

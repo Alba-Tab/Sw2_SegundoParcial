@@ -290,9 +290,12 @@ class ProgramarViajeTest {
             throw new IllegalStateException("PostgreSQL de Finanzas caído");
         };
         var stub = iniciar(UUID.randomUUID());
-        var estado = esperar(stub, e -> "REQUIERE_INTERVENCION".equals(e.etapa()));
+        // La etapa cambia antes de que corra la actividad que marca el viaje: se esperan las dos cosas.
+        var estado = esperar(
+                stub,
+                e -> "REQUIERE_INTERVENCION".equals(e.etapa())
+                        && llamadas.contains("Viajes.marcarRequiereIntervencion:Finanzas.liberarCredito"));
         assertEquals(List.of("Finanzas.liberarCredito", "Viajes.cancelarViaje"), estado.compensacionesPendientes());
-        assertTrue(llamadas.contains("Viajes.marcarRequiereIntervencion:Finanzas.liberarCredito"));
         stub.resolverIntervencion(
                 new SenalResolverIntervencion("MARCAR_RESUELTO", "sub-despachador", "Liberado a mano"));
         var r = resultado(stub);

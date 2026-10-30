@@ -24,6 +24,7 @@ jobs:
       finanzas: ${{ steps.f.outputs.finanzas }}
       keycloak: ${{ steps.f.outputs.keycloak }}
       compose: ${{ steps.f.outputs.compose }}
+      simulador: ${{ steps.f.outputs.simulador }}
     steps:
       - uses: actions/checkout@v7
       - id: f
@@ -66,6 +67,11 @@ jobs:
             compose:
               - *ci
               - plataforma/compose/**
+            simulador:
+              - *ci
+              - contratos/eventos/flota/LecturaSensorCombustible.v1.schema.json
+              - contratos/comun/**
+              - plataforma/simulador-combustible/**
 
   contratos:
     needs: cambios
@@ -171,7 +177,20 @@ jobs:
     defaults: { run: { working-directory: plataforma/compose } }
     steps:
       - uses: actions/checkout@v7
-      - run: cp .env.example .env && docker compose --profile core --profile plataforma --profile trazas --profile demo config -q
+      - run: cp .env.example .env && docker compose --profile core --profile plataforma --profile trazas --profile demo --profile simulador config -q
+
+  simulador:
+    needs: cambios
+    if: needs.cambios.outputs.simulador == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: plataforma/simulador-combustible } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm, cache-dependency-path: plataforma/simulador-combustible/package-lock.json }
+      - run: npm ci
+      - run: npm test
+      - run: docker build -q .
 
   gitleaks:
     runs-on: ubuntu-latest
@@ -195,7 +214,7 @@ jobs:
 
   ci-ok:
     if: always()
-    needs: [cambios, contratos, viajes, flota, finanzas, keycloak, compose, gitleaks, commitlint]
+    needs: [cambios, contratos, viajes, flota, finanzas, keycloak, compose, simulador, gitleaks, commitlint]
     runs-on: ubuntu-latest
     steps:
       - name: Todo en verde u omitido por no tener cambios
