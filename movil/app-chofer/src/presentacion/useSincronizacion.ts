@@ -35,17 +35,27 @@ export function useSincronizacion(alCancelarse: (viajeIds: string[]) => void, al
   ).data[0]?.n;
   const puntos = useLiveQuery(bd.select({ n: sql<number>`count(*)` }).from(puntoGps)).data[0]?.n;
 
-  const sincronizar = useCallback(async () => {
-    const r = await motor.sincronizar();
-    setUltimo(r);
-    setEnLinea(!r.sinConexion);
-    if (r.cancelados.length) avisos.current.alCancelarse(r.cancelados);
-    if (r.requiereSesion) avisos.current.alVencerSesion();
-    return r;
+  // Nunca rechaza: los disparadores la llaman con `void` y un error inesperado no debe quedar sin capturar. La tanda
+  // siguiente vuelve a intentar.
+  const sincronizar = useCallback(async (): Promise<Resumen | null> => {
+    try {
+      const r = await motor.sincronizar();
+      setUltimo(r);
+      setEnLinea(!r.sinConexion);
+      if (r.cancelados.length) avisos.current.alCancelarse(r.cancelados);
+      if (r.requiereSesion) avisos.current.alVencerSesion();
+      return r;
+    } catch {
+      return null;
+    }
   }, []);
 
   useEffect(() => {
-    void motor.recuperarCursor().then(sincronizar);
+    // La limpieza del cursor nunca lanza; aun así, la sincronización inicial corre pase lo que pase.
+    void motor
+      .recuperarCursor()
+      .catch(() => {})
+      .then(sincronizar);
     const red = Network.addNetworkStateListener((e) => {
       setEnLinea(e.isConnected === true);
       if (e.isConnected) void sincronizar();

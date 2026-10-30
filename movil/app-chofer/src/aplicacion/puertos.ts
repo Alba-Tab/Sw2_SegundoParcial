@@ -44,8 +44,10 @@ export interface Viajes {
 export interface Api {
   enviar(op: Operacion, token: string): Promise<Respuesta>;
   enviarLoteGps(viajeId: string, dispositivoId: string, puntos: PuntoGps[], loteId: string, token: string): Promise<Respuesta>;
-  estadoDelViaje(viajeId: string, token: string): Promise<string | null>;
+  /** `GET /viajes/{id}` tras un 409 CONFLICTO_ESTADO; con 200, `cuerpo.estado`. Sin red: `SIN_RED` (nunca lanza). */
+  estadoDelViaje(viajeId: string, token: string): Promise<Respuesta>;
   misViajes(token: string): Promise<ViajeLocal[]>;
+  /** Último `seq` que el servidor tiene del dispositivo (D55); null si no hay o no se pudo saber (nunca lanza). */
   cursor(dispositivoId: string, viajeId: string, token: string): Promise<number | null>;
   registrarDispositivo(dispositivoId: string, plataforma: 'ANDROID' | 'IOS', tokenPush: string | null, token: string): Promise<Respuesta>;
 }

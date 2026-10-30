@@ -1,6 +1,6 @@
 import { PUNTOS_POR_LOTE } from '../dominio/gps';
 import { inicioConfirmado, type Operacion, RETENCION_DESCARTADAS_MS, siguiente } from '../dominio/operacion';
-import { decidir } from '../dominio/reintento';
+import { decidir, type Respuesta } from '../dominio/reintento';
 import type { SubidaEvidencias } from './subidaEvidencias';
 import {
   type Api,
@@ -29,6 +29,7 @@ export interface Resumen {
  * Motor de sincronización (spec 005, CU-08). Una tanda a la vez: renueva el token, envía la cola de cada viaje en orden
  * (una petición a la vez por viaje) y después los lotes de GPS de los viajes con el inicio confirmado (un lote a la vez).
  * Los reintentos esperan con *full jitter*; un 409 CONFLICTO_ESTADO con el viaje cancelado descarta su cola y avisa.
+ * Un error inesperado al enviar una operación no rompe la tanda: esa operación se reintenta y las demás siguen.
  */
 export class MotorSincronizacion {
   private corriendo: Promise<Resumen> | null = null;
@@ -87,10 +88,7 @@ export class MotorSincronizacion {
       const ahora = this.reloj.ahora();
       const op = siguiente(ops, ahora);
       if (!op) return;
-      // Entrega, rechazo y carga con foto salen solo con sus evidencias completas en S3 (spec 006).
-      const evidencias = op.evidencias.length && this.subida ? await this.subida.asegurar(op.evidencias, token) : { listo: true as const };
-      const respuesta = evidencias.listo ? await this.api.enviar(op, token) : evidencias.respuesta;
-      const d = decidir(respuesta, op.intentos + 1, this.azar);
+      const d = decidir(await this.intentar(op, token), op.intentos + 1, this.azar);
       if (d.tipo === 'SESION') return 'SESION';
       if (d.tipo === 'CONFIRMADA') {
         this.cerrar(op, 'CONFIRMADA', null);
@@ -98,12 +96,23 @@ export class MotorSincronizacion {
         continue;
       }
       if (d.tipo === 'REINTENTAR') {
-        op.intentos++;
-        op.proximoIntentoEn = new Date(ahora.getTime() + d.esperaMs).toISOString();
-        this.cola.actualizar(op);
+        this.reprogramar(op, ahora, d.esperaMs);
         return;
       }
-      if (d.tipo === 'CONFLICTO' && (await this.api.estadoDelViaje(viajeId, token)) === 'CANCELADO') {
+      if (d.tipo === 'FALLIDA') {
+        this.cerrar(op, 'FALLIDA', d.codigo);
+        continue;
+      }
+      // 409 CONFLICTO_ESTADO: ¿se canceló el viaje mientras no había señal? Si no se puede saber (red, 5xx), se
+      // reintenta la operación con la misma clave; nunca queda FALLIDA por no haber podido preguntar.
+      const estado = await this.api.estadoDelViaje(viajeId, token);
+      const e = decidir(estado, op.intentos + 1, this.azar);
+      if (e.tipo === 'SESION') return 'SESION';
+      if (e.tipo === 'REINTENTAR') {
+        this.reprogramar(op, ahora, e.esperaMs);
+        return;
+      }
+      if (e.tipo === 'CONFIRMADA' && (estado.cuerpo as { estado?: unknown } | undefined)?.estado === 'CANCELADO') {
         // Plan F7: "Viaje cancelado; llama al despachador". El resto de su cola no se envía (queda 7 días en Descartadas).
         this.cola.descartarViaje(viajeId, ahora.toISOString());
         for (const o of ops) if (o.estado === 'PENDIENTE') o.estado = 'DESCARTADA';
@@ -111,8 +120,25 @@ export class MotorSincronizacion {
         r.cancelados.push(viajeId);
         return;
       }
-      this.cerrar(op, 'FALLIDA', d.tipo === 'FALLIDA' ? d.codigo : 'CONFLICTO_ESTADO');
+      this.cerrar(op, 'FALLIDA', 'CONFLICTO_ESTADO');
     }
+  }
+
+  /** Sube las evidencias (entrega, rechazo y carga con foto salen solo con ellas completas en S3, spec 006) y envía. */
+  private async intentar(op: Operacion, token: string): Promise<Respuesta> {
+    try {
+      const evidencias = op.evidencias.length && this.subida ? await this.subida.asegurar(op.evidencias, token) : { listo: true as const };
+      return evidencias.listo ? await this.api.enviar(op, token) : evidencias.respuesta;
+    } catch {
+      // Un fallo del celular (un archivo que no se pudo leer, un adaptador que lanzó): se reintenta como un corte.
+      return { estado: 'SIN_RED' };
+    }
+  }
+
+  private reprogramar(op: Operacion, ahora: Date, esperaMs: number) {
+    op.intentos++;
+    op.proximoIntentoEn = new Date(ahora.getTime() + esperaMs).toISOString();
+    this.cola.actualizar(op);
   }
 
   private async enviarGps(viajeId: string, token: string, r: Resumen): Promise<'SESION' | void> {
@@ -149,18 +175,24 @@ export class MotorSincronizacion {
 
   /**
    * Al abrir la app: lo que el servidor ya aceptó (si la app se cerró antes de recibir la respuesta del lote) se borra
-   * de SQLite con el cursor del dispositivo (D55).
+   * de SQLite con el cursor del dispositivo (D55). Es solo una limpieza: nunca lanza, para que la sincronización
+   * inicial corra igual sin señal o con la sesión vencida; si falla, los puntos se reenvían y el servidor los ignora.
    */
   async recuperarCursor(): Promise<void> {
-    if (!(await this.red.hayConexion())) return;
+    let token: string;
     try {
-      const token = await this.sesion.tokenVigente();
-      for (const viajeId of this.puntos.viajes()) {
+      if (!(await this.red.hayConexion())) return;
+      token = await this.sesion.tokenVigente();
+    } catch {
+      return;
+    }
+    for (const viajeId of this.puntos.viajes()) {
+      try {
         const seq = await this.api.cursor(this.dispositivo.id(), viajeId, token);
         if (seq !== null) this.puntos.borrarHasta(viajeId, seq);
+      } catch {
+        // Ese viaje se limpia en otra apertura.
       }
-    } catch (e) {
-      if (!(e instanceof SesionVencida || e instanceof SinRed)) throw e;
     }
   }
 }

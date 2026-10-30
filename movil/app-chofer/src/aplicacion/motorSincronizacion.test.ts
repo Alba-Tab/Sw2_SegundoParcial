@@ -61,7 +61,13 @@ class ApiFalsa implements Api {
   enviadas: string[] = [];
   lotes: { puntos: number[]; loteId: string }[] = [];
   estado = 'EN_RUTA';
+  /** Respuestas de `GET /viajes/{id}` antes de la normal (200 con `estado`). */
+  respuestasEstado: Respuesta[] = [];
   cursorServidor: number | null = null;
+  /** Viajes cuyo cursor lanza (un adaptador que no envolvió el corte de red). */
+  cursorQueLanza = new Set<string>();
+  /** Operaciones cuyo envío lanza en vez de devolver una respuesta. */
+  lanzaAlEnviar = new Set<string>();
   responder(clave: string, ...r: Respuesta[]) {
     this.respuestas.set(clave, r);
   }
@@ -71,15 +77,19 @@ class ApiFalsa implements Api {
   }
   enviar = async (op: Operacion) => {
     this.enviadas.push(`${op.tipo}:${op.opId}`);
+    if (this.lanzaAlEnviar.has(op.opId)) throw new TypeError('Network request failed');
     return this.siguiente(`${op.tipo}:${op.opId}`);
   };
   enviarLoteGps = async (_v: string, _d: string, puntos: PuntoGps[], loteId: string) => {
     this.lotes.push({ puntos: puntos.map((p) => p.seq), loteId });
     return this.siguiente('GPS');
   };
-  estadoDelViaje = async () => this.estado;
+  estadoDelViaje = async (): Promise<Respuesta> => this.respuestasEstado.shift() ?? { estado: 200, cuerpo: { estado: this.estado } };
   misViajes = async () => [];
-  cursor = async () => this.cursorServidor;
+  cursor = async (_d: string, viajeId: string) => {
+    if (this.cursorQueLanza.has(viajeId)) throw new TypeError('Network request failed');
+    return this.cursorServidor;
+  };
   registrarDispositivo = async () => ({ estado: 200 });
 }
 
@@ -355,5 +365,70 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     expect(apiEvidencias.completadas.map((c) => c.id)).toEqual(carga.evidencias);
     expect(api.enviadas).toContain(`CARGA_COMBUSTIBLE:${op}`);
     expect(() => casos.cargarCombustible('v1', { litros: 0, monto: '10', kilometraje: 1, foto: null })).toThrow();
+  });
+
+  it('409 CONFLICTO_ESTADO sin poder preguntar el estado (corte o 5xx): reintenta con la misma clave, no queda FALLIDA', async () => {
+    const inicio = casos.iniciarViaje('v1', null);
+    api.responder(`INICIO:${inicio}`, { estado: 409, codigo: 'CONFLICTO_ESTADO' });
+    api.respuestasEstado = [{ estado: 'SIN_RED' }, { estado: 503 }];
+    const op = cola.ops[0];
+    await motor.sincronizar();
+    expect(op).toMatchObject({ estado: 'PENDIENTE', intentos: 1 });
+    ahora = new Date(Date.parse(op.proximoIntentoEn!));
+    await motor.sincronizar();
+    expect(op).toMatchObject({ estado: 'PENDIENTE', intentos: 2 });
+
+    ahora = new Date(Date.parse(op.proximoIntentoEn!));
+    api.estado = 'CANCELADO';
+    expect((await motor.sincronizar()).cancelados).toEqual(['v1']);
+    expect(op.estado).toBe('DESCARTADA');
+    expect(new Set(api.enviadas)).toEqual(new Set([`INICIO:${inicio}`]));
+  });
+
+  it('409 CONFLICTO_ESTADO con el viaje en otro estado: FALLIDA con su código', async () => {
+    const inicio = casos.iniciarViaje('v1', null);
+    api.responder(`INICIO:${inicio}`, { estado: 409, codigo: 'CONFLICTO_ESTADO' });
+    api.estado = 'ENTREGADO';
+    await motor.sincronizar();
+    expect(cola.ops[0]).toMatchObject({ estado: 'FALLIDA', codigoError: 'CONFLICTO_ESTADO' });
+  });
+
+  it('un envío que lanza no rompe la tanda: esa operación se reintenta y los otros viajes siguen', async () => {
+    viajes.guardarDelServidor([viaje('v2')]);
+    const malo = casos.encolar('v1', 'HITO', { tipo: 'PARADA' });
+    const bueno = casos.encolar('v2', 'HITO', { tipo: 'PARADA' });
+    api.lanzaAlEnviar.add(malo);
+    const r = await motor.sincronizar();
+    expect(r.confirmadas).toBe(1);
+    expect(cola.ops.find((o) => o.opId === malo)).toMatchObject({ estado: 'PENDIENTE', intentos: 1 });
+    expect(cola.ops.find((o) => o.opId === bueno)?.estado).toBe('CONFIRMADA');
+  });
+
+  it('al abrir, un cursor que falla por red no rechaza ni impide limpiar los otros viajes', async () => {
+    for (let s = 0; s < 5; s++) gps(s);
+    puntos.agregar({
+      viajeId: 'v2',
+      seq: 0,
+      registradaEn: ahora.toISOString(),
+      lat: -17.7,
+      lng: -63.1,
+      velocidadKmh: 0,
+      precisionMetros: null,
+    });
+    api.cursorServidor = 3;
+    api.cursorQueLanza.add('v1');
+    await expect(motor.recuperarCursor()).resolves.toBeUndefined();
+    expect(puntos.pendientes('v1', 100)).toHaveLength(5);
+    expect(puntos.pendientes('v2', 100)).toHaveLength(0);
+  });
+
+  it('al abrir sin señal o con la sesión vencida, la limpieza del cursor no rechaza (la sincronización inicial corre igual)', async () => {
+    gps(0);
+    conRed = false;
+    await expect(motor.recuperarCursor()).resolves.toBeUndefined();
+    conRed = true;
+    sesionVencida = true;
+    await expect(motor.recuperarCursor()).resolves.toBeUndefined();
+    expect(puntos.contar()).toBe(1);
   });
 });
