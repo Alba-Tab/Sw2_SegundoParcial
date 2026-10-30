@@ -1,0 +1,82 @@
+query Tablero($periodo: Periodo!) {
+  tablero(periodo: $periodo) {
+    periodo
+    viajesEnCurso {
+      viajeId
+      placa
+      choferNombre
+      cliente {
+        razonSocial
+      }
+      ruta {
+        nombre
+      }
+      riesgo {
+        probabilidad
+        enRiesgo
+      }
+    }
+    unidadesPorEstado {
+      estado
+      cantidad
+    }
+    cuentasPorCobrar {
+      saldoTotal
+      facturasPorVencer
+      facturasVencidas
+      proximas {
+        facturaId
+        numero
+        razonSocial
+        saldo
+        venceEl
+      }
+    }
+    alertasAbiertas
+    datosAl
+  }
+}
+
+query Catalogo {
+  catalogoReportes {
+    reporteId
+    titulo
+    descripcion
+    roles
+    maxDias
+    parametros
+  }
+  clientes {
+    clienteId
+    razonSocial
+  }
+  rutas {
+    rutaId
+    nombre
+  }
+}
+
+query Reporte($id: ReporteId!, $params: ReporteParams) {
+  reporte(id: $id, params: $params) {
+    reporteId
+    titulo
+    parametros
+    columnas {
+      clave
+      titulo
+      tipo
+    }
+    filas
+    totales
+    grafico
+    datosAl
+  }
+}
+
+mutation ExportarReporte($id: ReporteId!, $params: ReporteParams, $clave: ID!) {
+  exportarReporte(id: $id, params: $params, claveIdempotencia: $clave) {
+    url
+    nombreArchivo
+    expiraEn
+  }
+}

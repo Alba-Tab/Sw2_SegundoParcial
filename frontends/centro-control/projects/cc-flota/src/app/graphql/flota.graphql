@@ -1,0 +1,109 @@
+query Unidades($tipo: TipoUnidad, $estado: EstadoUnidad) {
+  unidades(tipo: $tipo, estado: $estado) {
+    unidadId
+    tipoUnidad
+    placa
+    tipoRemolque
+    estado
+    kilometraje
+    kmDesdeUltimoMantenimiento
+    documentos {
+      tipo
+      venceEl
+    }
+  }
+}
+
+query Unidad($id: ID!) {
+  unidad(id: $id) {
+    unidadId
+    tipoUnidad
+    placa
+    tipoRemolque
+    capacidadToneladas
+    estado
+    kilometraje
+    kmDesdeUltimoMantenimiento
+    documentos {
+      tipo
+      venceEl
+    }
+    atributos
+  }
+  mantenimientos(unidadId: $id) {
+    mantenimientoId
+    tipo
+    estado
+    fechaProgramada
+    taller
+    descripcion
+    checklist {
+      item
+      ok
+      nota
+    }
+    programadoEn
+    cerradoEn
+    observaciones
+  }
+}
+
+query Combustible($desde: Fecha!) {
+  anomaliasCombustible(desde: $desde) {
+    cargaId
+    placa
+    viajeId
+    litros
+    kmPorLitro
+    puntaje
+    registradaEn
+  }
+  cargasCombustible(limite: 50) {
+    cargaId
+    viajeId
+    placa
+    litros
+    monto
+    kilometraje
+    registradaEn
+  }
+}
+
+query Conduccion($desde: Fecha) {
+  puntajesConduccion(desde: $desde) {
+    desde
+    hasta
+    datosAl
+    choferes {
+      choferId
+      nombre
+      frenadas
+      fatigas
+      km
+      puntaje
+    }
+    viajes {
+      viajeId
+      choferId
+      nombre
+      frenadas
+      fatigas
+      km
+      puntaje
+    }
+  }
+}
+
+mutation ProgramarMantenimiento($input: MantenimientoInput!) {
+  programarMantenimiento(input: $input) {
+    mantenimientoId
+    estado
+  }
+}
+
+mutation CerrarMantenimiento($input: CierreMantenimientoInput!) {
+  cerrarMantenimiento(input: $input) {
+    mantenimientoId
+    estado
+  }
+}

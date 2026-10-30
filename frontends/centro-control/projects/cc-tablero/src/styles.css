@@ -1,0 +1,56 @@
+html,
+body {
+  height: 100%;
+}
+body {
+  margin: 0;
+  font-family: Roboto, 'Helvetica Neue', sans-serif;
+  background: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+}
+h1 {
+  font: var(--mat-sys-headline-small);
+  margin: 0 0 16px;
+}
+h2 {
+  font: var(--mat-sys-title-medium);
+  margin: 24px 0 8px;
+}
+.tarjetas {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 16px;
+}
+.fila-acciones {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin: 8px 0 16px;
+}
+.no-disponible {
+  color: var(--mat-sys-error);
+}
+.secundario {
+  color: var(--mat-sys-on-surface-variant);
+  font-size: 13px;
+}
+.tabla-ancha {
+  width: 100%;
+  overflow-x: auto;
+}
+table {
+  width: 100%;
+}
+.chip-estado {
+  padding: 2px 8px;
+  border-radius: 12px;
+  background: var(--mat-sys-secondary-container);
+  color: var(--mat-sys-on-secondary-container);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.chip-estado[data-alerta='true'] {
+  background: var(--mat-sys-error-container);
+  color: var(--mat-sys-on-error-container);
+}
