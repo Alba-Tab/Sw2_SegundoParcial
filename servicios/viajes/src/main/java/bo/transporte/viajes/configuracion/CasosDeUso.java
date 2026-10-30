@@ -20,6 +20,8 @@ import bo.transporte.viajes.aplicacion.servicio.CancelacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ConfirmacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ConsultaDeServicios;
 import bo.transporte.viajes.aplicacion.servicio.ParametrosSaga;
+import bo.transporte.viajes.aplicacion.viaje.ConsultaDeViajes;
+import bo.transporte.viajes.aplicacion.viaje.InicioDeViaje;
 import bo.transporte.viajes.aplicacion.viaje.ProgramacionDeViaje;
 import java.time.Clock;
 import java.time.Duration;
@@ -130,5 +132,24 @@ class CasosDeUso {
             Auditoria auditoria,
             Transacciones tx) {
         return new CancelacionDeServicio(servicios, viajes, eventos, idempotencia, auditoria, tx);
+    }
+
+    @Bean
+    ConsultaDeViajes consultaDeViajes(
+            ViajeRepositorio viajes, ClienteRepositorio clientes, RutaRepositorio rutas, Clock reloj) {
+        return new ConsultaDeViajes(viajes, clientes, rutas, reloj);
+    }
+
+    @Bean
+    InicioDeViaje inicioDeViaje(
+            ViajeRepositorio viajes,
+            ServicioRepositorio servicios,
+            ConsultaDeViajes consulta,
+            RegistroDeEventos eventos,
+            RegistroIdempotente idempotencia,
+            Auditoria auditoria,
+            Transacciones tx,
+            Clock reloj) {
+        return new InicioDeViaje(viajes, servicios, consulta, eventos, idempotencia, auditoria, tx, reloj);
     }
 }

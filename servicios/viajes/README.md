@@ -16,7 +16,7 @@ Clientes, cotizaciones confirmadas, servicios, viajes en ruta y la saga `Program
 | Interfaces REST y DTO generados desde `contratos/openapi/viajes.yaml` con openapi-generator 7.26 (`useSpringBoot4`, `useJackson3`); `SaludController` implementa `SaludApi` | `pom.xml`, `target/generated-sources/openapi` |
 
 ```bash
-./mvnw verify                                            # 43 pruebas (Testcontainers + Temporal en memoria)
+./mvnw verify                                            # 48 pruebas (Testcontainers + Temporal en memoria)
 docker compose -f ../../plataforma/compose/compose.yaml --profile core --profile plataforma up -d --build viajes   # contexto: raíz del repo
 curl localhost:8101/health/ready
 ```
@@ -75,3 +75,9 @@ curl localhost:8101/health/ready
   - en cualquier otro estado, `409 CONFLICTO_ESTADO`.
 - **En una transacción:** el viaje pasa a `CANCELADO`, se registra la auditoría y queda `ViajeCancelado` en el Outbox con `origen = USUARIO`, `canceladoPor`, `detalle` y `choferUsuarioSub`. Finanzas y Flota liberan por su cuenta (coreografía).
 - La respuesta `200` se guarda para los reenvíos con la misma clave.
+
+## Inicio de viaje (T5.0, spec 005)
+
+- `GET /api/v1/viajes/mios` (chofer): sus viajes `CONFIRMADO`, `EN_RUTA` o `ENTREGA_OBSERVADA` y los que cambiaron en los últimos 7 días (D50), con cliente y ruta y **sin montos** (D51).
+- `GET /api/v1/viajes/{viajeId}`: el chofer ve solo los suyos; despachador, comercial, gerente, jefe de flota y agente, todos.
+- `POST /api/v1/viajes/{viajeId}/inicio` (chofer asignado; `Idempotency-Key` = `opId` de la cola del celular): `CONFIRMADO` → `EN_RUTA` con `iniciadoEn` del celular (hasta 2 min en el futuro), auditoría `APP_CHOFER` y `ViajeIniciado` en el Outbox. Sin confirmación completa, `409 CONFIRMACION_EN_CURSO` (la app reintenta); cancelado u otro estado, `409 CONFLICTO_ESTADO`; un segundo viaje en ruta del mismo chofer, `409` (D11, también con un índice único parcial).
