@@ -389,6 +389,12 @@
           "options": {
             "port": 4204
           }
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "projects/cc-finanzas/tsconfig.spec.json"
+          }
         }
       }
     },

@@ -11,7 +11,7 @@
     "generar:verificar": "npm run generar && test -z \"$(git status --porcelain -- 'projects/*/src/*/graphql/generado.ts')\" || (echo 'El código generado no coincide con el esquema: corre npm run generar' && exit 1)",
     "formato": "prettier --check \"projects/**/*.{ts,html,css,graphql}\" codegen.ts",
     "construir": "ng build cc-tablero && ng build cc-operaciones && ng build cc-flota && ng build cc-finanzas",
-    "probar": "ng test ui-comun --watch=false && ng test cc-operaciones --watch=false",
+    "probar": "ng test ui-comun --watch=false && ng test cc-operaciones --watch=false && ng test cc-finanzas --watch=false",
     "verificar": "npm run formato && npm run probar && npm run construir",
     "modelos": "sh scripts/descargar-whisper.sh"
   },

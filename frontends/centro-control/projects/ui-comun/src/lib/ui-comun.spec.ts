@@ -2,7 +2,7 @@ import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { esperaReconexion } from './conexion';
 import { APPS_POR_ROL, DESTINO_POR_ROL } from './configuracion';
 import { codigoDe, mensajeDe, servicioCaido } from './errores';
-import { BobPipe, FechaPipe, pct } from './formato';
+import { BobPipe, fechaLaPaz, FechaPipe, pct } from './formato';
 import { reclamos } from './sesion';
 
 const jwt = (datos: object) => `x.${btoa(JSON.stringify(datos)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')}.y`;
@@ -47,5 +47,13 @@ describe('ui-comun', () => {
     expect(new BobPipe().transform(null)).toBe('—');
     expect(new FechaPipe().transform('2026-11-03')).toBe('03/11/2026');
     expect(pct(0.857)).toBe('86 %');
+  });
+
+  it('las fechas por defecto salen de La Paz (UTC−4), no de UTC', () => {
+    const noche = new Date('2026-10-31T02:30:00Z'); // 30/10 22:30 en La Paz
+    expect(fechaLaPaz(0, noche)).toBe('2026-10-30');
+    expect(fechaLaPaz(-61, noche)).toBe('2026-08-30');
+    expect(fechaLaPaz(2, noche)).toBe('2026-11-01');
+    expect(fechaLaPaz(1, new Date('2026-12-31T12:00:00Z'))).toBe('2027-01-01');
   });
 });
