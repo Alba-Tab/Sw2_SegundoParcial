@@ -149,13 +149,7 @@ export type SolicitudesQuery = {
     venceEn: string;
     decididaPor: string | null;
     motivoDecision: string | null;
-    facturasVencidas: Array<{
-      facturaId: string;
-      numero: string;
-      saldo: string;
-      venceEl: string;
-      diasVencida: number;
-    }> | null;
+    facturasVencidas: Array<{ facturaId: string; numero: string; saldo: string; venceEl: string; diasVencida: number }> | null;
   }> | null;
 };
 
@@ -164,13 +158,7 @@ export type LineaCreditoQueryVariables = Exact<{
 }>;
 
 export type LineaCreditoQuery = {
-  lineaCredito: {
-    limite: string;
-    reservado: string;
-    utilizado: string;
-    disponible: string;
-    enMora: boolean;
-  } | null;
+  lineaCredito: { limite: string; reservado: string; utilizado: string; disponible: string; enMora: boolean } | null;
 };
 
 export type CobranzaQueryVariables = Exact<{
@@ -194,9 +182,7 @@ export type RegistrarPagoMutationVariables = Exact<{
   input: PagoInput;
 }>;
 
-export type RegistrarPagoMutation = {
-  registrarPago: { facturaId: string; saldo: string; estado: EstadoFactura };
-};
+export type RegistrarPagoMutation = { registrarPago: { facturaId: string; saldo: string; estado: EstadoFactura } };
 
 export type AprobarCreditoMutationVariables = Exact<{
   servicioId: string | number;
@@ -206,11 +192,7 @@ export type AprobarCreditoMutationVariables = Exact<{
 }>;
 
 export type AprobarCreditoMutation = {
-  aprobarCredito: {
-    servicioId: string;
-    aprobado: boolean;
-    servicio: { estado: EstadoServicio } | null;
-  };
+  aprobarCredito: { servicioId: string; aprobado: boolean; servicio: { estado: EstadoServicio } | null };
 };
 
 export const FacturaFilaFragmentDoc = gql`
