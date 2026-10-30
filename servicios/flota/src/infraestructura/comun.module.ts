@@ -4,6 +4,8 @@ import { LoggerModule } from 'nestjs-pino';
 import { CHOFER_REPOSITORIO } from '../aplicacion/puertos/chofer-repositorio';
 import { COMBUSTIBLE_REPOSITORIO } from '../aplicacion/puertos/combustible-repositorio';
 import { INBOX } from '../aplicacion/puertos/inbox';
+import { MANTENIMIENTO_REPOSITORIO } from '../aplicacion/puertos/mantenimiento-repositorio';
+import { OPERACIONES_IDEMPOTENTES } from '../aplicacion/puertos/operaciones-idempotentes';
 import { REGISTRO_DE_EVENTOS } from '../aplicacion/puertos/registro-de-eventos';
 import { RELOJ } from '../aplicacion/puertos/reloj';
 import { RESERVA_UNIDAD_REPOSITORIO } from '../aplicacion/puertos/reserva-unidad-repositorio';
@@ -16,6 +18,7 @@ import { opcionesLog } from './observabilidad/logger';
 import { ChoferRepositorioMongo, ReservaUnidadRepositorioMongo, UnidadRepositorioMongo } from './persistencia/colecciones-flota';
 import { CombustibleRepositorioMongo } from './persistencia/combustible-mongo';
 import { InboxMongo } from './persistencia/inbox-mongo';
+import { MantenimientoRepositorioMongo, OperacionesIdempotentesMongo } from './persistencia/mantenimiento-mongo';
 import { MongoUnidadDeTrabajo } from './persistencia/mongo-unidad-de-trabajo';
 import { RegistroDeEventosMongo } from './persistencia/registro-de-eventos-mongo';
 import { RelojSistema } from './persistencia/reloj-sistema';
@@ -29,6 +32,8 @@ const PUERTOS = [
   { provide: INBOX, useClass: InboxMongo },
   { provide: RELOJ, useClass: RelojSistema },
   { provide: COMBUSTIBLE_REPOSITORIO, useClass: CombustibleRepositorioMongo },
+  { provide: MANTENIMIENTO_REPOSITORIO, useClass: MantenimientoRepositorioMongo },
+  { provide: OPERACIONES_IDEMPOTENTES, useClass: OperacionesIdempotentesMongo },
 ];
 
 /** Lo que comparten la API, el worker y la CLI: logs, Mongo, AMQP, la validación de eventos y los adaptadores de los puertos. */

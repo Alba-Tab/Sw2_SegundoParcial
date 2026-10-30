@@ -42,7 +42,12 @@ export class UnidadesController {
   async listarUnidades(@Req() req: ConUsuario, @Query() q: unknown): Promise<z.infer<typeof ListarUnidadesResponse>> {
     const p = consulta(ListarUnidadesQueryParams, q);
     const limite = p.limite ?? 20;
-    const items = await this.unidades.listar(req.usuario.roles, { tipo: p.tipo, estado: p.estado }, desdeCursor(p.cursor), limite + 1);
+    const items = await this.unidades.listar(
+      req.usuario.roles,
+      { placa: p.placa, tipo: p.tipo, estado: p.estado },
+      desdeCursor(p.cursor),
+      limite + 1,
+    );
     return pagina(items as never[], limite, (u: { unidadId: string }) => u.unidadId) as z.infer<typeof ListarUnidadesResponse>;
   }
 

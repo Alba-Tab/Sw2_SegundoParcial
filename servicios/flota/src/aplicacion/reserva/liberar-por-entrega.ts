@@ -1,4 +1,4 @@
-import { liberarDespuesDelViaje } from '../../dominio/unidad/mantenimiento';
+import { liberarDespuesDelViaje, mantenimientoRequerido } from '../../dominio/unidad/mantenimiento';
 import type { ChoferRepositorio } from '../puertos/chofer-repositorio';
 import type { Inbox } from '../puertos/inbox';
 import type { RegistroDeEventos } from '../puertos/registro-de-eventos';
@@ -42,14 +42,11 @@ export class LiberarPorEntrega {
         if (!fin) continue;
         await this.unidades.guardar(fin.unidad);
         if (fin.revision.motivos.length) {
-          await this.eventos.registrar('MantenimientoRequerido', 'flota.mantenimiento-requerido.v1', {
-            unidadId: fin.unidad.unidadId,
-            tipoUnidad: fin.unidad.tipoUnidad,
-            placa: fin.unidad.placa,
-            motivos: fin.revision.motivos,
-            kmDesdeUltimo: fin.unidad.kmDesdeUltimoMantenimiento,
-            ...(fin.revision.documentoVenceEl ? { documentoVenceEl: fin.revision.documentoVenceEl } : {}),
-          });
+          await this.eventos.registrar(
+            'MantenimientoRequerido',
+            'flota.mantenimiento-requerido.v1',
+            mantenimientoRequerido(fin.unidad, fin.revision),
+          );
         }
       }
       await this.choferes.devolver(d.choferId);

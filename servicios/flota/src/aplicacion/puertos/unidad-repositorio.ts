@@ -11,8 +11,10 @@ export interface UnidadRepositorio {
   devolver(unidadId: string): Promise<void>;
   /** RESERVADA → EN_VIAJE (D20); no toca una unidad que ya cambió de estado. */
   ponerEnViaje(unidadId: string): Promise<void>;
+  /** Alta (spec 010); la placa es única por índice. */
+  insertar(unidad: Unidad): Promise<void>;
   /** Reemplaza el documento (estado, km, documentos, atributos) dentro de la transacción en curso. */
   guardar(unidad: Unidad): Promise<void>;
-  listar(filtro: { tipo?: string; estado?: string }, despuesDe: string | undefined, limite: number): Promise<Unidad[]>;
+  listar(filtro: { placa?: string; tipo?: string; estado?: string }, despuesDe: string | undefined, limite: number): Promise<Unidad[]>;
 }
 export const UNIDAD_REPOSITORIO = Symbol('UnidadRepositorio');

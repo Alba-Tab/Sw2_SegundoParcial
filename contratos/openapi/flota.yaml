@@ -3,9 +3,10 @@ info:
   title: API de Flota
   version: 1.0.0
   description: |
-    Núcleo de Flota (NestJS, Clean): lectura de unidades y choferes para el Gateway y la app.
-    Las reservas de la saga no pasan por esta API (van por Temporal, spec 003). Las escrituras
-    (cargas de combustible, mantenimiento) se agregan en F5 junto con su código.
+    Núcleo de Flota (NestJS, Clean): unidades, choferes, combustible y mantenimiento para el Gateway y la app.
+    Las reservas de la saga no pasan por esta API (van por Temporal, spec 003). Toda escritura lleva
+    `Idempotency-Key`; la autoridad es la colección `operacionIdempotente` (000 §4.1), salvo las cargas de
+    combustible, que usan su `opId` (spec 009).
 servers:
   - url: http://localhost:8102
     description: Local
@@ -16,6 +17,7 @@ tags:
   - name: unidades
   - name: choferes
   - name: combustible
+  - name: mantenimientos
 paths:
   /health:
     get:
@@ -42,8 +44,13 @@ paths:
     get:
       tags: [unidades]
       operationId: listarUnidades
-      summary: Tractos y remolques (jefe_flota, despachador, gerente).
+      summary: Tractos y remolques (jefe_flota, despachador, gerente, agente_lectura).
       parameters:
+        - name: placa
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/Placa'
         - name: tipo
           in: query
           required: false
@@ -63,10 +70,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/PaginaUnidades'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
         '401':
           $ref: './comun.yaml#/components/responses/NoAutenticado'
         '403':
           $ref: './comun.yaml#/components/responses/SinPermiso'
+    post:
+      tags: [unidades]
+      operationId: crearUnidad
+      summary: Alta de un tracto o remolque (jefe_flota). Spec 010, paso 1.
+      description: |
+        Valida `atributos` con las reglas del tipo (ver `UnidadNueva.atributos`). Crea la unidad `DISPONIBLE`, o
+        `MANTENIMIENTO_PENDIENTE` con `MantenimientoRequerido` si ya cumple la regla C (km o documentos por vencer).
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnidadNueva'
+      responses:
+        '201':
+          description: Unidad creada (también en el reenvío con la misma clave).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unidad'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
   /api/v1/unidades/{unidadId}:
     parameters:
       - name: unidadId
@@ -91,6 +134,202 @@ paths:
           $ref: './comun.yaml#/components/responses/SinPermiso'
         '404':
           $ref: './comun.yaml#/components/responses/NoEncontrado'
+    put:
+      tags: [unidades]
+      operationId: actualizarUnidad
+      summary: Edición de una unidad (jefe_flota). Spec 010, paso 2.
+      description: |
+        Documento completo salvo `estado`, `placa`, `kilometraje` y `kmDesdeUltimoMantenimiento`; si vienen, 400
+        VALIDACION. Una unidad `RESERVADA`, `EN_VIAJE`, `EN_MANTENIMIENTO` o `INACTIVA` no se edita (409). Si una
+        `MANTENIMIENTO_PENDIENTE` ya no cumple la regla C con los documentos renovados, vuelve a `DISPONIBLE`.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UnidadEdicion'
+      responses:
+        '200':
+          description: Unidad actualizada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unidad'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/unidades/{unidadId}/baja:
+    parameters:
+      - name: unidadId
+        in: path
+        required: true
+        schema:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    post:
+      tags: [unidades]
+      operationId: darDeBajaUnidad
+      summary: Baja de una unidad DISPONIBLE o MANTENIMIENTO_PENDIENTE (jefe_flota); queda INACTIVA, que es final. Spec 010, paso 3.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BajaUnidad'
+      responses:
+        '200':
+          description: Unidad dada de baja.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Unidad'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/unidades/{unidadId}/mantenimientos:
+    parameters:
+      - name: unidadId
+        in: path
+        required: true
+        schema:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    post:
+      tags: [mantenimientos]
+      operationId: programarMantenimiento
+      summary: Programa un mantenimiento (jefe_flota); la unidad pasa a EN_MANTENIMIENTO. Spec 010, paso 6.
+      description: |
+        Desde `DISPONIBLE` (preventivo voluntario) o `MANTENIMIENTO_PENDIENTE`; desde otro estado, 409
+        CONFLICTO_ESTADO. Un solo mantenimiento `EN_CURSO` por unidad.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MantenimientoNuevo'
+      responses:
+        '201':
+          description: Mantenimiento EN_CURSO.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mantenimiento'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/mantenimientos:
+    get:
+      tags: [mantenimientos]
+      operationId: listarMantenimientos
+      summary: Mantenimientos (jefe_flota, despachador, gerente), del más reciente al más antiguo.
+      parameters:
+        - name: unidadId
+          in: query
+          required: false
+          schema:
+            $ref: './comun.yaml#/components/schemas/Uuid'
+        - name: estado
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/EstadoMantenimiento'
+        - $ref: './comun.yaml#/components/parameters/Limite'
+        - $ref: './comun.yaml#/components/parameters/Cursor'
+      responses:
+        '200':
+          description: Página de mantenimientos.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginaMantenimientos'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+  /api/v1/mantenimientos/{mantenimientoId}/cierre:
+    parameters:
+      - name: mantenimientoId
+        in: path
+        required: true
+        schema:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    post:
+      tags: [mantenimientos]
+      operationId: cerrarMantenimiento
+      summary: Cierra un mantenimiento EN_CURSO (jefe_flota). Spec 010, paso 7.
+      description: |
+        El checklist trae todos los ítems programados con `ok = true` (si no, 400 y sigue EN_CURSO). `kilometraje` es
+        obligatorio en tractos (≥ el odómetro, si no 422 KILOMETRAJE_INVALIDO) y prohibido en remolques. `PREVENTIVO` y
+        `CORRECTIVO` ponen `kmDesdeUltimoMantenimiento` en 0. La unidad queda `DISPONIBLE`, o `MANTENIMIENTO_PENDIENTE`
+        con otro `MantenimientoRequerido` si todavía cumple la regla C.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CierreMantenimiento'
+      responses:
+        '200':
+          description: Mantenimiento CERRADO.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Mantenimiento'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
 
   /api/v1/choferes:
     get:
@@ -310,6 +549,210 @@ components:
           example:
             compartimentos: 3
             capacidadLitros: 30000
+        baja:
+          type: object
+          required: [motivo, dadaEn]
+          description: Solo en unidades INACTIVA.
+          properties:
+            motivo:
+              type: string
+            dadaEn:
+              $ref: './comun.yaml#/components/schemas/Instante'
+    TipoRemolque:
+      type: string
+      enum: [FURGON, PLATAFORMA, CISTERNA]
+    Atributos:
+      type: object
+      additionalProperties: true
+      description: |
+        Según el tipo (D76); un campo de otro tipo o fuera de rango es 400 VALIDACION:
+        - `TRACTO`: `capacidadTanqueLitros` (100 a 1500) y `potenciaHp` opcional (mayor que 0).
+        - `FURGON`: `volumenM3` (10 a 120).
+        - `PLATAFORMA`: `largoMetros` (6 a 15).
+        - `CISTERNA`: `compartimentos` (entero, 1 a 6) y `capacidadLitros` (5000 a 45000).
+      example:
+        capacidadTanqueLitros: 600
+        potenciaHp: 480
+    Documentos:
+      type: array
+      description: Un `SOAT` y una `INSPECCION_TECNICA`.
+      minItems: 2
+      maxItems: 2
+      items:
+        $ref: '#/components/schemas/Documento'
+    UnidadNueva:
+      type: object
+      required: [tipoUnidad, placa, kmDesdeUltimoMantenimiento, documentos, atributos]
+      properties:
+        tipoUnidad:
+          $ref: '#/components/schemas/TipoUnidad'
+        placa:
+          $ref: './comun.yaml#/components/schemas/Placa'
+        tipoRemolque:
+          $ref: '#/components/schemas/TipoRemolque'
+        capacidadToneladas:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 30
+          description: Obligatoria en remolques; prohibida en tractos (D03).
+        kilometraje:
+          type: number
+          minimum: 0
+          description: Odómetro, solo en tractos (0 si no viene).
+        kmDesdeUltimoMantenimiento:
+          type: number
+          minimum: 0
+        documentos:
+          $ref: '#/components/schemas/Documentos'
+        atributos:
+          $ref: '#/components/schemas/Atributos'
+    UnidadEdicion:
+      type: object
+      required: [documentos, atributos]
+      properties:
+        capacidadToneladas:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 30
+          description: Obligatoria en remolques; prohibida en tractos.
+        documentos:
+          $ref: '#/components/schemas/Documentos'
+        atributos:
+          $ref: '#/components/schemas/Atributos'
+    BajaUnidad:
+      type: object
+      required: [motivo]
+      properties:
+        motivo:
+          type: string
+          minLength: 3
+          maxLength: 200
+    TipoMantenimiento:
+      type: string
+      enum: [PREVENTIVO, CORRECTIVO, DOCUMENTOS]
+      description: '`DOCUMENTOS` no reinicia `kmDesdeUltimoMantenimiento`.'
+    EstadoMantenimiento:
+      type: string
+      enum: [EN_CURSO, CERRADO]
+    MantenimientoNuevo:
+      type: object
+      required: [tipo, fechaProgramada, taller, descripcion, checklist]
+      properties:
+        tipo:
+          $ref: '#/components/schemas/TipoMantenimiento'
+        fechaProgramada:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+        taller:
+          type: string
+          minLength: 3
+          maxLength: 120
+        descripcion:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        checklist:
+          type: array
+          minItems: 1
+          maxItems: 30
+          items:
+            type: object
+            required: [item]
+            properties:
+              item:
+                type: string
+                minLength: 1
+                maxLength: 120
+    CierreMantenimiento:
+      type: object
+      required: [checklist]
+      properties:
+        kilometraje:
+          type: number
+          minimum: 0
+          description: Obligatorio en tractos; prohibido en remolques.
+        checklist:
+          type: array
+          minItems: 1
+          maxItems: 30
+          items:
+            type: object
+            required: [item, ok]
+            properties:
+              item:
+                type: string
+                minLength: 1
+                maxLength: 120
+              ok:
+                type: boolean
+              nota:
+                type: string
+                maxLength: 500
+        observaciones:
+          type: string
+          maxLength: 1000
+        documentosRenovados:
+          type: array
+          maxItems: 2
+          items:
+            $ref: '#/components/schemas/Documento'
+    Mantenimiento:
+      type: object
+      required: [mantenimientoId, unidadId, placa, tipo, estado, fechaProgramada, taller, descripcion, checklist, programadoEn]
+      properties:
+        mantenimientoId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        unidadId:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+        placa:
+          $ref: './comun.yaml#/components/schemas/Placa'
+        tipo:
+          $ref: '#/components/schemas/TipoMantenimiento'
+        estado:
+          $ref: '#/components/schemas/EstadoMantenimiento'
+        fechaProgramada:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+        taller:
+          type: string
+        descripcion:
+          type: string
+        checklist:
+          type: array
+          items:
+            type: object
+            required: [item]
+            properties:
+              item:
+                type: string
+              ok:
+                type: boolean
+              nota:
+                type: string
+        programadoEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        cerradoEn:
+          $ref: './comun.yaml#/components/schemas/Instante'
+        kilometraje:
+          type: number
+          minimum: 0
+        observaciones:
+          type: string
+        documentosRenovados:
+          type: array
+          items:
+            $ref: '#/components/schemas/Documento'
+    PaginaMantenimientos:
+      type: object
+      required: [items, siguienteCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Mantenimiento'
+        siguienteCursor:
+          type: string
+          nullable: true
     PaginaUnidades:
       type: object
       required: [items, siguienteCursor]
