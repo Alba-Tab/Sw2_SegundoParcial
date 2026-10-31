@@ -5,7 +5,7 @@ import { firstValueFrom, type Observable } from 'rxjs';
 export const nuevaClave = (): string => crypto.randomUUID();
 
 /**
- * ¿El intento puede no haber llegado o seguir en curso? Red caída, 5xx (también `DEPENDENCIA_NO_DISPONIBLE`, que el
+ * ¿El intento puede no haber llegado o seguir en curso? Red caída, 5xx (también `ERROR_INTERNO` y `DEPENDENCIA_NO_DISPONIBLE`, que el
  * Gateway da cuando el servicio no respondió a tiempo) o `409 IDEMPOTENCIA_EN_PROCESO`. Con eso se reenvía la misma
  * clave; cualquier otra respuesta es definitiva (000 §4.1).
  */
@@ -13,7 +13,12 @@ export function esTransitorio(error: unknown): boolean {
   if (CombinedGraphQLErrors.is(error)) {
     return error.errors.some((e) => {
       const codigo = e.extensions?.['codigo'];
-      return codigo === 'IDEMPOTENCIA_EN_PROCESO' || codigo === 'DEPENDENCIA_NO_DISPONIBLE' || Number(e.extensions?.['status']) >= 500;
+      return (
+        codigo === 'IDEMPOTENCIA_EN_PROCESO' ||
+        codigo === 'DEPENDENCIA_NO_DISPONIBLE' ||
+        codigo === 'ERROR_INTERNO' ||
+        Number(e.extensions?.['status']) >= 500
+      );
     });
   }
   if (ServerError.is(error) || ServerParseError.is(error)) return error.statusCode >= 500;
