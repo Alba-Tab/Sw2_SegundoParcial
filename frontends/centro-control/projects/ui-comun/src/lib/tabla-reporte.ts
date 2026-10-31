@@ -1,6 +1,7 @@
 import { Component, computed, input } from '@angular/core';
 import { MatTableModule } from '@angular/material/table';
-import { aCentavos, BobPipe, FechaPipe, pct, sumarMontos } from './formato';
+import { aCentavos, pct, sumarMontos } from 'ui-comun/dominio';
+import { BobPipe, FechaPipe } from './formato';
 
 export interface Columna {
   clave: string;

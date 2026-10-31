@@ -16,6 +16,7 @@ Cuatro apps Angular 22 independientes y la librería `ui-comun`, en un solo work
 - **Marco:** barra con las apps que el rol permite, que pide `/salud.json` de cada una cada 60 s (con CORS) y deshabilita el enlace si no responde un 2xx con `{"estado":"UP"}` (FR3). Por eso, en la nube, el hosting de cada app tiene que servir `/salud.json` con `Access-Control-Allow-Origin` para los orígenes de las otras apps; en local, el dev server de Angular ya lo manda. Campana con las alertas por rol: al conectar y al reconectar pide `alertasPendientes(desde)` y descarta las repetidas. Enlaces por URL a la app de cada alerta.
 - **Acceso:** `cliente` y `chofer` ven "Sin acceso" (con enlace al portal para el cliente). Cada app exige sus roles; el Gateway y los servicios vuelven a validar.
 - Respuesta parcial: `servicioCaido(error, campo)` muestra "Finanzas no disponible" solo en su tarjeta del tablero, y `<cc-aviso-servicios>` pone el mismo aviso en las demás páginas (FR1, FR2).
+- **`ui-comun/dominio`:** punto de entrada sin Angular (dinero en centavos, `fechaLaPaz`, `pct`, `ROLES_CAMPO`) para la capa `domain/`; el índice `ui-comun` lo reexporta.
 - Idempotencia: `Intentos` da una `claveIdempotencia` por intento. La conserva solo si se reenvían los mismos datos después de una red caída, un 5xx o un `409 IDEMPOTENCIA_EN_PROCESO`; con datos distintos o después de una respuesta definitiva, la clave es nueva.
 - Los montos se muestran como texto con `BobPipe`; nunca se calculan en float.
 
@@ -25,7 +26,7 @@ Cada app se organiza por feature (por ejemplo `cc-flota/src/app/unidades/`), con
 
 | Carpeta | Qué tiene | No puede |
 |---|---|---|
-| `domain/` | Tipos y reglas de presentación puras (`lineasChecklist`, `paramsCobranza`, `motivoCancelacionValido`…), con sus pruebas | Importar Angular, Apollo, rxjs ni otras capas; del código generado, solo `import type`; de `ui-comun`, solo los ayudantes puros de dinero y fechas |
+| `domain/` | Tipos y reglas de presentación puras (`lineasChecklist`, `paramsCobranza`, `motivoCancelacionValido`…), con sus pruebas | Importar Angular, Apollo, rxjs ni otras capas; del código generado, solo `import type`; de `ui-comun`, solo `ui-comun/dominio` (el índice carga Angular) |
 | `data/` | El repositorio que envuelve los servicios `*GQL` de Apollo (y el OCR en cc-finanzas) | Importar `ui/` ni fachadas |
 | `<feature>.fachada.ts` | Fachada con Signals que la UI lee; se provee por componente, así el sondeo vive y muere con la página | — |
 | `ui/` | Los componentes: plantilla, estado del formulario y avisos | Inyectar `*GQL` ni usar Apollo o `data/` directamente |

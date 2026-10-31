@@ -1,4 +1,5 @@
-/** ui-comun: lo que comparten las 4 apps del Centro de Control (propuesta 6.1). */
+/** ui-comun: lo que comparten las 4 apps del Centro de Control (propuesta 6.1). Lo puro también sale de ui-comun/dominio. */
+export * from 'ui-comun/dominio';
 export * from './lib/acceso';
 export * from './lib/alertas';
 export * from './lib/apollo';

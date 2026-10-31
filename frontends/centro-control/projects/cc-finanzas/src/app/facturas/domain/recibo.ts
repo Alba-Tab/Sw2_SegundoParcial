@@ -1,4 +1,4 @@
-import { aCentavos } from 'ui-comun';
+import { aCentavos } from 'ui-comun/dominio';
 
 /**
  * OCR de recibos en el navegador con Tesseract.js (propuesta 6.1): la imagen no sale del equipo. Solo propone datos;

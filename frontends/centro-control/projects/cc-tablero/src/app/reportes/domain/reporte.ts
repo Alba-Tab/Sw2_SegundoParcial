@@ -1,4 +1,4 @@
-import { fechaLaPaz } from 'ui-comun';
+import { fechaLaPaz } from 'ui-comun/dominio';
 import type { ReporteId, ReporteParams } from '../../graphql/generado';
 
 /**

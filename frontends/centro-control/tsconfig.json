@@ -16,6 +16,9 @@
     "paths": {
       "ui-comun": [
         "./projects/ui-comun/src/public-api.ts"
+      ],
+      "ui-comun/dominio": [
+        "./projects/ui-comun/dominio/src/index.ts"
       ]
     },
     "strict": true
