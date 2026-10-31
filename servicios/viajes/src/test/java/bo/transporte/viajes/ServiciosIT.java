@@ -165,6 +165,13 @@ class ServiciosIT {
         assertEquals("PORTAL", s.get("canal").asString());
         assertFalse(s.has("etapa"));
 
+        JsonNode item = pedir("GET", "/api/v1/viajes", TokensDePrueba.token("g", "gerente", null), null, null)
+                .cuerpo()
+                .get("items")
+                .get(0);
+        assertEquals("Agroexport SRL", item.get("cliente").get("razonSocial").asString());
+        assertEquals("Aula", item.get("ruta").get("nombre").asString());
+
         JsonNode datos = sobre("ViajeConfirmado").get("datos");
         assertEquals(servicioId, datos.get("servicioId").asString());
         assertEquals(CLIENTE, datos.get("clienteId").asString());

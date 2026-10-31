@@ -7,6 +7,7 @@ import bo.transporte.viajes.dominio.comun.CanalServicio;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -59,6 +60,15 @@ class ClienteRepositorioJdbc implements ClienteRepositorio {
                 .param("id", clienteId)
                 .query(this::fila)
                 .optional();
+    }
+
+    @Override
+    public List<Cliente> porIds(Collection<UUID> clienteIds) {
+        if (clienteIds.isEmpty()) return List.of();
+        return jdbc.sql("SELECT " + COLUMNAS + " FROM cliente WHERE cliente_id IN (:ids)")
+                .param("ids", clienteIds)
+                .query(this::fila)
+                .list();
     }
 
     @Override

@@ -6,14 +6,18 @@ import bo.transporte.viajes.aplicacion.puerto.salida.RutaRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.UltimaPosicionRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.UltimaPosicionRepositorio.UltimaPosicion;
 import bo.transporte.viajes.aplicacion.puerto.salida.ViajeRepositorio;
+import bo.transporte.viajes.dominio.cliente.Cliente;
 import bo.transporte.viajes.dominio.comun.ErrorDeDominio;
+import bo.transporte.viajes.dominio.ruta.Ruta;
 import bo.transporte.viajes.dominio.viaje.EstadoViaje;
 import bo.transporte.viajes.dominio.viaje.Viaje;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /**
  * GET /viajes/mios y /viajes/{id} (spec 005). El chofer ve solo los suyos (D50: activos y los terminados en los
@@ -51,7 +55,21 @@ public class ConsultaDeViajes {
         List<Viaje> filas = viajes.listar(estado, despuesDe, limite + 1);
         List<Viaje> pagina = filas.stream().limit(limite).toList();
         var ultimas = posiciones.de(pagina.stream().map(Viaje::viajeId).toList());
-        var items = pagina.stream().map(v -> vista(v, ultimas.get(v.viajeId()))).toList();
+        // Clientes y rutas de toda la página en una consulta cada uno, no dos por viaje.
+        Map<UUID, String> razones = clientes.porIds(pagina.stream().map(Viaje::clienteId).collect(Collectors.toSet()))
+                .stream()
+                .collect(Collectors.toMap(Cliente::clienteId, c -> c.datos().razonSocial()));
+        Map<UUID, Ruta> rutasPorId = rutas
+                .porIds(pagina.stream().map(v -> v.asignacion().rutaId()).collect(Collectors.toSet()))
+                .stream()
+                .collect(Collectors.toMap(Ruta::rutaId, r -> r));
+        var items = pagina.stream()
+                .map(v -> ViajeVista.de(
+                        v,
+                        razones.getOrDefault(v.clienteId(), ""),
+                        rutasPorId.get(v.asignacion().rutaId()),
+                        ultimas.get(v.viajeId())))
+                .toList();
         return new Pagina(items, filas.size() > limite ? pagina.getLast().viajeId() : null);
     }
 
