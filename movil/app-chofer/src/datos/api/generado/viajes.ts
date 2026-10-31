@@ -624,6 +624,11 @@ export interface Monto {
   moneda: MontoMoneda;
 }
 
+/**
+ * `monto`, `facturaId` y `numeroFactura` solo salen para gerente, administracion, comercial y el cliente dueño
+ * del servicio; con otro rol (despachador) se omiten, porque no ve finanzas (propuesta 7.2, igual que `@roles`
+ * en el Gateway).
+ */
 export interface Servicio {
   servicioId: Uuid;
   viajeId: Uuid;

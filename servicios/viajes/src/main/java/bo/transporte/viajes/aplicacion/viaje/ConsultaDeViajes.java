@@ -60,8 +60,9 @@ public class ConsultaDeViajes {
         Viaje v = viajes.porId(viajeId)
                 .filter(x -> x.asignacion() != null)
                 .orElseThrow(() -> new ErrorDeDominio("NO_ENCONTRADO", "No existe el viaje"));
-        boolean suyo = quien.tiene("chofer") && quien.sub().equals(v.choferUsuarioSub());
-        if (!suyo && !quien.tieneAlguno(VEN_TODOS)) {
+        if (quien.tieneAlguno(VEN_TODOS)) return v;
+        if (!quien.tiene("chofer")) throw new ErrorDeDominio("SIN_PERMISO", "Tu rol no puede ver este viaje");
+        if (!quien.sub().equals(v.choferUsuarioSub())) {
             throw new ErrorDeDominio("SIN_PERMISO", "El viaje es de otro chofer");
         }
         return v;

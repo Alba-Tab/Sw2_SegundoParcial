@@ -108,11 +108,14 @@ class ServiciosController implements ServiciosApi {
                     .tipoCarga(TipoCargaDto.fromValue(a.tipoCarga().name()))
                     .toneladas(a.toneladas())
                     .fechaViaje(a.fechaViaje())
-                    .monto(new MontoDto(
-                            a.monto().comoTexto(),
-                            MontoDto.MonedaEnum.fromValue(a.monto().moneda())))
                     .placa(a.placa())
                     .choferNombre(a.choferNombre());
+            // Sin monto cuando el rol no ve finanzas (ServicioVista.para).
+            if (a.monto() != null) {
+                d.monto(new MontoDto(
+                        a.monto().comoTexto(),
+                        MontoDto.MonedaEnum.fromValue(a.monto().moneda())));
+            }
         }
         return d;
     }

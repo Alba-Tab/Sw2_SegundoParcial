@@ -17,7 +17,7 @@ Clientes, cotizaciones confirmadas, servicios, viajes en ruta y la saga `Program
 | Interfaces REST y DTO generados desde `contratos/openapi/viajes.yaml` con openapi-generator 7.26 (`useSpringBoot4`, `useJackson3`); `SaludController` implementa `SaludApi` | `pom.xml`, `target/generated-sources/openapi` |
 
 ```bash
-./mvnw verify                                            # 79 pruebas (Testcontainers + Temporal en memoria)
+./mvnw verify                                            # 83 pruebas (Testcontainers + Temporal en memoria)
 docker compose -f ../../plataforma/compose/compose.yaml --profile core --profile plataforma up -d --build viajes   # contexto: raíz del repo
 curl localhost:8101/health/ready
 ```
@@ -41,6 +41,7 @@ curl localhost:8101/health/ready
 - Un reenvío con la clave en `EN_PROCESO` repite el inicio; `WorkflowExecutionAlreadyStarted` cuenta como éxito (D43, FS7). Si Temporal no responde, la API devuelve `503` y la clave sigue en `EN_PROCESO`.
 - `GET /api/v1/servicios/{id}` trae la `etapa` mientras el viaje está en `PROGRAMANDO`. Sale de la consulta `estado`, con 2 s de límite; si Temporal no responde, la etapa es `DESCONOCIDA`.
 - `GET /api/v1/servicios` filtra por cliente y estado, ordena del más nuevo al más viejo y pagina con cursor.
+- `monto`, `facturaId` y `numeroFactura` salen solo para gerente, administración, comercial y el cliente dueño. Al despachador se le omiten en `GET /servicios`, `/servicios/{id}` y en la respuesta de la cancelación (propuesta 7.2).
 - **Workflow** (`adaptadores/temporal/ProgramarViajeImpl`):
   - Corre los pasos 1, 2, 2b, 3, el pivote, 5 y 6, con los timeouts de D15.
   - Compensa en orden inverso. Un paso que falló por algo técnico también se compensa, porque el otro servicio pudo haber reservado antes de que venciera el tiempo.
