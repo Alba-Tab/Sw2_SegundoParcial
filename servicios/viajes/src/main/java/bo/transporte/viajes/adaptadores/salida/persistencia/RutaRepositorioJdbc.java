@@ -6,6 +6,7 @@ import bo.transporte.viajes.dominio.ruta.Ruta.Coordenadas;
 import bo.transporte.viajes.dominio.ruta.Ruta.Lugar;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -33,6 +34,15 @@ class RutaRepositorioJdbc implements RutaRepositorio {
                 .param("id", rutaId)
                 .query(this::fila)
                 .optional();
+    }
+
+    @Override
+    public List<Ruta> porIds(Collection<UUID> rutaIds) {
+        if (rutaIds.isEmpty()) return List.of();
+        return jdbc.sql("SELECT * FROM ruta WHERE ruta_id IN (:ids)")
+                .param("ids", rutaIds)
+                .query(this::fila)
+                .list();
     }
 
     private Ruta fila(ResultSet rs, int i) throws SQLException {

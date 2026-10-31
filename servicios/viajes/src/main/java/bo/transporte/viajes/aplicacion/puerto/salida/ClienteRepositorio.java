@@ -1,6 +1,7 @@
 package bo.transporte.viajes.aplicacion.puerto.salida;
 
 import bo.transporte.viajes.dominio.cliente.Cliente;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -11,6 +12,9 @@ public interface ClienteRepositorio {
     void marcarVinculado(UUID clienteId);
 
     Optional<Cliente> porId(UUID clienteId);
+
+    /** Los clientes de esos ids en una consulta. */
+    List<Cliente> porIds(Collection<UUID> clienteIds);
 
     Optional<Cliente> porSub(String sub);
 
