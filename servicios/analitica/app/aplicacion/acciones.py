@@ -1,6 +1,5 @@
 """Acciones propuestas (spec 014, B): el agente propone, el despachador aprueba o rechaza, el sistema archiva."""
 
-import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
@@ -13,11 +12,15 @@ from app.aplicacion import alertas
 from app.configuracion import configuracion
 from app.dominio import acciones as dominio
 from app.dominio.acciones import EstadoAccion
-from app.dominio.alertas import TipoAlerta
+from app.dominio.alertas import ESTADOS_VIVOS, TipoAlerta
 from app.dominio.errores import ErrorDeDominio
-from app.infraestructura.bd import AccionPropuesta, Cliente, HechoViaje, Outbox, Ruta
+from app.dominio.retraso import UMBRAL_RIESGO
+from app.infraestructura.bd import AccionPropuesta, Alerta, Cliente, HechoViaje, Outbox, PrediccionRetraso, Ruta
+from app.infraestructura.observabilidad import traceparent
 
 CLAVE_AVISO = "analitica.aviso-cliente-aprobado.v1"
+# Un aviso de retraso solo tiene sentido para un viaje que sigue en camino (spec 014, obtener_viajes_en_curso).
+ESTADOS_AVISABLES = ("EN_RUTA", "ENTREGA_OBSERVADA")
 
 
 def accion_json(a: AccionPropuesta, razon_social: str | None = None) -> dict[str, Any]:
@@ -57,6 +60,12 @@ def proponer(
     viaje = s.get(HechoViaje, viaje_id)
     if viaje is None:
         raise ErrorDeDominio("NO_ENCONTRADO", "Analítica no conoce ese viaje")
+    # La regla la decide el código, no el LLM: un texto inyectado en la bitácora (FM2) no abre avisos para otros viajes.
+    if not _en_riesgo(s, viaje):
+        raise ErrorDeDominio(
+            "CONFLICTO_ESTADO",
+            f"El viaje está {viaje.estado} y sin riesgo de retraso ≥ {UMBRAL_RIESGO:.2f}: no se propone el aviso",
+        )
     # El destinatario es siempre el cliente del viaje; el LLM nunca escribe una dirección.
     if str(viaje.cliente_id) != str(cuerpo["destinatario"]["clienteId"]):
         raise ErrorDeDominio("DESTINATARIO_INVALIDO", "El destinatario debe ser el cliente del viaje")
@@ -101,15 +110,30 @@ def proponer(
     }
 
 
+def _en_riesgo(s: Session, viaje: HechoViaje) -> bool:
+    """En camino y con probabilidad ≥ 0,70, o con una RIESGO_RETRASO que todavía no se resolvió."""
+    if viaje.estado not in ESTADOS_AVISABLES:
+        return False
+    probabilidad = s.scalar(select(PrediccionRetraso.probabilidad).where(PrediccionRetraso.viaje_id == viaje.viaje_id))
+    if probabilidad is not None and probabilidad >= UMBRAL_RIESGO:
+        return True
+    alerta = s.scalar(
+        select(Alerta.alerta_id)
+        .where(
+            Alerta.tipo == TipoAlerta.RIESGO_RETRASO.value,
+            Alerta.entidad_id == str(viaje.viaje_id),
+            Alerta.estado.in_(ESTADOS_VIVOS),
+        )
+        .limit(1)
+    )
+    return alerta is not None
+
+
 def _accion(s: Session, accion_id: UUID) -> AccionPropuesta:
     accion = s.get(AccionPropuesta, accion_id, with_for_update=True)
     if accion is None:
         raise ErrorDeDominio("NO_ENCONTRADO", "La acción no existe")
     return accion
-
-
-def _traceparent() -> str:
-    return f"00-{secrets.token_hex(16)}-{secrets.token_hex(8)}-01"
 
 
 def aprobar(
@@ -136,7 +160,8 @@ def aprobar(
         "version": 1,
         "ocurridoEn": ahora.astimezone(UTC).isoformat().replace("+00:00", "Z"),
         "correlationId": correlacion if _es_uuid(correlacion) else str(uuid.uuid4()),
-        "traceparent": _traceparent(),
+        # El de la petición que aprueba: en Jaeger se sigue la aprobación hasta n8n.
+        "traceparent": traceparent(),
         "productor": "analitica",
         "datos": {
             "accionId": str(accion.accion_id),

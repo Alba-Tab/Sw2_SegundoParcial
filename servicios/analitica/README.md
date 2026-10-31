@@ -25,8 +25,9 @@ consumidor de `analitica.eventos`. Es la única fuente de alertas del Centro de 
 
 ## Alertas (T8.2)
 
-- Fuentes de la tabla B de la spec 013. Una abierta por `(tipo, entidad)` (índice único parcial); un evento repetido no crea otra (Inbox).
-- Se resuelven solas: entrega observada (al aprobar o rechazar), intervención (al cancelar), riesgo de retraso (al terminar el viaje) y acción propuesta.
+- Fuentes de la tabla B de la spec 013. Una abierta por `(tipo, entidad)` (índice único parcial); un evento repetido no crea otra (Inbox). En los tipos que se resuelven solos cuenta también la `ATENDIDA`: una predicción nueva actualiza la `RIESGO_RETRASO` atendida en vez de abrir otra (migración 0003).
+- Las alertas se crean de a una (bloqueo consultivo hasta el commit): el orden de `secuencia` es el de confirmación y el cursor no salta ninguna.
+- Se resuelven solas: entrega observada (al rechazar, o con una `EntregaConfirmada` que trae `aprobadaPor`), intervención (al cancelar), riesgo de retraso (al terminar el viaje) y acción propuesta.
 - `GET /api/v1/alertas` filtra por los roles del token, en orden de `secuencia`, con cursor opaco y la cifra `abiertas` de la campana. Sin estado, las abiertas y las cerradas de las últimas 24 h (D83).
 - `POST /api/v1/alertas/{id}/atencion` con `Idempotency-Key` (`operacion_idempotente`): solo un rol de la alerta y nunca el gerente (403).
 
@@ -41,28 +42,37 @@ consumidor de `analitica.eventos`. Es la única fuente de alertas del Centro de 
 ## Machine learning (T8.4)
 
 - `ml/entrenar.py` entrena con la semilla fija desde `plataforma/datos-sinteticos` **en el build de la imagen** (los `.joblib` no se versionan) y falla si el recall de *retrasado* baja de 0,75 (D82). El notebook `notebooks/modelos.ipynb` corre el mismo código y muestra recall, matriz de confusión e importancias.
-- **Retraso:** `GradientBoostingClassifier(random_state=42)` con pesos balanceados sobre las variables de D79; se recalcula con `ViajeIniciado`, `PosicionActualizada` y `HitoRegistrado` como máximo una vez por minuto (D78), y un job cada 60 s alcanza a los que quedaron atrás. Con probabilidad ≥ 0,70 abre (o actualiza) una sola `RIESGO_RETRASO`. Los 3 factores son las variables que más bajan la probabilidad al volver a su mediana.
+- **Retraso:** `GradientBoostingClassifier(random_state=42)` con pesos balanceados sobre las variables de D79; se recalcula con `ViajeIniciado`, `PosicionActualizada` y `HitoRegistrado` como máximo una vez por minuto (D78), y un job cada 60 s alcanza a los que quedaron atrás (tampoco fuerza: espera a que pase el minuto). Con probabilidad ≥ 0,70 abre (o actualiza) una sola `RIESGO_RETRASO`. Los 3 factores son las variables que más bajan la probabilidad al volver a su mediana.
 - **Anomalías:** `IsolationForest(contamination=0.05, n_estimators=100, random_state=42)` sobre `[kmPorLitro, litros]`; la primera carga de un tracto queda `SIN_REFERENCIA`.
-- Sin modelos (por ejemplo, en `uv run` sin entrenar), `obtenerRiesgoRetraso` responde `503 MODELO_NO_DISPONIBLE` y no se crean alertas de ML. Para entrenar en local: `uv run python -m ml.entrenar --datos ../../plataforma/datos-sinteticos --salida modelos`.
+- Sin modelos (por ejemplo, en `uv run` sin entrenar), `obtenerRiesgoRetraso` responde `503 DEPENDENCIA_NO_DISPONIBLE` (spec 013) y no se crean alertas de ML. El mismo 503, con otro mensaje, si todavía falta la copia de la ruta o el inicio del viaje. Para entrenar en local: `uv run python -m ml.entrenar --datos ../../plataforma/datos-sinteticos --salida modelos`.
 
 ## Acciones propuestas y aviso al cliente (T8.6)
 
-- `POST /api/v1/acciones` (solo `agente_lectura`, por el MCP): una por `(tipo, viaje)` salvo `ARCHIVADA` (índice único parcial). La repetida devuelve la existente con `creada = false`. El destinatario tiene que ser el cliente del viaje. Hay como máximo 3 por misión (`X-Mision-Id`, D86). Abre la alerta `ACCION_PROPUESTA`.
+- `POST /api/v1/acciones` (solo `agente_lectura`, por el MCP): una por `(tipo, viaje)` salvo `ARCHIVADA` (índice único parcial). La repetida devuelve la existente con `creada = false`. El viaje tiene que estar `EN_RUTA` o `ENTREGA_OBSERVADA` y con probabilidad ≥ 0,70 o una `RIESGO_RETRASO` sin resolver; si no, `409 CONFLICTO_ESTADO` (FM2: una bitácora maliciosa no abre avisos para otros viajes). El destinatario tiene que ser el cliente del viaje. Hay como máximo 3 por misión (`X-Mision-Id`, D86). Abre la alerta `ACCION_PROPUESTA`.
 - Aprobar (solo `despachador`, con `Idempotency-Key`): en una transacción pasa a `APROBADA`, se audita y se escribe `AvisoClienteAprobado` en el `outbox`. El destinatario y el correo salen de la copia `cliente`; el asunto, de la plantilla; el enlace, de `PORTAL_URL`. Rechazar → `RECHAZADA`. El gerente recibe 403.
-- El relay del Outbox (Python, cada 2 s) reclama con `SKIP LOCKED` y publica con confirmación del broker. Recién después marca publicado y pasa la acción a `EJECUTADA`. n8n (`aviso-cliente`) envía el correo una sola vez por `eventId`.
+- El relay del Outbox (Python, cada 2 s) reclama con `SKIP LOCKED` y publica `mandatory` con confirmación del broker. Recién después marca publicado y pasa la acción a `EJECUTADA`; un mensaje sin ruta queda pendiente y la acción sigue `APROBADA`. El sobre lleva el `traceparent` de la aprobación. n8n (`aviso-cliente`) envía el correo una sola vez por `eventId`.
 - Un job cada 5 min archiva las `PENDIENTE` de más de 24 h o cuyo viaje terminó (D87).
 
 ## Agente "vigilar viajes" (T10.2, spec 014)
 
 - Cada 10 min (`MISION_CADA_MINUTOS`) o con `POST /api/v1/agente/misiones` (despachador o gerente, con `Idempotency-Key`), que responde `202` con `{misionId}`. Corre una misión a la vez (bloqueo consultivo; la manual recibe `409`). Sin LLM queda `SALTADA` y la manual recibe `503 LLM_NO_DISPONIBLE` (FR4).
-- El agente usa el token del cliente `agente` (*client credentials*) y consulta **solo** por el MCP (SDK `mcp` 2.x): `tools/list`, el prompt `mision_vigilar_viajes` y el recurso `vocabulario://negocio`. El LLM (Ollama, temperatura 0, `LLM_TURNO_S` por turno, 20 s según D85) elige herramientas hasta `FIN`, 8 pasos o 90 s (→ `AGOTADA`). A qwen3 también se le reconoce la llamada que escribe como JSON en el texto.
-- Cada paso queda en la misión: herramienta, argumentos (sin el texto al cliente), resumen y ms. Lo ve el panel del agente. `proponer_accion` viaja con `X-Mision-Id`, que limita a 3 acciones por misión.
+- El agente usa el token del cliente `agente` (*client credentials*) y consulta **solo** por el MCP (SDK `mcp` 2.x): `tools/list`, el prompt `mision_vigilar_viajes` y el recurso `vocabulario://negocio`. El LLM (Ollama, temperatura 0, `LLM_TURNO_S` por turno, 20 s según D85) elige herramientas hasta `FIN`, 8 pasos o 90 s (→ `AGOTADA`); los 90 s se cumplen también en medio de un turno o de una herramienta. A qwen3 también se le reconoce la llamada que escribe como JSON en el texto (uno o varios objetos, con texto alrededor).
+- Cada paso se guarda en la misión apenas termina: herramienta, argumentos (sin el texto al cliente), resumen y ms. Lo ve el panel del agente. `traceId` es el de la traza real de la misión (vacío sin collector). Un reintento de `POST /agente/misiones` con la misma clave devuelve la misión ya disparada antes de mirar el LLM. `proponer_accion` viaja con `X-Mision-Id`, que limita a 3 acciones por misión.
 
 ## Consulta por voz (T10.3, spec 015)
 
 - `POST /api/v1/voz/preguntas`: el LLM devuelve solo la intención en JSON (esquema completo en `format`). El código la valida en el orden de la spec: fuera del catálogo → `422 PREGUNTA_FUERA_DE_ALCANCE`; aclaración; rol → `403`; nombres a ids por coincidencia exacta o por prefijo de palabra ("agro" → 2 opciones); periodo a fechas y límites.
-- El reporte se corre por el MCP (`ejecutar_reporte`) con el token del usuario **intercambiado otra vez** hacia `mcp-server`: cc-tablero → gateway → analitica → mcp-server → analitica. La redacción usa el prompt `redactar_respuesta_reporte`. Si el texto trae un número que no está en las filas o los totales, o el LLM no responde, se usa la plantilla.
-- Plan B de K1 (`VOZ_CADENA=DOS_SALTOS`): `POST /voz/interpretaciones` y `POST /voz/redacciones`, y el Gateway llama al MCP.
+- El reporte se corre por el MCP (`ejecutar_reporte`) con el token del usuario **intercambiado otra vez** hacia `mcp-server`: cc-tablero → gateway → analitica → mcp-server → analitica. La redacción usa el prompt `redactar_respuesta_reporte`. Si el texto trae un número que no está en las filas o los totales, o el LLM no responde, se usa la plantilla ("8.400" no vale por 8.400,50).
+- Cada opción de una `ACLARACION` trae parámetros completos (fechas del periodo o, si no sirven, las de por defecto del reporte): la pantalla la corre sin el LLM.
+- Keycloak o el MCP caídos → `503 DEPENDENCIA_NO_DISPONIBLE` en Problem Details. Las tres rutas de voz tienen un límite de 20 peticiones por minuto y por `sub` (`VOZ_PETICIONES_POR_MINUTO`) → `429 LIMITE_PETICIONES` con `Retry-After`.
+- Plan B de K1 (`VOZ_CADENA=DOS_SALTOS`): `POST /voz/interpretaciones` y `POST /voz/redacciones`, y el Gateway llama al MCP. `redacciones` valida el `ReporteResultado` (400), exige que el rol vea ese reporte (403) y responde `exportable = false`.
+
+## Trazas y errores
+
+- OpenTelemetry (D23) solo si `OTEL_EXPORTER_OTLP_ENDPOINT` está definido (OTLP/HTTP, `…/v1/traces`): FastAPI, httpx y SQLAlchemy, más un span por evento consumido (continúa el `traceparent` del sobre), por predicción, por alerta, por turno del LLM y por herramienta. Las llamadas al MCP y al LLM llevan `traceparent` y `X-Correlation-Id`.
+- Un error inesperado responde `500` en Problem Details (`ERROR_INTERNO`) y queda en el log; una dependencia caída, `503` con `Retry-After`.
+- `/docs` y `/openapi.json` están apagados; `DOCUMENTACION_API=true` los enciende en local.
+- En el Excel, un texto que empieza con `=`, `+`, `-`, `@`, tabulación o retorno de carro se guarda como texto (nunca como fórmula).
 
 ## Correr
 

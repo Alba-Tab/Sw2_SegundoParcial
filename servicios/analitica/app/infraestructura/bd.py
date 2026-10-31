@@ -279,9 +279,14 @@ class Exportacion(Base):
     expira_en: Mapped[datetime] = mapped_column(Instante)
 
 
+# Mensajes que el consumidor procesa a la vez, cada uno en su hilo y con su conexión. El pool los cubre a todos y deja
+# otras tantas para la API, las tareas periódicas y el relay del Outbox.
+PREFETCH = 10
+
+
 @lru_cache
 def motor():
-    return create_engine(configuracion().database_url, pool_size=5, max_overflow=0, pool_pre_ping=True)
+    return create_engine(configuracion().database_url, pool_size=PREFETCH, max_overflow=PREFETCH, pool_pre_ping=True)
 
 
 @lru_cache

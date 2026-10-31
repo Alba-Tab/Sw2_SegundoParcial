@@ -1,12 +1,23 @@
 """Modelo de lectura y alertas (spec 013) con PostgreSQL real."""
 
+from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 from uuid import uuid4
 
-from sqlalchemy import select
+import pytest
+from sqlalchemy import select, text, update
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import TimeoutError as PoolAgotado
 
+from app.aplicacion import alertas
+from app.aplicacion.prediccion import recalcular_riesgo
 from app.aplicacion.proyecciones import Proyecciones
-from app.aplicacion.puertos import Puntaje, SinModelos
-from app.infraestructura.bd import Alerta, HechoCombustible, HechoFactura, HechoViaje, transaccion
+from app.aplicacion.puertos import Prediccion, Puntaje, SinModelos
+from app.dominio.alertas import TipoAlerta
+from app.infraestructura import programador
+from app.infraestructura.bd import Alerta, HechoCombustible, HechoFactura, HechoViaje, PrediccionRetraso, transaccion
+from app.infraestructura.mensajeria import ConsumidorEventos
+from app.infraestructura.observabilidad import correlacion, trace_id
 from tests.conftest import ejemplo, token
 
 
@@ -138,6 +149,130 @@ def test_puntaje_de_conduccion_por_chofer(cliente):
             "EventoConduccionRegistrado", viajeId=viaje, choferId=chofer, eventoId=str(uuid4()), tipo="ALERTA_FATIGA"
         ),
         ejemplo("EntregaConfirmada", viajeId=viaje, choferId=chofer, kmRecorridos=120),
+        # Un viaje en curso todavía sin kmRecorridos no castiga al chofer con 0 (queda fuera del puntaje).
+        ejemplo("EventoConduccionRegistrado", viajeId=str(uuid4()), choferId=chofer, eventoId=str(uuid4())),
     )
     r = cliente.get("/api/v1/conduccion?desde=2026-11-01", headers=token("jefe_flota")).json()
     assert r["choferes"][0]["frenadas"] == 1 and r["choferes"][0]["fatigas"] == 1 and r["choferes"][0]["puntaje"] == 75
+    assert [v["viajeId"] for v in r["viajes"]] == [viaje]
+
+
+class EnRiesgo(SinModelos):
+    def __init__(self) -> None:
+        self.trazas: list[str | None] = []
+
+    def retraso(self, variables):
+        self.trazas.append(trace_id())
+        return Prediccion(0.83, [{"nombre": "Bloqueos en la bitácora", "aporte": 0.3}], "prueba-1")
+
+
+def viaje_en_riesgo(modelos: SinModelos | None = None) -> str:
+    viaje = str(uuid4())
+    procesar(
+        ejemplo("RutaActualizada"),
+        ejemplo("ViajeConfirmado", viajeId=viaje),
+        ejemplo("ViajeIniciado", viajeId=viaje),
+        modelos=modelos or EnRiesgo(),
+    )
+    return viaje
+
+
+def test_paso_7_una_sola_riesgo_retraso_aunque_se_haya_atendido(cliente):
+    """Spec 013: una predicción nueva actualiza la alerta que ya existe, también si alguien la atendió."""
+    viaje = viaje_en_riesgo()
+    (a,) = cliente.get("/api/v1/alertas", headers=token("despachador")).json()["alertas"]
+    atendida = cliente.post(
+        f"/api/v1/alertas/{a['alertaId']}/atencion",
+        json={"nota": "Llamé al chofer"},
+        headers={**token("despachador"), "Idempotency-Key": str(uuid4())},
+    )
+    assert atendida.json()["estado"] == "ATENDIDA"
+    for _ in range(3):
+        with transaccion() as s:
+            recalcular_riesgo(s, EnRiesgo(), viaje, datetime.now(UTC), forzar=True)
+    (alerta,) = alertas_de("RIESGO_RETRASO")
+    assert (alerta.estado, str(alerta.alerta_id)) == ("ATENDIDA", a["alertaId"])
+    assert alerta.actualizada_en > datetime.fromisoformat(a["actualizadaEn"].replace("Z", "+00:00"))
+    # Un tipo que no se resuelve solo sí abre otra después de atendida (es otra ocurrencia de la causa).
+    caida = ejemplo("CaidaCombustibleDetectada")
+    procesar(caida)
+    with transaccion() as s:
+        s.execute(update(Alerta).where(Alerta.tipo == "CAIDA_COMBUSTIBLE").values(estado="ATENDIDA"))
+    procesar(ejemplo("CaidaCombustibleDetectada", deteccionId=str(uuid4())))
+    assert sorted(x.estado for x in alertas_de("CAIDA_COMBUSTIBLE")) == ["ABIERTA", "ATENDIDA"]
+
+
+def test_las_alertas_se_crean_de_a_una_para_que_el_cursor_no_pierda_ninguna():
+    """La secuencia sigue el orden de confirmación: la segunda transacción espera a que confirme la primera."""
+    ahora = datetime.now(UTC)
+    with transaccion() as primera:
+        alertas.abrir(primera, TipoAlerta.CAIDA_COMBUSTIBLE, str(uuid4()), "t", "d", "prueba", ahora)
+        with pytest.raises(OperationalError), transaccion() as segunda:
+            segunda.execute(text("SET LOCAL lock_timeout = '200ms'"))
+            alertas.abrir(segunda, TipoAlerta.CAIDA_COMBUSTIBLE, str(uuid4()), "t", "d", "prueba", ahora)
+
+
+def test_observada_no_se_resuelve_con_una_confirmacion_sin_aprobacion():
+    viaje = str(uuid4())
+    procesar(ejemplo("EntregaObservada", viajeId=viaje), ejemplo("EntregaConfirmada", viajeId=viaje))
+    assert alertas_de("ENTREGA_OBSERVADA")[0].estado == "ABIERTA"
+
+
+def test_el_job_y_los_hitos_respetan_un_calculo_por_minuto_d78():
+    modelos = EnRiesgo()
+    viaje = viaje_en_riesgo(modelos)
+    hace = datetime.now(UTC) - timedelta(seconds=20)
+    with transaccion() as s:
+        s.execute(update(PrediccionRetraso).values(calculada_en=hace))
+    procesar(ejemplo("HitoRegistrado", viajeId=viaje, tipo="BLOQUEO"), modelos=modelos)
+    app = SimpleNamespace(state=SimpleNamespace(modelos=modelos))
+    programador.recalcular_pendientes(app)
+    with transaccion() as s:
+        assert s.get(PrediccionRetraso, viaje).calculada_en == hace
+        assert s.get(HechoViaje, viaje).bloqueos == 1
+    # Pasado el minuto, el job lo alcanza: el hito quedó pendiente.
+    with transaccion() as s:
+        s.execute(update(PrediccionRetraso).values(calculada_en=hace - timedelta(minutes=1)))
+    programador.recalcular_pendientes(app)
+    with transaccion() as s:
+        assert s.get(PrediccionRetraso, viaje).calculada_en > hace
+
+
+def test_el_consumo_continua_la_traza_y_la_correlacion_del_evento():
+    modelos = EnRiesgo()
+    procesar(ejemplo("RutaActualizada"))
+    viaje = str(uuid4())
+    procesar(ejemplo("ViajeConfirmado", viajeId=viaje))
+    iniciado = ejemplo("ViajeIniciado", viajeId=viaje)
+    vistos = []
+
+    class Proyeccion(Proyecciones):
+        def procesar(self, sesion, sobre):
+            vistos.append(correlacion())
+            return super().procesar(sesion, sobre)
+
+    ConsumidorEventos(Proyeccion(modelos))._procesar(iniciado)
+    assert modelos.trazas == [iniciado["traceparent"].split("-")[1]]
+    assert vistos == [iniciado["correlationId"]]
+
+
+@pytest.mark.parametrize("falla", [PoolAgotado("pool"), OperationalError("x", {}, Exception("caída"))])
+async def test_una_falla_tecnica_de_la_base_reencola(falla):
+    consumidor = ConsumidorEventos(Proyecciones(SinModelos()))
+    respuestas = []
+
+    class Mensaje:
+        body = __import__("json").dumps(ejemplo("ClienteActualizado")).encode()
+
+        async def ack(self):
+            respuestas.append("ack")
+
+        async def nack(self, requeue):
+            respuestas.append(("nack", requeue))
+
+    def fallar(_sobre):
+        raise falla
+
+    consumidor._procesar = fallar
+    await consumidor.recibir(Mensaje())
+    assert respuestas == [("nack", True)]

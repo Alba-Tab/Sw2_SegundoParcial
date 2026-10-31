@@ -156,10 +156,14 @@ class Proyecciones:
         )
 
     # ------------------------------------------------------------------ viajes
-    def _viaje(self, s: Session, viaje_id: str, ahora: datetime, **valores: Any) -> None:
-        """Crea la fila parcial si el evento llega antes que ViajeConfirmado (paso 2) y aplica los valores."""
+    def _viaje(self, s: Session, viaje_id: str, **valores: Any) -> None:
+        """Crea la fila parcial si el evento llega antes que ViajeConfirmado (paso 2) y aplica los valores.
+
+        `actualizado_en` es la hora en que se procesó (no `ocurridoEn`): el job de riesgo compara contra `calculada_en`
+        y un evento que llega atrasado igual queda pendiente (D78).
+        """
         valores = {k: v for k, v in valores.items() if v is not None}
-        fila = {"viaje_id": UUID(viaje_id), "actualizado_en": ahora, **valores}
+        fila = {"viaje_id": UUID(viaje_id), "actualizado_en": self.reloj(), **valores}
         s.execute(insert(HechoViaje).values(fila).on_conflict_do_update(index_elements=["viaje_id"], set_=fila))
 
     def _estado(self, s: Session, viaje_id: str, estado: str, ahora: datetime) -> None:
@@ -174,7 +178,6 @@ class Proyecciones:
         self._viaje(
             s,
             d["viajeId"],
-            ocurrido,
             servicio_id=UUID(d["servicioId"]),
             cliente_id=UUID(d["clienteId"]),
             ruta_id=UUID(d["rutaId"]),
@@ -201,7 +204,6 @@ class Proyecciones:
         self._viaje(
             s,
             d["viajeId"],
-            ocurrido,
             servicio_id=UUID(d["servicioId"]),
             chofer_id=UUID(d["choferId"]),
             tracto_id=UUID(d["tractoId"]),
@@ -229,7 +231,7 @@ class Proyecciones:
             )
         )
         # Solo avanza la última posición (los lotes pueden llegar desordenados).
-        self._viaje(s, d["viajeId"], ocurrido, chofer_id=UUID(d["choferId"]))
+        self._viaje(s, d["viajeId"], chofer_id=UUID(d["choferId"]))
         s.execute(
             update(HechoViaje)
             .where(
@@ -250,11 +252,12 @@ class Proyecciones:
             .on_conflict_do_nothing()
             .returning(HitoViaje.hito_id)
         ).scalar_one_or_none()
-        self._viaje(s, d["viajeId"], ocurrido)
+        self._viaje(s, d["viajeId"])
         if nuevo and d["tipo"] in ("BLOQUEO", "FALLA_MECANICA"):
             columna = HechoViaje.bloqueos if d["tipo"] == "BLOQUEO" else HechoViaje.fallas
             s.execute(update(HechoViaje).where(HechoViaje.viaje_id == viaje_id).values({columna: columna + 1}))
-        recalcular_riesgo(s, self.modelos, viaje_id, self.reloj(), forzar=True)
+        # D78: como máximo una vez por minuto; si el último es más nuevo, lo alcanza el job de pendientes.
+        recalcular_riesgo(s, self.modelos, viaje_id, self.reloj())
 
     def conduccion(self, s: Session, d: Datos, _: datetime, __: str) -> None:
         s.execute(
@@ -274,7 +277,6 @@ class Proyecciones:
         self._viaje(
             s,
             d["viajeId"],
-            ocurrido,
             servicio_id=UUID(d["servicioId"]),
             cliente_id=UUID(d["clienteId"]) if d.get("clienteId") else None,
             tracto_id=UUID(d["tractoId"]) if d.get("tractoId") else None,
@@ -288,8 +290,9 @@ class Proyecciones:
 
     def entrega_confirmada(self, s: Session, d: Datos, ocurrido: datetime, origen: str) -> None:
         self._fin(s, d, ocurrido, "ENTREGADO", d["entregadoEn"], None)
-        # Una entrega observada se cierra al aprobarla el despachador (spec 007).
-        alertas.resolver(s, TipoAlerta.ENTREGA_OBSERVADA, d["viajeId"], ocurrido)
+        # Una entrega observada se cierra al aprobarla el despachador (spec 007): la confirmación trae `aprobadaPor`.
+        if d.get("aprobadaPor"):
+            alertas.resolver(s, TipoAlerta.ENTREGA_OBSERVADA, d["viajeId"], ocurrido)
 
     def entrega_rechazada(self, s: Session, d: Datos, ocurrido: datetime, origen: str) -> None:
         self._fin(s, d, ocurrido, "ENTREGA_RECHAZADA", d["rechazadaEn"], d.get("motivo"))
@@ -306,7 +309,7 @@ class Proyecciones:
         )
 
     def entrega_observada(self, s: Session, d: Datos, ocurrido: datetime, origen: str) -> None:
-        self._viaje(s, d["viajeId"], ocurrido, servicio_id=UUID(d["servicioId"]))
+        self._viaje(s, d["viajeId"], servicio_id=UUID(d["servicioId"]))
         self._estado(s, d["viajeId"], "ENTREGA_OBSERVADA", ocurrido)
         razones = ", ".join(r.replace("_", " ").lower() for r in d.get("razones", []))
         distancia = f" a {d['distanciaMetros']} m del destino" if d.get("distanciaMetros") is not None else ""
@@ -324,7 +327,6 @@ class Proyecciones:
         self._viaje(
             s,
             d["viajeId"],
-            ocurrido,
             servicio_id=UUID(d["servicioId"]),
             cliente_id=UUID(d["clienteId"]),
             terminado_en=ocurrido,
@@ -335,7 +337,7 @@ class Proyecciones:
         alertas.resolver(s, TipoAlerta.RIESGO_RETRASO, d["viajeId"], ocurrido)
 
     def intervencion(self, s: Session, d: Datos, ocurrido: datetime, origen: str) -> None:
-        self._viaje(s, d["viajeId"], ocurrido, servicio_id=UUID(d["servicioId"]))
+        self._viaje(s, d["viajeId"], servicio_id=UUID(d["servicioId"]))
         self._estado(s, d["viajeId"], "REQUIERE_INTERVENCION", ocurrido)
         error = d.get("error") or {}
         alertas.abrir(

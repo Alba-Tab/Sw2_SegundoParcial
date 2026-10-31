@@ -33,6 +33,10 @@ class Configuracion(BaseSettings):
     programar_tareas: bool = True
     mision_cada_minutos: int = 10
     otel_exporter_otlp_endpoint: str = ""
+    # /docs y /openapi.json: apagados salvo en local.
+    documentacion_api: bool = False
+    # Consulta por voz: peticiones por minuto y por `sub` (el Ollama es uno solo).
+    voz_peticiones_por_minuto: int = 20
 
 
 @lru_cache

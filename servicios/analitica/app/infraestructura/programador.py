@@ -16,10 +16,16 @@ log = logging.getLogger(__name__)
 
 
 def recalcular_pendientes(app: FastAPI) -> None:
-    """Viajes en ruta cuyos eventos llegaron dentro del minuto de espera (D78) se recalculan aquí."""
+    """Viajes en ruta cuyos eventos llegaron dentro del minuto de espera (D78) se recalculan aquí.
+
+    Sin forzar: si el último cálculo tiene menos de 1 min, ese viaje espera a la vuelta siguiente. Una transacción por
+    viaje, así el bloqueo de las alertas no se guarda mientras se toman las filas de otro viaje.
+    """
     with transaccion() as s:
-        for viaje_id in prediccion.pendientes(s):
-            prediccion.recalcular_riesgo(s, app.state.modelos, viaje_id, datetime.now(UTC), forzar=True)
+        viajes = prediccion.pendientes(s)
+    for viaje_id in viajes:
+        with transaccion() as s:
+            prediccion.recalcular_riesgo(s, app.state.modelos, viaje_id, datetime.now(UTC))
 
 
 def purgar_exportaciones() -> None:

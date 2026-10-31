@@ -41,7 +41,12 @@ def riesgo(s: Session, modelos: Modelos, viaje_id: UUID, ahora: datetime) -> dic
     if previa is None:
         if viaje.estado != "EN_RUTA":
             raise ErrorDeDominio("NO_ENCONTRADO", f"El viaje está {viaje.estado}: no tiene predicción")
-        raise ErrorDeDominio("MODELO_NO_DISPONIBLE", "El modelo de retraso no está cargado")
+        # Spec 013: 503 DEPENDENCIA_NO_DISPONIBLE, con el motivo real.
+        if not modelos.cargados:
+            raise ErrorDeDominio("DEPENDENCIA_NO_DISPONIBLE", "El modelo de retraso no está cargado")
+        raise ErrorDeDominio(
+            "DEPENDENCIA_NO_DISPONIBLE", "Analítica todavía no tiene la ruta o el inicio de ese viaje para predecir"
+        )
     return {
         "viajeId": str(viaje_id),
         "probabilidad": previa.probabilidad,
@@ -79,7 +84,10 @@ def anomalias(s: Session, desde: date, hasta: date | None, limite: int) -> list[
 
 
 def conduccion(s: Session, chofer_id: UUID | None, desde: date | None) -> dict[str, Any]:
-    """D84 por viaje y por chofer en la semana: frenadas y fatigas sobre los km de los viajes terminados o en curso."""
+    """D84 por viaje y por chofer en la semana: frenadas y fatigas sobre los km recorridos.
+
+    Un viaje sin `kmRecorridos` (todavía en curso) no entra: sin km, el puntaje lo castigaría con 0.
+    """
     desde = desde or hoy() - timedelta(days=6)
     hasta = desde + timedelta(days=6)
     inicio = datetime.combine(desde, time.min, ZONA)
@@ -104,7 +112,9 @@ def conduccion(s: Session, chofer_id: UUID | None, desde: date | None) -> dict[s
     ).all()
     viajes, choferes = [], {}
     for f in filas:
-        km = float(f.km_recorridos or 0)
+        if f.km_recorridos is None:
+            continue
+        km = float(f.km_recorridos)
         viajes.append(
             {
                 "viajeId": str(f.viaje_id),

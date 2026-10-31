@@ -33,6 +33,15 @@ def base() -> Iterator[str]:
             CONTRATOS_DIR=str(CONTRATOS),
             MODELOS_DIR=str(Path(__file__).parent / "sin-modelos"),
         )
+        # Si algo leyó la configuración al importar (antes de este fixture), quedó en caché con los valores por defecto,
+        # que apuntan a la base y al RabbitMQ del stack local: se descarta y se verifica que todo use el contenedor.
+        from app.configuracion import configuracion
+        from app.infraestructura import bd
+
+        configuracion.cache_clear()
+        bd.motor.cache_clear()
+        bd.fabrica.cache_clear()
+        assert configuracion().database_url == url and not configuracion().consumir_eventos
         from alembic import command
         from alembic.config import Config
 

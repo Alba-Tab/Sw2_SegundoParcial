@@ -6,22 +6,38 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from sqlalchemy import func, or_, select, update
+from sqlalchemy import and_, func, or_, select, text, update
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session
 
-from app.dominio.alertas import REGLAS, EstadoAlerta, TipoAlerta, enlace, validar_atencion
+from app.dominio.alertas import (
+    ESTADOS_VIVOS,
+    REGLAS,
+    TIPOS_QUE_SE_RESUELVEN,
+    EstadoAlerta,
+    TipoAlerta,
+    enlace,
+    validar_atencion,
+)
 from app.dominio.errores import ErrorDeDominio
 from app.infraestructura.bd import Alerta
+from app.infraestructura.observabilidad import tramo
 
 RETENCION_CAMPANA = timedelta(hours=24)
+# pg_advisory_xact_lock: las alertas se crean de a una, así el orden de `secuencia` es el orden de confirmación y el
+# cursor del Gateway no salta una que se confirmó después que otra de secuencia mayor (spec 013, paso 10).
+BLOQUEO_ALERTAS = 4_201_313
 
 
 def abrir(
     sesion: Session, tipo: TipoAlerta, entidad_id: str, titulo: str, detalle: str, origen: str, ahora: datetime
 ) -> UUID:
-    """Una alerta abierta por causa (tipo, entidad): si ya hay una, se actualiza su detalle y no se crea otra."""
+    """Una alerta por causa (tipo, entidad): si ya hay una, se actualiza su detalle y no se crea otra.
+
+    Para los tipos que se resuelven solos cuenta también la ATENDIDA: una predicción nueva no abre otra (spec 013).
+    """
     regla = REGLAS[tipo]
+    sesion.execute(text("SELECT pg_advisory_xact_lock(:b)"), {"b": BLOQUEO_ALERTAS})
     fila = {
         "alerta_id": uuid4(),
         "tipo": tipo.value,
@@ -37,17 +53,24 @@ def abrir(
         "creada_en": ahora,
         "actualizada_en": ahora,
     }
+    # El mismo predicado que el índice único parcial de cada caso (migraciones 0001 y 0003).
+    viva = (
+        and_(Alerta.estado.in_(ESTADOS_VIVOS), Alerta.tipo.in_(TIPOS_QUE_SE_RESUELVEN))
+        if regla.se_resuelve_sola
+        else Alerta.estado == EstadoAlerta.ABIERTA.value
+    )
     sentencia = (
         insert(Alerta)
         .values(fila)
         .on_conflict_do_update(
             index_elements=["tipo", "entidad_id"],
-            index_where=Alerta.estado == EstadoAlerta.ABIERTA.value,
+            index_where=viva,
             set_={"titulo": fila["titulo"], "detalle": detalle, "actualizada_en": ahora},
         )
         .returning(Alerta.alerta_id)
     )
-    return sesion.execute(sentencia).scalar_one()
+    with tramo(f"alerta {tipo.value}", entidad=entidad_id):
+        return sesion.execute(sentencia).scalar_one()
 
 
 def resolver(sesion: Session, tipo: TipoAlerta, entidad_id: str, ahora: datetime) -> int:

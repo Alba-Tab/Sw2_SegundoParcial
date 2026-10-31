@@ -4,6 +4,7 @@ import re
 import unicodedata
 from dataclasses import dataclass
 from datetime import date, timedelta
+from decimal import Decimal, InvalidOperation
 
 from app.dominio.errores import ErrorDeDominio
 from app.dominio.reportes import CATALOGO, ReporteId
@@ -91,19 +92,19 @@ def numeros_validos(texto: str, filas: list[dict], totales: dict) -> bool:
             return set()
         s = str(valor)
         try:
-            n = float(s)
-        except ValueError:
+            n = Decimal(s)
+        except InvalidOperation:
             return {s}
-        entero = f"{n:,.0f}".replace(",", ".")
-        con_dec = f"{n:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        return {
-            s,
-            s.rstrip("0").rstrip(".") if "." in s else s,
-            entero,
-            con_dec,
-            con_dec.replace(".", ""),
-            str(int(n)) if n == int(n) else s,
-        }
+        if not n.is_finite():
+            return {s}
+        con_dec = _es_bo(n)
+        formas = {s, con_dec, con_dec.replace(".", "")}
+        if "." in s:
+            formas.add(s.rstrip("0").rstrip("."))
+        # "8.400" solo vale para 8400 o 8400,00: para 8400,50 sería un número que no está en los datos.
+        if n == n.to_integral_value():
+            formas |= {f"{n:,.0f}".replace(",", "."), str(int(n))}
+        return formas
 
     permitidos: set[str] = set()
     for fila in filas:
@@ -122,11 +123,15 @@ def numeros_validos(texto: str, filas: list[dict], totales: dict) -> bool:
     return True
 
 
+def _es_bo(monto: Decimal) -> str:
+    """8400.5 → "8.400,50" (formato boliviano, 2 decimales, sin pasar por float)."""
+    return f"{monto.quantize(Decimal('0.01')):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+
+
 def plantilla(reporte: ReporteId, filas: list[dict], totales: dict) -> str:
     """Texto fijo cuando el LLM no responde o inventa números."""
     titulo = CATALOGO[reporte].titulo
     if reporte == ReporteId.CUENTAS_POR_COBRAR:
-        saldo = totales.get("saldo", "0.00")
-        monto = f"{float(saldo):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+        monto = _es_bo(Decimal(str(totales.get("saldo", "0.00"))))
         return f"Hay {len(filas)} facturas con saldo por {monto} BOB en el periodo."
     return f"{titulo}: {len(filas)} filas."

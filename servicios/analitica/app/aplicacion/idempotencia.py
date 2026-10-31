@@ -38,6 +38,16 @@ def huella(cuerpo: Any) -> str:
     return hashlib.sha256(json.dumps(cuerpo, sort_keys=True, default=_texto).encode()).hexdigest()
 
 
+def guardada(sesion: Session, clave: UUID, operacion: str, sub: str, cuerpo: Any) -> tuple[int, dict[str, Any]] | None:
+    """La respuesta ya guardada para esa clave, o None. Otro cuerpo u otro `sub` → 422 IDEMPOTENCIA_CUERPO_DISTINTO."""
+    previa = sesion.get(OperacionIdempotente, clave)
+    if previa is None:
+        return None
+    if previa.hash_cuerpo != huella({"operacion": operacion, "cuerpo": cuerpo}) or previa.sub != sub:
+        raise ErrorDeDominio("IDEMPOTENCIA_CUERPO_DISTINTO", "La misma Idempotency-Key se usó con otro cuerpo")
+    return previa.status, previa.respuesta
+
+
 def una_vez(
     sesion: Session,
     clave: UUID,
@@ -48,12 +58,9 @@ def una_vez(
 ) -> tuple[int, dict[str, Any]]:
     # Serializa las peticiones con la misma clave dentro de esta transacción.
     sesion.execute(text("SELECT pg_advisory_xact_lock(hashtextextended(:c, 0))"), {"c": str(clave)})
-    previa = sesion.get(OperacionIdempotente, clave)
+    if previa := guardada(sesion, clave, operacion, sub, cuerpo):
+        return previa
     h = huella({"operacion": operacion, "cuerpo": cuerpo})
-    if previa:
-        if previa.hash_cuerpo != h or previa.sub != sub:
-            raise ErrorDeDominio("IDEMPOTENCIA_CUERPO_DISTINTO", "La misma Idempotency-Key se usó con otro cuerpo")
-        return previa.status, previa.respuesta
     status, respuesta = hacer()
     respuesta = a_json(respuesta)
     sesion.add(
