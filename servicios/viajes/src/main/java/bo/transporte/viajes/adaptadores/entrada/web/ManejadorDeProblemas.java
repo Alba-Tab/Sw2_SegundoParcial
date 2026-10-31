@@ -135,10 +135,9 @@ class ManejadorDeProblemas extends ResponseEntityExceptionHandler {
         return interno();
     }
 
+    /** 500 ERROR_INTERNO (000 §5): sin trazas ni mensajes internos; el detalle queda en el log con el correlationId. */
     private static ProblemDetail interno() {
-        ProblemDetail p = Problemas.de("DEPENDENCIA_NO_DISPONIBLE", "Error interno", "Ocurrió un error inesperado");
-        p.setStatus(500);
-        return p;
+        return Problemas.de("ERROR_INTERNO", Problemas.titulo("ERROR_INTERNO"), "Ocurrió un error inesperado");
     }
 
     @Override
