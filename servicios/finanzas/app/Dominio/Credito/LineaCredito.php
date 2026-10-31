@@ -7,7 +7,7 @@ use App\Dominio\Comun\Monto;
 
 /**
  * Agregado LineaCredito (D01): disponible = límite − reservado − utilizado. Se crea con el primer ClienteActualizado
- * con 30.000,00 BOB. `version` es el bloqueo optimista (000 §9): cada cambio devuelve una línea nueva con version + 1.
+ * con 30.000,00 BOB. Cada cambio devuelve una línea nueva; la fila se bloquea con FOR UPDATE al leerla (000 §9).
  * Las reservas ACTIVA y PENDIENTE_APROBACION cuentan en `reservado` (spec 003).
  */
 final class LineaCredito
@@ -19,12 +19,11 @@ final class LineaCredito
         public readonly Monto $limite,
         public readonly Monto $reservado,
         public readonly Monto $utilizado,
-        public readonly int $version,
     ) {}
 
     public static function porDefecto(string $clienteId): self
     {
-        return new self($clienteId, Monto::bob(self::LIMITE_POR_DEFECTO), Monto::bob('0'), Monto::bob('0'), 0);
+        return new self($clienteId, Monto::bob(self::LIMITE_POR_DEFECTO), Monto::bob('0'), Monto::bob('0'));
     }
 
     /** Puede ser 0 pero nunca negativo: el límite nunca se excede (Monto rechaza negativos). */
@@ -42,20 +41,19 @@ final class LineaCredito
                 ['disponible' => $this->disponible()->aContrato(), 'monto' => $monto->aContrato()]);
         }
 
-        return new self($this->clienteId, $this->limite, $this->reservado->mas($monto), $this->utilizado, $this->version + 1);
+        return new self($this->clienteId, $this->limite, $this->reservado->mas($monto), $this->utilizado);
     }
 
     /** Compensación del paso 2. */
     public function liberar(Monto $monto): self
     {
-        return new self($this->clienteId, $this->limite, $this->sinReserva($monto, 'liberar'), $this->utilizado, $this->version + 1);
+        return new self($this->clienteId, $this->limite, $this->sinReserva($monto, 'liberar'), $this->utilizado);
     }
 
     /** Spec 006: la factura consume la reserva; reservado baja y utilizado sube. */
     public function consumir(Monto $monto): self
     {
-        return new self($this->clienteId, $this->limite, $this->sinReserva($monto, 'consumir'), $this->utilizado->mas($monto),
-            $this->version + 1);
+        return new self($this->clienteId, $this->limite, $this->sinReserva($monto, 'consumir'), $this->utilizado->mas($monto));
     }
 
     /**
@@ -78,6 +76,6 @@ final class LineaCredito
     {
         $utilizado = $monto->esMayorQue($this->utilizado) ? Monto::bob('0') : $this->utilizado->menos($monto);
 
-        return new self($this->clienteId, $this->limite, $this->reservado, $utilizado, $this->version + 1);
+        return new self($this->clienteId, $this->limite, $this->reservado, $utilizado);
     }
 }

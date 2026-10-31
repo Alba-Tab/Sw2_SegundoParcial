@@ -3,7 +3,6 @@
 namespace App\Infraestructura\Persistencia;
 
 use App\Aplicacion\Puertos\LineaCreditoRepositorio;
-use App\Aplicacion\Puertos\VersionDesactualizada;
 use App\Dominio\Comun\Monto;
 use App\Dominio\Credito\LineaCredito;
 use Illuminate\Support\Facades\DB;
@@ -27,28 +26,21 @@ final class LineaCreditoRepositorioDb implements LineaCreditoRepositorio
             'limite' => $l->limite->aContrato()['monto'],
             'reservado' => $l->reservado->aContrato()['monto'],
             'utilizado' => $l->utilizado->aContrato()['monto'],
-            'version' => $l->version,
         ]);
     }
 
     public function actualizar(LineaCredito $l): void
     {
-        $cambiadas = DB::table('linea_credito')
-            ->where('cliente_id', $l->clienteId)->where('version', $l->version - 1)
-            ->update([
-                'limite' => $l->limite->aContrato()['monto'],
-                'reservado' => $l->reservado->aContrato()['monto'],
-                'utilizado' => $l->utilizado->aContrato()['monto'],
-                'version' => $l->version,
-            ]);
-        if ($cambiadas !== 1) {
-            throw new VersionDesactualizada("La línea de {$l->clienteId} cambió mientras se actualizaba");
-        }
+        DB::table('linea_credito')->where('cliente_id', $l->clienteId)->update([
+            'limite' => $l->limite->aContrato()['monto'],
+            'reservado' => $l->reservado->aContrato()['monto'],
+            'utilizado' => $l->utilizado->aContrato()['monto'],
+        ]);
     }
 
     private static function fila(?object $f): ?LineaCredito
     {
         return $f ? new LineaCredito($f->cliente_id, Monto::bob((string) $f->limite), Monto::bob((string) $f->reservado),
-            Monto::bob((string) $f->utilizado), (int) $f->version) : null;
+            Monto::bob((string) $f->utilizado)) : null;
     }
 }

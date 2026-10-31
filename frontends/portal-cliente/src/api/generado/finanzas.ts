@@ -121,8 +121,6 @@ export interface LineaCredito {
   disponible: Monto;
   /** Tiene al menos una factura con saldo vencida hace más de 7 días (D04). */
   enMora: boolean;
-  /** @minimum 0 */
-  version: number;
 }
 
 export type EstadoSolicitud = (typeof EstadoSolicitud)[keyof typeof EstadoSolicitud];

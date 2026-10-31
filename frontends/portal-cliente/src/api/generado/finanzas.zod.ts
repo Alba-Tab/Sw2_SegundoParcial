@@ -169,7 +169,6 @@ export const obtenerMiLineaCreditoResponseLimiteMontoRegExp = new RegExp('^(0|[1
 export const obtenerMiLineaCreditoResponseReservadoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
 export const obtenerMiLineaCreditoResponseUtilizadoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
 export const obtenerMiLineaCreditoResponseDisponibleMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
-export const obtenerMiLineaCreditoResponseVersionMin = 0;
 
 export const ObtenerMiLineaCreditoResponse = zod.object({
   clienteId: zod.uuid(),
@@ -190,7 +189,6 @@ export const ObtenerMiLineaCreditoResponse = zod.object({
     moneda: zod.enum(['BOB']),
   }),
   enMora: zod.boolean().describe('Tiene al menos una factura con saldo vencida hace más de 7 días (D04).'),
-  version: zod.int().min(obtenerMiLineaCreditoResponseVersionMin),
 });
 
 /**
@@ -204,7 +202,6 @@ export const obtenerLineaCreditoResponseLimiteMontoRegExp = new RegExp('^(0|[1-9
 export const obtenerLineaCreditoResponseReservadoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
 export const obtenerLineaCreditoResponseUtilizadoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
 export const obtenerLineaCreditoResponseDisponibleMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
-export const obtenerLineaCreditoResponseVersionMin = 0;
 
 export const ObtenerLineaCreditoResponse = zod.object({
   clienteId: zod.uuid(),
@@ -225,7 +222,6 @@ export const ObtenerLineaCreditoResponse = zod.object({
     moneda: zod.enum(['BOB']),
   }),
   enMora: zod.boolean().describe('Tiene al menos una factura con saldo vencida hace más de 7 días (D04).'),
-  version: zod.int().min(obtenerLineaCreditoResponseVersionMin),
 });
 
 /**

@@ -1,10 +1,10 @@
 <?php
 
 use App\Aplicacion\Puertos\LineaCreditoRepositorio;
-use App\Aplicacion\Puertos\VersionDesactualizada;
 use App\Dominio\Credito\LineaCredito;
 use App\Infraestructura\Persistencia\LineaCreditoRepositorioDb;
 use App\Infraestructura\Temporal\FinanzasActividades;
+use Illuminate\Database\LostConnectionException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -129,8 +129,8 @@ it('la misma clave y el mismo cuerpo en otra factura no devuelven el pago de la 
         ->and(DB::table('pago')->count())->toBe(1);
 });
 
-/** La línea de crédito real, pero `actualizar` pierde el bloqueo optimista las primeras $fallas veces. */
-function lineaQueChoca(int $fallas): object
+/** La línea de crédito real, pero `actualizar` pierde la conexión las primeras $fallas veces (falla pasajera). */
+function lineaQueSeCae(int $fallas): object
 {
     $linea = new class(app(LineaCreditoRepositorioDb::class), $fallas) implements LineaCreditoRepositorio
     {
@@ -156,7 +156,7 @@ function lineaQueChoca(int $fallas): object
         public function actualizar(LineaCredito $linea): void
         {
             if (++$this->intentos <= $this->fallas) {
-                throw new VersionDesactualizada('otro cambio ganó');
+                throw new LostConnectionException('se cortó la conexión');
             }
             $this->real->actualizar($linea);
         }
@@ -165,21 +165,6 @@ function lineaQueChoca(int $fallas): object
 
     return $linea;
 }
-
-it('VersionDesactualizada repite la transacción del pago hasta 3 veces y después responde 409', function () {
-    consumidor()->aplicar(entregaConfirmada(reservaActiva($this)['servicio'], (string) Str::uuid7()));
-    $id = DB::table('factura')->value('factura_id');
-
-    $linea = lineaQueChoca(2);
-    pagar($this, $id, '100.00', 'BNB-600001')->assertStatus(201)->assertJsonPath('saldo.monto', '2700.00');
-    expect($linea->intentos)->toBe(3)->and(DB::table('pago')->count())->toBe(1);
-
-    $linea->intentos = 0;
-    $linea->fallas = 3;
-    pagar($this, $id, '100.00', 'BNB-600002')->assertStatus(409)->assertJsonPath('codigo', 'VERSION_DESACTUALIZADA');
-    expect($linea->intentos)->toBe(3)->and(DB::table('pago')->count())->toBe(1)
-        ->and(DB::table('factura')->where('factura_id', $id)->value('saldo'))->toBe('2700.00');
-});
 
 it('el cliente ve solo sus facturas, con mora calculada; administración filtra por saldo y vencimiento', function () {
     $this->artisan('semilla:cargar')->assertSuccessful();
