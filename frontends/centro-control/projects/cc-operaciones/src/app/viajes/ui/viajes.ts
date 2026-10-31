@@ -1,26 +1,15 @@
-import { Component, inject, signal } from '@angular/core';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { Component, inject } from '@angular/core';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { switchMap } from 'rxjs';
 import { AvisoServicios, FechaPipe } from 'ui-comun';
-import { ViajesGQL, type EstadoViaje } from '../graphql/generado';
-
-const ESTADOS: EstadoViaje[] = [
-  'CONFIRMADO',
-  'EN_RUTA',
-  'ENTREGA_OBSERVADA',
-  'ENTREGADO',
-  'CERRADO',
-  'ENTREGA_RECHAZADA',
-  'REQUIERE_INTERVENCION',
-  'CANCELADO',
-];
+import { ESTADOS_VIAJE } from '../domain/viaje';
+import { ViajesFachada } from '../viajes.fachada';
 
 @Component({
   selector: 'app-viajes',
+  providers: [ViajesFachada],
   imports: [MatTableModule, MatSelectModule, MatProgressBarModule, RouterLink, FechaPipe, AvisoServicios],
   template: `
     <div class="fila-acciones">
@@ -79,12 +68,10 @@ const ESTADOS: EstadoViaje[] = [
   `,
 })
 export class ViajesPagina {
-  private readonly gql = inject(ViajesGQL);
-  readonly estados = ESTADOS;
+  private readonly fachada = inject(ViajesFachada);
+  readonly estados = ESTADOS_VIAJE;
   readonly columnas = ['placa', 'cliente', 'ruta', 'chofer', 'fecha', 'estado'];
-  readonly estado = signal<EstadoViaje | null>(null);
-  readonly datos = toSignal(
-    toObservable(this.estado).pipe(switchMap((estado) => this.gql.watch({ variables: { estado }, pollInterval: 15_000 }).valueChanges)),
-  );
+  readonly estado = this.fachada.estado;
+  readonly datos = this.fachada.datos;
   readonly campos = { viajes: 'Viajes' };
 }

@@ -1,13 +1,13 @@
-import { Component, computed, inject } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, inject } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { RouterLink } from '@angular/router';
 import { AvisoServicios, FechaPipe } from 'ui-comun';
-import { IntervencionesGQL } from '../graphql/generado';
+import { IntervencionesFachada } from '../viajes.fachada';
 
 /** Spec 011: viajes cuya compensación se agotó; el despachador reintenta o marca resuelto en el detalle. */
 @Component({
   selector: 'app-intervenciones',
+  providers: [IntervencionesFachada],
   imports: [MatCardModule, RouterLink, FechaPipe, AvisoServicios],
   template: `
     <h1>Intervenciones</h1>
@@ -31,7 +31,8 @@ import { IntervencionesGQL } from '../graphql/generado';
   `,
 })
 export class IntervencionesPagina {
-  readonly datos = toSignal(inject(IntervencionesGQL).watch({ pollInterval: 15_000 }).valueChanges);
-  readonly error = computed(() => this.datos()?.error);
+  private readonly fachada = inject(IntervencionesFachada);
+  readonly datos = this.fachada.datos;
+  readonly error = this.fachada.error;
   readonly campos = { intervenciones: 'Viajes' };
 }

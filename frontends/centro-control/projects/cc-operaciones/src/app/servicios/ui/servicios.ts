@@ -1,14 +1,13 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
-import { firstValueFrom } from 'rxjs';
-import { AvisoServicios, BobPipe, CONFIG_CENTRO, FechaPipe, Intentos, mensajeDe, Sesion } from 'ui-comun';
-import { CancelarServicioGQL, ServiciosGQL } from '../graphql/generado';
+import { AvisoServicios, BobPipe, CONFIG_CENTRO, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { motivoCancelacionValido } from '../domain/servicio';
+import { ServiciosFachada } from '../servicios.fachada';
 
 /**
  * Servicios confirmados (spec 004): el despachador y atención comercial cancelan; comercial abre el portal "como el
@@ -16,6 +15,7 @@ import { CancelarServicioGQL, ServiciosGQL } from '../graphql/generado';
  */
 @Component({
   selector: 'app-servicios',
+  providers: [ServiciosFachada],
   imports: [FormsModule, MatTableModule, MatButtonModule, MatFormFieldModule, MatInputModule, BobPipe, FechaPipe, AvisoServicios],
   template: `
     <h1>Servicios confirmados</h1>
@@ -88,14 +88,12 @@ import { CancelarServicioGQL, ServiciosGQL } from '../graphql/generado';
   `,
 })
 export class ServiciosPagina {
-  private readonly gql = inject(ServiciosGQL);
-  private readonly cancelarGql = inject(CancelarServicioGQL);
+  private readonly fachada = inject(ServiciosFachada);
   private readonly avisos = inject(MatSnackBar);
   readonly sesion = inject(Sesion);
   readonly config = inject(CONFIG_CENTRO);
-  readonly datos = toSignal(this.gql.watch({ variables: { estado: 'CONFIRMADO' }, pollInterval: 20_000 }).valueChanges);
-  readonly servicios = computed(() => this.datos()?.data?.servicios ?? []);
-  readonly error = computed(() => this.datos()?.error);
+  readonly servicios = this.fachada.servicios;
+  readonly error = this.fachada.error;
   readonly campos = { servicios: 'Viajes', clientes: 'Viajes' };
   readonly puedeCancelar = computed(() => this.sesion.tiene('despachador', 'comercial'));
   readonly columnas = computed(() =>
@@ -104,18 +102,16 @@ export class ServiciosPagina {
       : ['cliente', 'carga', 'fecha', 'unidad', 'monto', 'acciones'],
   );
   readonly enviando = signal(false);
-  private readonly intentos = new Intentos();
   /** La fila que está pidiendo confirmación; cada fila tiene su propio motivo. */
   readonly confirmando = signal<string | null>(null);
   motivos: Record<string, string> = {};
 
   nombre(clienteId: string): string {
-    return this.datos()?.data?.clientes?.find((c) => c?.clienteId === clienteId)?.razonSocial ?? clienteId;
+    return this.fachada.nombreCliente(clienteId);
   }
 
   motivoValido(servicioId: string): boolean {
-    const n = (this.motivos[servicioId] ?? '').trim().length;
-    return n >= 3 && n <= 300;
+    return motivoCancelacionValido(this.motivos[servicioId]);
   }
 
   async cancelar(servicioId: string): Promise<void> {
@@ -123,13 +119,11 @@ export class ServiciosPagina {
     this.enviando.set(true);
     try {
       const motivo = this.motivos[servicioId].trim();
-      await this.intentos.enviar(`cancelarServicio:${servicioId}`, { motivo }, (clave) =>
-        this.cancelarGql.mutate({ variables: { servicioId, motivo, clave } }),
-      );
+      await this.fachada.cancelar(servicioId, motivo);
       this.avisos.open('Servicio cancelado: se devolvieron el crédito y la unidad', undefined, { duration: 5000 });
       delete this.motivos[servicioId];
       this.confirmando.set(null);
-      await firstValueFrom(this.gql.fetch({ variables: { estado: 'CONFIRMADO' } }));
+      await this.fachada.recargar();
     } catch (e) {
       this.avisos.open(mensajeDe(e), 'Cerrar', { duration: 6000 });
     } finally {

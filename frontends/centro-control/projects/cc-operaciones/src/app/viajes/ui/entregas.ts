@@ -1,13 +1,13 @@
-import { Component, computed, inject } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, inject } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { RouterLink } from '@angular/router';
 import { AvisoServicios, FechaPipe } from 'ui-comun';
-import { EntregasObservadasGQL } from '../graphql/generado';
+import { EntregasFachada } from '../viajes.fachada';
 
 /** Spec 007: entregas fuera de la geocerca o sin firma, para aprobar o rechazar en el detalle del viaje. */
 @Component({
   selector: 'app-entregas',
+  providers: [EntregasFachada],
   imports: [MatCardModule, RouterLink, FechaPipe, AvisoServicios],
   template: `
     <h1>Entregas observadas</h1>
@@ -32,7 +32,8 @@ import { EntregasObservadasGQL } from '../graphql/generado';
   `,
 })
 export class EntregasPagina {
-  readonly datos = toSignal(inject(EntregasObservadasGQL).watch({ pollInterval: 15_000 }).valueChanges);
-  readonly error = computed(() => this.datos()?.error);
+  private readonly fachada = inject(EntregasFachada);
+  readonly datos = this.fachada.datos;
+  readonly error = this.fachada.error;
   readonly campos = { entregasObservadas: 'Viajes' };
 }

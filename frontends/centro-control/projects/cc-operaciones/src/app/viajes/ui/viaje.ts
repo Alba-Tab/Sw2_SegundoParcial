@@ -1,5 +1,4 @@
-import { Component, inject, input, signal } from '@angular/core';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { Component, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -7,13 +6,15 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { type Observable, firstValueFrom, switchMap } from 'rxjs';
-import { AvisoServicios, BobPipe, FechaPipe, Intentos, mensajeDe, pct, Sesion } from 'ui-comun';
-import { AprobarEntregaGQL, RechazarEntregaGQL, ResolverIntervencionGQL, ViajeGQL, type OpcionIntervencion } from '../graphql/generado';
+import { AvisoServicios, BobPipe, FechaPipe, mensajeDe, pct, Sesion } from 'ui-comun';
+import type { OpcionIntervencion } from '../../graphql/generado';
+import { estadoConAlerta } from '../domain/viaje';
+import { ViajeFachada } from '../viajes.fachada';
 
 /** Detalle del viaje (al que llevan las alertas): bitácora, entrega, riesgo y las decisiones del despachador. */
 @Component({
   selector: 'app-viaje',
+  providers: [ViajeFachada],
   imports: [
     FormsModule,
     MatCardModule,
@@ -132,58 +133,41 @@ import { AprobarEntregaGQL, RechazarEntregaGQL, ResolverIntervencionGQL, ViajeGQ
   `,
 })
 export class ViajePagina {
-  private readonly gql = inject(ViajeGQL);
-  private readonly aprobarGql = inject(AprobarEntregaGQL);
-  private readonly rechazarGql = inject(RechazarEntregaGQL);
-  private readonly resolverGql = inject(ResolverIntervencionGQL);
+  private readonly fachada = inject(ViajeFachada);
   private readonly avisos = inject(MatSnackBar);
   readonly sesion = inject(Sesion);
   readonly id = input.required<string>();
-  readonly datos = toSignal(
-    toObservable(this.id).pipe(switchMap((id) => this.gql.watch({ variables: { id }, pollInterval: 20_000 }).valueChanges)),
-  );
+  readonly datos = this.fachada.datos;
   readonly enviando = signal(false);
-  private readonly intentos = new Intentos();
   readonly pct = pct;
   readonly campos = { viaje: 'Viajes', unidad: 'Flota', riesgo: 'Analítica' };
-  readonly alerta = (estado?: string) => ['ENTREGA_OBSERVADA', 'REQUIERE_INTERVENCION', 'ENTREGA_RECHAZADA'].includes(estado ?? '');
+  readonly alerta = estadoConAlerta;
   texto = '';
+
+  constructor() {
+    effect(() => this.fachada.id.set(this.id()));
+  }
 
   aprobar(viajeId: string) {
     const nota = this.texto.trim() || undefined;
-    return this.enviar(
-      `aprobarEntrega:${viajeId}`,
-      { nota },
-      (clave) => this.aprobarGql.mutate({ variables: { viajeId, nota, clave } }),
-      'Entrega aprobada: se factura',
-    );
+    return this.enviar(() => this.fachada.aprobarEntrega(viajeId, nota), 'Entrega aprobada: se factura');
   }
   rechazar(viajeId: string) {
     const motivo = this.texto.trim();
-    return this.enviar(
-      `rechazarEntrega:${viajeId}`,
-      { motivo },
-      (clave) => this.rechazarGql.mutate({ variables: { viajeId, motivo, clave } }),
-      'Entrega rechazada',
-    );
+    return this.enviar(() => this.fachada.rechazarEntrega(viajeId, motivo), 'Entrega rechazada');
   }
   resolver(viajeId: string, opcion: OpcionIntervencion) {
     const nota = this.texto.trim() || undefined;
-    return this.enviar(
-      `resolverIntervencion:${viajeId}`,
-      { opcion, nota },
-      (clave) => this.resolverGql.mutate({ variables: { viajeId, opcion, nota, clave } }),
-      'Intervención enviada',
-    );
+    return this.enviar(() => this.fachada.resolverIntervencion(viajeId, opcion, nota), 'Intervención enviada');
   }
 
-  private async enviar(operacion: string, datos: unknown, peticion: (clave: string) => Observable<unknown>, ok: string): Promise<void> {
+  private async enviar(accion: () => Promise<unknown>, ok: string): Promise<void> {
     this.enviando.set(true);
     try {
-      await this.intentos.enviar(operacion, datos, peticion);
+      await accion();
       this.texto = '';
       this.avisos.open(ok, undefined, { duration: 4000 });
-      await firstValueFrom(this.gql.fetch({ variables: { id: this.id() } }));
+      await this.fachada.recargar();
     } catch (e) {
       this.avisos.open(mensajeDe(e), 'Cerrar', { duration: 6000 });
     } finally {

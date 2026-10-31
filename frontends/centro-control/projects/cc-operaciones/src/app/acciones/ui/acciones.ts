@@ -1,5 +1,4 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -7,9 +6,9 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { RouterLink } from '@angular/router';
-import { type Observable, firstValueFrom } from 'rxjs';
-import { AvisoServicios, completo, CONFIG_CENTRO, FechaPipe, Intentos, mensajeDe, Sesion } from 'ui-comun';
-import { AccionesGQL, AprobarAccionGQL, RechazarAccionGQL, type AccionesQuery } from '../graphql/generado';
+import { AvisoServicios, CONFIG_CENTRO, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { AccionesFachada } from '../acciones.fachada';
+import { conLaElegidaPrimero } from '../domain/accion';
 
 /**
  * CU-18 (spec 014): el agente propone; el despachador revisa la evidencia, edita el mensaje y aprueba (sale el correo
@@ -17,6 +16,7 @@ import { AccionesGQL, AprobarAccionGQL, RechazarAccionGQL, type AccionesQuery } 
  */
 @Component({
   selector: 'app-acciones',
+  providers: [AccionesFachada],
   imports: [FormsModule, MatCardModule, MatButtonModule, MatFormFieldModule, MatInputModule, RouterLink, FechaPipe, AvisoServicios],
   template: `
     <h1>Acciones propuestas por el agente</h1>
@@ -102,52 +102,38 @@ import { AccionesGQL, AprobarAccionGQL, RechazarAccionGQL, type AccionesQuery } 
   `,
 })
 export class AccionesPagina {
-  private readonly gql = inject(AccionesGQL);
-  private readonly aprobarGql = inject(AprobarAccionGQL);
-  private readonly rechazarGql = inject(RechazarAccionGQL);
+  private readonly fachada = inject(AccionesFachada);
   private readonly avisos = inject(MatSnackBar);
   readonly sesion = inject(Sesion);
   readonly config = inject(CONFIG_CENTRO);
   readonly id = input<string>();
-  readonly datos = toSignal(this.gql.watch({ pollInterval: 15_000 }).valueChanges);
+  readonly datos = this.fachada.datos;
   readonly visibles = computed(() => {
-    const todas = completo<AccionesQuery>(this.datos())?.accionesPropuestas ?? [];
+    const todas = this.fachada.acciones();
     for (const a of todas) if (a.estado === 'PENDIENTE' && this.mensajes[a.accionId] === undefined) this.mensajes[a.accionId] = a.mensaje;
-    const id = this.id();
-    return id ? [...todas.filter((a) => a.accionId === id), ...todas.filter((a) => a.accionId !== id)] : todas;
+    return conLaElegidaPrimero(todas, this.id());
   });
-  readonly error = computed(() => this.datos()?.error);
+  readonly error = this.fachada.error;
   readonly campos = { accionesPropuestas: 'Analítica', viaje: 'Viajes' };
   readonly enviando = signal(false);
-  private readonly intentos = new Intentos();
   mensajes: Record<string, string> = {};
   motivos: Record<string, string> = {};
 
   aprobar(id: string) {
     const mensaje = this.mensajes[id].trim();
-    return this.enviar(
-      `aprobarAccion:${id}`,
-      { mensaje },
-      (clave) => this.aprobarGql.mutate({ variables: { id, mensaje, clave } }),
-      'Aprobada: el correo sale por n8n',
-    );
+    return this.enviar(() => this.fachada.aprobar(id, mensaje), 'Aprobada: el correo sale por n8n');
   }
   rechazar(id: string) {
     const motivo = this.motivos[id]?.trim() || undefined;
-    return this.enviar(
-      `rechazarAccion:${id}`,
-      { motivo },
-      (clave) => this.rechazarGql.mutate({ variables: { id, motivo, clave } }),
-      'Acción rechazada',
-    );
+    return this.enviar(() => this.fachada.rechazar(id, motivo), 'Acción rechazada');
   }
 
-  private async enviar(operacion: string, datos: unknown, peticion: (clave: string) => Observable<unknown>, ok: string): Promise<void> {
+  private async enviar(accion: () => Promise<unknown>, ok: string): Promise<void> {
     this.enviando.set(true);
     try {
-      await this.intentos.enviar(operacion, datos, peticion);
+      await accion();
       this.avisos.open(ok, undefined, { duration: 5000 });
-      await firstValueFrom(this.gql.fetch());
+      await this.fachada.recargar();
     } catch (e) {
       this.avisos.open(mensajeDe(e), 'Cerrar', { duration: 6000 });
     } finally {

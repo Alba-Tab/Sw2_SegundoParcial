@@ -1,10 +1,8 @@
-import { afterNextRender, Component, computed, effect, ElementRef, inject, OnDestroy, viewChild } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { afterNextRender, Component, effect, ElementRef, inject, OnDestroy, viewChild } from '@angular/core';
 import * as L from 'leaflet';
-import { AvisoServicios, completo, CONFIG_CENTRO, pct } from 'ui-comun';
-import { MapaGQL, type MapaQuery } from '../graphql/generado';
-
-type ViajeMapa = NonNullable<MapaQuery['viajesEnCurso']>[number];
+import { AvisoServicios, CONFIG_CENTRO, pct } from 'ui-comun';
+import type { ViajeMapa } from '../domain/viaje';
+import { MapaFachada } from '../viajes.fachada';
 
 /**
  * Contenido del popup armado con nodos y `textContent`: la razón social la escribe el cliente al registrarse, así que
@@ -34,6 +32,7 @@ export function popupViaje(v: ViajeMapa, urlViaje: string): HTMLElement {
 /** Mapa en vivo (spec 005): la última posición de cada viaje en ruta, cada 15 s; en rojo los que tienen riesgo. */
 @Component({
   selector: 'app-mapa',
+  providers: [MapaFachada],
   imports: [AvisoServicios],
   template: `<h1>Mapa en vivo</h1>
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!viajes().length" />
@@ -49,9 +48,9 @@ export function popupViaje(v: ViajeMapa, urlViaje: string): HTMLElement {
 export class MapaPagina implements OnDestroy {
   private readonly contenedor = viewChild.required<ElementRef<HTMLDivElement>>('mapa');
   private readonly config = inject(CONFIG_CENTRO);
-  private readonly datos = toSignal(inject(MapaGQL).watch({ pollInterval: 15_000 }).valueChanges);
-  readonly viajes = computed(() => completo<MapaQuery>(this.datos())?.viajesEnCurso ?? []);
-  readonly error = computed(() => this.datos()?.error);
+  private readonly fachada = inject(MapaFachada);
+  readonly viajes = this.fachada.viajes;
+  readonly error = this.fachada.error;
   readonly campos = { viajesEnCurso: 'Viajes', riesgo: 'Analítica' };
   private mapa?: L.Map;
   private capa = L.layerGroup();
