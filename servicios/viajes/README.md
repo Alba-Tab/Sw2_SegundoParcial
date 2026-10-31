@@ -9,7 +9,7 @@ Clientes, cotizaciones confirmadas, servicios, viajes en ruta y la saga `Program
 | Problem Details (RFC 9457) con `codigo` y `correlationId` | `adaptadores/entrada/web/Problemas`, `ManejadorDeProblemas` |
 | `X-Correlation-Id`: se genera si no viene, va al MDC, a los logs y al sobre de los eventos | `adaptadores/entrada/web/CorrelacionFiltro` |
 | Tablas comunes (`operacion_idempotente`, `outbox_eventos`, `inbox_eventos`, `auditoria`) | `db/migration/V1__tablas_comunes.sql` |
-| Outbox y relay con confirmación del broker y `FOR UPDATE SKIP LOCKED` | `adaptadores/salida/persistencia/RegistroDeEventosOutbox`, `adaptadores/salida/mensajeria/RelayOutbox` |
+| Outbox y relay con confirmación del broker y `FOR UPDATE SKIP LOCKED`; con el broker caído, un WARN de una línea y una espera que se duplica de `outbox.espera-minima` a `outbox.espera-maxima` | `adaptadores/salida/persistencia/RegistroDeEventosOutbox`, `adaptadores/salida/mensajeria/RelayOutbox` |
 | Logs JSON (000 §10) y trazas OTLP solo si `OTEL_EXPORTER_OTLP_ENDPOINT` existe | `configuracion/FormatoLog`, `configuracion/TrazasSiHayEndpoint` |
 | CORS desde `CORS_ORIGENES` | `configuracion/SeguridadConfig` |
 | Hilos virtuales de Java 25 | `spring.threads.virtual.enabled` |

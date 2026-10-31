@@ -70,9 +70,12 @@ semilla:
   dir: ${SEMILLA_DIR:/app/semilla}
   cargar: false
 
+# Con el broker caído, el relay espera entre intentos de espera-minima a espera-maxima, duplicando cada vez.
 outbox:
   intervalo: PT1S
   lote: 100
+  espera-minima: PT1S
+  espera-maxima: PT1M
 
 logging:
   structured.format.console: ${FORMATO_LOG:bo.transporte.viajes.configuracion.FormatoLog}
