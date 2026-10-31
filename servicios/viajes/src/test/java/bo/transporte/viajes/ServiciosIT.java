@@ -114,11 +114,7 @@ class ServiciosIT {
     private JsonNode esperar(String servicioId, Predicate<JsonNode> condicion) throws Exception {
         for (int i = 0; i < 100; i++) {
             var r = pedir(
-                    "GET",
-                    "/api/v1/servicios/" + servicioId,
-                    TokensDePrueba.token("d", "despachador", null),
-                    null,
-                    null);
+                    "GET", "/api/v1/servicios/" + servicioId, TokensDePrueba.token("g", "gerente", null), null, null);
             if (r.estado() == 200 && condicion.test(r.cuerpo())) return r.cuerpo();
             Thread.sleep(100);
         }
@@ -458,6 +454,48 @@ class ServiciosIT {
                 "{\"motivo\":\"" + motivo + "\"}");
     }
 
+    private static boolean conFinanzas(JsonNode s) {
+        return s.has("monto") || s.has("facturaId") || s.has("numeroFactura");
+    }
+
+    @Test
+    void elDespachadorNoVeMontoNiFacturaPorRest() throws Exception {
+        String servicioId = confirmado();
+        jdbc.sql("""
+                        UPDATE viaje SET factura_id = '0193f000-0000-7000-8000-000000000123', numero_factura = 'FAC-000123'
+                        WHERE servicio_id = CAST(:id AS uuid)""").param("id", servicioId).update();
+        String despachador = TokensDePrueba.token("sub-desp", "despachador", null);
+
+        JsonNode visto = pedir("GET", "/api/v1/servicios/" + servicioId, despachador, null, null)
+                .cuerpo();
+        assertEquals("4521KTR", visto.get("placa").asString());
+        assertFalse(conFinanzas(visto), visto.toString());
+        JsonNode lista = pedir("GET", "/api/v1/servicios?clienteId=" + CLIENTE, despachador, null, null)
+                .cuerpo()
+                .get("items");
+        assertEquals(1, lista.size());
+        assertFalse(conFinanzas(lista.get(0)), lista.toString());
+
+        for (String token : List.of(
+                cliente(CLIENTE),
+                TokensDePrueba.token("g", "gerente", null),
+                TokensDePrueba.token("a", "administracion", null),
+                TokensDePrueba.token("c", "comercial", null))) {
+            JsonNode s = pedir("GET", "/api/v1/servicios/" + servicioId, token, null, null)
+                    .cuerpo();
+            assertEquals("2800.00", s.get("monto").get("monto").asString(), token);
+            assertEquals("FAC-000123", s.get("numeroFactura").asString(), token);
+            assertTrue(s.has("facturaId"), token);
+        }
+
+        UUID clave = UUID.randomUUID();
+        var cancelado = cancelar(despachador, servicioId, clave, "Pedido del cliente");
+        assertEquals(200, cancelado.estado(), String.valueOf(cancelado.cuerpo()));
+        assertFalse(conFinanzas(cancelado.cuerpo()), cancelado.cuerpo().toString());
+        assertFalse(conFinanzas(
+                cancelar(despachador, servicioId, clave, "Pedido del cliente").cuerpo()));
+    }
+
     @Test
     void elClienteCancelaUnServicioConfirmadoYSePublicaViajeCancelado() throws Exception {
         String servicioId = confirmado();
@@ -542,6 +580,21 @@ class ServiciosIT {
                 clave,
                 "{\"dispositivoId\":\"0193a000-0000-7000-8000-0000000d0001\",\"iniciadoEn\":\"" + iniciadoEn
                         + "\",\"posicion\":{\"lat\":-17.78,\"lng\":-63.18}}");
+    }
+
+    @Test
+    void elMensajeDe403DependeDelRol() throws Exception {
+        String viajeId = viajeDe(confirmado());
+        var delCliente = pedir("GET", "/api/v1/viajes/" + viajeId, cliente(CLIENTE), null, null);
+        assertEquals(403, delCliente.estado());
+        assertEquals(
+                "Tu rol no puede ver este viaje",
+                delCliente.cuerpo().get("detail").asString());
+        var otroChofer =
+                pedir("GET", "/api/v1/viajes/" + viajeId, TokensDePrueba.token("otro", "chofer", null), null, null);
+        assertEquals(403, otroChofer.estado());
+        assertEquals(
+                "El viaje es de otro chofer", otroChofer.cuerpo().get("detail").asString());
     }
 
     @Test

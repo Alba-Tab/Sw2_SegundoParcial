@@ -5,7 +5,7 @@
  * Núcleo de Viajes (Spring Boot, hexagonal): clientes, rutas, servicios (inicio de la saga), cancelación
  * y las señales de la saga. Specs: 001, 002, 003, 004, 011 y 012. Convenciones: specs/000-convenciones.md.
  * Con rol `cliente`, el `clienteId` sale del token y se ignora el del cuerpo o la consulta; con `comercial`,
- * sale del cuerpo o la consulta.
+ * sale del cuerpo o la consulta. Un cuerpo de más de 256 KB responde 413 `VALIDACION`.
  *
  * OpenAPI spec version: 1.0.0
  */
@@ -624,6 +624,11 @@ export interface Monto {
   moneda: MontoMoneda;
 }
 
+/**
+ * `monto`, `facturaId` y `numeroFactura` solo salen para gerente, administracion, comercial y el cliente dueño
+ * del servicio; con otro rol (despachador) se omiten, porque no ve finanzas (propuesta 7.2, igual que `@roles`
+ * en el Gateway).
+ */
 export interface Servicio {
   servicioId: Uuid;
   viajeId: Uuid;

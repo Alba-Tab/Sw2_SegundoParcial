@@ -5,7 +5,7 @@
  * Núcleo de Viajes (Spring Boot, hexagonal): clientes, rutas, servicios (inicio de la saga), cancelación
  * y las señales de la saga. Specs: 001, 002, 003, 004, 011 y 012. Convenciones: specs/000-convenciones.md.
  * Con rol `cliente`, el `clienteId` sale del token y se ignora el del cuerpo o la consulta; con `comercial`,
- * sale del cuerpo o la consulta.
+ * sale del cuerpo o la consulta. Un cuerpo de más de 256 KB responde 413 `VALIDACION`.
  *
  * OpenAPI spec version: 1.0.0
  */
@@ -428,67 +428,79 @@ export const listarServiciosResponseItemsItemNumeroFacturaRegExp = new RegExp('^
 
 export const ListarServiciosResponse = zod.object({
   items: zod.array(
-    zod.object({
-      servicioId: zod.uuid(),
-      viajeId: zod.uuid(),
-      clienteId: zod.uuid(),
-      cotizacionId: zod.uuid(),
-      canal: zod.enum(['PORTAL', 'TELEFONO']),
-      creadoPor: zod.string().min(1).max(listarServiciosResponseItemsItemCreadoPorMax).optional().describe('Claim `sub` de Keycloak.'),
-      estado: zod.enum([
-        'PROGRAMANDO',
-        'CONFIRMADO',
-        'EN_RUTA',
-        'ENTREGADO',
-        'CERRADO',
-        'CANCELADO',
-        'ENTREGA_OBSERVADA',
-        'ENTREGA_RECHAZADA',
-        'REQUIERE_INTERVENCION',
-      ]),
-      etapa: zod
-        .enum(['INICIANDO', 'VALIDANDO_CREDITO', 'ESPERANDO_APROBACION', 'RESERVANDO_UNIDAD', 'CONFIRMANDO', 'COMPENSANDO', 'DESCONOCIDA'])
-        .optional()
-        .describe('Solo mientras estado es PROGRAMANDO (consulta `estado` del workflow).'),
-      motivo: zod
-        .string()
-        .optional()
-        .describe('Código de 000 §5 cuando el servicio terminó CANCELADO (por ejemplo SIN_UNIDAD_COMPATIBLE).'),
-      confirmacionCompleta: zod.boolean(),
-      rutaId: zod.uuid().optional(),
-      tipoCarga: zod.enum(['GRANOS', 'INSUMOS', 'INSUMOS_LIQUIDOS', 'CONTENEDOR']).optional(),
-      toneladas: zod
-        .number()
-        .gt(listarServiciosResponseItemsItemToneladasExclusiveMin)
-        .max(listarServiciosResponseItemsItemToneladasMax)
-        .optional(),
-      fechaViaje: zod.iso.date().optional().describe('Fecha sin hora, en America/La_Paz.'),
-      monto: zod
-        .object({
-          monto: zod.string().regex(listarServiciosResponseItemsItemMontoMontoRegExp),
-          moneda: zod.enum(['BOB']),
-        })
-        .optional(),
-      placa: zod.string().regex(listarServiciosResponseItemsItemPlacaRegExp).optional(),
-      choferNombre: zod.string().optional(),
-      ultimaPosicion: zod
-        .object({
-          lat: zod
-            .number()
-            .min(listarServiciosResponseItemsItemUltimaPosicionLatMin)
-            .max(listarServiciosResponseItemsItemUltimaPosicionLatMax),
-          lng: zod
-            .number()
-            .min(listarServiciosResponseItemsItemUltimaPosicionLngMin)
-            .max(listarServiciosResponseItemsItemUltimaPosicionLngMax),
-        })
-        .optional(),
-      iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
-      entregadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
-      facturaId: zod.uuid().optional(),
-      numeroFactura: zod.string().regex(listarServiciosResponseItemsItemNumeroFacturaRegExp).optional(),
-      creadoEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
-    }),
+    zod
+      .object({
+        servicioId: zod.uuid(),
+        viajeId: zod.uuid(),
+        clienteId: zod.uuid(),
+        cotizacionId: zod.uuid(),
+        canal: zod.enum(['PORTAL', 'TELEFONO']),
+        creadoPor: zod.string().min(1).max(listarServiciosResponseItemsItemCreadoPorMax).optional().describe('Claim `sub` de Keycloak.'),
+        estado: zod.enum([
+          'PROGRAMANDO',
+          'CONFIRMADO',
+          'EN_RUTA',
+          'ENTREGADO',
+          'CERRADO',
+          'CANCELADO',
+          'ENTREGA_OBSERVADA',
+          'ENTREGA_RECHAZADA',
+          'REQUIERE_INTERVENCION',
+        ]),
+        etapa: zod
+          .enum([
+            'INICIANDO',
+            'VALIDANDO_CREDITO',
+            'ESPERANDO_APROBACION',
+            'RESERVANDO_UNIDAD',
+            'CONFIRMANDO',
+            'COMPENSANDO',
+            'DESCONOCIDA',
+          ])
+          .optional()
+          .describe('Solo mientras estado es PROGRAMANDO (consulta `estado` del workflow).'),
+        motivo: zod
+          .string()
+          .optional()
+          .describe('Código de 000 §5 cuando el servicio terminó CANCELADO (por ejemplo SIN_UNIDAD_COMPATIBLE).'),
+        confirmacionCompleta: zod.boolean(),
+        rutaId: zod.uuid().optional(),
+        tipoCarga: zod.enum(['GRANOS', 'INSUMOS', 'INSUMOS_LIQUIDOS', 'CONTENEDOR']).optional(),
+        toneladas: zod
+          .number()
+          .gt(listarServiciosResponseItemsItemToneladasExclusiveMin)
+          .max(listarServiciosResponseItemsItemToneladasMax)
+          .optional(),
+        fechaViaje: zod.iso.date().optional().describe('Fecha sin hora, en America/La_Paz.'),
+        monto: zod
+          .object({
+            monto: zod.string().regex(listarServiciosResponseItemsItemMontoMontoRegExp),
+            moneda: zod.enum(['BOB']),
+          })
+          .optional(),
+        placa: zod.string().regex(listarServiciosResponseItemsItemPlacaRegExp).optional(),
+        choferNombre: zod.string().optional(),
+        ultimaPosicion: zod
+          .object({
+            lat: zod
+              .number()
+              .min(listarServiciosResponseItemsItemUltimaPosicionLatMin)
+              .max(listarServiciosResponseItemsItemUltimaPosicionLatMax),
+            lng: zod
+              .number()
+              .min(listarServiciosResponseItemsItemUltimaPosicionLngMin)
+              .max(listarServiciosResponseItemsItemUltimaPosicionLngMax),
+          })
+          .optional(),
+        iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
+        entregadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
+        facturaId: zod.uuid().optional(),
+        numeroFactura: zod.string().regex(listarServiciosResponseItemsItemNumeroFacturaRegExp).optional(),
+        creadoEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+      })
+      .describe(
+        '`monto`, `facturaId` y `numeroFactura` solo salen para gerente, administracion, comercial y el cliente dueño\ndel servicio; con otro rol (despachador) se omiten, porque no ve finanzas (propuesta 7.2, igual que `@roles`\nen el Gateway).\n',
+      ),
   ),
   siguienteCursor: zod.string().nullable(),
 });
@@ -515,54 +527,58 @@ export const obtenerServicioResponseUltimaPosicionLngMax = 180;
 
 export const obtenerServicioResponseNumeroFacturaRegExp = new RegExp('^FAC-[0-9]{6}$');
 
-export const ObtenerServicioResponse = zod.object({
-  servicioId: zod.uuid(),
-  viajeId: zod.uuid(),
-  clienteId: zod.uuid(),
-  cotizacionId: zod.uuid(),
-  canal: zod.enum(['PORTAL', 'TELEFONO']),
-  creadoPor: zod.string().min(1).max(obtenerServicioResponseCreadoPorMax).optional().describe('Claim `sub` de Keycloak.'),
-  estado: zod.enum([
-    'PROGRAMANDO',
-    'CONFIRMADO',
-    'EN_RUTA',
-    'ENTREGADO',
-    'CERRADO',
-    'CANCELADO',
-    'ENTREGA_OBSERVADA',
-    'ENTREGA_RECHAZADA',
-    'REQUIERE_INTERVENCION',
-  ]),
-  etapa: zod
-    .enum(['INICIANDO', 'VALIDANDO_CREDITO', 'ESPERANDO_APROBACION', 'RESERVANDO_UNIDAD', 'CONFIRMANDO', 'COMPENSANDO', 'DESCONOCIDA'])
-    .optional()
-    .describe('Solo mientras estado es PROGRAMANDO (consulta `estado` del workflow).'),
-  motivo: zod.string().optional().describe('Código de 000 §5 cuando el servicio terminó CANCELADO (por ejemplo SIN_UNIDAD_COMPATIBLE).'),
-  confirmacionCompleta: zod.boolean(),
-  rutaId: zod.uuid().optional(),
-  tipoCarga: zod.enum(['GRANOS', 'INSUMOS', 'INSUMOS_LIQUIDOS', 'CONTENEDOR']).optional(),
-  toneladas: zod.number().gt(obtenerServicioResponseToneladasExclusiveMin).max(obtenerServicioResponseToneladasMax).optional(),
-  fechaViaje: zod.iso.date().optional().describe('Fecha sin hora, en America/La_Paz.'),
-  monto: zod
-    .object({
-      monto: zod.string().regex(obtenerServicioResponseMontoMontoRegExp),
-      moneda: zod.enum(['BOB']),
-    })
-    .optional(),
-  placa: zod.string().regex(obtenerServicioResponsePlacaRegExp).optional(),
-  choferNombre: zod.string().optional(),
-  ultimaPosicion: zod
-    .object({
-      lat: zod.number().min(obtenerServicioResponseUltimaPosicionLatMin).max(obtenerServicioResponseUltimaPosicionLatMax),
-      lng: zod.number().min(obtenerServicioResponseUltimaPosicionLngMin).max(obtenerServicioResponseUltimaPosicionLngMax),
-    })
-    .optional(),
-  iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
-  entregadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
-  facturaId: zod.uuid().optional(),
-  numeroFactura: zod.string().regex(obtenerServicioResponseNumeroFacturaRegExp).optional(),
-  creadoEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
-});
+export const ObtenerServicioResponse = zod
+  .object({
+    servicioId: zod.uuid(),
+    viajeId: zod.uuid(),
+    clienteId: zod.uuid(),
+    cotizacionId: zod.uuid(),
+    canal: zod.enum(['PORTAL', 'TELEFONO']),
+    creadoPor: zod.string().min(1).max(obtenerServicioResponseCreadoPorMax).optional().describe('Claim `sub` de Keycloak.'),
+    estado: zod.enum([
+      'PROGRAMANDO',
+      'CONFIRMADO',
+      'EN_RUTA',
+      'ENTREGADO',
+      'CERRADO',
+      'CANCELADO',
+      'ENTREGA_OBSERVADA',
+      'ENTREGA_RECHAZADA',
+      'REQUIERE_INTERVENCION',
+    ]),
+    etapa: zod
+      .enum(['INICIANDO', 'VALIDANDO_CREDITO', 'ESPERANDO_APROBACION', 'RESERVANDO_UNIDAD', 'CONFIRMANDO', 'COMPENSANDO', 'DESCONOCIDA'])
+      .optional()
+      .describe('Solo mientras estado es PROGRAMANDO (consulta `estado` del workflow).'),
+    motivo: zod.string().optional().describe('Código de 000 §5 cuando el servicio terminó CANCELADO (por ejemplo SIN_UNIDAD_COMPATIBLE).'),
+    confirmacionCompleta: zod.boolean(),
+    rutaId: zod.uuid().optional(),
+    tipoCarga: zod.enum(['GRANOS', 'INSUMOS', 'INSUMOS_LIQUIDOS', 'CONTENEDOR']).optional(),
+    toneladas: zod.number().gt(obtenerServicioResponseToneladasExclusiveMin).max(obtenerServicioResponseToneladasMax).optional(),
+    fechaViaje: zod.iso.date().optional().describe('Fecha sin hora, en America/La_Paz.'),
+    monto: zod
+      .object({
+        monto: zod.string().regex(obtenerServicioResponseMontoMontoRegExp),
+        moneda: zod.enum(['BOB']),
+      })
+      .optional(),
+    placa: zod.string().regex(obtenerServicioResponsePlacaRegExp).optional(),
+    choferNombre: zod.string().optional(),
+    ultimaPosicion: zod
+      .object({
+        lat: zod.number().min(obtenerServicioResponseUltimaPosicionLatMin).max(obtenerServicioResponseUltimaPosicionLatMax),
+        lng: zod.number().min(obtenerServicioResponseUltimaPosicionLngMin).max(obtenerServicioResponseUltimaPosicionLngMax),
+      })
+      .optional(),
+    iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
+    entregadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
+    facturaId: zod.uuid().optional(),
+    numeroFactura: zod.string().regex(obtenerServicioResponseNumeroFacturaRegExp).optional(),
+    creadoEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+  })
+  .describe(
+    '`monto`, `facturaId` y `numeroFactura` solo salen para gerente, administracion, comercial y el cliente dueño\ndel servicio; con otro rol (despachador) se omiten, porque no ve finanzas (propuesta 7.2, igual que `@roles`\nen el Gateway).\n',
+  );
 
 /**
  * @summary Cancela un servicio CONFIRMADO con confirmacionCompleta (cliente propio, comercial o despachador). Spec 004.
@@ -597,54 +613,58 @@ export const cancelarServicioResponseUltimaPosicionLngMax = 180;
 
 export const cancelarServicioResponseNumeroFacturaRegExp = new RegExp('^FAC-[0-9]{6}$');
 
-export const CancelarServicioResponse = zod.object({
-  servicioId: zod.uuid(),
-  viajeId: zod.uuid(),
-  clienteId: zod.uuid(),
-  cotizacionId: zod.uuid(),
-  canal: zod.enum(['PORTAL', 'TELEFONO']),
-  creadoPor: zod.string().min(1).max(cancelarServicioResponseCreadoPorMax).optional().describe('Claim `sub` de Keycloak.'),
-  estado: zod.enum([
-    'PROGRAMANDO',
-    'CONFIRMADO',
-    'EN_RUTA',
-    'ENTREGADO',
-    'CERRADO',
-    'CANCELADO',
-    'ENTREGA_OBSERVADA',
-    'ENTREGA_RECHAZADA',
-    'REQUIERE_INTERVENCION',
-  ]),
-  etapa: zod
-    .enum(['INICIANDO', 'VALIDANDO_CREDITO', 'ESPERANDO_APROBACION', 'RESERVANDO_UNIDAD', 'CONFIRMANDO', 'COMPENSANDO', 'DESCONOCIDA'])
-    .optional()
-    .describe('Solo mientras estado es PROGRAMANDO (consulta `estado` del workflow).'),
-  motivo: zod.string().optional().describe('Código de 000 §5 cuando el servicio terminó CANCELADO (por ejemplo SIN_UNIDAD_COMPATIBLE).'),
-  confirmacionCompleta: zod.boolean(),
-  rutaId: zod.uuid().optional(),
-  tipoCarga: zod.enum(['GRANOS', 'INSUMOS', 'INSUMOS_LIQUIDOS', 'CONTENEDOR']).optional(),
-  toneladas: zod.number().gt(cancelarServicioResponseToneladasExclusiveMin).max(cancelarServicioResponseToneladasMax).optional(),
-  fechaViaje: zod.iso.date().optional().describe('Fecha sin hora, en America/La_Paz.'),
-  monto: zod
-    .object({
-      monto: zod.string().regex(cancelarServicioResponseMontoMontoRegExp),
-      moneda: zod.enum(['BOB']),
-    })
-    .optional(),
-  placa: zod.string().regex(cancelarServicioResponsePlacaRegExp).optional(),
-  choferNombre: zod.string().optional(),
-  ultimaPosicion: zod
-    .object({
-      lat: zod.number().min(cancelarServicioResponseUltimaPosicionLatMin).max(cancelarServicioResponseUltimaPosicionLatMax),
-      lng: zod.number().min(cancelarServicioResponseUltimaPosicionLngMin).max(cancelarServicioResponseUltimaPosicionLngMax),
-    })
-    .optional(),
-  iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
-  entregadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
-  facturaId: zod.uuid().optional(),
-  numeroFactura: zod.string().regex(cancelarServicioResponseNumeroFacturaRegExp).optional(),
-  creadoEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
-});
+export const CancelarServicioResponse = zod
+  .object({
+    servicioId: zod.uuid(),
+    viajeId: zod.uuid(),
+    clienteId: zod.uuid(),
+    cotizacionId: zod.uuid(),
+    canal: zod.enum(['PORTAL', 'TELEFONO']),
+    creadoPor: zod.string().min(1).max(cancelarServicioResponseCreadoPorMax).optional().describe('Claim `sub` de Keycloak.'),
+    estado: zod.enum([
+      'PROGRAMANDO',
+      'CONFIRMADO',
+      'EN_RUTA',
+      'ENTREGADO',
+      'CERRADO',
+      'CANCELADO',
+      'ENTREGA_OBSERVADA',
+      'ENTREGA_RECHAZADA',
+      'REQUIERE_INTERVENCION',
+    ]),
+    etapa: zod
+      .enum(['INICIANDO', 'VALIDANDO_CREDITO', 'ESPERANDO_APROBACION', 'RESERVANDO_UNIDAD', 'CONFIRMANDO', 'COMPENSANDO', 'DESCONOCIDA'])
+      .optional()
+      .describe('Solo mientras estado es PROGRAMANDO (consulta `estado` del workflow).'),
+    motivo: zod.string().optional().describe('Código de 000 §5 cuando el servicio terminó CANCELADO (por ejemplo SIN_UNIDAD_COMPATIBLE).'),
+    confirmacionCompleta: zod.boolean(),
+    rutaId: zod.uuid().optional(),
+    tipoCarga: zod.enum(['GRANOS', 'INSUMOS', 'INSUMOS_LIQUIDOS', 'CONTENEDOR']).optional(),
+    toneladas: zod.number().gt(cancelarServicioResponseToneladasExclusiveMin).max(cancelarServicioResponseToneladasMax).optional(),
+    fechaViaje: zod.iso.date().optional().describe('Fecha sin hora, en America/La_Paz.'),
+    monto: zod
+      .object({
+        monto: zod.string().regex(cancelarServicioResponseMontoMontoRegExp),
+        moneda: zod.enum(['BOB']),
+      })
+      .optional(),
+    placa: zod.string().regex(cancelarServicioResponsePlacaRegExp).optional(),
+    choferNombre: zod.string().optional(),
+    ultimaPosicion: zod
+      .object({
+        lat: zod.number().min(cancelarServicioResponseUltimaPosicionLatMin).max(cancelarServicioResponseUltimaPosicionLatMax),
+        lng: zod.number().min(cancelarServicioResponseUltimaPosicionLngMin).max(cancelarServicioResponseUltimaPosicionLngMax),
+      })
+      .optional(),
+    iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
+    entregadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
+    facturaId: zod.uuid().optional(),
+    numeroFactura: zod.string().regex(cancelarServicioResponseNumeroFacturaRegExp).optional(),
+    creadoEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+  })
+  .describe(
+    '`monto`, `facturaId` y `numeroFactura` solo salen para gerente, administracion, comercial y el cliente dueño\ndel servicio; con otro rol (despachador) se omiten, porque no ve finanzas (propuesta 7.2, igual que `@roles`\nen el Gateway).\n',
+  );
 
 /**
  * @summary Envía la señal aprobacionCredito al workflow (solo administracion). Spec 012.

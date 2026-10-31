@@ -48,11 +48,14 @@ public class CancelacionDeServicio {
     }
 
     public ServicioVista ejecutar(Solicitante quien, UUID servicioId, String motivo, UUID clave, String hashCuerpo) {
+        ServicioVista vista;
         try {
-            return tx.enTransaccion(() -> cancelar(quien, servicioId, motivo, clave, hashCuerpo));
+            vista = tx.enTransaccion(() -> cancelar(quien, servicioId, motivo, clave, hashCuerpo));
         } catch (RegistroIdempotente.ClaveRepetida e) {
-            return tx.enTransaccion(() -> guardada(clave, hashCuerpo));
+            vista = tx.enTransaccion(() -> guardada(clave, hashCuerpo));
         }
+        // Se guarda la vista completa; el despachador la recibe sin monto ni factura (propuesta 7.2).
+        return vista.para(quien);
     }
 
     private ServicioVista cancelar(Solicitante quien, UUID servicioId, String motivo, UUID clave, String hashCuerpo) {

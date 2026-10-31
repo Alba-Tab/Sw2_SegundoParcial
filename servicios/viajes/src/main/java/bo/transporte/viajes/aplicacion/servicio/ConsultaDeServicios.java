@@ -12,7 +12,8 @@ import java.util.UUID;
 
 /**
  * GET /servicios y /servicios/{id} (spec 003). Un cliente ve solo los suyos; comercial, despachador, administración y
- * gerente ven todos. En PROGRAMANDO se pregunta la etapa al workflow; si no responde, {@code DESCONOCIDA}.
+ * gerente ven todos, aunque el despachador sin monto ni factura (propuesta 7.2). En PROGRAMANDO se pregunta la etapa al
+ * workflow; si no responde, {@code DESCONOCIDA}.
  */
 public class ConsultaDeServicios {
     private static final Set<String> VEN_TODOS = Set.of("comercial", "despachador", "administracion", "gerente");
@@ -55,7 +56,7 @@ public class ConsultaDeServicios {
         var ultima = f.estado() == EstadoViaje.EN_RUTA
                 ? posiciones.de(f.servicio().viajeId()).orElse(null)
                 : null;
-        return ServicioVista.de(f, etapa, ultima);
+        return ServicioVista.de(f, etapa, ultima).para(quien);
     }
 
     public Pagina listar(Solicitante quien, UUID clienteId, EstadoViaje estado, UUID antesDe, int limite) {
@@ -64,8 +65,10 @@ public class ConsultaDeServicios {
         else if (quien.tiene("cliente") && quien.clienteId() != null) filtro = quien.clienteId();
         else throw new ErrorDeDominio("SIN_PERMISO", "No puede listar servicios");
         var filas = servicios.listar(filtro, estado, antesDe, limite + 1);
-        var items =
-                filas.stream().limit(limite).map(f -> ServicioVista.de(f, null)).toList();
+        var items = filas.stream()
+                .limit(limite)
+                .map(f -> ServicioVista.de(f, null).para(quien))
+                .toList();
         return new Pagina(
                 items, filas.size() > limite ? items.getLast().servicio().servicioId() : null);
     }
