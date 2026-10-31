@@ -1,13 +1,14 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, inject } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, inject } from '@angular/core';
 import { MatTableModule } from '@angular/material/table';
-import { AvisoServicios, completo, FechaPipe } from 'ui-comun';
-import { ConduccionGQL, type ConduccionQuery } from '../graphql/generado';
+import { AvisoServicios, FechaPipe } from 'ui-comun';
+import { ConduccionFachada } from '../conduccion.fachada';
+import { PUNTAJE_BAJO } from '../domain/conduccion';
 
 /** D84: max(0, 100 − 10 × (frenadas + 2 × fatigas) × 100 / km), por chofer en la semana. */
 @Component({
   selector: 'app-conduccion',
+  providers: [ConduccionFachada],
   imports: [MatTableModule, DecimalPipe, FechaPipe, AvisoServicios],
   template: `
     <h1>Puntaje de conducción</h1>
@@ -34,7 +35,9 @@ import { ConduccionGQL, type ConduccionQuery } from '../graphql/generado';
           >
           <ng-container matColumnDef="puntaje"
             ><th mat-header-cell *matHeaderCellDef>Puntaje</th>
-            <td mat-cell *matCellDef="let c" [class.no-disponible]="c.puntaje < 70">{{ c.puntaje | number: '1.0-1' }}</td></ng-container
+            <td mat-cell *matCellDef="let c" [class.no-disponible]="c.puntaje < puntajeBajo">
+              {{ c.puntaje | number: '1.0-1' }}
+            </td></ng-container
           >
           <tr mat-header-row *matHeaderRowDef="columnas"></tr>
           <tr mat-row *matRowDef="let c; columns: columnas"></tr>
@@ -47,9 +50,10 @@ import { ConduccionGQL, type ConduccionQuery } from '../graphql/generado';
   `,
 })
 export class ConduccionPagina {
-  private readonly datos = toSignal(inject(ConduccionGQL).watch({ pollInterval: 60_000 }).valueChanges);
-  readonly puntajes = computed(() => completo<ConduccionQuery>(this.datos())?.puntajesConduccion);
-  readonly error = computed(() => this.datos()?.error);
+  private readonly fachada = inject(ConduccionFachada);
+  readonly puntajes = this.fachada.puntajes;
+  readonly error = this.fachada.error;
+  readonly puntajeBajo = PUNTAJE_BAJO;
   readonly campos = { puntajesConduccion: 'Analítica' };
   readonly columnas = ['nombre', 'frenadas', 'fatigas', 'km', 'puntaje'];
 }

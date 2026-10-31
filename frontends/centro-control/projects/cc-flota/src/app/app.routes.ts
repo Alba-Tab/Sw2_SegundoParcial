@@ -10,11 +10,23 @@ export const rutas: Routes = [
     canActivate: [soloInternos, soloRoles('jefe_flota', 'gerente')],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'unidades' },
-      { path: 'unidades', loadComponent: () => import('./paginas/unidades').then((m) => m.UnidadesPagina), title: 'Unidades' },
-      { path: 'unidades/:id', loadComponent: () => import('./paginas/unidad').then((m) => m.UnidadPagina), title: 'Unidad' },
-      { path: 'combustible', loadComponent: () => import('./paginas/combustible').then((m) => m.CombustiblePagina), title: 'Combustible' },
-      { path: 'combustible/:id', loadComponent: () => import('./paginas/combustible').then((m) => m.CombustiblePagina), title: 'Carga' },
-      { path: 'conduccion', loadComponent: () => import('./paginas/conduccion').then((m) => m.ConduccionPagina), title: 'Conducción' },
+      { path: 'unidades', loadComponent: () => import('./unidades/ui/unidades').then((m) => m.UnidadesPagina), title: 'Unidades' },
+      { path: 'unidades/:id', loadComponent: () => import('./unidades/ui/unidad').then((m) => m.UnidadPagina), title: 'Unidad' },
+      {
+        path: 'combustible',
+        loadComponent: () => import('./combustible/ui/combustible').then((m) => m.CombustiblePagina),
+        title: 'Combustible',
+      },
+      {
+        path: 'combustible/:id',
+        loadComponent: () => import('./combustible/ui/combustible').then((m) => m.CombustiblePagina),
+        title: 'Carga',
+      },
+      {
+        path: 'conduccion',
+        loadComponent: () => import('./conduccion/ui/conduccion').then((m) => m.ConduccionPagina),
+        title: 'Conducción',
+      },
     ],
   },
   { path: '**', redirectTo: '' },

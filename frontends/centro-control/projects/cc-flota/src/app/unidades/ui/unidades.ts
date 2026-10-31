@@ -1,16 +1,14 @@
-import { Component, computed, inject } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, inject } from '@angular/core';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
-import { AvisoServicios, completo, FechaPipe } from 'ui-comun';
-import { UnidadesGQL, type UnidadesQuery } from '../graphql/generado';
-
-/** D11: el aviso de mantenimiento es a los 10.000 km; aquí se marca desde los 9.000. */
-const AVISO_KM = 9000;
+import { AvisoServicios, FechaPipe } from 'ui-comun';
+import { AVISO_KM } from '../domain/unidad';
+import { UnidadesFachada } from '../unidades.fachada';
 
 @Component({
   selector: 'app-unidades',
+  providers: [UnidadesFachada],
   imports: [MatTableModule, RouterLink, FechaPipe, DecimalPipe, AvisoServicios],
   template: `
     <h1>Unidades</h1>
@@ -54,9 +52,9 @@ const AVISO_KM = 9000;
   `,
 })
 export class UnidadesPagina {
-  private readonly datos = toSignal(inject(UnidadesGQL).watch({ pollInterval: 30_000 }).valueChanges);
-  readonly unidades = computed(() => completo<UnidadesQuery>(this.datos())?.unidades ?? []);
-  readonly error = computed(() => this.datos()?.error);
+  private readonly fachada = inject(UnidadesFachada);
+  readonly unidades = this.fachada.unidades;
+  readonly error = this.fachada.error;
   readonly campos = { unidades: 'Flota' };
   readonly columnas = ['placa', 'tipo', 'estado', 'km', 'documentos'];
   readonly avisoKm = AVISO_KM;

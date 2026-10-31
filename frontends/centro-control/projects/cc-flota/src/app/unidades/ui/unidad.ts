@@ -1,6 +1,5 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, inject, input, signal } from '@angular/core';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -9,21 +8,14 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { firstValueFrom, switchMap, type Observable } from 'rxjs';
-import { AvisoServicios, completo, fechaLaPaz, FechaPipe, Intentos, mensajeDe, Sesion } from 'ui-comun';
-import {
-  CerrarMantenimientoGQL,
-  ProgramarMantenimientoGQL,
-  UnidadGQL,
-  type TipoMantenimiento,
-  type UnidadQuery,
-} from '../graphql/generado';
-
-const CHECKLIST = 'Aceite y filtros\nFrenos\nNeumáticos\nLuces';
+import { AvisoServicios, fechaLaPaz, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { CHECKLIST_POR_DEFECTO, cierreInicial, puedeProgramar, type ItemCierre, type NuevoMantenimiento } from '../domain/unidad';
+import { UnidadFachada } from '../unidades.fachada';
 
 /** Spec 010: programar un mantenimiento (la unidad pasa a EN_MANTENIMIENTO) y cerrarlo con su checklist. */
 @Component({
   selector: 'app-unidad',
+  providers: [UnidadFachada],
   imports: [
     FormsModule,
     DecimalPipe,
@@ -52,7 +44,7 @@ const CHECKLIST = 'Aceite y filtros\nFrenos\nNeumáticos\nLuces';
         }
       </p>
 
-      @if (sesion.tiene('jefe_flota') && (u.estado === 'DISPONIBLE' || u.estado === 'MANTENIMIENTO_PENDIENTE')) {
+      @if (sesion.tiene('jefe_flota') && puedeProgramar(u.estado)) {
         <mat-card class="formulario">
           <mat-card-header><mat-card-title>Programar mantenimiento</mat-card-title></mat-card-header>
           <mat-card-content>
@@ -134,69 +126,54 @@ const CHECKLIST = 'Aceite y filtros\nFrenos\nNeumáticos\nLuces';
   `,
 })
 export class UnidadPagina {
-  private readonly gql = inject(UnidadGQL);
-  private readonly programarGql = inject(ProgramarMantenimientoGQL);
-  private readonly cerrarGql = inject(CerrarMantenimientoGQL);
+  private readonly fachada = inject(UnidadFachada);
   private readonly avisos = inject(MatSnackBar);
   readonly sesion = inject(Sesion);
   readonly id = input.required<string>();
-  private readonly datos = toSignal(toObservable(this.id).pipe(switchMap((id) => this.gql.watch({ variables: { id } }).valueChanges)));
-  readonly unidad = computed(() => completo<UnidadQuery>(this.datos())?.unidad);
-  readonly error = computed(() => this.datos()?.error);
+  readonly unidad = this.fachada.unidad;
+  readonly error = this.fachada.error;
   readonly campos = { unidad: 'Flota', mantenimientos: 'Flota' };
+  readonly puedeProgramar = puedeProgramar;
   readonly mantenimientos = computed(() => {
-    const lista = completo<UnidadQuery>(this.datos())?.mantenimientos ?? [];
-    for (const m of lista) this.cierres[m.mantenimientoId] ??= m.checklist.map((i) => ({ item: i.item, ok: true }));
+    const lista = this.fachada.mantenimientos();
+    for (const m of lista) this.cierres[m.mantenimientoId] ??= cierreInicial(m);
     return lista;
   });
   readonly enviando = signal(false);
-  private readonly intentos = new Intentos();
-  nuevo = {
-    tipo: 'PREVENTIVO' as TipoMantenimiento,
+  nuevo: NuevoMantenimiento = {
+    tipo: 'PREVENTIVO',
     fechaProgramada: fechaLaPaz(),
     taller: '',
     descripcion: '',
-    checklist: CHECKLIST,
+    checklist: CHECKLIST_POR_DEFECTO,
   };
-  cierres: Record<string, { item: string; ok: boolean }[]> = {};
+  cierres: Record<string, ItemCierre[]> = {};
   km: Record<string, number> = {};
   observaciones: Record<string, string> = {};
 
+  constructor() {
+    effect(() => this.fachada.id.set(this.id()));
+  }
+
   programar(unidadId: string) {
-    const checklist = this.nuevo.checklist
-      .split('\n')
-      .map((l) => l.trim())
-      .filter(Boolean);
-    const input = { unidadId, ...this.nuevo, checklist };
-    return this.enviar(
-      `programarMantenimiento:${unidadId}`,
-      input,
-      (clave) => this.programarGql.mutate({ variables: { input: { ...input, claveIdempotencia: clave } } }),
-      'Mantenimiento programado',
-    );
+    return this.enviar(() => this.fachada.programar(unidadId, this.nuevo), 'Mantenimiento programado');
   }
 
   cerrar(mantenimientoId: string) {
-    const input = {
-      mantenimientoId,
+    const cierre = {
       kilometraje: this.km[mantenimientoId],
       checklist: this.cierres[mantenimientoId],
       observaciones: this.observaciones[mantenimientoId] || undefined,
     };
-    return this.enviar(
-      `cerrarMantenimiento:${mantenimientoId}`,
-      input,
-      (clave) => this.cerrarGql.mutate({ variables: { input: { ...input, claveIdempotencia: clave } } }),
-      'Mantenimiento cerrado',
-    );
+    return this.enviar(() => this.fachada.cerrar(mantenimientoId, cierre), 'Mantenimiento cerrado');
   }
 
-  private async enviar(operacion: string, datos: unknown, peticion: (clave: string) => Observable<unknown>, ok: string): Promise<void> {
+  private async enviar(accion: () => Promise<unknown>, ok: string): Promise<void> {
     this.enviando.set(true);
     try {
-      await this.intentos.enviar(operacion, datos, peticion);
+      await accion();
       this.avisos.open(ok, undefined, { duration: 4000 });
-      await firstValueFrom(this.gql.fetch({ variables: { id: this.id() } }));
+      await this.fachada.recargar();
     } catch (e) {
       this.avisos.open(mensajeDe(e), 'Cerrar', { duration: 6000 });
     } finally {

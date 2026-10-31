@@ -1,15 +1,13 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, inject, input } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, inject, input } from '@angular/core';
 import { MatTableModule } from '@angular/material/table';
-import { AvisoServicios, BobPipe, completo, fechaLaPaz, FechaPipe } from 'ui-comun';
-import { CombustibleGQL, type CombustibleQuery } from '../graphql/generado';
-
-const hace = (dias: number) => fechaLaPaz(-dias);
+import { AvisoServicios, BobPipe, FechaPipe } from 'ui-comun';
+import { CombustibleFachada } from '../combustible.fachada';
 
 /** Anomalías de Isolation Forest (FF2) y las últimas cargas. Una alerta abre aquí con la carga marcada. */
 @Component({
   selector: 'app-combustible',
+  providers: [CombustibleFachada],
   imports: [MatTableModule, DecimalPipe, BobPipe, FechaPipe, AvisoServicios],
   template: `
     <h1>Combustible</h1>
@@ -77,10 +75,10 @@ const hace = (dias: number) => fechaLaPaz(-dias);
 })
 export class CombustiblePagina {
   readonly id = input<string>();
-  private readonly datos = toSignal(inject(CombustibleGQL).watch({ variables: { desde: hace(30) }, pollInterval: 30_000 }).valueChanges);
-  readonly anomalias = computed(() => completo<CombustibleQuery>(this.datos())?.anomaliasCombustible ?? []);
-  readonly cargas = computed(() => completo<CombustibleQuery>(this.datos())?.cargasCombustible ?? []);
-  readonly error = computed(() => this.datos()?.error);
+  private readonly fachada = inject(CombustibleFachada);
+  readonly anomalias = this.fachada.anomalias;
+  readonly cargas = this.fachada.cargas;
+  readonly error = this.fachada.error;
   readonly campos = { anomaliasCombustible: 'Analítica', cargasCombustible: 'Flota' };
   readonly columnasA = ['placa', 'litros', 'kmPorLitro', 'puntaje', 'fecha'];
   readonly columnasC = ['placa', 'litros', 'monto', 'km', 'fecha'];
