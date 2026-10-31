@@ -35,12 +35,31 @@ export function dependenciasPorDefecto(): Dependencias {
   };
 }
 
+/** `title` para personas (000 §5): el `codigo` es para el cliente, no para mostrarlo. */
+const TITULOS: Record<string, string> = {
+  VALIDACION: 'La petición no es válida',
+  NO_AUTENTICADO: 'No autenticado',
+  SIN_PERMISO: 'Sin permiso',
+  NO_ENCONTRADO: 'No encontrado',
+  LIMITE_PETICIONES: 'Demasiadas peticiones',
+  DEPENDENCIA_NO_DISPONIBLE: 'Servicio no disponible',
+  ERROR_INTERNO: 'Error interno',
+};
+
+export const tituloProblema = (codigo: string) => TITULOS[codigo] ?? 'No se pudo atender la petición';
+
 /** Problem Details (000 §5) con el `type` en minúsculas y guiones. */
 const problema = (res: Response, status: number, codigo: string, detail: string) =>
   res
     .status(status)
     .type('application/problem+json')
-    .json({ type: `https://transporte.local/errores/${codigo.toLowerCase().replace(/_/g, '-')}`, title: codigo, status, codigo, detail });
+    .json({
+      type: `https://transporte.local/errores/${codigo.toLowerCase().replace(/_/g, '-')}`,
+      title: tituloProblema(codigo),
+      status,
+      codigo,
+      detail,
+    });
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const TRACEPARENT = /^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$/;
@@ -109,16 +128,23 @@ export function crearControlador(d: Dependencias) {
         if (n.status === 401) res.setHeader('WWW-Authenticate', 'Bearer realm="transporte", resource="mcp-server"');
         return problema(res, n.status, n.codigo, n.message);
       }
+      const misionId = req.header('x-mision-id') || undefined;
       const base: Omit<Contexto, 'llamador'> = {
         correlationId: correlationIdDe(req.header('x-correlation-id')),
         traceparent: TRACEPARENT.test(req.header('traceparent') ?? '') ? req.header('traceparent') : undefined,
-        misionId: req.header('x-mision-id') ?? undefined,
+        misionId,
       };
       // D91: también se audita la llamada rechazada (límite, herramienta desconocida u oculta), sin sus argumentos.
       const rechazo = (nombre: string, resultado: string) =>
         d.auditar(lineaAuditoria(llamador, base.correlationId, accionDe(nombre), resultado, { entidad: conocida(nombre)?.entidad }));
-      // El límite cuenta solo las llamadas a herramientas, no tools/list, ping ni la inicialización.
       const llamadas = llamadasAHerramientas(req.body);
+      // X-Mision-Id lleva el límite de 3 acciones por misión (D86) hasta Analítica: si llega, tiene que ser un UUID. Si
+      // se ignorara, la llamada pasaría sin límite. Que la misión exista y esté en curso lo decide Analítica.
+      if (misionId !== undefined && !UUID.test(misionId)) {
+        for (const nombre of llamadas) rechazo(nombre, 'VALIDACION');
+        return problema(res, 400, 'VALIDACION', 'X-Mision-Id tiene que ser un UUID');
+      }
+      // El límite cuenta solo las llamadas a herramientas, no tools/list, ping ni la inicialización.
       let espera = 0;
       for (let i = 0; i < llamadas.length; i++) espera = Math.max(espera, d.limite.tomar(`${llamador.sub}|${llamador.azp}`));
       if (espera) {
