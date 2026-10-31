@@ -1,13 +1,11 @@
-import { Component, computed, inject, signal } from '@angular/core';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { Component, inject } from '@angular/core';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { RouterLink } from '@angular/router';
-import { switchMap } from 'rxjs';
-import { AvisoServicios, BobPipe, CONFIG_CENTRO, FechaPipe, pct, servicioCaido } from 'ui-comun';
-import { TableroGQL, type Periodo } from '../graphql/generado';
+import { AvisoServicios, BobPipe, CONFIG_CENTRO, FechaPipe, pct } from 'ui-comun';
+import { TableroFachada } from '../tablero.fachada';
 
 /**
  * Tablero del gerente (spec 016, paso 10): compone Viajes, Flota, Finanzas y Analítica en una consulta. Si un servicio
@@ -15,6 +13,7 @@ import { TableroGQL, type Periodo } from '../graphql/generado';
  */
 @Component({
   selector: 'app-tablero',
+  providers: [TableroFachada],
   imports: [MatCardModule, MatButtonToggleModule, MatProgressBarModule, MatIconModule, RouterLink, BobPipe, FechaPipe, AvisoServicios],
   template: `
     <div class="encabezado">
@@ -120,16 +119,14 @@ import { TableroGQL, type Periodo } from '../graphql/generado';
   `,
 })
 export class TableroPagina {
-  private readonly gql = inject(TableroGQL);
+  private readonly fachada = inject(TableroFachada);
   readonly config = inject(CONFIG_CENTRO);
-  readonly periodo = signal<Periodo>('ESTA_SEMANA');
+  readonly periodo = this.fachada.periodo;
   readonly pct = pct;
-  readonly datos = toSignal(
-    toObservable(this.periodo).pipe(switchMap((periodo) => this.gql.watch({ variables: { periodo }, pollInterval: 30_000 }).valueChanges)),
-  );
-  readonly cargando = computed(() => this.datos()?.loading ?? true);
+  readonly datos = this.fachada.datos;
+  readonly cargando = this.fachada.cargando;
 
   caido(campo: string): boolean {
-    return servicioCaido(this.datos()?.error, campo);
+    return this.fachada.caido(campo);
   }
 }

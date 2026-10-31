@@ -1,5 +1,4 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -9,12 +8,10 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { firstValueFrom, map } from 'rxjs';
-import { fechaLaPaz, Intentos, mensajeDe, Sesion, TablaReporte, type Resultado } from 'ui-comun';
-import { CatalogoGQL, ExportarReporteGQL, ReporteGQL, type ReporteId, type ReporteParams } from '../graphql/generado';
-
-const hoy = () => fechaLaPaz();
-const dias = (n: number) => fechaLaPaz(n);
+import { mensajeDe, Sesion, TablaReporte, type Resultado } from 'ui-comun';
+import type { ReporteId, ReporteParams } from '../../graphql/generado';
+import { paramsLimpios, paramsPorDefecto, usaParametro } from '../domain/reporte';
+import { ReportesFachada } from '../reportes.fachada';
 
 /**
  * Los 5 reportes del catálogo con botones (spec 015): sin LLM ni MCP, `reporte(id, params)` va directo a Analítica.
@@ -22,6 +19,7 @@ const dias = (n: number) => fechaLaPaz(n);
  */
 @Component({
   selector: 'app-reportes',
+  providers: [ReportesFachada],
   imports: [
     FormsModule,
     MatCardModule,
@@ -125,13 +123,11 @@ const dias = (n: number) => fechaLaPaz(n);
   `,
 })
 export class ReportesPagina {
-  private readonly catalogoGql = inject(CatalogoGQL);
-  private readonly reporteGql = inject(ReporteGQL);
-  private readonly exportarGql = inject(ExportarReporteGQL);
+  private readonly fachada = inject(ReportesFachada);
   private readonly avisos = inject(MatSnackBar);
   private readonly sesion = inject(Sesion);
 
-  readonly catalogo = toSignal(this.catalogoGql.fetch().pipe(map((r) => r.data)));
+  readonly catalogo = this.fachada.catalogo;
   readonly permitidos = computed(() =>
     (this.catalogo()?.catalogoReportes ?? []).filter((r) => r.roles.some((rol) => this.sesion.tiene(rol))),
   );
@@ -144,24 +140,16 @@ export class ReportesPagina {
   params: ReporteParams = {};
   /** El reporte y los parámetros del resultado que se ve: "Exportar" usa estos, no lo que se editó después sin "Ver". */
   mostrado: { id: ReporteId; params: ReporteParams } | null = null;
-  private readonly intentos = new Intentos();
 
   usa(campo: string): boolean {
-    return campo in ((this.definicion()?.parametros as { properties?: object } | undefined)?.properties ?? {});
+    return usaParametro(this.definicion()?.parametros, campo);
   }
 
   elegir(id: ReporteId): void {
     this.elegido.set(id);
     this.resultado.set(null);
     this.mostrado = null;
-    // Cuentas por cobrar mira vencimientos: "esta semana" hacia adelante; los demás, el último mes.
-    this.params =
-      id === 'CUENTAS_POR_COBRAR'
-        ? { desde: hoy(), hasta: dias(6) }
-        : id === 'VIAJES_EN_RIESGO'
-          ? { umbral: 0.7 }
-          : { desde: dias(-30), hasta: hoy() };
-    if (id === 'RENTABILIDAD') this.params.agrupar = 'RUTA';
+    this.params = paramsPorDefecto(id);
     void this.ver();
   }
 
@@ -171,10 +159,8 @@ export class ReportesPagina {
     this.cargando.set(true);
     this.error.set(null);
     try {
-      const params = this.limpios();
-      const r = await firstValueFrom(this.reporteGql.fetch({ variables: { id, params } }));
-      if (r.error) throw r.error;
-      const resultado = (r.data?.reporte as Resultado | undefined) ?? null;
+      const params = paramsLimpios(this.params);
+      const resultado = await this.fachada.consultar(id, params);
       this.resultado.set(resultado);
       this.mostrado = resultado ? { id, params } : null;
     } catch (e) {
@@ -191,19 +177,12 @@ export class ReportesPagina {
     const { id, params } = this.mostrado;
     this.exportando.set(true);
     try {
-      const r = await this.intentos.enviar('exportarReporte', { id, params }, (clave) =>
-        this.exportarGql.mutate({ variables: { id, params, clave } }),
-      );
-      const url = r.data?.exportarReporte.url;
+      const url = await this.fachada.exportar(id, params);
       if (url) window.location.assign(url);
     } catch (e) {
       this.avisos.open(mensajeDe(e), 'Cerrar', { duration: 6000 });
     } finally {
       this.exportando.set(false);
     }
-  }
-
-  private limpios(): ReporteParams {
-    return Object.fromEntries(Object.entries(this.params).filter(([, v]) => v !== undefined && v !== null && v !== '')) as ReporteParams;
   }
 }

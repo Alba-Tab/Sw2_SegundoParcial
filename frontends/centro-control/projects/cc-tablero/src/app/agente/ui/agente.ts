@@ -1,10 +1,10 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, inject, input, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { AvisoServicios, codigoDe, completo, CONFIG_CENTRO, FechaPipe, Intentos, mensajeDe, Sesion } from 'ui-comun';
-import { DispararMisionGQL, MisionesGQL, type MisionesQuery } from '../graphql/generado';
+import { AvisoServicios, codigoDe, CONFIG_CENTRO, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { AgenteFachada } from '../agente.fachada';
+import { mensajeDisparo, urlTraza } from '../domain/mision';
 
 /**
  * Panel del agente (spec 014): cada misión con sus pasos (herramienta, argumentos, resumen y ms). El gerente y el
@@ -12,6 +12,7 @@ import { DispararMisionGQL, MisionesGQL, type MisionesQuery } from '../graphql/g
  */
 @Component({
   selector: 'app-agente',
+  providers: [AgenteFachada],
   imports: [MatButtonModule, MatExpansionModule, FechaPipe, AvisoServicios],
   template: `
     <div class="fila-acciones">
@@ -80,42 +81,29 @@ import { DispararMisionGQL, MisionesGQL, type MisionesQuery } from '../graphql/g
   `,
 })
 export class AgentePagina {
-  private readonly gql = inject(MisionesGQL);
-  private readonly dispararGql = inject(DispararMisionGQL);
+  private readonly fachada = inject(AgenteFachada);
   private readonly avisos = inject(MatSnackBar);
   readonly sesion = inject(Sesion);
   readonly config = inject(CONFIG_CENTRO);
   /** `?mision=<id>`: el enlace de una acción en cc-operaciones abre esa misión. */
   readonly mision = input<string>();
-  private readonly datos = toSignal(this.gql.watch({ pollInterval: 5_000 }).valueChanges);
-  readonly misiones = computed(() => completo<MisionesQuery>(this.datos())?.misionesAgente ?? []);
-  readonly error = computed(() => this.datos()?.error);
+  readonly misiones = this.fachada.misiones;
+  readonly error = this.fachada.error;
   readonly campos = { misionesAgente: 'Analítica' };
   readonly enviando = signal(false);
-  private readonly intentos = new Intentos();
   readonly json = (v: unknown) => JSON.stringify(v);
 
   urlTraza(traceId: string): string | null {
-    const base = this.config.jaegerUrl?.replace(/\/$/, '');
-    return base ? `${base}/trace/${encodeURIComponent(traceId)}` : null;
+    return urlTraza(this.config.jaegerUrl, traceId);
   }
 
   async disparar(): Promise<void> {
     this.enviando.set(true);
     try {
-      await this.intentos.enviar('dispararMision', {}, (clave) => this.dispararGql.mutate({ variables: { clave } }));
+      await this.fachada.disparar();
       this.avisos.open('Misión disparada: los pasos aparecen aquí', undefined, { duration: 4000 });
     } catch (e) {
-      const codigo = codigoDe(e);
-      this.avisos.open(
-        codigo === 'LLM_NO_DISPONIBLE'
-          ? 'El asistente no está disponible (misión saltada)'
-          : codigo === 'CONFLICTO_ESTADO'
-            ? 'Ya hay una misión en curso'
-            : mensajeDe(e),
-        'Cerrar',
-        { duration: 6000 },
-      );
+      this.avisos.open(mensajeDisparo(codigoDe(e), mensajeDe(e)), 'Cerrar', { duration: 6000 });
     } finally {
       this.enviando.set(false);
     }

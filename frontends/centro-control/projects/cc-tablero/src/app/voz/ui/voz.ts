@@ -6,12 +6,11 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { firstValueFrom } from 'rxjs';
-import { codigoDe, Intentos, mensajeDe, TablaReporte, type Resultado } from 'ui-comun';
-import { ExportarReporteGQL, PreguntarGQL, ReporteGQL, type PreguntarMutation, type ReporteId } from '../graphql/generado';
+import { codigoDe, mensajeDe, TablaReporte, type Resultado } from 'ui-comun';
+import type { ReporteId } from '../../graphql/generado';
+import { mensajePregunta, mostrarCatalogo, preguntaValida, REPORTES_CATALOGO, type Respuesta } from '../domain/voz';
+import { VozFachada } from '../voz.fachada';
 import { Grabadora } from './grabadora';
-
-type Respuesta = PreguntarMutation['preguntar'];
 
 /**
  * CU-16 (spec 015): mantener pulsado para hablar (15 s), Whisper tiny transcribe en un Web Worker sin salir del
@@ -20,6 +19,7 @@ type Respuesta = PreguntarMutation['preguntar'];
  */
 @Component({
   selector: 'app-voz',
+  providers: [VozFachada],
   imports: [
     FormsModule,
     MatCardModule,
@@ -109,9 +109,7 @@ type Respuesta = PreguntarMutation['preguntar'];
   `,
 })
 export class VozPagina implements OnDestroy {
-  private readonly preguntarGql = inject(PreguntarGQL);
-  private readonly reporteGql = inject(ReporteGQL);
-  private readonly exportarGql = inject(ExportarReporteGQL);
+  private readonly fachada = inject(VozFachada);
   private readonly grabadora = new Grabadora();
   private readonly trabajador = new Worker(new URL('./whisper.worker', import.meta.url), { type: 'module' });
   readonly grabando = signal(false);
@@ -122,17 +120,10 @@ export class VozPagina implements OnDestroy {
   readonly respuesta = signal<Respuesta | null>(null);
   readonly resultado = signal<Resultado | null>(null);
   private ultimo: { id: ReporteId; params: Record<string, unknown> } | null = null;
-  private readonly intentos = new Intentos();
   texto = '';
   /** El botón está pulsado (puntero o tecla), aunque el micrófono todavía no haya llegado. */
   private pulsado = false;
-  readonly reportes: { id: ReporteId; titulo: string }[] = [
-    { id: 'CUENTAS_POR_COBRAR', titulo: 'Cuentas por cobrar' },
-    { id: 'VIAJES_EN_RIESGO', titulo: 'Viajes en riesgo' },
-    { id: 'FACTURACION_POR_CLIENTE', titulo: 'Facturación por cliente' },
-    { id: 'CONSUMO_COMBUSTIBLE', titulo: 'Consumo de combustible' },
-    { id: 'RENTABILIDAD', titulo: 'Rentabilidad' },
-  ];
+  readonly reportes = REPORTES_CATALOGO;
 
   constructor() {
     this.trabajador.onmessage = ({ data }: MessageEvent<{ texto?: string; error?: string }>) => {
@@ -153,7 +144,7 @@ export class VozPagina implements OnDestroy {
   }
 
   puedeEnviar(): boolean {
-    return this.texto.trim().length >= 3 && !this.enviando();
+    return preguntaValida(this.texto) && !this.enviando();
   }
 
   teclaAbajo(evento: Event): void {
@@ -210,8 +201,7 @@ export class VozPagina implements OnDestroy {
     this.respuesta.set(null);
     this.resultado.set(null);
     try {
-      const r = await firstValueFrom(this.preguntarGql.mutate({ variables: { texto: this.texto.trim() } }));
-      const p = r.data?.preguntar ?? null;
+      const p = await this.fachada.preguntar(this.texto.trim());
       this.respuesta.set(p);
       if (p?.resultado && p.reporteId) {
         this.resultado.set(p.resultado as Resultado);
@@ -219,16 +209,8 @@ export class VozPagina implements OnDestroy {
       }
     } catch (e) {
       const codigo = codigoDe(e);
-      this.error.set(
-        codigo === 'LLM_NO_DISPONIBLE'
-          ? 'El asistente no está disponible'
-          : codigo === 'PREGUNTA_FUERA_DE_ALCANCE'
-            ? 'Puedo responder sobre estos 5 reportes'
-            : codigo === 'SIN_PERMISO'
-              ? 'No tienes permiso para ese reporte'
-              : mensajeDe(e),
-      );
-      this.catalogo.set(codigo === 'LLM_NO_DISPONIBLE' || codigo === 'PREGUNTA_FUERA_DE_ALCANCE');
+      this.error.set(mensajePregunta(codigo, mensajeDe(e)));
+      this.catalogo.set(mostrarCatalogo(codigo));
     } finally {
       this.enviando.set(false);
     }
@@ -239,9 +221,7 @@ export class VozPagina implements OnDestroy {
     this.enviando.set(true);
     this.error.set(null);
     try {
-      const r = await firstValueFrom(this.reporteGql.fetch({ variables: { id, params } }));
-      if (r.error) throw r.error;
-      this.resultado.set((r.data?.reporte as Resultado | undefined) ?? null);
+      this.resultado.set(await this.fachada.consultar(id, params));
       this.ultimo = { id, params };
     } catch (e) {
       this.error.set(mensajeDe(e));
@@ -254,10 +234,8 @@ export class VozPagina implements OnDestroy {
     if (!this.ultimo) return;
     try {
       const { id, params } = this.ultimo;
-      const r = await this.intentos.enviar('exportarReporte', { id, params }, (clave) =>
-        this.exportarGql.mutate({ variables: { id, params, clave } }),
-      );
-      if (r.data?.exportarReporte.url) window.location.assign(r.data.exportarReporte.url);
+      const url = await this.fachada.exportar(id, params);
+      if (url) window.location.assign(url);
     } catch (e) {
       this.error.set(mensajeDe(e));
     }

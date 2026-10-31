@@ -8,18 +8,18 @@ export const rutas: Routes = [
     path: '',
     canActivate: [soloInternos, entrada],
     children: [
-      { path: '', loadComponent: () => import('./tablero/tablero').then((m) => m.TableroPagina), title: 'Tablero' },
-      { path: 'reportes', loadComponent: () => import('./reportes/reportes').then((m) => m.ReportesPagina), title: 'Reportes' },
+      { path: '', loadComponent: () => import('./tablero/ui/tablero').then((m) => m.TableroPagina), title: 'Tablero' },
+      { path: 'reportes', loadComponent: () => import('./reportes/ui/reportes').then((m) => m.ReportesPagina), title: 'Reportes' },
       {
         path: 'voz',
         canActivate: [soloRoles('gerente', 'administracion', 'despachador', 'jefe_flota')],
-        loadComponent: () => import('./voz/voz').then((m) => m.VozPagina),
+        loadComponent: () => import('./voz/ui/voz').then((m) => m.VozPagina),
         title: 'Pregunta por voz',
       },
       {
         path: 'agente',
         canActivate: [soloRoles('gerente', 'despachador')],
-        loadComponent: () => import('./agente/agente').then((m) => m.AgentePagina),
+        loadComponent: () => import('./agente/ui/agente').then((m) => m.AgentePagina),
         title: 'Agente',
       },
     ],
