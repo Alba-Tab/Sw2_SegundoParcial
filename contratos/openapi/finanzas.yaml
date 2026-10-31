@@ -274,6 +274,38 @@ paths:
           $ref: './comun.yaml#/components/responses/NoAutenticado'
         '403':
           $ref: './comun.yaml#/components/responses/SinPermiso'
+  /api/v1/facturas/resumen:
+    get:
+      tags: [facturas]
+      operationId: resumirCobranza
+      summary: Cuentas por cobrar del tablero (spec 016), calculadas por Finanzas. Solo administracion y gerente.
+      description: |
+        Sobre todas las facturas con saldo: el saldo total, cuántas están vencidas (venceEl antes de hoy en America/La_Paz),
+        cuántas vencen entre `venceDesde` y `venceHasta`, y las 5 primeras de esa ventana por fecha de vencimiento.
+      parameters:
+        - name: venceDesde
+          in: query
+          required: true
+          schema:
+            $ref: './comun.yaml#/components/schemas/Fecha'
+        - name: venceHasta
+          in: query
+          required: true
+          schema:
+            $ref: './comun.yaml#/components/schemas/Fecha'
+      responses:
+        '200':
+          description: Resumen de cobranza.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ResumenCobranza'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
   /api/v1/facturas/{facturaId}:
     parameters:
       - $ref: '#/components/parameters/FacturaId'
@@ -599,6 +631,23 @@ components:
           description: Solo en obtenerFactura y registrarPago.
           items:
             $ref: '#/components/schemas/Pago'
+    ResumenCobranza:
+      type: object
+      required: [saldoTotal, facturasPorVencer, facturasVencidas, proximas]
+      properties:
+        saldoTotal:
+          $ref: './comun.yaml#/components/schemas/Monto'
+        facturasPorVencer:
+          type: integer
+          minimum: 0
+        facturasVencidas:
+          type: integer
+          minimum: 0
+        proximas:
+          type: array
+          maxItems: 5
+          items:
+            $ref: '#/components/schemas/Factura'
     PaginaFacturas:
       type: object
       required: [items, siguienteCursor]

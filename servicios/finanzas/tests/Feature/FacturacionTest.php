@@ -166,6 +166,31 @@ function lineaQueSeCae(int $fallas): object
     return $linea;
 }
 
+it('el resumen de cobranza suma en Finanzas el saldo, las vencidas y las de la ventana', function () {
+    $this->artisan('semilla:cargar')->assertSuccessful();
+    $hoy = $this->ahora->setTimezone(new DateTimeZone('America/La_Paz'))->format('Y-m-d');
+    $hasta = (new DateTimeImmutable($hoy))->modify('+6 days')->format('Y-m-d');
+    $conSaldo = DB::table('factura')->where('saldo', '>', 0);
+    $saldo = number_format((float) (clone $conSaldo)->sum('saldo'), 2, '.', '');
+    $vencidas = (clone $conSaldo)->where('vence_el', '<', $hoy)->count();
+    $ventana = (clone $conSaldo)->whereBetween('vence_el', [$hoy, $hasta])->orderBy('vence_el')->orderBy('numero')->pluck('numero');
+    expect($vencidas)->toBeGreaterThan(0)->and($ventana)->not->toBeEmpty();
+
+    $url = "/api/v1/facturas/resumen?venceDesde=$hoy&venceHasta=$hasta";
+    $r = $this->withHeaders(['X-Prueba' => 'sub-g~gerente~'])->withToken('p')->getJson($url)->assertOk()
+        ->assertJsonPath('saldoTotal', ['monto' => $saldo, 'moneda' => 'BOB'])
+        ->assertJsonPath('facturasVencidas', $vencidas)
+        ->assertJsonPath('facturasPorVencer', $ventana->count());
+    expect(array_column($r->json('proximas'), 'numero'))->toBe($ventana->take(5)->all());
+    cumpleContrato($r, '/api/v1/facturas/resumen');
+
+    $this->withHeaders(['X-Prueba' => 'sub-d~despachador~'])->withToken('p')->getJson($url)->assertStatus(403);
+    $this->withHeaders(['X-Prueba' => 'sub-a~administracion~'])->withToken('p')
+        ->getJson("/api/v1/facturas/resumen?venceDesde=$hasta&venceHasta=$hoy")->assertStatus(400);
+    $this->withHeaders(['X-Prueba' => 'sub-a~administracion~'])->withToken('p')
+        ->getJson('/api/v1/facturas/resumen')->assertStatus(400);
+});
+
 it('el cliente ve solo sus facturas, con mora calculada; administración filtra por saldo y vencimiento', function () {
     $this->artisan('semilla:cargar')->assertSuccessful();
     $moroso = '0193a000-0000-7000-8000-0000000c0002';

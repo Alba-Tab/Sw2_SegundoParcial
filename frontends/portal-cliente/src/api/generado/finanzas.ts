@@ -243,6 +243,16 @@ export interface Factura {
   pagos?: Pago[];
 }
 
+export interface ResumenCobranza {
+  saldoTotal: Monto;
+  /** @minimum 0 */
+  facturasPorVencer: number;
+  /** @minimum 0 */
+  facturasVencidas: number;
+  /** @maxItems 5 */
+  proximas: Factura[];
+}
+
 export interface PaginaFacturas {
   items: Factura[];
   /** @nullable */
@@ -365,6 +375,11 @@ export type ListarFacturasParams = {
    * @maxLength 500
    */
   cursor?: string;
+};
+
+export type ResumirCobranzaParams = {
+  venceDesde: Fecha;
+  venceHasta: Fecha;
 };
 
 type SecondParameter<T extends (...args: never) => unknown> = Parameters<T>[1];
@@ -1365,6 +1380,112 @@ export function useListarFacturas<TData = Awaited<ReturnType<typeof listarFactur
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getListarFacturasQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getResumirCobranzaUrl = (params: ResumirCobranzaParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/facturas/resumen?${stringifiedParams}` : `/api/v1/facturas/resumen`;
+};
+
+/**
+ * Sobre todas las facturas con saldo: el saldo total, cuántas están vencidas (venceEl antes de hoy en America/La_Paz),
+ * cuántas vencen entre `venceDesde` y `venceHasta`, y las 5 primeras de esa ventana por fecha de vencimiento.
+ * @summary Cuentas por cobrar del tablero (spec 016), calculadas por Finanzas. Solo administracion y gerente.
+ */
+export const resumirCobranza = async (
+  params: ResumirCobranzaParams,
+  options?: Parameters<typeof pedirFinanzas>[1],
+): Promise<ResumenCobranza> => {
+  return pedirFinanzas<ResumenCobranza>(getResumirCobranzaUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export const getResumirCobranzaQueryKey = (params?: ResumirCobranzaParams) => {
+  return [`/api/v1/facturas/resumen`, ...(params ? [params] : [])] as const;
+};
+
+export const getResumirCobranzaQueryOptions = <TData = Awaited<ReturnType<typeof resumirCobranza>>, TError = Problema>(
+  params: ResumirCobranzaParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof resumirCobranza>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getResumirCobranzaQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof resumirCobranza>>> = ({ signal }) =>
+    resumirCobranza(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<Awaited<ReturnType<typeof resumirCobranza>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ResumirCobranzaQueryResult = NonNullable<Awaited<ReturnType<typeof resumirCobranza>>>;
+export type ResumirCobranzaQueryError = Problema;
+
+export function useResumirCobranza<TData = Awaited<ReturnType<typeof resumirCobranza>>, TError = Problema>(
+  params: ResumirCobranzaParams,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof resumirCobranza>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<Awaited<ReturnType<typeof resumirCobranza>>, TError, Awaited<ReturnType<typeof resumirCobranza>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useResumirCobranza<TData = Awaited<ReturnType<typeof resumirCobranza>>, TError = Problema>(
+  params: ResumirCobranzaParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof resumirCobranza>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<Awaited<ReturnType<typeof resumirCobranza>>, TError, Awaited<ReturnType<typeof resumirCobranza>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useResumirCobranza<TData = Awaited<ReturnType<typeof resumirCobranza>>, TError = Problema>(
+  params: ResumirCobranzaParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof resumirCobranza>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Cuentas por cobrar del tablero (spec 016), calculadas por Finanzas. Solo administracion y gerente.
+ */
+
+export function useResumirCobranza<TData = Awaited<ReturnType<typeof resumirCobranza>>, TError = Problema>(
+  params: ResumirCobranzaParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof resumirCobranza>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getResumirCobranzaQueryOptions(params, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

@@ -92,7 +92,7 @@ Las 4 apps Angular (`cc-tablero`, `cc-operaciones`, `cc-flota`, `cc-finanzas`) s
 | `Viaje.unidad`, `unidades`, `unidad`, `mantenimientos`, `choferes`, `cargasCombustible`, `Tablero.unidadesPorEstado` | gerente, despachador, jefe_flota | Flota |
 | `anomaliasCombustible`, `puntajesConduccion` | gerente, jefe_flota | Analítica |
 | `facturas` (comercial con `clienteId`), `factura`, `lineaCredito`, `cotizaciones` | gerente, administracion, comercial | Finanzas |
-| `Tablero.cuentasPorCobrar`, `solicitudesAprobacion` | gerente, administracion | Finanzas |
+| `Tablero.cuentasPorCobrar`, `solicitudesAprobacion` | gerente, administracion | Finanzas (el resumen lo calcula `GET /facturas/resumen`; el Gateway no suma) |
 | `catalogoReportes`, `reporte`, `exportarReporte`, `alertasPendientes`, `Tablero.alertasAbiertas`, `Tablero.datosAl`, `subscription alertas`, `preguntar` | gerente, despachador, jefe_flota, administracion (cada reporte además con sus roles, spec 015) | Analítica |
 | `Viaje.riesgo` | gerente, despachador | Analítica |
 | `misionesAgente`, `mision`, `accionesPropuestas` | gerente, despachador | Analítica |

@@ -57,6 +57,19 @@ final class FacturaRepositorioDb implements FacturaRepositorio
             ->map(fn ($f) => self::fila($f))->values()->all();
     }
 
+    public function resumenCobranza(string $hoy, string $desde, string $hasta): array
+    {
+        $r = DB::selectOne(
+            'SELECT COALESCE(SUM(saldo), 0) AS saldo, COUNT(*) FILTER (WHERE vence_el < ?) AS vencidas,
+                    COUNT(*) FILTER (WHERE vence_el BETWEEN ? AND ?) AS por_vencer
+             FROM factura WHERE saldo > 0', [$hoy, $desde, $hasta]);
+        $proximas = DB::table('factura')->where('saldo', '>', 0)->whereBetween('vence_el', [$desde, $hasta])
+            ->orderBy('vence_el')->orderBy('numero')->limit(5)->get()->map(fn ($f) => self::fila($f))->values()->all();
+
+        return ['saldo' => Monto::bob((string) $r->saldo), 'vencidas' => (int) $r->vencidas, 'porVencer' => (int) $r->por_vencer,
+            'proximas' => $proximas];
+    }
+
     private static function fila(object $f): Factura
     {
         $toneladas = $f->toneladas === null ? null : rtrim(rtrim((string) $f->toneladas, '0'), '.');
