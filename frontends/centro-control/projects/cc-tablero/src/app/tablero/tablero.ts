@@ -6,7 +6,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { RouterLink } from '@angular/router';
 import { switchMap } from 'rxjs';
-import { BobPipe, CONFIG_CENTRO, FechaPipe, pct, servicioCaido } from 'ui-comun';
+import { AvisoServicios, BobPipe, CONFIG_CENTRO, FechaPipe, pct, servicioCaido } from 'ui-comun';
 import { TableroGQL, type Periodo } from '../graphql/generado';
 
 /**
@@ -15,7 +15,7 @@ import { TableroGQL, type Periodo } from '../graphql/generado';
  */
 @Component({
   selector: 'app-tablero',
-  imports: [MatCardModule, MatButtonToggleModule, MatProgressBarModule, MatIconModule, RouterLink, BobPipe, FechaPipe],
+  imports: [MatCardModule, MatButtonToggleModule, MatProgressBarModule, MatIconModule, RouterLink, BobPipe, FechaPipe, AvisoServicios],
   template: `
     <div class="encabezado">
       <h1>Tablero</h1>
@@ -32,6 +32,8 @@ import { TableroGQL, type Periodo } from '../graphql/generado';
       <mat-progress-bar mode="indeterminate" />
     }
     @let t = datos()?.data?.tablero;
+    <!-- Los servicios caídos los avisa cada tarjeta; aquí solo el error que deja al tablero entero sin datos. -->
+    <cc-aviso-servicios [error]="datos()?.error" [sinDatos]="!t && !cargando()" />
     <p class="secundario">Datos al {{ t?.datosAl ? (t?.datosAl | fecha: true) : '—' }}</p>
     <div class="tarjetas">
       <mat-card>
@@ -46,7 +48,7 @@ import { TableroGQL, type Periodo } from '../graphql/generado';
                 <a [href]="config.urls['cc-operaciones'] + '/viajes/' + v.viajeId">{{ v.placa }}</a>
                 · {{ v.cliente?.razonSocial }} · {{ v.ruta?.nombre }}
                 @if (v.riesgo?.enRiesgo) {
-                  <span class="chip-estado" data-alerta="true">riesgo {{ pct(v.riesgo?.probabilidad) }}</span>
+                  <span class="chip-estado" data-alerta="true">riesgo {{ pct(v.riesgo.probabilidad) }}</span>
                 }
               </p>
             }

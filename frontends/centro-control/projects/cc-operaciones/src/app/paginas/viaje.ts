@@ -8,18 +8,29 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { type Observable, firstValueFrom, switchMap } from 'rxjs';
-import { BobPipe, FechaPipe, mensajeDe, nuevaClave, pct, Sesion } from 'ui-comun';
+import { AvisoServicios, BobPipe, FechaPipe, Intentos, mensajeDe, pct, Sesion } from 'ui-comun';
 import { AprobarEntregaGQL, RechazarEntregaGQL, ResolverIntervencionGQL, ViajeGQL, type OpcionIntervencion } from '../graphql/generado';
 
 /** Detalle del viaje (al que llevan las alertas): bitácora, entrega, riesgo y las decisiones del despachador. */
 @Component({
   selector: 'app-viaje',
-  imports: [FormsModule, MatCardModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatProgressBarModule, BobPipe, FechaPipe],
+  imports: [
+    FormsModule,
+    MatCardModule,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatProgressBarModule,
+    BobPipe,
+    FechaPipe,
+    AvisoServicios,
+  ],
   template: `
     @let r = datos();
     @if (r?.loading && !r?.data) {
       <mat-progress-bar mode="indeterminate" />
     }
+    <cc-aviso-servicios [error]="r?.error" [campos]="campos" [sinDatos]="!r?.data?.viaje" />
     @if (r?.data?.viaje; as v) {
       <h1>
         Viaje {{ v.placa }} · <span class="chip-estado" [attr.data-alerta]="alerta(v.estado)">{{ v.estado }}</span>
@@ -61,7 +72,7 @@ import { AprobarEntregaGQL, RechazarEntregaGQL, ResolverIntervencionGQL, ViajeGQ
               </p>
               <p>{{ e.conFirma ? 'Con firma de ' + e.nombreReceptor : 'Sin firma' }}</p>
               @if (e.razones?.length) {
-                <p>Razones: {{ e.razones?.join(', ') }}</p>
+                <p>Razones: {{ e.razones.join(', ') }}</p>
               }
               @if (e.motivo) {
                 <p>Motivo: {{ e.motivo }}</p>
@@ -107,8 +118,8 @@ import { AprobarEntregaGQL, RechazarEntregaGQL, ResolverIntervencionGQL, ViajeGQ
       } @empty {
         <p class="secundario">Sin hitos.</p>
       }
-    } @else if (r && !r.loading) {
-      <p class="no-disponible">{{ r.error ? mensaje(r.error) : 'El viaje no existe' }}</p>
+    } @else if (r && !r.loading && !r.error) {
+      <p class="no-disponible">El viaje no existe</p>
     }
   `,
   styles: `
@@ -132,34 +143,44 @@ export class ViajePagina {
     toObservable(this.id).pipe(switchMap((id) => this.gql.watch({ variables: { id }, pollInterval: 20_000 }).valueChanges)),
   );
   readonly enviando = signal(false);
+  private readonly intentos = new Intentos();
   readonly pct = pct;
-  readonly mensaje = mensajeDe;
+  readonly campos = { viaje: 'Viajes', unidad: 'Flota', riesgo: 'Analítica' };
   readonly alerta = (estado?: string) => ['ENTREGA_OBSERVADA', 'REQUIERE_INTERVENCION', 'ENTREGA_RECHAZADA'].includes(estado ?? '');
   texto = '';
 
   aprobar(viajeId: string) {
+    const nota = this.texto.trim() || undefined;
     return this.enviar(
-      this.aprobarGql.mutate({ variables: { viajeId, nota: this.texto.trim() || undefined, clave: nuevaClave() } }),
+      `aprobarEntrega:${viajeId}`,
+      { nota },
+      (clave) => this.aprobarGql.mutate({ variables: { viajeId, nota, clave } }),
       'Entrega aprobada: se factura',
     );
   }
   rechazar(viajeId: string) {
+    const motivo = this.texto.trim();
     return this.enviar(
-      this.rechazarGql.mutate({ variables: { viajeId, motivo: this.texto.trim(), clave: nuevaClave() } }),
+      `rechazarEntrega:${viajeId}`,
+      { motivo },
+      (clave) => this.rechazarGql.mutate({ variables: { viajeId, motivo, clave } }),
       'Entrega rechazada',
     );
   }
   resolver(viajeId: string, opcion: OpcionIntervencion) {
+    const nota = this.texto.trim() || undefined;
     return this.enviar(
-      this.resolverGql.mutate({ variables: { viajeId, opcion, nota: this.texto.trim() || undefined, clave: nuevaClave() } }),
+      `resolverIntervencion:${viajeId}`,
+      { opcion, nota },
+      (clave) => this.resolverGql.mutate({ variables: { viajeId, opcion, nota, clave } }),
       'Intervención enviada',
     );
   }
 
-  private async enviar(peticion: Observable<unknown>, ok: string): Promise<void> {
+  private async enviar(operacion: string, datos: unknown, peticion: (clave: string) => Observable<unknown>, ok: string): Promise<void> {
     this.enviando.set(true);
     try {
-      await firstValueFrom(peticion);
+      await this.intentos.enviar(operacion, datos, peticion);
       this.texto = '';
       this.avisos.open(ok, undefined, { duration: 4000 });
       await firstValueFrom(this.gql.fetch({ variables: { id: this.id() } }));

@@ -13,6 +13,8 @@ export interface ConfigCentro {
   gatewayUrl: string;
   /** URL de cada app del Centro de Control y del portal (las apps solo se enlazan por URL). */
   urls: Record<App | 'portal-cliente', string>;
+  /** Interfaz de Jaeger para abrir la traza de una misión del agente (spec 014); si falta, no hay enlace. */
+  jaegerUrl?: string;
 }
 
 export const CONFIG_CENTRO = new InjectionToken<ConfigCentro>('CONFIG_CENTRO');

@@ -2,6 +2,7 @@
 export * from './lib/acceso';
 export * from './lib/alertas';
 export * from './lib/apollo';
+export * from './lib/aviso-servicios';
 export * from './lib/clave';
 export * from './lib/conexion';
 export * from './lib/configuracion';

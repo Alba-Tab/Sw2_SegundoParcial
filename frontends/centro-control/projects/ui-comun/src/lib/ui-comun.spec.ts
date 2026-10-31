@@ -1,8 +1,9 @@
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
-import { esperaReconexion } from './apollo';
+import { avisosServicio } from './aviso-servicios';
+import { esperaReconexion } from './conexion';
 import { APPS_POR_ROL, DESTINO_POR_ROL } from './configuracion';
 import { codigoDe, mensajeDe, servicioCaido } from './errores';
-import { BobPipe, FechaPipe, pct } from './formato';
+import { aCentavos, BobPipe, fechaLaPaz, FechaPipe, pct, sumarMontos } from './formato';
 import { reclamos } from './sesion';
 
 const jwt = (datos: object) => `x.${btoa(JSON.stringify(datos)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')}.y`;
@@ -47,5 +48,42 @@ describe('ui-comun', () => {
     expect(new BobPipe().transform(null)).toBe('—');
     expect(new FechaPipe().transform('2026-11-03')).toBe('03/11/2026');
     expect(pct(0.857)).toBe('86 %');
+  });
+
+  it('las fechas por defecto salen de La Paz (UTC−4), no de UTC', () => {
+    const noche = new Date('2026-10-31T02:30:00Z'); // 30/10 22:30 en La Paz
+    expect(fechaLaPaz(0, noche)).toBe('2026-10-30');
+    expect(fechaLaPaz(-61, noche)).toBe('2026-08-30');
+    expect(fechaLaPaz(2, noche)).toBe('2026-11-01');
+    expect(fechaLaPaz(1, new Date('2026-12-31T12:00:00Z'))).toBe('2027-01-01');
+  });
+
+  it('FR1: avisa "<Servicio> no disponible" por cada campo caído y, sin datos, el mensaje del error', () => {
+    const parcial = new CombinedGraphQLErrors({
+      errors: [
+        { message: 'Flota no disponible (no responde)', path: ['viaje', 'unidad'], extensions: { codigo: 'DEPENDENCIA_NO_DISPONIBLE' } },
+        { message: 'Tu rol no tiene acceso a este dato', path: ['viaje', 'monto'], extensions: { codigo: 'SIN_PERMISO' } },
+      ],
+    });
+    const campos = { viaje: 'Viajes', unidad: 'Flota', riesgo: 'Analítica' };
+    expect(avisosServicio(parcial, campos)).toEqual(['Flota no disponible']);
+    // Un SIN_PERMISO de un campo (despachador y monto) no es un servicio caído: no se avisa si la página tiene datos.
+    const soloPermiso = new CombinedGraphQLErrors({
+      errors: [{ message: 'Tu rol no tiene acceso a este dato', path: ['viaje', 'monto'], extensions: { codigo: 'SIN_PERMISO' } }],
+    });
+    expect(avisosServicio(soloPermiso, campos)).toEqual([]);
+    expect(avisosServicio(new TypeError('Failed to fetch'), campos, true)).toEqual(['Failed to fetch']);
+    expect(avisosServicio(undefined, campos, true)).toEqual([]);
+  });
+
+  it('dinero sin float: BobPipe no pasa por Number y las sumas van en centavos enteros', () => {
+    // 2^53 + 1 centavos: con Number se perdería el último dígito.
+    expect(new BobPipe().transform('90071992547409.93')).toBe('90.071.992.547.409,93 BOB');
+    expect(new BobPipe().transform('-1250.5', false)).toBe('-1.250,50');
+    expect(new BobPipe().transform('0.00')).toBe('0,00 BOB');
+    expect(new BobPipe().transform('abc')).toBe('abc');
+    expect(aCentavos('2800.005')).toBe(280001n); // HALF_UP al final
+    expect(sumarMontos(['0.10', '0.20', null, 'x'])).toBe('0.30');
+    expect(sumarMontos(['90071992547409.93', '0.01'])).toBe('90071992547409.94');
   });
 });

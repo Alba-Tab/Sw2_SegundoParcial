@@ -4,12 +4,12 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import { switchMap } from 'rxjs';
-import { BobPipe, completo, FechaPipe } from 'ui-comun';
+import { AvisoServicios, BobPipe, completo, FechaPipe } from 'ui-comun';
 import { FacturasGQL, type FacturasQuery } from '../graphql/generado';
 
 @Component({
   selector: 'app-facturas',
-  imports: [MatTableModule, MatButtonToggleModule, RouterLink, BobPipe, FechaPipe],
+  imports: [MatTableModule, MatButtonToggleModule, RouterLink, BobPipe, FechaPipe, AvisoServicios],
   template: `
     <div class="fila-acciones">
       <h1>Facturas</h1>
@@ -18,6 +18,7 @@ import { FacturasGQL, type FacturasQuery } from '../graphql/generado';
         <mat-button-toggle [value]="null">Todas</mat-button-toggle>
       </mat-button-toggle-group>
     </div>
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!facturas().length" />
     <div class="tabla-ancha">
       <table mat-table [dataSource]="facturas()">
         <ng-container matColumnDef="numero"
@@ -65,5 +66,7 @@ export class FacturasPagina {
     ),
   );
   readonly facturas = computed(() => completo<FacturasQuery>(this.datos())?.facturas ?? []);
+  readonly error = computed(() => this.datos()?.error);
+  readonly campos = { facturas: 'Finanzas' };
   readonly columnas = ['numero', 'cliente', 'monto', 'saldo', 'vence', 'estado'];
 }

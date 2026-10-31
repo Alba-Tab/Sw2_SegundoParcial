@@ -57,6 +57,8 @@
             "styles": [
               "@angular/material/prebuilt-themes/azure-blue.css",
               "node_modules/@transporte/design-tokens/generado/angular-material.css",
+              "node_modules/material-icons/iconfont/filled.css",
+              "projects/ui-comun/src/estilos/fuentes.css",
               "projects/cc-tablero/src/styles.css"
             ],
             "allowedCommonJsDependencies": [
@@ -101,6 +103,12 @@
           "defaultConfiguration": "development",
           "options": {
             "port": 4201
+          }
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "projects/cc-tablero/tsconfig.spec.json"
           }
         }
       }
@@ -151,6 +159,8 @@
             "styles": [
               "@angular/material/prebuilt-themes/azure-blue.css",
               "node_modules/@transporte/design-tokens/generado/angular-material.css",
+              "node_modules/material-icons/iconfont/filled.css",
+              "projects/ui-comun/src/estilos/fuentes.css",
               "node_modules/leaflet/dist/leaflet.css",
               "projects/cc-operaciones/src/styles.css"
             ],
@@ -195,6 +205,12 @@
           "defaultConfiguration": "development",
           "options": {
             "port": 4202
+          }
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "projects/cc-operaciones/tsconfig.spec.json"
           }
         }
       }
@@ -245,6 +261,8 @@
             "styles": [
               "@angular/material/prebuilt-themes/azure-blue.css",
               "node_modules/@transporte/design-tokens/generado/angular-material.css",
+              "node_modules/material-icons/iconfont/filled.css",
+              "projects/ui-comun/src/estilos/fuentes.css",
               "projects/cc-flota/src/styles.css"
             ],
             "allowedCommonJsDependencies": [
@@ -333,11 +351,23 @@
               {
                 "glob": "**/*",
                 "input": "projects/cc-finanzas/public"
+              },
+              {
+                "glob": "worker.min.js",
+                "input": "node_modules/tesseract.js/dist",
+                "output": "tesseract"
+              },
+              {
+                "glob": "tesseract-core*-lstm.wasm.js",
+                "input": "node_modules/tesseract.js-core",
+                "output": "tesseract"
               }
             ],
             "styles": [
               "@angular/material/prebuilt-themes/azure-blue.css",
               "node_modules/@transporte/design-tokens/generado/angular-material.css",
+              "node_modules/material-icons/iconfont/filled.css",
+              "projects/ui-comun/src/estilos/fuentes.css",
               "projects/cc-finanzas/src/styles.css"
             ],
             "allowedCommonJsDependencies": [
@@ -382,6 +412,12 @@
           "defaultConfiguration": "development",
           "options": {
             "port": 4204
+          }
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "projects/cc-finanzas/tsconfig.spec.json"
           }
         }
       }

@@ -45,3 +45,6 @@ Thumbs.db
 
 # Whisper tiny: lo baja scripts/descargar-whisper.sh (no se versiona)
 /projects/cc-tablero/public/modelos/
+
+# Tesseract spa: lo baja scripts/descargar-tesseract.sh (no se versiona)
+/projects/cc-finanzas/public/tesseract/

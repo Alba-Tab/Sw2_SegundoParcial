@@ -2,15 +2,16 @@ import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatTableModule } from '@angular/material/table';
-import { completo, FechaPipe } from 'ui-comun';
+import { AvisoServicios, completo, FechaPipe } from 'ui-comun';
 import { ConduccionGQL, type ConduccionQuery } from '../graphql/generado';
 
 /** D84: max(0, 100 − 10 × (frenadas + 2 × fatigas) × 100 / km), por chofer en la semana. */
 @Component({
   selector: 'app-conduccion',
-  imports: [MatTableModule, DecimalPipe, FechaPipe],
+  imports: [MatTableModule, DecimalPipe, FechaPipe, AvisoServicios],
   template: `
     <h1>Puntaje de conducción</h1>
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!puntajes()" />
     @if (puntajes(); as p) {
       <p class="secundario">Semana del {{ p.desde | fecha }} al {{ p.hasta | fecha }} · datos al {{ p.datosAl | fecha: true }}</p>
       <div class="tabla-ancha">
@@ -48,5 +49,7 @@ import { ConduccionGQL, type ConduccionQuery } from '../graphql/generado';
 export class ConduccionPagina {
   private readonly datos = toSignal(inject(ConduccionGQL).watch({ pollInterval: 60_000 }).valueChanges);
   readonly puntajes = computed(() => completo<ConduccionQuery>(this.datos())?.puntajesConduccion);
+  readonly error = computed(() => this.datos()?.error);
+  readonly campos = { puntajesConduccion: 'Analítica' };
   readonly columnas = ['nombre', 'frenadas', 'fatigas', 'km', 'puntaje'];
 }

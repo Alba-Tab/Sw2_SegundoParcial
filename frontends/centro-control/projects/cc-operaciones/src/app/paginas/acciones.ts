@@ -8,7 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { RouterLink } from '@angular/router';
 import { type Observable, firstValueFrom } from 'rxjs';
-import { completo, FechaPipe, mensajeDe, nuevaClave, Sesion } from 'ui-comun';
+import { AvisoServicios, completo, CONFIG_CENTRO, FechaPipe, Intentos, mensajeDe, Sesion } from 'ui-comun';
 import { AccionesGQL, AprobarAccionGQL, RechazarAccionGQL, type AccionesQuery } from '../graphql/generado';
 
 /**
@@ -17,9 +17,10 @@ import { AccionesGQL, AprobarAccionGQL, RechazarAccionGQL, type AccionesQuery } 
  */
 @Component({
   selector: 'app-acciones',
-  imports: [FormsModule, MatCardModule, MatButtonModule, MatFormFieldModule, MatInputModule, RouterLink, FechaPipe],
+  imports: [FormsModule, MatCardModule, MatButtonModule, MatFormFieldModule, MatInputModule, RouterLink, FechaPipe, AvisoServicios],
   template: `
     <h1>Acciones propuestas por el agente</h1>
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!visibles().length" />
     <div class="lista">
       @for (a of visibles(); track a.accionId) {
         <mat-card [class.elegida]="a.accionId === id()">
@@ -28,7 +29,10 @@ import { AccionesGQL, AprobarAccionGQL, RechazarAccionGQL, type AccionesQuery } 
             <mat-card-subtitle>
               <span class="chip-estado" [attr.data-alerta]="a.estado === 'PENDIENTE'">{{ a.estado }}</span>
               · {{ a.creadaEn | fecha: true }} · viaje <a [routerLink]="['/viajes', a.viajeId]">{{ a.viaje?.placa ?? a.viajeId }}</a>
-              {{ a.viaje?.ruta?.destino ? '→ ' + a.viaje?.ruta?.destino : '' }}
+              {{ a.viaje?.ruta.destino ? '→ ' + a.viaje.ruta.destino : '' }}
+              @if (a.misionId) {
+                · <a [href]="config.urls['cc-tablero'] + '/agente?mision=' + a.misionId">ver la misión del agente</a>
+              }
             </mat-card-subtitle>
           </mat-card-header>
           <mat-card-content>
@@ -41,7 +45,14 @@ import { AccionesGQL, AprobarAccionGQL, RechazarAccionGQL, type AccionesQuery } 
             @if (a.estado === 'PENDIENTE' && sesion.tiene('despachador')) {
               <mat-form-field class="mensaje">
                 <mat-label>Mensaje al cliente (10 a 1.000)</mat-label>
-                <textarea matInput rows="3" [(ngModel)]="mensajes[a.accionId]" [ngModelOptions]="{ standalone: true }"></textarea>
+                <textarea
+                  matInput
+                  rows="3"
+                  minlength="10"
+                  maxlength="1000"
+                  [(ngModel)]="mensajes[a.accionId]"
+                  [ngModelOptions]="{ standalone: true }"
+                ></textarea>
               </mat-form-field>
               <div class="fila-acciones">
                 <button
@@ -96,6 +107,7 @@ export class AccionesPagina {
   private readonly rechazarGql = inject(RechazarAccionGQL);
   private readonly avisos = inject(MatSnackBar);
   readonly sesion = inject(Sesion);
+  readonly config = inject(CONFIG_CENTRO);
   readonly id = input<string>();
   readonly datos = toSignal(this.gql.watch({ pollInterval: 15_000 }).valueChanges);
   readonly visibles = computed(() => {
@@ -104,27 +116,36 @@ export class AccionesPagina {
     const id = this.id();
     return id ? [...todas.filter((a) => a.accionId === id), ...todas.filter((a) => a.accionId !== id)] : todas;
   });
+  readonly error = computed(() => this.datos()?.error);
+  readonly campos = { accionesPropuestas: 'Analítica', viaje: 'Viajes' };
   readonly enviando = signal(false);
+  private readonly intentos = new Intentos();
   mensajes: Record<string, string> = {};
   motivos: Record<string, string> = {};
 
   aprobar(id: string) {
+    const mensaje = this.mensajes[id].trim();
     return this.enviar(
-      this.aprobarGql.mutate({ variables: { id, mensaje: this.mensajes[id].trim(), clave: nuevaClave() } }),
+      `aprobarAccion:${id}`,
+      { mensaje },
+      (clave) => this.aprobarGql.mutate({ variables: { id, mensaje, clave } }),
       'Aprobada: el correo sale por n8n',
     );
   }
   rechazar(id: string) {
+    const motivo = this.motivos[id]?.trim() || undefined;
     return this.enviar(
-      this.rechazarGql.mutate({ variables: { id, motivo: this.motivos[id]?.trim() || undefined, clave: nuevaClave() } }),
+      `rechazarAccion:${id}`,
+      { motivo },
+      (clave) => this.rechazarGql.mutate({ variables: { id, motivo, clave } }),
       'Acción rechazada',
     );
   }
 
-  private async enviar(peticion: Observable<unknown>, ok: string): Promise<void> {
+  private async enviar(operacion: string, datos: unknown, peticion: (clave: string) => Observable<unknown>, ok: string): Promise<void> {
     this.enviando.set(true);
     try {
-      await firstValueFrom(peticion);
+      await this.intentos.enviar(operacion, datos, peticion);
       this.avisos.open(ok, undefined, { duration: 5000 });
       await firstValueFrom(this.gql.fetch());
     } catch (e) {

@@ -1,16 +1,17 @@
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatCardModule } from '@angular/material/card';
 import { RouterLink } from '@angular/router';
-import { FechaPipe } from 'ui-comun';
+import { AvisoServicios, FechaPipe } from 'ui-comun';
 import { EntregasObservadasGQL } from '../graphql/generado';
 
 /** Spec 007: entregas fuera de la geocerca o sin firma, para aprobar o rechazar en el detalle del viaje. */
 @Component({
   selector: 'app-entregas',
-  imports: [MatCardModule, RouterLink, FechaPipe],
+  imports: [MatCardModule, RouterLink, FechaPipe, AvisoServicios],
   template: `
     <h1>Entregas observadas</h1>
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!datos()?.data?.entregasObservadas?.length" />
     <div class="tarjetas">
       @for (v of datos()?.data?.entregasObservadas ?? []; track v.viajeId) {
         <mat-card>
@@ -32,4 +33,6 @@ import { EntregasObservadasGQL } from '../graphql/generado';
 })
 export class EntregasPagina {
   readonly datos = toSignal(inject(EntregasObservadasGQL).watch({ pollInterval: 15_000 }).valueChanges);
+  readonly error = computed(() => this.datos()?.error);
+  readonly campos = { entregasObservadas: 'Viajes' };
 }

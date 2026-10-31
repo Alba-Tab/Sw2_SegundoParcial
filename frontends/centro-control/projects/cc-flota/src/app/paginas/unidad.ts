@@ -9,8 +9,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { firstValueFrom, switchMap } from 'rxjs';
-import { completo, FechaPipe, mensajeDe, nuevaClave, Sesion } from 'ui-comun';
+import { firstValueFrom, switchMap, type Observable } from 'rxjs';
+import { AvisoServicios, completo, fechaLaPaz, FechaPipe, Intentos, mensajeDe, Sesion } from 'ui-comun';
 import {
   CerrarMantenimientoGQL,
   ProgramarMantenimientoGQL,
@@ -34,14 +34,16 @@ const CHECKLIST = 'Aceite y filtros\nFrenos\nNeumáticos\nLuces';
     MatSelectModule,
     MatCheckboxModule,
     FechaPipe,
+    AvisoServicios,
   ],
   template: `
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!unidad()" />
     @if (unidad(); as u) {
       <h1>
         {{ u.placa }} · <span class="chip-estado">{{ u.estado }}</span>
       </h1>
       <p>
-        {{ u.tipoUnidad }} {{ u.tipoRemolque ?? '' }} · {{ u.kilometraje ?? '—' | number }} km ·
+        {{ u.tipoUnidad }} {{ u.tipoRemolque ?? '' }} · {{ (u.kilometraje | number) ?? '—' }} km ·
         {{ u.kmDesdeUltimoMantenimiento | number }} km desde el último mantenimiento
       </p>
       <p class="secundario">
@@ -140,15 +142,18 @@ export class UnidadPagina {
   readonly id = input.required<string>();
   private readonly datos = toSignal(toObservable(this.id).pipe(switchMap((id) => this.gql.watch({ variables: { id } }).valueChanges)));
   readonly unidad = computed(() => completo<UnidadQuery>(this.datos())?.unidad);
+  readonly error = computed(() => this.datos()?.error);
+  readonly campos = { unidad: 'Flota', mantenimientos: 'Flota' };
   readonly mantenimientos = computed(() => {
     const lista = completo<UnidadQuery>(this.datos())?.mantenimientos ?? [];
     for (const m of lista) this.cierres[m.mantenimientoId] ??= m.checklist.map((i) => ({ item: i.item, ok: true }));
     return lista;
   });
   readonly enviando = signal(false);
+  private readonly intentos = new Intentos();
   nuevo = {
     tipo: 'PREVENTIVO' as TipoMantenimiento,
-    fechaProgramada: new Date().toISOString().slice(0, 10),
+    fechaProgramada: fechaLaPaz(),
     taller: '',
     descripcion: '',
     checklist: CHECKLIST,
@@ -162,33 +167,34 @@ export class UnidadPagina {
       .split('\n')
       .map((l) => l.trim())
       .filter(Boolean);
+    const input = { unidadId, ...this.nuevo, checklist };
     return this.enviar(
-      this.programarGql.mutate({ variables: { input: { unidadId, ...this.nuevo, checklist, claveIdempotencia: nuevaClave() } } }),
+      `programarMantenimiento:${unidadId}`,
+      input,
+      (clave) => this.programarGql.mutate({ variables: { input: { ...input, claveIdempotencia: clave } } }),
       'Mantenimiento programado',
     );
   }
 
   cerrar(mantenimientoId: string) {
+    const input = {
+      mantenimientoId,
+      kilometraje: this.km[mantenimientoId],
+      checklist: this.cierres[mantenimientoId],
+      observaciones: this.observaciones[mantenimientoId] || undefined,
+    };
     return this.enviar(
-      this.cerrarGql.mutate({
-        variables: {
-          input: {
-            mantenimientoId,
-            kilometraje: this.km[mantenimientoId],
-            checklist: this.cierres[mantenimientoId],
-            observaciones: this.observaciones[mantenimientoId] || undefined,
-            claveIdempotencia: nuevaClave(),
-          },
-        },
-      }),
+      `cerrarMantenimiento:${mantenimientoId}`,
+      input,
+      (clave) => this.cerrarGql.mutate({ variables: { input: { ...input, claveIdempotencia: clave } } }),
       'Mantenimiento cerrado',
     );
   }
 
-  private async enviar(peticion: import('rxjs').Observable<unknown>, ok: string): Promise<void> {
+  private async enviar(operacion: string, datos: unknown, peticion: (clave: string) => Observable<unknown>, ok: string): Promise<void> {
     this.enviando.set(true);
     try {
-      await firstValueFrom(peticion);
+      await this.intentos.enviar(operacion, datos, peticion);
       this.avisos.open(ok, undefined, { duration: 4000 });
       await firstValueFrom(this.gql.fetch({ variables: { id: this.id() } }));
     } catch (e) {

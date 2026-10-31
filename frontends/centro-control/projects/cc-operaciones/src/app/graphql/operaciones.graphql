@@ -26,15 +26,40 @@ fragment ViajeFila on Viaje {
   }
 }
 
+# D101 (complejidad máxima 1.000): una lista con `limite` cuenta limite × campos de cada fila, y Apollo agrega
+# `__typename` a cada objeto. Las listas piden solo lo que muestran; `npm run complejidad` lo verifica.
+# Lo que se ve en la tabla de viajes, sin fragmento (cada fragmento suma otro `__typename` por fila): 80 × 12 + 1 = 961.
 query Viajes($estado: EstadoViaje) {
-  viajes(estado: $estado, limite: 100) {
-    ...ViajeFila
+  viajes(estado: $estado, limite: 80) {
+    viajeId
+    placa
+    estado
+    choferNombre
+    fechaViaje
+    cliente {
+      razonSocial
+    }
+    ruta {
+      nombre
+    }
   }
 }
 
+# El popup del mapa: 50 × 17 + 1 = 851 (el mismo valor por defecto que el esquema).
 query Mapa {
-  viajesEnCurso(limite: 100) {
-    ...ViajeFila
+  viajesEnCurso(limite: 50) {
+    viajeId
+    placa
+    ultimaPosicion {
+      lat
+      lng
+    }
+    cliente {
+      razonSocial
+    }
+    ruta {
+      nombre
+    }
     riesgo {
       probabilidad
       enRiesgo
@@ -103,14 +128,11 @@ query Intervenciones {
   }
 }
 
+# 80 × 10 + 1 más los clientes = 805.
 query Servicios($estado: EstadoServicio) {
-  servicios(estado: $estado, limite: 100) {
+  servicios(estado: $estado, limite: 80) {
     servicioId
-    viajeId
     clienteId
-    estado
-    etapa
-    motivo
     tipoCarga
     toneladas
     fechaViaje
@@ -118,7 +140,6 @@ query Servicios($estado: EstadoServicio) {
     placa
     choferNombre
     confirmacionCompleta
-    creadoEn
   }
   clientes {
     clienteId

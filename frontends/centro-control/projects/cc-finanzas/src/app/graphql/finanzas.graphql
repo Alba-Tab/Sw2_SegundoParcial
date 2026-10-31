@@ -12,9 +12,18 @@ fragment FacturaFila on Factura {
   diasVencida
 }
 
+# D101 (complejidad máxima 1.000): la lista pide solo lo que muestra la tabla; 80 × 10 + 1 = 801.
 query Facturas($estado: EstadoFactura, $conSaldo: Boolean) {
-  facturas(estado: $estado, conSaldo: $conSaldo, limite: 100) {
-    ...FacturaFila
+  facturas(estado: $estado, conSaldo: $conSaldo, limite: 80) {
+    facturaId
+    numero
+    razonSocial
+    monto
+    saldo
+    estado
+    venceEl
+    vencida
+    diasVencida
   }
 }
 
@@ -36,18 +45,17 @@ query Factura($id: ID!) {
   }
 }
 
+# D101: 80 × 11 + 1 más clientes y rutas = 889.
 query Cotizaciones {
-  cotizaciones(limite: 100) {
+  cotizaciones(limite: 80) {
     cotizacionId
     clienteId
     rutaId
     tipoCarga
     toneladas
-    fechaViaje
     monto
     estado
     vencida
-    venceEn
     canal
     creadaEn
   }

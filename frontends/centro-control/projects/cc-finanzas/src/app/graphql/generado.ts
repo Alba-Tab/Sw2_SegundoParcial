@@ -68,12 +68,10 @@ export type FacturasQuery = {
   facturas: Array<{
     facturaId: string;
     numero: string;
-    clienteId: string;
     razonSocial: string;
     monto: string;
     saldo: string;
     estado: EstadoFactura;
-    emitidaEl: string;
     venceEl: string;
     vencida: boolean;
     diasVencida: number | null;
@@ -121,11 +119,9 @@ export type CotizacionesQuery = {
     rutaId: string;
     tipoCarga: TipoCarga;
     toneladas: number;
-    fechaViaje: string;
     monto: string;
     estado: string;
     vencida: boolean;
-    venceEn: string | null;
     canal: string | null;
     creadaEn: string | null;
   }> | null;
@@ -212,11 +208,18 @@ export const FacturaFilaFragmentDoc = gql`
 `;
 export const FacturasDocument = gql`
   query Facturas($estado: EstadoFactura, $conSaldo: Boolean) {
-    facturas(estado: $estado, conSaldo: $conSaldo, limite: 100) {
-      ...FacturaFila
+    facturas(estado: $estado, conSaldo: $conSaldo, limite: 80) {
+      facturaId
+      numero
+      razonSocial
+      monto
+      saldo
+      estado
+      venceEl
+      vencida
+      diasVencida
     }
   }
-  ${FacturaFilaFragmentDoc}
 `;
 
 @Injectable({
@@ -262,17 +265,15 @@ export class FacturaGQL extends Apollo.Query<FacturaQuery, FacturaQueryVariables
 }
 export const CotizacionesDocument = gql`
   query Cotizaciones {
-    cotizaciones(limite: 100) {
+    cotizaciones(limite: 80) {
       cotizacionId
       clienteId
       rutaId
       tipoCarga
       toneladas
-      fechaViaje
       monto
       estado
       vencida
-      venceEn
       canal
       creadaEn
     }
