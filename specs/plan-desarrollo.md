@@ -292,7 +292,7 @@ Primero las specs 014 y 015 (`docs/specs/agente-voz`) y la micro-PoC de Whisper 
 | T11.7 LLM con GPU | `feat/plataforma/llm-gpu` | T11.1 | Responde en menos de 10 s ya despierto; no está expuesto sin autenticación |
 | T11.8 Gateway y MCP en Cloud Run | `ci/ci/deploy-gateway-mcp` | T11.5, T11.11 | La suscripción funciona; el Inspector funciona contra la nube |
 | T11.9 Las 5 apps, `CORS_ORIGENES` y Web Origins en el realm, modelos servidos | `ci/ci/deploy-firebase` | T11.8 | Salto de SSO en la nube |
-| T11.10 EC2: `pg_dump` diario a S3 y túnel SSM para la Temporal UI y la consola de RabbitMQ | `feat/plataforma/vm-respaldos-auth` | — | Hay respaldo en S3; los puertos 8233 y 15672 no son accesibles desde internet |
+| T11.10 EC2: túnel SSM para la Temporal UI y la consola de RabbitMQ (el respaldo automático se descartó el 31/10/2026: no aporta al examen) | `feat/plataforma/vm-tuneles` | — | Los puertos 8233 y 15672 no son accesibles desde internet |
 | T11.11 Configuración de AWS y GCP (`OIDC_ISSUER`, URLs, CORS) y semilla en la nube | `chore/plataforma/config-nube` | T11.3 | `reiniciar-demo.sh --nube` en verde |
 | T11.12 Escenario en la nube | `test/plataforma/escenario-nube` | Todas | `escenario-completo.sh --nube` en verde y `pg_stat_activity` con 35 conexiones o menos |
 
@@ -616,7 +616,7 @@ Ver [guion-fallos.md](guion-fallos.md).
 | Recorrido histórico en el mapa | 0,5 | F7, F9 |
 | Pipeline de n8n (importación manual) | 0,25 | F11 |
 | FC3, FC5 y FC6 | 0,5 | F5, F9 |
-| Respaldo automático (`pg_dump` manual) | 0,25 | F11 |
+| ~~Respaldo automático~~ (descartado el 31/10/2026) | 0,25 | F11 |
 | Pulido visual | 0,5 | F6, F9 |
 | D21: Excel directo desde Analítica | 0,25 | F9 |
 
@@ -652,7 +652,7 @@ Ver [guion-fallos.md](guion-fallos.md).
 | iPhone | PoC-4; reinstalar; Android |
 | Memoria de la Mac | PoC-5 |
 | Worker pool | Cloud Run *service* |
-| EC2 como punto único | Respaldos y grabaciones |
+| EC2 como punto único | Grabaciones de la demo |
 | Red el día de la defensa | Grabaciones; la Mac con todo el compose |
 | Licencia del modelo de fatiga | README |
 
