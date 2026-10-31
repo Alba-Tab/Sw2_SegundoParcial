@@ -2,8 +2,9 @@ import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { avisosServicio } from './aviso-servicios';
 import { esperaReconexion } from './conexion';
 import { APPS_POR_ROL, DESTINO_POR_ROL } from './configuracion';
-import { codigoDe, mensajeDe, servicioCaido } from './errores';
-import { aCentavos, BobPipe, fechaLaPaz, FechaPipe, pct, sumarMontos } from './formato';
+import { codigoDe, mensajeDe, servicioCaido, sinPermiso } from './errores';
+import { aCentavos, fechaLaPaz, pct, puedeVer, sumarMontos } from 'ui-comun/dominio';
+import { BobPipe, FechaPipe } from './formato';
 import { reclamos } from './sesion';
 
 const jwt = (datos: object) => `x.${btoa(JSON.stringify(datos)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')}.y`;
@@ -39,8 +40,30 @@ describe('ui-comun', () => {
     });
     expect(servicioCaido(error, 'cuentasPorCobrar')).toBe(true);
     expect(servicioCaido(error, 'unidadesPorEstado')).toBe(false);
+    expect(sinPermiso(error, 'cuentasPorCobrar')).toBe(false);
     expect(codigoDe(error)).toBe('DEPENDENCIA_NO_DISPONIBLE');
     expect(mensajeDe(error)).toBe('Finanzas no disponible');
+  });
+
+  it('un SIN_PERMISO del campo (rol sin acceso) no se confunde con un servicio caído', () => {
+    const error = new CombinedGraphQLErrors({
+      errors: [{ message: 'Sin permiso', path: ['tablero', 'unidadesPorEstado'], extensions: { codigo: 'SIN_PERMISO' } }],
+    });
+    expect(sinPermiso(error, 'unidadesPorEstado')).toBe(true);
+    expect(servicioCaido(error, 'unidadesPorEstado')).toBe(false);
+    expect(sinPermiso(error, 'viajesEnCurso')).toBe(false);
+    expect(sinPermiso(undefined, 'viajesEnCurso')).toBe(false);
+  });
+
+  it('roles por campo: copia de los @roles del esquema (propuesta 7.2)', () => {
+    expect(puedeVer(['despachador'], 'monto')).toBe(false);
+    expect(puedeVer(['comercial'], 'monto')).toBe(true);
+    expect(puedeVer(['comercial'], 'riesgo')).toBe(false);
+    expect(puedeVer(['jefe_flota'], 'riesgo')).toBe(false);
+    expect(puedeVer(['despachador'], 'riesgo')).toBe(true);
+    expect(puedeVer(['comercial'], 'unidad')).toBe(false);
+    expect(puedeVer(['jefe_flota', 'gerente'], 'cuentasPorCobrar')).toBe(true);
+    expect(puedeVer([], 'monto')).toBe(false);
   });
 
   it('formatea dinero como texto (nunca float en cálculos), fechas y porcentajes', () => {

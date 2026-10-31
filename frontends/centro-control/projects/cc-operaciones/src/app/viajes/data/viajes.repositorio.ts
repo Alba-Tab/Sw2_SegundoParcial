@@ -9,7 +9,9 @@ import {
   ViajeGQL,
   ViajesGQL,
   type EstadoViaje,
+  type MapaQueryVariables,
   type OpcionIntervencion,
+  type ViajeQueryVariables,
 } from '../../graphql/generado';
 
 /** Repositorio sobre Apollo de viajes, mapa, entregas observadas e intervenciones. */
@@ -28,16 +30,17 @@ export class ViajesRepositorio {
     return this.viajesGql.watch({ variables: { estado }, pollInterval: cadaMs }).valueChanges;
   }
 
-  observarViaje(id: string, cadaMs: number) {
-    return this.viajeGql.watch({ variables: { id }, pollInterval: cadaMs }).valueChanges;
+  /** Las variables dicen qué campos con `@roles` (monto, riesgo, unidad) pide el rol. */
+  observarViaje(variables: ViajeQueryVariables, cadaMs: number) {
+    return this.viajeGql.watch({ variables, pollInterval: cadaMs }).valueChanges;
   }
 
-  recargarViaje(id: string) {
-    return this.viajeGql.fetch({ variables: { id } });
+  recargarViaje(variables: ViajeQueryVariables) {
+    return this.viajeGql.fetch({ variables });
   }
 
-  observarMapa(cadaMs: number) {
-    return this.mapaGql.watch({ pollInterval: cadaMs }).valueChanges;
+  observarMapa(variables: MapaQueryVariables, cadaMs: number) {
+    return this.mapaGql.watch({ variables, pollInterval: cadaMs }).valueChanges;
   }
 
   observarEntregasObservadas(cadaMs: number) {

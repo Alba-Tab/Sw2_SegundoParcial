@@ -27,9 +27,19 @@ export function erroresGraphql(error: unknown) {
   return CombinedGraphQLErrors.is(error) ? error.errors : [];
 }
 
+/** ¿Algún error de la respuesta parcial tiene ese `codigo` en el `path` de ese campo? */
+function errorEnCampo(error: unknown, campo: string, codigo: string): boolean {
+  return erroresGraphql(error).some((e) => e.path?.includes(campo) && e.extensions?.['codigo'] === codigo);
+}
+
 /** Una consulta parcial con el campo en null porque su servicio cayó (por ejemplo, Finanzas en el tablero, FR2). */
 export function servicioCaido(error: unknown, campo: string): boolean {
-  return erroresGraphql(error).some((e) => e.path?.includes(campo) && e.extensions?.['codigo'] === 'DEPENDENCIA_NO_DISPONIBLE');
+  return errorEnCampo(error, campo, 'DEPENDENCIA_NO_DISPONIBLE');
+}
+
+/** El campo salió en null porque el rol no lo puede ver (`@roles` del Gateway o el 403 del servicio dueño). */
+export function sinPermiso(error: unknown, campo: string): boolean {
+  return errorEnCampo(error, campo, 'SIN_PERMISO');
 }
 
 /**

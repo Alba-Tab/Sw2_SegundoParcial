@@ -1,6 +1,6 @@
 import type { Routes } from '@angular/router';
 import { SinAcceso, soloInternos, soloRoles } from 'ui-comun';
-import { Seccion } from './seccion';
+import { ROLES_ACCIONES, Seccion } from './seccion';
 
 const p = (carga: () => Promise<unknown>, title: string) => ({ loadComponent: carga as never, title });
 
@@ -18,8 +18,16 @@ export const rutas: Routes = [
       { path: 'entregas-observadas', ...p(() => import('./viajes/ui/entregas').then((m) => m.EntregasPagina), 'Entregas observadas') },
       { path: 'intervenciones', ...p(() => import('./viajes/ui/intervenciones').then((m) => m.IntervencionesPagina), 'Intervenciones') },
       { path: 'servicios', ...p(() => import('./servicios/ui/servicios').then((m) => m.ServiciosPagina), 'Servicios') },
-      { path: 'acciones', ...p(() => import('./acciones/ui/acciones').then((m) => m.AccionesPagina), 'Acciones del agente') },
-      { path: 'acciones/:id', ...p(() => import('./acciones/ui/acciones').then((m) => m.AccionesPagina), 'Acción del agente') },
+      {
+        path: 'acciones',
+        canActivate: [soloRoles(...ROLES_ACCIONES)],
+        ...p(() => import('./acciones/ui/acciones').then((m) => m.AccionesPagina), 'Acciones del agente'),
+      },
+      {
+        path: 'acciones/:id',
+        canActivate: [soloRoles(...ROLES_ACCIONES)],
+        ...p(() => import('./acciones/ui/acciones').then((m) => m.AccionesPagina), 'Acción del agente'),
+      },
     ],
   },
   { path: '**', redirectTo: '' },

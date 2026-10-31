@@ -7,12 +7,13 @@ export class ServiciosRepositorio {
   private readonly gql = inject(ServiciosGQL);
   private readonly cancelarGql = inject(CancelarServicioGQL);
 
-  observar(estado: EstadoServicio, cadaMs: number) {
-    return this.gql.watch({ variables: { estado }, pollInterval: cadaMs }).valueChanges;
+  /** `verMonto`: el despachador no ve `Servicio.monto`, así que no se le pide (sin un SIN_PERMISO por fila). */
+  observar(estado: EstadoServicio, verMonto: boolean, cadaMs: number) {
+    return this.gql.watch({ variables: { estado, verMonto }, pollInterval: cadaMs }).valueChanges;
   }
 
-  recargar(estado: EstadoServicio) {
-    return this.gql.fetch({ variables: { estado } });
+  recargar(estado: EstadoServicio, verMonto: boolean) {
+    return this.gql.fetch({ variables: { estado, verMonto } });
   }
 
   cancelar(servicioId: string, motivo: string, clave: string) {

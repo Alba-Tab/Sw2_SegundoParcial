@@ -1,4 +1,4 @@
-import { fechaLaPaz } from 'ui-comun';
+import { fechaLaPaz } from 'ui-comun/dominio';
 import type { ReporteParams } from '../../graphql/generado';
 
 /** Analítica limita CUENTAS_POR_COBRAR a 92 días contando los dos extremos: 61 días hacia atrás y 30 hacia adelante. */

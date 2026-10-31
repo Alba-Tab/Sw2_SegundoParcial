@@ -1,4 +1,4 @@
-import { fechaLaPaz } from 'ui-comun';
+import { fechaLaPaz } from 'ui-comun/dominio';
 import type { MedioPago } from '../../graphql/generado';
 
 /** El pago que administración está cargando (spec 008); el monto va como texto con 2 decimales, nunca en float. */

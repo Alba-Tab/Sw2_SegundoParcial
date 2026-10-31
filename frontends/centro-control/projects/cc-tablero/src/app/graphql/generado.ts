@@ -24,23 +24,28 @@ export type Rol = 'administracion' | 'comercial' | 'despachador' | 'gerente' | '
 
 export type TableroQueryVariables = Exact<{
   periodo: Periodo;
+  verViajes: boolean;
+  verRiesgo: boolean;
+  verUnidades: boolean;
+  verCobranza: boolean;
+  verAlertas: boolean;
 }>;
 
 export type TableroQuery = {
   tablero: {
     periodo: Periodo;
-    alertasAbiertas: number | null;
-    datosAl: string | null;
-    viajesEnCurso: Array<{
+    alertasAbiertas?: number | null;
+    datosAl?: string | null;
+    viajesEnCurso?: Array<{
       viajeId: string;
       placa: string | null;
       choferNombre: string | null;
       cliente: { razonSocial: string };
       ruta: { nombre: string };
-      riesgo: { probabilidad: number; enRiesgo: boolean } | null;
+      riesgo?: { probabilidad: number; enRiesgo: boolean } | null;
     }> | null;
-    unidadesPorEstado: Array<{ estado: string; cantidad: number }> | null;
-    cuentasPorCobrar: {
+    unidadesPorEstado?: Array<{ estado: string; cantidad: number }> | null;
+    cuentasPorCobrar?: {
       saldoTotal: string;
       facturasPorVencer: number;
       facturasVencidas: number;
@@ -140,10 +145,17 @@ export type DispararMisionMutationVariables = Exact<{
 export type DispararMisionMutation = { dispararMision: { misionId: string } };
 
 export const TableroDocument = gql`
-  query Tablero($periodo: Periodo!) {
+  query Tablero(
+    $periodo: Periodo!
+    $verViajes: Boolean!
+    $verRiesgo: Boolean!
+    $verUnidades: Boolean!
+    $verCobranza: Boolean!
+    $verAlertas: Boolean!
+  ) {
     tablero(periodo: $periodo) {
       periodo
-      viajesEnCurso {
+      viajesEnCurso @include(if: $verViajes) {
         viajeId
         placa
         choferNombre
@@ -153,16 +165,16 @@ export const TableroDocument = gql`
         ruta {
           nombre
         }
-        riesgo {
+        riesgo @include(if: $verRiesgo) {
           probabilidad
           enRiesgo
         }
       }
-      unidadesPorEstado {
+      unidadesPorEstado @include(if: $verUnidades) {
         estado
         cantidad
       }
-      cuentasPorCobrar {
+      cuentasPorCobrar @include(if: $verCobranza) {
         saldoTotal
         facturasPorVencer
         facturasVencidas
@@ -174,8 +186,8 @@ export const TableroDocument = gql`
           venceEl
         }
       }
-      alertasAbiertas
-      datosAl
+      alertasAbiertas @include(if: $verAlertas)
+      datosAl @include(if: $verAlertas)
     }
   }
 `;

@@ -1,7 +1,8 @@
 // Capas por feature (AGENTS.md: "Por feature: domain/, data/, ui/. Fachada sobre Signals, repositorio sobre Apollo").
 // Como ArchUnit en Viajes o dependency-cruiser en Flota, falla si una capa importa lo que no le toca:
 //   - domain/: tipos y reglas puras; ni Angular, ni Apollo, ni rxjs, ni otras capas; del código generado, solo `import type`;
-//     de ui-comun, solo los ayudantes puros de dinero y fechas.
+//     de ui-comun, solo el punto de entrada puro `ui-comun/dominio` (el índice `ui-comun` carga Angular; de él, solo tipos).
+//   - ui-comun/dominio/: ese punto de entrada; no importa frameworks ni el resto de ui-comun.
 //   - ui/: consume la fachada; no importa los servicios generados (*GQL) ni Apollo; del generado, solo `import type`.
 //   - data/: el repositorio; no importa ui/ ni fachadas.
 // Uso: node scripts/capas.mjs (corre en npm run verificar).
@@ -17,24 +18,29 @@ const archivos = (dir) =>
 const importaciones = (texto) =>
   [...texto.matchAll(/^import\s+(type\s+)?([^'"]*?)\s*from\s+'([^']+)';/gms)].map((m) => ({
     soloTipos: !!m[1],
-    nombres: m[2].replace(/[{}]/g, '').split(',').map((n) => n.trim().replace(/^type\s+/, '')).filter(Boolean),
     desde: m[3],
   }));
 
-/** Lo de ui-comun que es puro (dinero en centavos, fechas de La Paz) y por eso puede usar el dominio. */
-const PUROS_DE_UI_COMUN = new Set(['aCentavos', 'desdeCentavos', 'sumarMontos', 'fechaLaPaz', 'pct']);
+const FRAMEWORKS = /^(@angular|apollo-angular|@apollo|rxjs|oidc-client-ts|graphql)/;
 
 const reglas = {
-  domain: ({ soloTipos, nombres, desde }) =>
-    desde === 'ui-comun' && !soloTipos && nombres.some((n) => !PUROS_DE_UI_COMUN.has(n))
-      ? `domain/ solo usa de ui-comun lo puro (${[...PUROS_DE_UI_COMUN].join(', ')})`
-      : /^(@angular|apollo-angular|@apollo|rxjs)/.test(desde)
+  domain: ({ soloTipos, desde }) =>
+    desde === 'ui-comun' && !soloTipos
+      ? "domain/ no importa el índice de ui-comun, que carga Angular: usa 'ui-comun/dominio'"
+      : FRAMEWORKS.test(desde)
         ? 'domain/ no importa frameworks'
-      : /\/(ui|data)\//.test(desde) || /\.fachada$/.test(desde)
-        ? 'domain/ no importa otras capas'
-        : /graphql\/generado$/.test(desde) && !soloTipos
-          ? 'domain/ solo importa tipos del código generado'
-          : null,
+        : /\/(ui|data)\//.test(desde) || /\.fachada$/.test(desde)
+          ? 'domain/ no importa otras capas'
+          : /graphql\/generado$/.test(desde) && !soloTipos
+            ? 'domain/ solo importa tipos del código generado'
+            : null,
+  // projects/ui-comun/dominio/: lo puro de ui-comun, que importa la capa domain/ de cada app.
+  dominio: ({ desde }) =>
+    FRAMEWORKS.test(desde)
+      ? 'ui-comun/dominio no importa frameworks'
+      : /^ui-comun/.test(desde) || /^\.\.\//.test(desde)
+        ? 'ui-comun/dominio no importa el resto de ui-comun'
+        : null,
   ui: ({ soloTipos, desde }) =>
     /^(apollo-angular|@apollo)/.test(desde)
       ? 'ui/ no usa Apollo: lo hace el repositorio'
@@ -59,4 +65,4 @@ if (fallas.length) {
   console.error(fallas.join('\n'));
   process.exit(1);
 }
-console.log('Capas por feature en orden (domain/, data/, ui/).');
+console.log('Capas por feature en orden (domain/, data/, ui/) y ui-comun/dominio sin frameworks.');
