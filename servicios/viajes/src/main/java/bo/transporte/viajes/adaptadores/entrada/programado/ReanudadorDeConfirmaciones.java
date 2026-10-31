@@ -22,7 +22,9 @@ class ReanudadorDeConfirmaciones {
         this.antiguedad = antiguedad;
     }
 
-    @Scheduled(fixedDelayString = "${saga.reanudar.intervalo:PT1M}", initialDelayString = "${saga.reanudar.intervalo:PT1M}")
+    @Scheduled(
+            fixedDelayString = "${saga.reanudar.intervalo:PT1M}",
+            initialDelayString = "${saga.reanudar.intervalo:PT1M}")
     public void reanudar() {
         try {
             int n = confirmacion.reanudarPendientes(antiguedad);

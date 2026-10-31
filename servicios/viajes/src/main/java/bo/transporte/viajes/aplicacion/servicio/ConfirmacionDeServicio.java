@@ -85,7 +85,8 @@ public class ConfirmacionDeServicio {
      */
     public int reanudarPendientes(Duration antiguedad) {
         int iniciadas = 0;
-        for (UUID clave : idempotencia.enProcesoAntesDe(OPERACION, reloj.instant().minus(antiguedad), 50)) {
+        for (UUID clave :
+                idempotencia.enProcesoAntesDe(OPERACION, reloj.instant().minus(antiguedad), 50)) {
             Servicio s = tx.enTransaccion(() -> idempotencia
                     .buscar(clave)
                     .filter(op -> op.estado() == Estado.EN_PROCESO)

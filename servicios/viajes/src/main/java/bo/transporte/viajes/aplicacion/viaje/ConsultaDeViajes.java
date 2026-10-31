@@ -56,13 +56,13 @@ public class ConsultaDeViajes {
         List<Viaje> pagina = filas.stream().limit(limite).toList();
         var ultimas = posiciones.de(pagina.stream().map(Viaje::viajeId).toList());
         // Clientes y rutas de toda la página en una consulta cada uno, no dos por viaje.
-        Map<UUID, String> razones = clientes.porIds(pagina.stream().map(Viaje::clienteId).collect(Collectors.toSet()))
-                .stream()
-                .collect(Collectors.toMap(Cliente::clienteId, c -> c.datos().razonSocial()));
-        Map<UUID, Ruta> rutasPorId = rutas
-                .porIds(pagina.stream().map(v -> v.asignacion().rutaId()).collect(Collectors.toSet()))
-                .stream()
-                .collect(Collectors.toMap(Ruta::rutaId, r -> r));
+        Map<UUID, String> razones =
+                clientes.porIds(pagina.stream().map(Viaje::clienteId).collect(Collectors.toSet())).stream()
+                        .collect(Collectors.toMap(
+                                Cliente::clienteId, c -> c.datos().razonSocial()));
+        Map<UUID, Ruta> rutasPorId =
+                rutas.porIds(pagina.stream().map(v -> v.asignacion().rutaId()).collect(Collectors.toSet())).stream()
+                        .collect(Collectors.toMap(Ruta::rutaId, r -> r));
         var items = pagina.stream()
                 .map(v -> ViajeVista.de(
                         v,
