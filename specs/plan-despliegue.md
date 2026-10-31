@@ -33,7 +33,7 @@ Estado: **aprobado** (28/10/2026). Parte de [plan-desarrollo.md](plan-desarrollo
 
 | Nube | Unidades |
 |---|---|
-| AWS | EC2: viajes, PostgreSQL de Viajes y Temporal, Temporal y su UI (por túnel), RabbitMQ (consola por túnel), Caddy. DynamoDB (20/5). S3 (POD y respaldos) |
+| AWS | EC2: viajes, PostgreSQL de Viajes y Temporal, Temporal y su UI (por túnel), RabbitMQ (consola por túnel), Caddy. DynamoDB (20/5). S3 (POD) |
 | GCP | Cloud Run: flota, gateway-erp, mcp-server. Worker pool: flota-worker. Atlas M0. Firebase con 5 sitios |
 | Azure | Container Apps con `maxReplicas = 1`: keycloak, finanzas, finanzas-worker, analitica, n8n. B1MS. LLM con GPU |
 
