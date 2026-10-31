@@ -296,7 +296,55 @@ describe('servidor MCP (spec 014)', () => {
     expect(r.body).toMatchObject({
       codigo: 'VALIDACION',
       type: 'https://transporte.local/errores/validacion',
+      title: 'La petición no es válida',
       detail: 'El cuerpo no es un JSON válido',
+    });
+    // El title es para personas, no el código.
+    const sin = await request(app.getHttpServer()).post('/mcp').send({});
+    expect(sin.body).toMatchObject({ codigo: 'NO_AUTENTICADO', title: 'No autenticado' });
+  });
+
+  it('X-Mision-Id que no es UUID → 400 VALIDACION sin llamar a Analítica; la llamada rechazada se audita', async () => {
+    const antes = pedidos.length;
+    const enviar = async (mision: string) =>
+      request(app.getHttpServer())
+        .post('/mcp')
+        .set('Authorization', `Bearer ${await token(['agente_lectura'], 'agente', 'mision-rara')}`)
+        .set('Content-Type', 'application/json')
+        .set('Accept', 'application/json, text/event-stream')
+        .set('X-Mision-Id', mision)
+        .send({
+          jsonrpc: '2.0',
+          id: 1,
+          method: 'tools/call',
+          params: {
+            name: 'proponer_accion',
+            arguments: {
+              tipo: 'AVISAR_CLIENTE_RETRASO',
+              viajeId: VIAJE,
+              destinatario: { clienteId: CLIENTE },
+              mensaje: 'Hay un bloqueo en Yapacaní según la bitácora del chofer.',
+              evidencia: [{ fuente: 'buscar_bitacora', referencia: 'h1', resumen: 'Bloqueo' }],
+            },
+          },
+        });
+    for (const mision of ['no-es-uuid', '01933c50-0000-7000-8000-0000000000ff, otra', '../misiones']) {
+      const r = await enviar(mision);
+      expect(r.status).toBe(400);
+      expect(r.headers['content-type']).toContain('application/problem+json');
+      expect(r.body).toEqual({
+        type: 'https://transporte.local/errores/validacion',
+        title: 'La petición no es válida',
+        status: 400,
+        codigo: 'VALIDACION',
+        detail: 'X-Mision-Id tiene que ser un UUID',
+      });
+    }
+    expect(pedidos.length).toBe(antes);
+    expect(auditoria.find((l) => l['actorSub'] === 'mision-rara')).toMatchObject({
+      accion: 'mcp.proponer_accion',
+      resultado: 'VALIDACION',
+      datos: {},
     });
   });
 
