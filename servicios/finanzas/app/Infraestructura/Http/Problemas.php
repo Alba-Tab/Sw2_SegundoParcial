@@ -21,12 +21,13 @@ final class Problemas
         'IDEMPOTENCIA_EN_PROCESO' => 409, 'PAGO_DUPLICADO' => 409, 'IDEMPOTENCIA_CUERPO_DISTINTO' => 422,
         'COTIZACION_VENCIDA' => 422, 'CREDITO_INSUFICIENTE' => 422, 'CREDITO_RECHAZADO' => 422,
         'APROBACION_VENCIDA' => 422, 'PAGO_EXCEDE_SALDO' => 422, 'TONELAJE_EXCEDIDO' => 422,
-        'CLIENTE_NO_REPLICADO' => 503, 'DEPENDENCIA_NO_DISPONIBLE' => 503,
+        'CLIENTE_NO_REPLICADO' => 503, 'DEPENDENCIA_NO_DISPONIBLE' => 503, 'ERROR_INTERNO' => 500,
     ];
 
     /** Código de una excepción HTTP del framework (ruta inexistente, cuerpo demasiado grande…) según su estado. */
     private const POR_ESTADO = [400 => 'VALIDACION', 401 => 'NO_AUTENTICADO', 403 => 'SIN_PERMISO', 404 => 'NO_ENCONTRADO',
-        405 => 'NO_ENCONTRADO', 409 => 'CONFLICTO_ESTADO', 413 => 'VALIDACION', 429 => 'LIMITE_PETICIONES'];
+        405 => 'NO_ENCONTRADO', 409 => 'CONFLICTO_ESTADO', 413 => 'VALIDACION', 429 => 'LIMITE_PETICIONES',
+        503 => 'DEPENDENCIA_NO_DISPONIBLE'];
 
     /** `title` para personas según el estado HTTP (000 §5), como Problemas.titulo de Viajes; el código va en `codigo`. */
     private const TITULOS = [
@@ -76,19 +77,19 @@ final class Problemas
             // PostgreSQL caído, reiniciándose o en interbloqueo: la petición se puede repetir.
             FallaTransitoria::es($e) => self::respuesta('DEPENDENCIA_NO_DISPONIBLE', 'Dependencia no disponible',
                 'La base de datos no responde; intenta de nuevo en unos segundos', 503, [], ['Retry-After' => '5']),
-            // 000 §5 no tiene un código para un error inesperado: sale 500 con DEPENDENCIA_NO_DISPONIBLE, como en Viajes.
-            default => self::respuesta('DEPENDENCIA_NO_DISPONIBLE', 'Error interno', 'Ocurrió un error inesperado', 500),
+            // Error inesperado: 500 ERROR_INTERNO (000 §5); la traza queda en el log, nunca en la respuesta.
+            default => self::respuesta('ERROR_INTERNO', 'Error interno', 'Ocurrió un error inesperado', 500),
         };
     }
 
     /**
      * Excepción HTTP del framework. 413 es el cuerpo que pasa `post_max_size` (ValidatePostSize): VALIDACION, con el
-     * detalle en español. Un estado sin código propio cae en VALIDACION (4xx) o DEPENDENCIA_NO_DISPONIBLE (5xx).
+     * detalle en español. Un estado sin código propio cae en VALIDACION (4xx) o ERROR_INTERNO (5xx).
      */
     private static function http(HttpExceptionInterface $e): JsonResponse
     {
         $estado = $e->getStatusCode();
-        $codigo = self::POR_ESTADO[$estado] ?? ($estado >= 500 ? 'DEPENDENCIA_NO_DISPONIBLE' : 'VALIDACION');
+        $codigo = self::POR_ESTADO[$estado] ?? ($estado >= 500 ? 'ERROR_INTERNO' : 'VALIDACION');
         $detalle = $estado === 413 ? 'El cuerpo de la petición pasa el tamaño máximo permitido' : ($e->getMessage() ?: self::titulo($estado));
 
         return self::respuesta($codigo, self::titulo($estado), $detalle, $estado, [], $e->getHeaders());

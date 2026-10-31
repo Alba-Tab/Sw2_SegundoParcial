@@ -2,6 +2,7 @@
 
 use App\Aplicacion\Puertos\RegistroDeEventos;
 use App\Infraestructura\Http\Middleware\Autenticacion;
+use App\Infraestructura\Http\Problemas;
 use App\Infraestructura\Log\FormatoJson;
 use App\Infraestructura\Log\Traza;
 use App\Infraestructura\Mensajeria\ConexionAmqp;
@@ -151,4 +152,13 @@ it('los logs llevan el traceId del traceparent en curso', function () {
     $registro = new LogRecord(new DateTimeImmutable, 'finanzas', Level::Info, 'hola', [], Context::all());
     expect(json_decode((new FormatoJson)->format($registro), true))->toMatchArray([
         'correlationId' => '0193a000-0000-7000-8000-00000000abcd', 'traceId' => '4bf92f3577b34da6a3ce929d0e0e4736']);
+});
+
+it('un error inesperado es 500 ERROR_INTERNO (000 §5), sin el mensaje interno', function () {
+    $r = Problemas::desde(new LogicException('columna rota en lineas_credito'));
+    $cuerpo = $r->getData(true);
+    expect($r->getStatusCode())->toBe(500)
+        ->and($cuerpo['codigo'])->toBe('ERROR_INTERNO')
+        ->and($cuerpo['title'])->toBe('Error interno')
+        ->and(json_encode($cuerpo))->not->toContain('columna');
 });
