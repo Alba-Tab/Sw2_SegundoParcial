@@ -141,6 +141,7 @@ Formato **Problem Details (RFC 9457)**, `Content-Type: application/problem+json`
 | `SIN_UNIDAD_COMPATIBLE` | 422 | No |
 | `CLIENTE_NO_REPLICADO` | 503 | Sí |
 | `DEPENDENCIA_NO_DISPONIBLE` | 503 | Sí |
+| `ERROR_INTERNO` | 500 | — (error inesperado del propio servicio; sin trazas ni mensajes internos en la respuesta, queda en el log con su `correlationId`. No se usa para una dependencia caída, que es `DEPENDENCIA_NO_DISPONIBLE`) |
 | `TONELAJE_EXCEDIDO` | 422 | No |
 | `APROBACION_VENCIDA` | 422 | No |
 | `CONFIRMACION_EN_CURSO` | 409 | — |
