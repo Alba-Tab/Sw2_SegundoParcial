@@ -37,7 +37,9 @@ export function useSincronizacion(alCancelarse: (viajeIds: string[]) => void, al
 
   // Nunca rechaza: los disparadores la llaman con `void` y un error inesperado no debe quedar sin capturar. La tanda
   // siguiente vuelve a intentar.
+  const [enviando, setEnviando] = useState(false);
   const sincronizar = useCallback(async (): Promise<Resumen | null> => {
+    setEnviando(true);
     try {
       const r = await motor.sincronizar();
       setUltimo(r);
@@ -47,6 +49,8 @@ export function useSincronizacion(alCancelarse: (viajeIds: string[]) => void, al
       return r;
     } catch {
       return null;
+    } finally {
+      setEnviando(false);
     }
   }, []);
 
@@ -69,5 +73,5 @@ export function useSincronizacion(alCancelarse: (viajeIds: string[]) => void, al
     };
   }, [sincronizar]);
 
-  return { enLinea, pendientes: pendientes ?? 0, conError: conError ?? 0, puntos: puntos ?? 0, ultimo, sincronizar };
+  return { enLinea, enviando, pendientes: pendientes ?? 0, conError: conError ?? 0, puntos: puntos ?? 0, ultimo, sincronizar };
 }

@@ -1,10 +1,24 @@
 import { esPositivo, normalizarMonto } from '../dominio/dinero';
+import { ErrorDeUsuario } from '../dominio/errores';
 import type { TipoEvidencia } from '../dominio/evidencia';
 import { descripcionValida, type OrigenHito, type TipoHito } from '../dominio/hito';
 import { kmh, type Lectura, MuestreoGps } from '../dominio/muestreo';
 import type { TipoOperacion } from '../dominio/operacion';
-import { puedeIniciar } from '../dominio/viaje';
-import type { Api, Archivos, Cola, Dispositivo, Evidencias, Ids, PosicionGuardada, PuntosGps, Reloj, Sesion, Viajes } from './puertos';
+import { estadoVisible, puedeIniciar } from '../dominio/viaje';
+import type {
+  Api,
+  Archivos,
+  Cola,
+  Dispositivo,
+  EnTransaccion,
+  Evidencias,
+  Ids,
+  PosicionGuardada,
+  PuntosGps,
+  Reloj,
+  Sesion,
+  Viajes,
+} from './puertos';
 
 /** Lo que hace el chofer. Las escrituras van primero a la cola local; el motor las envía cuando hay señal. */
 export class CasosDeUso {
@@ -23,6 +37,7 @@ export class CasosDeUso {
     private readonly evidencias: Evidencias,
     private readonly archivos: Archivos,
     private readonly posicionGuardada: PosicionGuardada | null = null,
+    private readonly enTransaccion: EnTransaccion = (fn) => fn(),
   ) {}
 
   /** Paso 1 (con señal): `GET /viajes/mios` a SQLite para operar sin red. */
@@ -33,7 +48,7 @@ export class CasosDeUso {
   /** Paso 2: el `opId` y la hora salen del celular al pulsar, no al enviar (FO1). */
   iniciarViaje(viajeId: string, posicion: { lat: number; lng: number } | null): string {
     const v = this.viajes.porId(viajeId);
-    if (!v || !puedeIniciar(v, this.viajes.todos())) throw new Error('Este viaje no se puede iniciar ahora');
+    if (!v || !puedeIniciar(v, this.viajes.todos())) throw new ErrorDeUsuario('Este viaje no se puede iniciar ahora');
     const opId = this.encolar(viajeId, 'INICIO', {
       dispositivoId: this.dispositivo.id(),
       iniciadoEn: this.reloj.ahora().toISOString(),
@@ -117,9 +132,10 @@ export class CasosDeUso {
    * audio se queda en el celular (D53).
    */
   registrarHito(viajeId: string, tipo: TipoHito, descripcion: string, origen: OrigenHito): string {
-    if (!descripcionValida(descripcion)) throw new Error('La descripción debe tener de 3 a 500 caracteres');
+    this.exigirEnRuta(viajeId);
+    if (!descripcionValida(descripcion)) throw new ErrorDeUsuario('La descripción debe tener de 3 a 500 caracteres');
     const posicion = this.ultimaPosicion();
-    if (!posicion) throw new Error('Esperando la posición del GPS; intenta en unos segundos');
+    if (!posicion) throw new ErrorDeUsuario('Esperando la posición del GPS; intenta en unos segundos');
     return this.encolar(viajeId, 'HITO', {
       hitoId: this.ids.nuevo(),
       tipo,
@@ -141,42 +157,49 @@ export class CasosDeUso {
     observacion: string | null,
     precisionMetros: number | null,
   ): string {
+    this.exigirEnRuta(viajeId);
     const posicion = this.exigirPosicion();
-    if (fotos.length < 1 || fotos.length > 3) throw new Error('Toma de 1 a 3 fotos de la entrega');
-    const idsFotos = fotos.map((f) => this.evidencia(viajeId, 'FOTO_ENTREGA', f));
-    const idFirma = firma ? this.evidencia(viajeId, 'FIRMA', firma.archivo) : null;
-    const opId = this.encolar(
-      viajeId,
-      'ENTREGA',
-      {
-        entregaId: this.ids.nuevo(),
-        entregadoEn: this.reloj.ahora().toISOString(),
-        posicion,
-        ...(precisionMetros !== null ? { precisionMetros } : {}),
-        fotos: idsFotos,
-        firma: idFirma && firma ? { evidenciaId: idFirma, nombreReceptor: firma.nombreReceptor.trim() } : null,
-        ...(observacion?.trim() ? { observacion: observacion.trim() } : {}),
-      },
-      idFirma ? [...idsFotos, idFirma] : idsFotos,
-    );
-    this.viajes.marcarEntregaLocal(viajeId, 'ENTREGA');
-    return opId;
+    if (fotos.length < 1 || fotos.length > 3) throw new ErrorDeUsuario('Toma de 1 a 3 fotos de la entrega');
+    return this.conEvidencias((evidencia) => {
+      const idsFotos = fotos.map((f) => evidencia(viajeId, 'FOTO_ENTREGA', f));
+      const idFirma = firma ? evidencia(viajeId, 'FIRMA', firma.archivo) : null;
+      const opId = this.encolar(
+        viajeId,
+        'ENTREGA',
+        {
+          entregaId: this.ids.nuevo(),
+          entregadoEn: this.reloj.ahora().toISOString(),
+          posicion,
+          ...(precisionMetros !== null ? { precisionMetros } : {}),
+          fotos: idsFotos,
+          firma: idFirma && firma ? { evidenciaId: idFirma, nombreReceptor: firma.nombreReceptor.trim() } : null,
+          ...(observacion?.trim() ? { observacion: observacion.trim() } : {}),
+        },
+        idFirma ? [...idsFotos, idFirma] : idsFotos,
+      );
+      this.viajes.marcarEntregaLocal(viajeId, 'ENTREGA');
+      return opId;
+    });
   }
 
   /** Spec 007: el receptor no acepta la carga; el motivo y de 1 a 3 fotos. */
   rechazar(viajeId: string, motivo: string, fotos: string[]): string {
+    this.exigirEnRuta(viajeId);
     const posicion = this.exigirPosicion();
-    if (motivo.trim().length < 3) throw new Error('Escribe el motivo del rechazo');
-    if (fotos.length < 1 || fotos.length > 3) throw new Error('Toma de 1 a 3 fotos');
-    const ids = fotos.map((f) => this.evidencia(viajeId, 'FOTO_RECHAZO', f));
-    const opId = this.encolar(
-      viajeId,
-      'RECHAZO',
-      { entregaId: this.ids.nuevo(), rechazadaEn: this.reloj.ahora().toISOString(), posicion, motivo: motivo.trim(), fotos: ids },
-      ids,
-    );
-    this.viajes.marcarEntregaLocal(viajeId, 'RECHAZO');
-    return opId;
+    if (motivo.trim().length < 3) throw new ErrorDeUsuario('Escribe el motivo del rechazo');
+    if (motivo.trim().length > 300) throw new ErrorDeUsuario('El motivo puede tener hasta 300 caracteres');
+    if (fotos.length < 1 || fotos.length > 3) throw new ErrorDeUsuario('Toma de 1 a 3 fotos');
+    return this.conEvidencias((evidencia) => {
+      const ids = fotos.map((f) => evidencia(viajeId, 'FOTO_RECHAZO', f));
+      const opId = this.encolar(
+        viajeId,
+        'RECHAZO',
+        { entregaId: this.ids.nuevo(), rechazadaEn: this.reloj.ahora().toISOString(), posicion, motivo: motivo.trim(), fotos: ids },
+        ids,
+      );
+      this.viajes.marcarEntregaLocal(viajeId, 'RECHAZO');
+      return opId;
+    });
   }
 
   /**
@@ -185,49 +208,81 @@ export class CasosDeUso {
    * normaliza como texto (000 §3), nunca como `number`.
    */
   cargarCombustible(viajeId: string, datos: { litros: number; monto: string; kilometraje: number; foto: string | null }): string {
+    this.exigirEnRuta(viajeId);
     const monto = normalizarMonto(datos.monto);
-    if (monto === null) throw new Error('Escribe el monto en Bs con hasta 2 decimales, por ejemplo 675,50');
+    if (monto === null) throw new ErrorDeUsuario('Escribe el monto en Bs con hasta 2 decimales, por ejemplo 675,50');
     if (!(datos.litros > 0) || !esPositivo(monto) || !(datos.kilometraje > 0)) {
-      throw new Error('Litros, monto y kilometraje deben ser mayores que 0');
+      throw new ErrorDeUsuario('Litros, monto y kilometraje deben ser mayores que 0');
     }
-    const foto = datos.foto ? this.evidencia(viajeId, 'RECIBO_COMBUSTIBLE', datos.foto) : null;
-    const opId = this.ids.nuevo();
-    const posicion = this.ultimaPosicion();
-    this.cola.agregar({
-      ...this.nueva(opId, viajeId, 'CARGA_COMBUSTIBLE', {
-        opId,
-        viajeId,
-        litros: datos.litros,
-        monto: { monto, moneda: 'BOB' },
-        kilometraje: datos.kilometraje,
-        registradaEn: this.reloj.ahora().toISOString(),
-        ...(posicion ? { posicion } : {}),
-        ...(foto ? { fotoReciboEvidenciaId: foto } : {}),
-      }),
-      evidencias: foto ? [foto] : [],
+    return this.conEvidencias((evidencia) => {
+      const foto = datos.foto ? evidencia(viajeId, 'RECIBO_COMBUSTIBLE', datos.foto) : null;
+      const opId = this.ids.nuevo();
+      const posicion = this.ultimaPosicion();
+      this.cola.agregar({
+        ...this.nueva(opId, viajeId, 'CARGA_COMBUSTIBLE', {
+          opId,
+          viajeId,
+          litros: datos.litros,
+          monto: { monto, moneda: 'BOB' },
+          kilometraje: datos.kilometraje,
+          registradaEn: this.reloj.ahora().toISOString(),
+          ...(posicion ? { posicion } : {}),
+          ...(foto ? { fotoReciboEvidenciaId: foto } : {}),
+        }),
+        evidencias: foto ? [foto] : [],
+      });
+      return opId;
     });
-    return opId;
   }
 
-  private evidencia(viajeId: string, tipo: TipoEvidencia, origen: string): string {
-    const evidenciaId = this.ids.nuevo();
-    const png = origen.toLowerCase().endsWith('.png');
-    const { archivo, tamanoBytes } = this.archivos.guardar(origen, `${evidenciaId}.${png ? 'png' : 'jpg'}`);
-    this.evidencias.agregar({
-      evidenciaId,
-      viajeId,
-      tipo,
-      archivo,
-      contentType: png ? 'image/png' : 'image/jpeg',
-      tamanoBytes,
-      estado: 'PENDIENTE',
-    });
-    return evidenciaId;
+  /**
+   * Copia las fotos y firmas y corre `fn` en una transacción: las filas de evidencia, la operación y la marca del viaje
+   * quedan todas o ninguna. Si algo falla a mitad (la segunda foto, la cola, la marca), además se borran las copias: sin
+   * esto quedaban evidencias huérfanas, o una entrega encolada que el chofer volvía a registrar.
+   */
+  private conEvidencias<T>(fn: (evidencia: (viajeId: string, tipo: TipoEvidencia, origen: string) => string) => T): T {
+    const hechas: { evidenciaId: string; archivo: string }[] = [];
+    try {
+      return this.enTransaccion(() =>
+        fn((viajeId, tipo, origen) => {
+          const evidenciaId = this.ids.nuevo();
+          const png = origen.toLowerCase().endsWith('.png');
+          const { archivo, tamanoBytes } = this.archivos.guardar(origen, `${evidenciaId}.${png ? 'png' : 'jpg'}`);
+          hechas.push({ evidenciaId, archivo });
+          this.evidencias.agregar({
+            evidenciaId,
+            viajeId,
+            tipo,
+            archivo,
+            contentType: png ? 'image/png' : 'image/jpeg',
+            tamanoBytes,
+            estado: 'PENDIENTE',
+          });
+          return evidenciaId;
+        }),
+      );
+    } catch (e) {
+      for (const h of hechas) {
+        // Cada borrado por su lado: uno que falla no corta la limpieza ni tapa el error original.
+        try {
+          this.evidencias.borrar(h.evidenciaId);
+        } catch {
+          // la transacción ya la deshizo
+        }
+        this.archivos.borrar(h.archivo);
+      }
+      throw e;
+    }
+  }
+
+  private exigirEnRuta(viajeId: string): void {
+    const v = this.viajes.porId(viajeId);
+    if (!v || estadoVisible(v) !== 'EN_RUTA') throw new ErrorDeUsuario('Este viaje ya no está en ruta');
   }
 
   private exigirPosicion(): { lat: number; lng: number } {
     const p = this.ultimaPosicion();
-    if (!p) throw new Error('Esperando la posición del GPS; intenta en unos segundos');
+    if (!p) throw new ErrorDeUsuario('Esperando la posición del GPS; intenta en unos segundos');
     return p;
   }
 

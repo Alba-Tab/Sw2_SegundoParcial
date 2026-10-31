@@ -114,11 +114,12 @@ export class PuntosSqlite implements PuntosGps {
       .run();
   }
 
-  contar(): number {
+  contar(viajeId?: string): number {
     return (
       bd
         .select({ n: sql<number>`count(*)` })
         .from(puntoGps)
+        .where(viajeId ? eq(puntoGps.viajeId, viajeId) : undefined)
         .get()?.n ?? 0
     );
   }
@@ -204,6 +205,10 @@ export class EvidenciasSqlite implements Evidencias {
 
   marcarCompleta(evidenciaId: string): void {
     bd.update(evidenciaLocal).set({ estado: 'COMPLETA' }).where(eq(evidenciaLocal.evidenciaId, evidenciaId)).run();
+  }
+
+  borrar(evidenciaId: string): void {
+    bd.delete(evidenciaLocal).where(eq(evidenciaLocal.evidenciaId, evidenciaId)).run();
   }
 }
 

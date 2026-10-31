@@ -7,10 +7,12 @@ import { captureRef } from 'react-native-view-shot';
 export interface FirmaRef {
   /** PNG de la firma en un archivo temporal, o null si está en blanco. */
   exportar(): Promise<string | null>;
+  /** Si el receptor ya trazó algo. */
+  firmada(): boolean;
 }
 
 /** Recuadro para que el receptor firme con el dedo (spec 006); se guarda como PNG. */
-export const Firma = forwardRef<FirmaRef>(function Firma(_props, ref) {
+export const Firma = forwardRef<FirmaRef, { alFirmar?: (firmando: boolean) => void }>(function Firma({ alFirmar }, ref) {
   const tema = useTheme();
   const vista = useRef<View>(null);
   const [trazos, setTrazos] = useState<string[]>([]);
@@ -20,7 +22,13 @@ export const Firma = forwardRef<FirmaRef>(function Firma(_props, ref) {
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
+      // Que la ScrollView de la entrega no se lleve el trazo cuando va en vertical.
+      onPanResponderTerminationRequest: () => false,
+      onShouldBlockNativeResponder: () => true,
+      onPanResponderRelease: () => alFirmar?.(false),
+      onPanResponderTerminate: () => alFirmar?.(false),
       onPanResponderGrant: (e) => {
+        alFirmar?.(true);
         actual.current = `M${e.nativeEvent.locationX.toFixed(1)},${e.nativeEvent.locationY.toFixed(1)}`;
         setTrazos((t) => [...t, actual.current]);
       },
@@ -32,6 +40,7 @@ export const Firma = forwardRef<FirmaRef>(function Firma(_props, ref) {
   ).current;
 
   useImperativeHandle(ref, () => ({
+    firmada: () => trazos.length > 0,
     exportar: async () => (trazos.length ? captureRef(vista, { format: 'png', quality: 1, result: 'tmpfile' }) : null),
   }));
 
@@ -50,7 +59,7 @@ export const Firma = forwardRef<FirmaRef>(function Firma(_props, ref) {
           ))}
         </Svg>
       </View>
-      <Button compact onPress={() => setTrazos([])} style={{ alignSelf: 'flex-end' }}>
+      <Button icon="eraser" onPress={() => setTrazos([])} style={{ alignSelf: 'flex-end' }}>
         Borrar firma
       </Button>
     </View>

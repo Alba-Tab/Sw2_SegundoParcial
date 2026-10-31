@@ -5,9 +5,11 @@ import type { Cola, PuntosGps } from './puertos';
 
 const pendiente = (opId: string) => ({ opId, estado: 'PENDIENTE' }) as Operacion;
 
-function armar(o: { pendientes?: number; puntos?: number; fallaGps?: boolean; sinRed?: boolean } = {}) {
+function armar(o: { pendientes?: number; fallidas?: number; puntos?: number; fallaGps?: boolean; sinRed?: boolean } = {}) {
   const pasos: string[] = [];
-  const cola = { todas: () => Array.from({ length: o.pendientes ?? 0 }, (_, i) => pendiente(`op-${i}`)) } as unknown as Cola;
+  const pendientes = Array.from({ length: o.pendientes ?? 0 }, (_, i) => pendiente(`op-${i}`));
+  const fallidas = Array.from({ length: o.fallidas ?? 0 }, (_, i) => ({ opId: `f-${i}`, estado: 'FALLIDA' }) as Operacion);
+  const cola = { todas: () => pendientes, visibles: () => [...pendientes, ...fallidas] } as unknown as Cola;
   const puntos = { contar: () => o.puntos ?? 0 } as unknown as PuntosGps;
   const cierre = new CierreSesion(
     cola,
@@ -52,7 +54,7 @@ describe('cerrar sesión (spec 005)', () => {
   });
 
   it('cuenta lo que se perdería al salir, para pedir confirmación', () => {
-    expect(armar().cierre.sinEnviar()).toEqual({ operaciones: 0, puntos: 0 });
-    expect(armar({ pendientes: 2, puntos: 37 }).cierre.sinEnviar()).toEqual({ operaciones: 2, puntos: 37 });
+    expect(armar().cierre.sinEnviar()).toEqual({ operaciones: 0, conError: 0, puntos: 0 });
+    expect(armar({ pendientes: 2, fallidas: 1, puntos: 37 }).cierre.sinEnviar()).toEqual({ operaciones: 2, conError: 1, puntos: 37 });
   });
 });

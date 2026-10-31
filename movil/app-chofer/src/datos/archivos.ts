@@ -1,5 +1,6 @@
 import { Directory, File, Paths } from 'expo-file-system';
 import type { Archivos } from '../aplicacion/puertos';
+import { ErrorDeUsuario } from '../dominio/errores';
 
 /**
  * Las fotos y firmas se copian a una carpeta propia de la app: la cámara y el selector dejan archivos temporales que
@@ -12,8 +13,32 @@ export const archivos: Archivos = {
     const carpeta = carpetaEvidencias();
     carpeta.create({ idempotent: true, intermediates: true });
     const destino = new File(carpeta, nombre);
-    new File(origen).copy(destino);
-    return { archivo: destino.uri, tamanoBytes: destino.size };
+    // `copy` devuelve una promesa: sin esperar, el tamaño todavía es null (NOT NULL en evidencia_local).
+    // react-native-view-shot puede devolver en Android una ruta sin esquema; File exige file://.
+    new File(origen.includes('://') ? origen : `file://${origen}`).copySync(destino);
+    const tamanoBytes = destino.size;
+    if (!tamanoBytes) {
+      if (destino.exists) destino.delete();
+      throw new ErrorDeUsuario('No se pudo guardar la imagen. Vuelve a intentarlo.');
+    }
+    return { archivo: destino.uri, tamanoBytes };
+  },
+
+  existe(archivo) {
+    try {
+      return new File(archivo).exists;
+    } catch {
+      return false;
+    }
+  },
+
+  borrar(archivo) {
+    try {
+      const f = new File(archivo);
+      if (f.exists) f.delete();
+    } catch {
+      // Si no se pudo, se borra con la carpeta al cerrar sesión.
+    }
   },
 
   /** Lee solo los bytes de una parte (5 MB), sin cargar la foto entera en memoria. */
