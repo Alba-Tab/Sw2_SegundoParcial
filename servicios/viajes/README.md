@@ -6,7 +6,8 @@ Clientes, cotizaciones confirmadas, servicios, viajes en ruta y la saga `Program
 |---|---|
 | Salud `GET /health` y `GET /health/ready` (PostgreSQL, RabbitMQ y Temporal), sin Keycloak (P10) | `adaptadores/entrada/web/SaludController` |
 | JWT de Keycloak: emisor `OIDC_ISSUER`, audiencia `viajes`, roles de `realm_access.roles`; sin `OIDC_ISSUER`, `/api/**` responde 503 `DEPENDENCIA_NO_DISPONIBLE` | `configuracion/SeguridadConfig` |
-| Problem Details (RFC 9457) con `codigo` y `correlationId` | `adaptadores/entrada/web/Problemas`, `ManejadorDeProblemas` |
+| Problem Details (RFC 9457) con `codigo` y `correlationId`; los errores de Tomcat y Spring (consulta mal codificada, tipo, parámetro o encabezado faltante, JSON ilegible) salen 400 `VALIDACION` con detalle en español | `adaptadores/entrada/web/Problemas`, `ManejadorDeProblemas` |
+| Cuerpos de hasta 256 KB (`servidor.cuerpo-maximo`); si pasan, 413 `VALIDACION`, también sin `Content-Length` | `adaptadores/entrada/web/LimiteCuerpoFiltro` |
 | `X-Correlation-Id`: se genera si no viene, va al MDC, a los logs y al sobre de los eventos | `adaptadores/entrada/web/CorrelacionFiltro` |
 | Tablas comunes (`operacion_idempotente`, `outbox_eventos`, `inbox_eventos`, `auditoria`) | `db/migration/V1__tablas_comunes.sql` |
 | Outbox y relay con confirmación del broker y `FOR UPDATE SKIP LOCKED`; con el broker caído, un WARN de una línea y una espera que se duplica de `outbox.espera-minima` a `outbox.espera-maxima` | `adaptadores/salida/persistencia/RegistroDeEventosOutbox`, `adaptadores/salida/mensajeria/RelayOutbox` |

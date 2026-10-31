@@ -27,6 +27,10 @@ server:
   port: ${PORT:8101}
   shutdown: graceful
 
+# Tope de los cuerpos JSON (LimiteCuerpoFiltro); si se pasa, 413 VALIDACION. Las evidencias van a S3 por URL firmada.
+servidor:
+  cuerpo-maximo: 256KB
+
 seguridad:
   issuer: ${OIDC_ISSUER:}
   audiencia: viajes
