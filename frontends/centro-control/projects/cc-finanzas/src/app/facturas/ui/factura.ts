@@ -1,5 +1,4 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { Component, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -9,10 +8,10 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { firstValueFrom, switchMap } from 'rxjs';
-import { AvisoServicios, BobPipe, completo, fechaLaPaz, FechaPipe, Intentos, mensajeDe, Sesion } from 'ui-comun';
-import { FacturaGQL, RegistrarPagoGQL, type FacturaQuery, type MedioPago } from '../graphql/generado';
-import { leerRecibo } from './ocr';
+import { AvisoServicios, BobPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { completarConRecibo } from '../domain/recibo';
+import { MEDIOS_PAGO, pagoNuevo, pagoValido } from '../domain/pago';
+import { FacturaFachada } from '../facturas.fachada';
 
 /**
  * Spec 008: administración registra un pago (baja el saldo y libera crédito). El OCR del recibo (Tesseract.js en el
@@ -20,6 +19,7 @@ import { leerRecibo } from './ocr';
  */
 @Component({
   selector: 'app-factura',
+  providers: [FacturaFachada],
   imports: [
     FormsModule,
     MatCardModule,
@@ -102,27 +102,24 @@ import { leerRecibo } from './ocr';
   `,
 })
 export class FacturaPagina {
-  private readonly gql = inject(FacturaGQL);
-  private readonly pagarGql = inject(RegistrarPagoGQL);
+  private readonly fachada = inject(FacturaFachada);
   private readonly avisos = inject(MatSnackBar);
   readonly sesion = inject(Sesion);
   readonly id = input.required<string>();
-  private readonly datos = toSignal(toObservable(this.id).pipe(switchMap((id) => this.gql.watch({ variables: { id } }).valueChanges)));
-  readonly factura = computed(() => completo<FacturaQuery>(this.datos())?.factura);
-  readonly error = computed(() => this.datos()?.error);
+  readonly factura = this.fachada.factura;
+  readonly error = this.fachada.error;
   readonly campos = { factura: 'Finanzas' };
-  readonly medios: MedioPago[] = ['TRANSFERENCIA', 'DEPOSITO', 'EFECTIVO', 'CHEQUE'];
+  readonly medios = MEDIOS_PAGO;
   readonly enviando = signal(false);
   readonly leyendo = signal(false);
-  pago = { monto: '', fecha: fechaLaPaz(), medio: 'TRANSFERENCIA' as MedioPago, referencia: '' };
-  /**
-   * Una clave por intento (spec 008): si la persona reintenta después de un corte con los mismos datos, Finanzas no
-   * registra dos pagos; si corrige el monto después de un error de negocio, la clave es nueva.
-   */
-  private readonly intentos = new Intentos();
+  pago = pagoNuevo();
+
+  constructor() {
+    effect(() => this.fachada.id.set(this.id()));
+  }
 
   valido(): boolean {
-    return /^(0|[1-9]\d{0,11})\.\d{2}$/.test(this.pago.monto) && this.pago.referencia.trim().length > 0;
+    return pagoValido(this.pago);
   }
 
   async ocr(evento: Event): Promise<void> {
@@ -130,8 +127,7 @@ export class FacturaPagina {
     if (!archivo) return;
     this.leyendo.set(true);
     try {
-      const leido = await leerRecibo(archivo);
-      this.pago = { ...this.pago, ...Object.fromEntries(Object.entries(leido).filter(([, v]) => v)) };
+      this.pago = completarConRecibo(this.pago, await this.fachada.leerRecibo(archivo));
       this.avisos.open('Revisa los datos leídos del recibo antes de registrar', undefined, { duration: 5000 });
     } catch {
       this.avisos.open('No se pudo leer el recibo; completa los datos a mano', 'Cerrar', { duration: 6000 });
@@ -143,13 +139,10 @@ export class FacturaPagina {
   async registrar(facturaId: string): Promise<void> {
     this.enviando.set(true);
     try {
-      const datos = { facturaId, ...this.pago };
-      await this.intentos.enviar(`registrarPago:${facturaId}`, datos, (clave) =>
-        this.pagarGql.mutate({ variables: { input: { ...datos, claveIdempotencia: clave } } }),
-      );
+      await this.fachada.registrarPago(facturaId, this.pago);
       this.avisos.open('Pago registrado: se liberó el crédito', undefined, { duration: 5000 });
       this.pago = { ...this.pago, monto: '', referencia: '' };
-      await firstValueFrom(this.gql.fetch({ variables: { id: this.id() } }));
+      await this.fachada.recargar();
     } catch (e) {
       this.avisos.open(mensajeDe(e), 'Cerrar', { duration: 6000 });
     } finally {

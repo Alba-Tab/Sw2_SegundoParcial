@@ -1,14 +1,13 @@
-import { Component, computed, inject, signal } from '@angular/core';
-import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { Component, inject } from '@angular/core';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { switchMap } from 'rxjs';
-import { AvisoServicios, BobPipe, completo, FechaPipe } from 'ui-comun';
-import { FacturasGQL, type FacturasQuery } from '../graphql/generado';
+import { AvisoServicios, BobPipe, FechaPipe } from 'ui-comun';
+import { FacturasFachada } from '../facturas.fachada';
 
 @Component({
   selector: 'app-facturas',
+  providers: [FacturasFachada],
   imports: [MatTableModule, MatButtonToggleModule, RouterLink, BobPipe, FechaPipe, AvisoServicios],
   template: `
     <div class="fila-acciones">
@@ -58,15 +57,10 @@ import { FacturasGQL, type FacturasQuery } from '../graphql/generado';
   `,
 })
 export class FacturasPagina {
-  private readonly gql = inject(FacturasGQL);
-  readonly conSaldo = signal<boolean | null>(true);
-  private readonly datos = toSignal(
-    toObservable(this.conSaldo).pipe(
-      switchMap((conSaldo) => this.gql.watch({ variables: { conSaldo }, pollInterval: 30_000 }).valueChanges),
-    ),
-  );
-  readonly facturas = computed(() => completo<FacturasQuery>(this.datos())?.facturas ?? []);
-  readonly error = computed(() => this.datos()?.error);
+  private readonly fachada = inject(FacturasFachada);
+  readonly conSaldo = this.fachada.conSaldo;
+  readonly facturas = this.fachada.facturas;
+  readonly error = this.fachada.error;
   readonly campos = { facturas: 'Finanzas' };
   readonly columnas = ['numero', 'cliente', 'monto', 'saldo', 'vence', 'estado'];
 }

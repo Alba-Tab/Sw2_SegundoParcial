@@ -1,15 +1,9 @@
-import { interpretar, rutasTesseract } from './ocr';
+import { completarConRecibo, interpretar } from './recibo';
 
 describe('OCR del recibo', () => {
-  it('D38: worker, core e idioma salen del hosting propio, nunca de un CDN', () => {
-    const rutas = rutasTesseract('https://finanzas.transporte.bo');
-    expect(rutas).toEqual({
-      workerPath: 'https://finanzas.transporte.bo/tesseract/worker.min.js',
-      corePath: 'https://finanzas.transporte.bo/tesseract/',
-      langPath: 'https://finanzas.transporte.bo/tesseract',
-      workerBlobURL: false,
-    });
-    expect(JSON.stringify(rutas)).not.toMatch(/jsdelivr|unpkg|cdn/);
+  it('lo leído reemplaza solo los campos que trae', () => {
+    const pago = { monto: '', fecha: '2026-10-30', medio: 'TRANSFERENCIA', referencia: 'A' };
+    expect(completarConRecibo(pago, { monto: '2800.00', referencia: undefined })).toEqual({ ...pago, monto: '2800.00' });
   });
 
   it('elige el mayor monto comparando centavos enteros, no floats', () => {

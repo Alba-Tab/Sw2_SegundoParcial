@@ -1,11 +1,11 @@
-import { Component, computed, inject } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, inject } from '@angular/core';
 import { MatTableModule } from '@angular/material/table';
-import { AvisoServicios, BobPipe, completo, FechaPipe } from 'ui-comun';
-import { CotizacionesGQL, type CotizacionesQuery } from '../graphql/generado';
+import { AvisoServicios, BobPipe, FechaPipe } from 'ui-comun';
+import { CotizacionesFachada } from '../cotizaciones.fachada';
 
 @Component({
   selector: 'app-cotizaciones',
+  providers: [CotizacionesFachada],
   imports: [MatTableModule, BobPipe, FechaPipe, AvisoServicios],
   template: `
     <h1>Cotizaciones</h1>
@@ -45,12 +45,11 @@ import { CotizacionesGQL, type CotizacionesQuery } from '../graphql/generado';
   `,
 })
 export class CotizacionesPagina {
-  private readonly datos = toSignal(inject(CotizacionesGQL).watch({ pollInterval: 30_000 }).valueChanges);
-  private readonly d = computed(() => completo<CotizacionesQuery>(this.datos()));
-  readonly cotizaciones = computed(() => this.d()?.cotizaciones ?? []);
-  readonly error = computed(() => this.datos()?.error);
+  private readonly fachada = inject(CotizacionesFachada);
+  readonly cotizaciones = this.fachada.cotizaciones;
+  readonly error = this.fachada.error;
   readonly campos = { cotizaciones: 'Finanzas', clientes: 'Viajes', rutas: 'Viajes' };
   readonly columnas = ['cliente', 'ruta', 'carga', 'monto', 'estado', 'creada'];
-  nombre = (id: string) => this.d()?.clientes?.find((c) => c.clienteId === id)?.razonSocial ?? id;
-  ruta = (id: string) => this.d()?.rutas?.find((r) => r.rutaId === id)?.nombre ?? id;
+  nombre = (id: string) => this.fachada.nombreCliente(id);
+  ruta = (id: string) => this.fachada.nombreRuta(id);
 }

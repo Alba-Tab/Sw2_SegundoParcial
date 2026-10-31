@@ -1,18 +1,18 @@
-import { Component, computed, inject, signal } from '@angular/core';
-import { toSignal } from '@angular/core/rxjs-interop';
+import { Component, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { firstValueFrom } from 'rxjs';
-import { AvisoServicios, BobPipe, completo, FechaPipe, Intentos, mensajeDe, Sesion } from 'ui-comun';
-import { AprobarCreditoGQL, SolicitudesGQL, type SolicitudesQuery } from '../graphql/generado';
+import { AvisoServicios, BobPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { CreditoFachada } from '../credito.fachada';
+import { puedeRechazar } from '../domain/credito';
 
 /** Spec 012 (paso 2b de la saga): cliente en mora; administración aprueba o rechaza antes de que venza la espera. */
 @Component({
   selector: 'app-aprobaciones',
+  providers: [CreditoFachada],
   imports: [FormsModule, MatCardModule, MatButtonModule, MatFormFieldModule, MatInputModule, BobPipe, FechaPipe, AvisoServicios],
   template: `
     <h1>Aprobación de crédito</h1>
@@ -41,7 +41,7 @@ import { AprobarCreditoGQL, SolicitudesGQL, type SolicitudesQuery } from '../gra
                 <button
                   mat-stroked-button
                   (click)="decidir(s.servicioId, false)"
-                  [disabled]="enviando() || (motivos[s.servicioId] ?? '').trim().length < 3"
+                  [disabled]="enviando() || !puedeRechazar(motivos[s.servicioId])"
                 >
                   Rechazar
                 </button>
@@ -63,27 +63,23 @@ import { AprobarCreditoGQL, SolicitudesGQL, type SolicitudesQuery } from '../gra
   `,
 })
 export class AprobacionesPagina {
-  private readonly gql = inject(SolicitudesGQL);
-  private readonly decidirGql = inject(AprobarCreditoGQL);
+  private readonly fachada = inject(CreditoFachada);
   private readonly avisos = inject(MatSnackBar);
   readonly sesion = inject(Sesion);
-  private readonly datos = toSignal(this.gql.watch({ pollInterval: 15_000 }).valueChanges);
-  readonly solicitudes = computed(() => completo<SolicitudesQuery>(this.datos())?.solicitudesAprobacion ?? []);
-  readonly error = computed(() => this.datos()?.error);
+  readonly solicitudes = this.fachada.solicitudes;
+  readonly error = this.fachada.error;
   readonly campos = { solicitudesAprobacion: 'Finanzas' };
   readonly enviando = signal(false);
-  private readonly intentos = new Intentos();
+  readonly puedeRechazar = puedeRechazar;
   motivos: Record<string, string> = {};
 
   async decidir(servicioId: string, aprobado: boolean): Promise<void> {
     this.enviando.set(true);
     try {
       const motivo = this.motivos[servicioId]?.trim() || undefined;
-      await this.intentos.enviar(`aprobarCredito:${servicioId}`, { aprobado, motivo }, (clave) =>
-        this.decidirGql.mutate({ variables: { servicioId, aprobado, motivo, clave } }),
-      );
+      await this.fachada.decidir(servicioId, aprobado, motivo);
       this.avisos.open(aprobado ? 'Crédito aprobado: la saga sigue' : 'Crédito rechazado', undefined, { duration: 5000 });
-      await firstValueFrom(this.gql.fetch());
+      await this.fachada.recargar();
     } catch (e) {
       this.avisos.open(mensajeDe(e), 'Cerrar', { duration: 6000 });
     } finally {
