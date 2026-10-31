@@ -49,7 +49,10 @@ if [ -n "$GRUPO" ]; then
   done
 fi
 
-echo "5. Encendiendo relays y consumidores"
+echo "5. Vaciando Mailpit (los demos cuentan correos)"
+curl -sf -X DELETE "http://localhost:8025/api/v1/messages" >/dev/null && echo "   correos borrados" || echo "   Mailpit no responde"
+
+echo "6. Encendiendo relays y consumidores"
 # up -d (no start): si la imagen cambió desde la última vez, recrea el contenedor con la nueva.
 dc up -d $SERVICIOS >/dev/null
 echo "Demo reiniciada: semilla de plataforma/semilla en todos los servicios, colas vacías y sin workflows abiertos."

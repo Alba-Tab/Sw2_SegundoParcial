@@ -118,6 +118,10 @@ cola() { # cola <nombre> -> mensajes en la cola (las estadísticas de la consola
   curl -sf -u "$RABBITMQ_ADMIN:$RABBITMQ_ADMIN_CLAVE" "http://localhost:15672/api/queues/%2F/$1" | json "str(d.get('messages', 0))"
 }
 
+consumidores() { # consumidores <nombre> -> consumidores conectados a la cola
+  curl -sf -u "$RABBITMQ_ADMIN:$RABBITMQ_ADMIN_CLAVE" "http://localhost:15672/api/queues/%2F/$1" | json "str(d.get('consumers', 0))"
+}
+
 publicar() { # publicar <claveEnrutamiento> <sobre JSON>: en transporte.events por la API de administración
   curl -sf -u "$RABBITMQ_ADMIN:$RABBITMQ_ADMIN_CLAVE" -H 'content-type: application/json' -X POST \
     "http://localhost:15672/api/exchanges/%2F/transporte.events/publish" \
