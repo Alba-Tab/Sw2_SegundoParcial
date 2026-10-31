@@ -3,6 +3,7 @@
 use App\Infraestructura\Temporal\FinanzasActividades;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
+use Temporal\Exception\Failure\ApplicationErrorCategory;
 use Temporal\Exception\Failure\ApplicationFailure;
 
 /** Actividades Finanzas.* de la saga (spec 003) y el paso 2b (spec 012), llamadas como lo hace el worker. */
@@ -107,7 +108,8 @@ it('crédito insuficiente no reintenta, trae el detalle y no deja nada a medias'
     DB::table('linea_credito')->where('cliente_id', CLIENTE)->update(['limite' => '5000.00']);
     $cot = cotizacion($this, LA_PAZ, 20);
     $f = falla(fn () => reservar((string) Str::uuid7(), $cot));
-    expect($f->getType())->toBe('CREDITO_INSUFICIENTE')->and($f->isNonRetryable())->toBeTrue();
+    expect($f->getType())->toBe('CREDITO_INSUFICIENTE')->and($f->isNonRetryable())->toBeTrue()
+        ->and($f->getApplicationErrorCategory())->toBe(ApplicationErrorCategory::Benign);
     expect($f->getDetails()->getValue(0, 'array'))->toMatchArray(['codigo' => 'CREDITO_INSUFICIENTE',
         'datos' => ['disponible' => ['monto' => '5000.00', 'moneda' => 'BOB'], 'monto' => ['monto' => '7600.00', 'moneda' => 'BOB']]]);
     expect(DB::table('cotizacion')->where('cotizacion_id', $cot)->value('estado'))->toBe('VIGENTE')
@@ -118,7 +120,8 @@ it('crédito insuficiente no reintenta, trae el detalle y no deja nada a medias'
 it('cotización ajena, inexistente, vencida o ya usada', function () {
     consumidor()->aplicar(clienteActualizado(OTRO_CLIENTE, 1, 'Agro Moroso'));
     $ajena = cotizacion($this, AULA, 10, OTRO_CLIENTE);
-    expect(falla(fn () => reservar((string) Str::uuid7(), $ajena))->getType())->toBe('COTIZACION_AJENA')
+    $f = falla(fn () => reservar((string) Str::uuid7(), $ajena));
+    expect($f->getType())->toBe('COTIZACION_AJENA')->and($f->getApplicationErrorCategory())->toBe(ApplicationErrorCategory::Benign)
         ->and(falla(fn () => reservar((string) Str::uuid7(), (string) Str::uuid7()))->getType())->toBe('COTIZACION_AJENA');
 
     $usada = cotizacion($this, AULA, 10);
@@ -133,7 +136,8 @@ it('cotización ajena, inexistente, vencida o ya usada', function () {
 
 it('un cliente sin copia todavía es reintentable', function () {
     $f = falla(fn () => reservar((string) Str::uuid7(), (string) Str::uuid7(), '01933b5a-1f00-7a20-8b11-0c2d3e4f5aff'));
-    expect($f->getType())->toBe('CLIENTE_NO_REPLICADO')->and($f->isNonRetryable())->toBeFalse();
+    expect($f->getType())->toBe('CLIENTE_NO_REPLICADO')->and($f->isNonRetryable())->toBeFalse()
+        ->and($f->getApplicationErrorCategory())->toBe(ApplicationErrorCategory::Unspecified);
 });
 
 it('con mora queda PENDIENTE_APROBACION, crea la solicitud y administración la ve con sus facturas', function () {

@@ -43,8 +43,31 @@ it('rechaza más de 30 t con 422 TONELAJE_EXCEDIDO y lo registra como INFO, no c
     Log::listen(function (MessageLogged $m) use (&$niveles) {
         $niveles[$m->message] = $m->level;
     });
-    cotizar($this, 'sub-1~cliente~'.CLIENTE, ['toneladas' => 31] + $laPaz20)->assertStatus(422)->assertJsonPath('codigo', 'TONELAJE_EXCEDIDO');
+    cotizar($this, 'sub-1~cliente~'.CLIENTE, ['toneladas' => 31] + $laPaz20)->assertStatus(422)->assertJsonPath('codigo', 'TONELAJE_EXCEDIDO')
+        ->assertJsonPath('title', 'Regla de negocio no cumplida');
     expect($niveles)->toMatchArray(['El máximo por servicio es 30 t' => 'info']);
+});
+
+/** POST con el cuerpo tal cual: json_encode de PHP no escribe 1E1 ni 1e400. */
+function cotizarCrudo($prueba, string $usuario, string $toneladas, string $llave = 'toneladas')
+{
+    $cuerpo = '{"rutaId":"'.LA_PAZ.'","tipoCarga":"GRANOS","fechaViaje":"2026-11-10","'.$llave.'":'.$toneladas.'}';
+
+    return $prueba->call('POST', '/api/v1/cotizaciones', [], [], [], ['CONTENT_TYPE' => 'application/json',
+        'HTTP_ACCEPT' => 'application/json', 'HTTP_AUTHORIZATION' => 'Bearer prueba', 'HTTP_X_PRUEBA' => $usuario,
+        'HTTP_IDEMPOTENCY_KEY' => (string) Str::uuid()], $cuerpo);
+}
+
+it('toneladas: valida el literal que llegó; exponente, infinito o una llave con escapes dan 400, nunca 500', function () {
+    $u = 'sub-1~cliente~'.CLIENTE;
+    foreach (['1E1', '2e1', '1.0e1', '1e1', '2E+1', '1e400', '-1e400', '1e-400'] as $t) {
+        cotizarCrudo($this, $u, $t)->assertStatus(400)->assertJsonPath('codigo', 'VALIDACION')
+            ->assertJsonPath('title', 'Petición inválida')->assertJsonPath('errores.0.campo', 'toneladas');
+    }
+    cotizarCrudo($this, $u, '2e1', 'tonelad\\u0061s')->assertStatus(400)->assertJsonPath('errores.0.campo', 'toneladas');
+    cotizarCrudo($this, $u, '30.0000001')->assertStatus(400)->assertJsonPath('errores.0.campo', 'toneladas');
+    cotizarCrudo($this, $u, '20.10')->assertStatus(201)->assertJsonPath('toneladas', 20.1)->assertJsonPath('monto.monto', '7638.00');
+    expect(DB::table('operacion_idempotente')->count())->toBe(1);
 });
 
 it('toneladas: como máximo 2 decimales, sin exponente y el tope de 30 t con escala 2', function () use ($laPaz20) {
@@ -69,12 +92,14 @@ it('con rol cliente ignora el clienteId del cuerpo; comercial lo exige y registr
 
 it('cliente aún no replicado: 503 CLIENTE_NO_REPLICADO con Retry-After 2', function () use ($laPaz20) {
     cotizar($this, 'sub-2~cliente~'.OTRO_CLIENTE, $laPaz20)->assertStatus(503)
-        ->assertJsonPath('codigo', 'CLIENTE_NO_REPLICADO')->assertHeader('Retry-After', '2');
+        ->assertJsonPath('codigo', 'CLIENTE_NO_REPLICADO')->assertJsonPath('title', 'Dependencia no disponible')
+        ->assertHeader('Retry-After', '2');
 });
 
 it('ruta inexistente 404, sin tarifa 400 y fecha pasada 400', function () use ($laPaz20) {
     $u = 'sub-1~cliente~'.CLIENTE;
-    cotizar($this, $u, ['rutaId' => '01933a00-0000-7000-8000-0000000000ff'] + $laPaz20)->assertStatus(404);
+    cotizar($this, $u, ['rutaId' => '01933a00-0000-7000-8000-0000000000ff'] + $laPaz20)->assertStatus(404)
+        ->assertJsonPath('title', 'No encontrado');
     cotizar($this, $u, ['tipoCarga' => 'CONTENEDOR'] + $laPaz20)->assertStatus(400)->assertJsonPath('codigo', 'VALIDACION');
     cotizar($this, $u, ['fechaViaje' => '2026-11-01'] + $laPaz20)->assertStatus(400);
     cotizar($this, $u, ['fechaViaje' => '2027-03-01'] + $laPaz20)->assertStatus(400);

@@ -12,12 +12,17 @@ use Illuminate\Support\Facades\Log;
 use Temporal\Activity\ActivityInterface;
 use Temporal\Activity\ActivityMethod;
 use Temporal\DataConverter\EncodedValues;
+use Temporal\Exception\Failure\ApplicationErrorCategory;
 use Temporal\Exception\Failure\ApplicationFailure;
 
 /**
  * Actividades Finanzas.* de la saga ProgramarViaje (contratos/temporal/programar-viaje.md), cola `finanzas`. Cada una
  * corre su caso de uso en una transacción. Un ErrorDeDominio sale como ApplicationFailure con `type` = código y un
  * DetalleFallo; CLIENTE_NO_REPLICADO y DEPENDENCIA_NO_DISPONIBLE son reintentables, los demás no (S9).
+ *
+ * Un error de negocio no reintentable (CREDITO_INSUFICIENTE, COTIZACION_AJENA…) es una respuesta esperada de la saga:
+ * sale con la categoría BENIGN, y el SDK de Go de RoadRunner lo deja en DEBUG en vez de "Activity error." en ERROR. El
+ * registro que queda es el INFO de esta clase. Las fallas reintentables siguen en ERROR en cada intento.
  */
 #[ActivityInterface(prefix: 'Finanzas.')]
 final class FinanzasActividades
@@ -81,8 +86,9 @@ final class FinanzasActividades
         } catch (ErrorDeDominio $e) {
             Log::info('Actividad con error de negocio', ['codigo' => $e->codigo, 'mensaje' => $e->getMessage()]);
             $detalle = array_filter(['codigo' => $e->codigo, 'mensaje' => $e->getMessage(), 'datos' => $e->datos ?: null]);
-            throw new ApplicationFailure($e->getMessage(), $e->codigo, ! in_array($e->codigo, self::REINTENTABLES, true),
-                EncodedValues::fromValues([$detalle]));
+            $noReintentable = ! in_array($e->codigo, self::REINTENTABLES, true);
+            throw new ApplicationFailure($e->getMessage(), $e->codigo, $noReintentable, EncodedValues::fromValues([$detalle]),
+                category: $noReintentable ? ApplicationErrorCategory::Benign : ApplicationErrorCategory::Unspecified);
         }
     }
 }
