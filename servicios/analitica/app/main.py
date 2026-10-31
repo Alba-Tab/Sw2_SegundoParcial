@@ -15,7 +15,7 @@ from sqlalchemy import text
 from starlette.concurrency import run_in_threadpool
 
 from app.api import errores
-from app.api.limite import Limitador
+from app.api.limite import Limitador, LimiteCuerpo
 from app.api.rutas_acciones import rutas as rutas_acciones
 from app.api.rutas_agente import rutas as rutas_agente
 from app.api.rutas_lectura import rutas as rutas_lectura
@@ -57,11 +57,12 @@ async def ciclo(app: FastAPI) -> AsyncIterator[None]:
     yield
     if tareas:
         tareas.shutdown(wait=False)
-    for t in (tarea, tarea_relay):
-        if t:
-            t.cancel()
     await consumidor.detener()
     await relay.detener()
+    pendientes = [t for t in (tarea, tarea_relay) if t]
+    for t in pendientes:
+        t.cancel()
+    await asyncio.gather(*pendientes, return_exceptions=True)
 
 
 # /docs y /openapi.json solo si se piden (DOCUMENTACION_API=true en local): no se sirven sin token (el contrato está
@@ -84,6 +85,8 @@ if configuracion().cors_origenes:
         allow_methods=["GET", "POST"],
         allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Correlation-Id"],
     )
+# Queda dentro de `autenticar_api`: primero el token (401) y después el tamaño del cuerpo (413).
+app.add_middleware(LimiteCuerpo)
 
 
 @app.middleware("http")
@@ -116,6 +119,7 @@ def salud_lista(request: Request) -> JSONResponse:
         dependencias["postgres"] = "UP"
     except Exception:
         pass
+    # `conectado` es el estado real: pasa a False apenas se cierra la conexión o el canal con RabbitMQ (FC5).
     consumidor = getattr(request.app.state, "consumidor", None)
     if not configuracion().consumir_eventos or (consumidor and consumidor.conectado):
         dependencias["rabbitmq"] = "UP"

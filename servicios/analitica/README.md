@@ -18,6 +18,7 @@ consumidor de `analitica.eventos`. Es la única fuente de alertas del Centro de 
 ## Modelo de lectura (T8.1)
 
 - Cada evento se valida contra su contrato; inválido o sin manejador → `analitica.eventos.dlq`. Una falla de la base se reencola (la cola de quórum lo manda a la DLQ a las 5 entregas).
+- Reconexión propia, sin `connect_robust` (FC5): conecta, fija el `prefetch`, consume y espera a que se cierre la conexión o el canal; entonces vuelve a conectar con espera creciente (1 s a 30 s). `/health/ready` da `rabbitmq: DOWN` (503) mientras no hay consumidor.
 - Inbox por `id` del sobre en la misma transacción que los hechos, las alertas y `datosAl` (el mayor `ocurridoEn`).
 - Copias de `cliente`, `ruta` y `chofer` por `versionAgregado`; `hecho_viaje` se crea parcial si un evento llega antes que `ViajeConfirmado`; un estado final no retrocede.
 - `hecho_conduccion` guarda frenadas y fatigas; el puntaje por cada 100 km se calcula al consultar `GET /api/v1/conduccion`.
@@ -48,9 +49,9 @@ consumidor de `analitica.eventos`. Es la única fuente de alertas del Centro de 
 
 ## Acciones propuestas y aviso al cliente (T8.6)
 
-- `POST /api/v1/acciones` (solo `agente_lectura`, por el MCP): una por `(tipo, viaje)` salvo `ARCHIVADA` (índice único parcial). La repetida devuelve la existente con `creada = false`. El viaje tiene que estar `EN_RUTA` o `ENTREGA_OBSERVADA` y con probabilidad ≥ 0,70 o una `RIESGO_RETRASO` sin resolver; si no, `409 CONFLICTO_ESTADO` (FM2: una bitácora maliciosa no abre avisos para otros viajes). El destinatario tiene que ser el cliente del viaje. Hay como máximo 3 por misión (`X-Mision-Id`, D86). Abre la alerta `ACCION_PROPUESTA`.
+- `POST /api/v1/acciones` (solo `agente_lectura`, por el MCP): una por `(tipo, viaje)` salvo `ARCHIVADA` (índice único parcial). La repetida devuelve la existente con `creada = false`. El viaje tiene que estar `EN_RUTA` o `ENTREGA_OBSERVADA` y con probabilidad ≥ 0,70 o una `RIESGO_RETRASO` sin resolver; si no, `409 CONFLICTO_ESTADO` (FM2: una bitácora maliciosa no abre avisos para otros viajes). El destinatario tiene que ser el cliente del viaje (`422 DESTINATARIO_INVALIDO`, antes de buscar la existente). Hay como máximo 3 por misión (`X-Mision-Id`, D86): el id tiene que ser una misión `EN_CURSO` de la base (si no, `409 CONFLICTO_ESTADO`) y su fila se bloquea mientras se cuenta; sin la cabecera (opcional en el contrato) no hay misión que contar. Abre la alerta `ACCION_PROPUESTA`.
 - Aprobar (solo `despachador`, con `Idempotency-Key`): en una transacción pasa a `APROBADA`, se audita y se escribe `AvisoClienteAprobado` en el `outbox`. El destinatario y el correo salen de la copia `cliente`; el asunto, de la plantilla; el enlace, de `PORTAL_URL`. Rechazar → `RECHAZADA`. El gerente recibe 403.
-- El relay del Outbox (Python, cada 2 s) reclama con `SKIP LOCKED` y publica `mandatory` con confirmación del broker. Recién después marca publicado y pasa la acción a `EJECUTADA`; un mensaje sin ruta queda pendiente y la acción sigue `APROBADA`. El sobre lleva el `traceparent` de la aprobación. n8n (`aviso-cliente`) envía el correo una sola vez por `eventId`.
+- El relay del Outbox (Python, cada 2 s) reclama con `SKIP LOCKED` y publica `mandatory` con confirmación del broker. Recién después marca publicado y pasa la acción a `EJECUTADA`; un mensaje sin ruta queda pendiente y la acción sigue `APROBADA`. El sobre lleva el `traceparent` de la aprobación. n8n (`aviso-cliente`) envía el correo una sola vez por `eventId`. Usa una conexión simple: si el broker la cierra, o una publicación falla o no se confirma en 10 s, la suelta y la vuelta siguiente abre otra.
 - Un job cada 5 min archiva las `PENDIENTE` de más de 24 h o cuyo viaje terminó (D87).
 
 ## Agente "vigilar viajes" (T10.2, spec 014)
@@ -65,12 +66,13 @@ consumidor de `analitica.eventos`. Es la única fuente de alertas del Centro de 
 - El reporte se corre por el MCP (`ejecutar_reporte`) con el token del usuario **intercambiado otra vez** hacia `mcp-server`: cc-tablero → gateway → analitica → mcp-server → analitica. La redacción usa el prompt `redactar_respuesta_reporte`. Si el texto trae un número que no está en las filas o los totales, o el LLM no responde, se usa la plantilla ("8.400" no vale por 8.400,50).
 - Cada opción de una `ACLARACION` trae parámetros completos (fechas del periodo o, si no sirven, las de por defecto del reporte): la pantalla la corre sin el LLM.
 - Keycloak o el MCP caídos → `503 DEPENDENCIA_NO_DISPONIBLE` en Problem Details. Las tres rutas de voz tienen un límite de 20 peticiones por minuto y por `sub` (`VOZ_PETICIONES_POR_MINUTO`) → `429 LIMITE_PETICIONES` con `Retry-After`.
-- Plan B de K1 (`VOZ_CADENA=DOS_SALTOS`): `POST /voz/interpretaciones` y `POST /voz/redacciones`, y el Gateway llama al MCP. `redacciones` valida el `ReporteResultado` (400), exige que el rol vea ese reporte (403) y responde `exportable = false`.
+- Plan B de K1 (`VOZ_CADENA=DOS_SALTOS`): `POST /voz/interpretaciones` y `POST /voz/redacciones`, y el Gateway llama al MCP. `redacciones` valida el `ReporteResultado` sin claves de más (solo `grafico.datos` y el `truncado` del MCP) y con largos máximos (400), exige que el rol vea ese reporte (403) y responde `exportable = false`.
 
 ## Trazas y errores
 
 - OpenTelemetry (D23) solo si `OTEL_EXPORTER_OTLP_ENDPOINT` está definido (OTLP/HTTP, `…/v1/traces`): FastAPI, httpx y SQLAlchemy, más un span por evento consumido (continúa el `traceparent` del sobre), por predicción, por alerta, por turno del LLM y por herramienta. Las llamadas al MCP y al LLM llevan `traceparent` y `X-Correlation-Id`.
 - Un error inesperado responde `500` en Problem Details (`ERROR_INTERNO`) y queda en el log; una dependencia caída, `503` con `Retry-After`.
+- Un cuerpo de más de 256 KB (con `Content-Length` o en trozos) responde `413` en Problem Details (`VALIDACION`).
 - `/docs` y `/openapi.json` están apagados; `DOCUMENTACION_API=true` los enciende en local.
 - En el Excel, un texto que empieza con `=`, `+`, `-`, `@`, tabulación o retorno de carro se guarda como texto (nunca como fórmula).
 
