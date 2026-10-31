@@ -2,7 +2,7 @@
 
 import asyncio
 from datetime import datetime
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Query, Request
@@ -93,18 +93,46 @@ class Pregunta(BaseModel):
     texto: str = Field(min_length=3, max_length=300)
 
 
-class ResultadoReporte(BaseModel):
-    """`ReporteResultado` del contrato: lo manda el Gateway (plan B), así que se valida antes de usarlo."""
+class Columna(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    clave: str = Field(max_length=60)
+    titulo: str = Field(max_length=120)
+    tipo: Literal["TEXTO", "MONTO", "NUMERO", "PORCENTAJE", "FECHA", "INSTANTE", "BOOLEANO"]
 
-    model_config = ConfigDict(extra="allow")
+
+class Serie(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    clave: str = Field(max_length=60)
+    titulo: str = Field(max_length=120)
+
+
+class Grafico(BaseModel):
+    """`datos` es lo que agrega `ejecutarReporte` para dibujar el gráfico."""
+
+    model_config = ConfigDict(extra="forbid")
+    tipo: Literal["BARRAS", "BARRAS_APILADAS"]
+    ejeX: str = Field(max_length=60)
+    series: list[Serie] = Field(max_length=10)
+    datos: list[dict[str, Any]] | None = Field(default=None, max_length=MAX_FILAS_PANTALLA)
+
+
+class ResultadoReporte(BaseModel):
+    """`ReporteResultado` del contrato: lo manda el Gateway (plan B), así que se valida antes de usarlo.
+
+    Sin claves de más (la respuesta lo devuelve en `resultado`) y con largos máximos; el cuerpo entero tiene además el
+    límite global de 256 KB (413). `truncado` es la marca del MCP cuando recorta filas (16 KB, D88).
+    """
+
+    model_config = ConfigDict(extra="forbid")
     reporteId: ReporteId
-    titulo: str
-    parametros: dict[str, Any]
-    columnas: list[dict[str, Any]]
+    titulo: str = Field(max_length=120)
+    parametros: dict[str, Any] = Field(max_length=10)
+    columnas: list[Columna] = Field(max_length=20)
     filas: list[dict[str, Any]] = Field(max_length=MAX_FILAS_PANTALLA)
-    totales: dict[str, Any]
-    grafico: dict[str, Any]
+    totales: dict[str, Any] = Field(max_length=20)
+    grafico: Grafico
     datosAl: datetime | None
+    truncado: bool | None = None
 
 
 class Redaccion(BaseModel):
@@ -155,7 +183,7 @@ async def redactar(cuerpo: Redaccion, usuario: UsuarioActual, request: Request) 
     # El resultado lo manda quien llama: solo se redacta sobre un reporte que su rol puede ver.
     if not set(CATALOGO[reporte].roles) & usuario.roles:
         raise ErrorDeDominio("SIN_PERMISO", "No tienes permiso para ese reporte")
-    r = cuerpo.resultado.model_dump(mode="json")
+    r = cuerpo.resultado.model_dump(mode="json", exclude_unset=True)
     texto = await _voz(request).redactar(cuerpo.pregunta, r)
     return {
         "tipo": "RESPUESTA",

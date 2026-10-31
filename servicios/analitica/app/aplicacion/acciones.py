@@ -15,7 +15,16 @@ from app.dominio.acciones import EstadoAccion
 from app.dominio.alertas import ESTADOS_VIVOS, TipoAlerta
 from app.dominio.errores import ErrorDeDominio
 from app.dominio.retraso import UMBRAL_RIESGO
-from app.infraestructura.bd import AccionPropuesta, Alerta, Cliente, HechoViaje, Outbox, PrediccionRetraso, Ruta
+from app.infraestructura.bd import (
+    AccionPropuesta,
+    Alerta,
+    Cliente,
+    HechoViaje,
+    Mision,
+    Outbox,
+    PrediccionRetraso,
+    Ruta,
+)
 from app.infraestructura.observabilidad import traceparent
 
 CLAVE_AVISO = "analitica.aviso-cliente-aprobado.v1"
@@ -44,10 +53,22 @@ def accion_json(a: AccionPropuesta, razon_social: str | None = None) -> dict[str
 def proponer(
     s: Session, cuerpo: dict[str, Any], mision_id: UUID | None, ahora: datetime
 ) -> tuple[bool, dict[str, Any]]:
-    """Una por (tipo, viaje) salvo ARCHIVADA: la repetida devuelve la existente sin crear nada."""
+    """Una por (tipo, viaje) salvo ARCHIVADA: la repetida devuelve la existente sin crear nada.
+
+    Primero se valida lo que manda quien llama (viaje, destinatario, misión) y recién después se busca la existente:
+    un destinatario ajeno nunca recibe `creada = false` con la acción de otro.
+    """
     if cuerpo["tipo"] not in dominio.TIPOS:
         raise ErrorDeDominio("VALIDACION", "Tipo de acción desconocido", "tipo")
     viaje_id = UUID(str(cuerpo["viajeId"]))
+    viaje = s.get(HechoViaje, viaje_id)
+    if viaje is None:
+        raise ErrorDeDominio("NO_ENCONTRADO", "Analítica no conoce ese viaje")
+    # El destinatario es siempre el cliente del viaje; el LLM nunca escribe una dirección.
+    if str(viaje.cliente_id) != str(cuerpo["destinatario"]["clienteId"]):
+        raise ErrorDeDominio("DESTINATARIO_INVALIDO", "El destinatario debe ser el cliente del viaje")
+    if mision_id:
+        _mision_en_curso(s, mision_id)
     existente = s.scalar(
         select(AccionPropuesta).where(
             AccionPropuesta.tipo == cuerpo["tipo"],
@@ -57,18 +78,12 @@ def proponer(
     )
     if existente:
         return False, {"accionId": str(existente.accion_id), "estado": existente.estado, "creada": False}
-    viaje = s.get(HechoViaje, viaje_id)
-    if viaje is None:
-        raise ErrorDeDominio("NO_ENCONTRADO", "Analítica no conoce ese viaje")
     # La regla la decide el código, no el LLM: un texto inyectado en la bitácora (FM2) no abre avisos para otros viajes.
     if not _en_riesgo(s, viaje):
         raise ErrorDeDominio(
             "CONFLICTO_ESTADO",
             f"El viaje está {viaje.estado} y sin riesgo de retraso ≥ {UMBRAL_RIESGO:.2f}: no se propone el aviso",
         )
-    # El destinatario es siempre el cliente del viaje; el LLM nunca escribe una dirección.
-    if str(viaje.cliente_id) != str(cuerpo["destinatario"]["clienteId"]):
-        raise ErrorDeDominio("DESTINATARIO_INVALIDO", "El destinatario debe ser el cliente del viaje")
     if mision_id:
         creadas = s.scalar(
             select(func.count()).select_from(AccionPropuesta).where(AccionPropuesta.mision_id == mision_id)
@@ -108,6 +123,16 @@ def proponer(
         "creada": True,
         "alertaId": str(alerta_id),
     }
+
+
+def _mision_en_curso(s: Session, mision_id: UUID) -> None:
+    """D86: el límite de 3 cuenta por una misión real que está corriendo, no por cualquier `X-Mision-Id`.
+
+    Se bloquea la fila hasta el commit: dos propuestas a la vez de la misma misión se cuentan una después de la otra.
+    """
+    mision = s.get(Mision, mision_id, with_for_update=True)
+    if mision is None or mision.estado != "EN_CURSO":
+        raise ErrorDeDominio("CONFLICTO_ESTADO", "X-Mision-Id no corresponde a una misión EN_CURSO")
 
 
 def _en_riesgo(s: Session, viaje: HechoViaje) -> bool:

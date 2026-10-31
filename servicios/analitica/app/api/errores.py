@@ -39,6 +39,7 @@ TITULOS = {
     403: "Sin permiso",
     404: "No encontrado",
     409: "Conflicto",
+    413: "Cuerpo demasiado grande",
     429: "Demasiadas peticiones",
     500: "Error interno",
     503: "Servicio no disponible",

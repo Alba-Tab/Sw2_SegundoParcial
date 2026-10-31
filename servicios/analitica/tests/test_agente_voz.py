@@ -25,6 +25,7 @@ from app.infraestructura.llm import LlmNoDisponible
 from app.infraestructura.observabilidad import cabeceras_traza, con_correlacion
 from app.infraestructura.tokens import ErrorToken, Tokens
 from tests.conftest import ejemplo, token
+from tests.test_acciones import en_ruta
 from tests.test_alertas import procesar
 
 # Un proveedor real con exportador en memoria: se ven los spans sin collector (D23).
@@ -362,6 +363,39 @@ def test_redacciones_valida_el_resultado_y_el_rol(cliente, monkeypatch):
     assert ajeno.status_code == 403 and ajeno.json()["codigo"] == "SIN_PERMISO"
     ok = cliente.post(url, json={"pregunta": pregunta, "resultado": resultado_reporte()}, headers=token("gerente"))
     assert ok.status_code == 200 and ok.json()["texto"] == "Se deben 7.600,00 BOB." and ok.json()["exportable"] is False
+
+
+def test_redacciones_no_devuelve_claves_de_mas_ni_cuerpos_enormes(cliente):
+    cliente.app.state.voz = voz.Voz(LlmIntencion("Hay un viaje en riesgo."), Tokens())
+    url, pregunta, gerente = "/api/v1/voz/redacciones", "¿Qué viajes van atrasados?", token("gerente")
+    # Lo que devuelve ejecutarReporte (`grafico.datos` en los reportes agrupados) y la marca `truncado` del MCP pasan
+    # tal cual.
+    en_ruta(str(uuid4()))
+    real = cliente.get("/api/v1/reportes/VIAJES_EN_RIESGO", headers=gerente).json()
+    assert real["filas"]
+    datos = [{"placa": real["filas"][0]["placa"], "probabilidad": real["filas"][0]["probabilidad"]}]
+    for resultado in (real, {**real, "grafico": {**real["grafico"], "datos": datos}, "truncado": True}):
+        r = cliente.post(url, json={"pregunta": pregunta, "resultado": resultado}, headers=gerente)
+        assert r.status_code == 200 and r.json()["resultado"] == resultado
+    # Una clave que no está en el contrato o un texto sin límite → 400; nunca vuelve en `resultado`.
+    for malo in (
+        {**real, "relleno": "x" * 1000},
+        {**real, "titulo": "x" * 121},
+        {**real, "grafico": {**real["grafico"], "otra": 1}},
+        {**real, "columnas": [{**real["columnas"][0], "extra": "x"}]},
+    ):
+        r = cliente.post(url, json={"pregunta": pregunta, "resultado": malo}, headers=gerente)
+        assert r.status_code == 400 and r.json()["codigo"] == "VALIDACION" and "xxxx" not in r.text
+    # Límite global de 256 KB: con Content-Length y en trozos (sin Content-Length).
+    enorme = cliente.post(
+        url, json={"pregunta": pregunta, "resultado": {**real, "x": "x" * 10_000_000}}, headers=gerente
+    )
+    assert enorme.status_code == 413 and enorme.headers["content-type"] == "application/problem+json"
+    assert enorme.json()["codigo"] == "VALIDACION" and enorme.json()["status"] == 413
+    trozos = cliente.post(
+        url, content=(b" " * 65_536 for _ in range(5)), headers={**gerente, "Content-Type": "application/json"}
+    )
+    assert trozos.status_code == 413 and trozos.json()["codigo"] == "VALIDACION"
 
 
 def test_limite_de_peticiones_de_voz_por_sub(cliente, monkeypatch):

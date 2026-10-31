@@ -1,7 +1,7 @@
 """Límite de peticiones por `sub` (ventana deslizante en memoria; Analítica corre en una réplica, T11.5).
 
 La consulta por voz usa el único Ollama: un usuario no puede saturarlo. Pasado el límite → 429 LIMITE_PETICIONES con
-Retry-After, igual que el servidor MCP (spec 014).
+Retry-After, igual que el servidor MCP (spec 014). Además, un límite global al tamaño del cuerpo (413).
 """
 
 import math
@@ -10,7 +10,16 @@ import time
 from collections import deque
 from collections.abc import Callable
 
+from starlette.datastructures import Headers
+from starlette.exceptions import HTTPException
+from starlette.requests import Request
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+from app.api.errores import problema
 from app.dominio.errores import ErrorDeDominio
+
+MAX_CUERPO = 256 * 1024
+CUERPO_GRANDE = f"El cuerpo de la petición pasa de {MAX_CUERPO // 1024} KB"
 
 
 class LimitePeticiones(ErrorDeDominio):
@@ -40,3 +49,37 @@ class Limitador:
             if len(marcas) >= self.por_minuto:
                 raise LimitePeticiones(max(1, math.ceil(marcas[0] - desde)))
             marcas.append(ahora)
+
+
+class LimiteCuerpo:
+    """Cuerpo de más de `maximo` bytes → 413 en Problem Details (`VALIDACION`), con o sin `Content-Length`.
+
+    Ninguna operación de Analítica necesita más: el resultado que llega a `/voz/redacciones` sale del MCP, que lo corta
+    en 16 KB (D88).
+    """
+
+    def __init__(self, app: ASGIApp, maximo: int = MAX_CUERPO) -> None:
+        self.app = app
+        self.maximo = maximo
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http":
+            await self.app(scope, receive, send)
+            return
+        largo = Headers(scope=scope).get("content-length", "")
+        if largo.isdigit() and int(largo) > self.maximo:
+            await problema(Request(scope), "VALIDACION", CUERPO_GRANDE, status=413)(scope, receive, send)
+            return
+        leidos = 0
+
+        async def recibir() -> Message:
+            # Sin Content-Length (chunked): se cuentan los bytes a medida que llegan.
+            nonlocal leidos
+            mensaje = await receive()
+            if mensaje["type"] == "http.request":
+                leidos += len(mensaje.get("body", b""))
+                if leidos > self.maximo:
+                    raise HTTPException(413, CUERPO_GRANDE)
+            return mensaje
+
+        await self.app(scope, recibir, send)

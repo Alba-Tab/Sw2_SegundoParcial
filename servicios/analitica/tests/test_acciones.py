@@ -2,15 +2,15 @@
 
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 import aio_pika
 import pytest
 from opentelemetry import trace
 from pamqp.commands import Basic
-from sqlalchemy import select, update
+from sqlalchemy import func, select, update
 
-from app.aplicacion import acciones
+from app.aplicacion import acciones, agente
 from app.aplicacion.puertos import Prediccion, SinModelos
 from app.infraestructura import eventos, relay
 from app.infraestructura.bd import AccionPropuesta, Alerta, Outbox, PrediccionRetraso, transaccion
@@ -131,15 +131,38 @@ def test_rechazo_y_reglas(cliente, viaje):
     assert [a["accionId"] for a in lista] == [accion] and lista[0]["razonSocial"] == "Agroexport SRL"
 
 
+def test_destinatario_ajeno_no_recibe_la_accion_existente(cliente, viaje):
+    """Se valida antes de buscar la existente: otro cliente nunca recibe `creada = false` con la acción del viaje."""
+    assert post(cliente, "/api/v1/acciones", propuesta(viaje), "agente_lectura").status_code == 201
+    ajeno = post(
+        cliente, "/api/v1/acciones", propuesta(viaje, destinatario={"clienteId": str(uuid4())}), "agente_lectura"
+    )
+    assert ajeno.status_code == 422 and ajeno.json()["codigo"] == "DESTINATARIO_INVALIDO"
+    assert "accionId" not in ajeno.json()
+
+
 def test_limite_de_tres_por_mision(cliente):
-    mision = str(uuid4())
-    viajes = [str(uuid4()) for _ in range(4)]
+    mision = str(agente.abrir("PROGRAMADA", None))
+    viajes = [str(uuid4()) for _ in range(5)]
     en_ruta(*viajes)
-    codigos = [
-        post(cliente, "/api/v1/acciones", propuesta(v), "agente_lectura", **{"X-Mision-Id": mision}).status_code
-        for v in viajes
-    ]
-    assert codigos == [201, 201, 201, 422]
+
+    def proponer(v: str, id_mision: str) -> int:
+        return post(
+            cliente, "/api/v1/acciones", propuesta(v), "agente_lectura", **{"X-Mision-Id": id_mision}
+        ).status_code
+
+    assert [proponer(v, mision) for v in viajes[:4]] == [201, 201, 201, 422]
+    # Cambiar el X-Mision-Id no salta el límite: tiene que ser una misión EN_CURSO de la base.
+    inventada = proponer(viajes[4], str(uuid4()))
+    agente.cerrar(UUID(mision), "COMPLETADA", [], 3, None, None)
+    terminada = proponer(viajes[4], mision)
+    assert (inventada, terminada) == (409, 409)
+    r = post(cliente, "/api/v1/acciones", propuesta(viajes[4]), "agente_lectura", **{"X-Mision-Id": str(uuid4())})
+    assert r.json()["codigo"] == "CONFLICTO_ESTADO"
+    with transaccion() as s:
+        assert s.scalar(select(func.count()).select_from(AccionPropuesta)) == 3
+    # Sin X-Mision-Id (opcional en el contrato) no hay misión que contar.
+    assert post(cliente, "/api/v1/acciones", propuesta(viajes[4]), "agente_lectura").status_code == 201
 
 
 def test_archivo_automatico_d87(viaje):
@@ -184,8 +207,8 @@ async def test_relay_sin_ruta_no_marca_ejecutada_y_cierra_el_canal(viaje):
         async def get_exchange(self, nombre, ensure):
             return self
 
-        async def publish(self, mensaje, routing_key, mandatory):
-            assert mandatory and mensaje.headers["traceparent"]
+        async def publish(self, mensaje, routing_key, mandatory, timeout):
+            assert mandatory and timeout and mensaje.headers["traceparent"]
             raise aio_pika.exceptions.DeliveryError(
                 None, Basic.Return(312, "NO_ROUTE", "transporte.events", routing_key)
             )
