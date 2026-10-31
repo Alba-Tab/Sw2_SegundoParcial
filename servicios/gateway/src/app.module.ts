@@ -1,6 +1,7 @@
 import type { ApolloServerPlugin } from '@apollo/server';
 import { ApolloDriver, type ApolloDriverConfig } from '@nestjs/apollo';
 import { Controller, Get, Inject, type MiddlewareConsumer, Module, type NestModule } from '@nestjs/common';
+import { APP_FILTER } from '@nestjs/core';
 import { GraphQLModule } from '@nestjs/graphql';
 import { IntercambioToken } from '@transporte/intercambio-token';
 import type { NextFunction, Request, Response } from 'express';
@@ -11,12 +12,14 @@ import { Autenticador, correlationId, TokenInvalido, traceparent, type Contexto,
 import { configuracion } from './configuracion';
 import { cuerpoProblema } from './errores';
 import { ExportacionesController } from './exportaciones.controller';
+import { FiltroProblemas } from './filtro-problemas';
 import { crearCargadores } from './graphql/cargadores';
 import { limiteComplejidad, limiteProfundidad } from './graphql/limites';
 import { crearResolvers } from './graphql/resolvers';
 import { aplicarRoles } from './graphql/roles';
 import { DURACION_MAXIMA_MS } from './graphql/suscripcion';
 import { registrar, traceIdDe } from './log';
+import { PresupuestoLlamadas } from './presupuesto';
 import { ClienteServicios } from './servicios';
 import { AUTENTICADOR, HMAC_SECRETO, INTERCAMBIO } from './tokens-inyeccion';
 
@@ -55,8 +58,13 @@ function autenticarHttp(req: Request & { contexto?: Contexto }, res: Response, s
     .catch((e) => (e instanceof TokenInvalido ? problema(res, e) : siguiente(e)));
 }
 
-function contextoCompleto(base: Contexto) {
-  return { ...base, cargadores: crearCargadores(servicios, base), avisos: [] };
+/**
+ * Contexto de cada operación. Una petición HTTP trae su presupuesto de llamadas a los servicios (`presupuesto.ts`); la
+ * suscripción no, porque consulta a Analítica cada 3 s durante toda la conexión.
+ */
+function contextoCompleto(base: Contexto, presupuesto?: PresupuestoLlamadas) {
+  const ctx: Contexto = { ...base, presupuesto, avisos: [] };
+  return { ...ctx, cargadores: crearCargadores(servicios, ctx) };
 }
 
 /** Errores de Apollo que son culpa de la petición: consulta mal escrita, variables, operación inexistente. */
@@ -164,7 +172,7 @@ class SaludController {
       plugins: [limiteComplejidad(() => esquema), registroYAvisos as ApolloServerPlugin],
       formatError: formatearError,
       context: ({ req, extra }: { req?: Request & { contexto?: Contexto }; extra?: { contexto?: Contexto } }) =>
-        contextoCompleto((req?.contexto ?? extra?.contexto) as Contexto),
+        req ? contextoCompleto(req.contexto as Contexto, new PresupuestoLlamadas()) : contextoCompleto(extra?.contexto as Contexto),
       subscriptions: {
         'graphql-ws': {
           path: '/graphql',
@@ -196,6 +204,7 @@ class SaludController {
   ],
   controllers: [SaludController, ExportacionesController],
   providers: [
+    { provide: APP_FILTER, useClass: FiltroProblemas },
     { provide: ClienteServicios, useValue: servicios },
     { provide: INTERCAMBIO, useValue: intercambio },
     { provide: HMAC_SECRETO, useValue: config.hmacSecreto },

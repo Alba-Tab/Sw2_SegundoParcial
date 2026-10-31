@@ -25,7 +25,10 @@ export async function enParalelo<K, V>(claves: readonly K[], pedir: (k: K) => Pr
 }
 
 const status = (e: unknown) => (e instanceof GraphQLError ? e.extensions['status'] : undefined);
-/** Un 404 del servicio es "no hay" (null), no un error del campo. */
+/**
+ * Para lo que puede no existir todavía (la predicción, la entrega, la línea de crédito), un 404 es "no hay" (null) y no
+ * un error del campo. Un viaje pedido por id que no existe sí es error: `NO_ENCONTRADO`, igual que `factura` y `unidad`.
+ */
 const nuloSi404 = async <T>(p: Promise<T>): Promise<T | null> => p.catch((e) => (status(e) === 404 ? null : Promise.reject(e)));
 
 type Json = Record<string, unknown>;
@@ -39,7 +42,7 @@ export function crearCargadores(servicios: ClienteServicios, ctx: Contexto) {
   const cargador = <V>(pedir: (k: string) => Promise<V>) => new DataLoader<string, V>((claves) => enParalelo(claves, pedir));
   return {
     servicio: cargador((id) => servicios.get<Json>(ctx, 'viajes', rutaRest`/api/v1/servicios/${id}`).then(m.servicio)),
-    viaje: cargador((id) => nuloSi404(servicios.get<Json>(ctx, 'viajes', rutaRest`/api/v1/viajes/${id}`).then(m.viaje))),
+    viaje: cargador((id) => servicios.get<Json>(ctx, 'viajes', rutaRest`/api/v1/viajes/${id}`).then(m.viaje)),
     riesgo: cargador((id) => nuloSi404(servicios.get<Json>(ctx, 'analitica', rutaRest`/api/v1/predicciones/retraso/${id}`))),
     unidadPorPlaca: cargador((placa) =>
       servicios
