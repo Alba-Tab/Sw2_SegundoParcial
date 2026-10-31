@@ -28,14 +28,16 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Errores del contenedor y del framework: 400 VALIDACION con detalle en español, nunca 500 ni el texto de Spring, y
- * 413 VALIDACION para un cuerpo de más de 256 KB. Misma configuración que ServiciosIT para reusar su contexto.
+ * 413 VALIDACION para un cuerpo de más de 256 KB. Contexto propio sin worker de Temporal: si compartiera el de
+ * ServiciosIT, Spring lo pausa al correr otra clase y al reanudarlo el WorkerFactory ya cerrado no vuelve a arrancar.
  */
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = {
             "seguridad.issuer=http://localhost:1/realms/transporte",
             "outbox.intervalo=PT1H",
-            "saga.compensacion.maximo-intentos=2"
+            "saga.compensacion.maximo-intentos=2",
+            "temporal.worker.habilitado=false"
         })
 @Import({TestcontainersConfiguration.class, TokensDePrueba.class, AlmacenDePrueba.class, DynamoDePrueba.class})
 class PeticionesInvalidasIT {
