@@ -21,6 +21,9 @@ use Symfony\Component\HttpFoundation\Response;
  * controlador. Si no cumple, 400 VALIDACION con el campo. Una ruta que no está en el contrato sigue a la ruta (404).
  * El validador se arma una vez por worker de Octane. También exige el esquema `bearer` del contrato, que
  * Autenticacion ya garantizó antes.
+ *
+ * Antes del contrato rechaza lo que el validador no ve: un parámetro de consulta que no es UTF-8 válido y un número
+ * del cuerpo que PHP vuelve infinito (`1e400`), que no se puede guardar ni volver a codificar en JSON.
  */
 final class ValidarContrato
 {
@@ -28,6 +31,10 @@ final class ValidarContrato
 
     public function handle(Request $req, Closure $siguiente): Response
     {
+        $error = self::consultaNoUtf8($req->query->all()) ?? self::numeroNoFinito($req->json()->all());
+        if ($error !== null) {
+            return Problemas::respuesta('VALIDACION', 'Petición inválida', 'La petición no cumple el contrato', 400, ['errores' => [$error]]);
+        }
         $f = new Psr17Factory;
         $psr = (new PsrHttpFactory($f, $f, $f, $f))->createRequest($req);
         try {
@@ -60,6 +67,40 @@ final class ValidarContrato
         $campo = preg_replace('/\.(monto|moneda)$/', '', $campo) ?? $campo;
 
         return ['campo' => $campo, 'mensaje' => $mensaje];
+    }
+
+    /**
+     * @param  array<mixed>  $consulta
+     * @return array{campo: string, mensaje: string}|null
+     */
+    private static function consultaNoUtf8(array $consulta, string $prefijo = ''): ?array
+    {
+        foreach ($consulta as $nombre => $valor) {
+            $campo = $prefijo === '' ? (string) $nombre : $prefijo.'.'.$nombre;
+            if (! mb_check_encoding((string) $nombre, 'UTF-8') || (is_string($valor) && ! mb_check_encoding($valor, 'UTF-8'))) {
+                return ['campo' => $campo, 'mensaje' => 'No es texto UTF-8 válido'];
+            }
+            if (is_array($valor) && ($error = self::consultaNoUtf8($valor, $campo)) !== null) {
+                return $error;
+            }
+        }
+
+        return null;
+    }
+
+    /** @return array{campo: string, mensaje: string}|null */
+    private static function numeroNoFinito(mixed $valor, string $campo = ''): ?array
+    {
+        if (is_float($valor) && ! is_finite($valor)) {
+            return ['campo' => $campo, 'mensaje' => 'El número está fuera de rango'];
+        }
+        foreach (is_array($valor) ? $valor : [] as $nombre => $x) {
+            if (($error = self::numeroNoFinito($x, $campo === '' ? (string) $nombre : $campo.'.'.$nombre)) !== null) {
+                return $error;
+            }
+        }
+
+        return null;
     }
 
     public static function contrato(): string

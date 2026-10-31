@@ -19,6 +19,21 @@ final class Formato
         return str_contains($decimal, '.') ? (float) $decimal : (int) $decimal;
     }
 
+    /**
+     * Literal de un número de primer nivel del cuerpo JSON tal como llegó ("1E1", "20.10"), o null si el campo no es un
+     * número. Cada número que no está dentro de un texto se vuelve texto antes de decodificar: json_decode no lo
+     * redondea ni le cambia la forma. Los textos (y las llaves con escapes) quedan como estaban.
+     */
+    public static function numeroCrudo(string $cuerpo, string $campo): ?string
+    {
+        $comoTexto = preg_replace_callback('/"(?:[^"\\\\]++|\\\\.)*+"|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/s',
+            fn (array $m) => $m[0][0] === '"' ? $m[0] : '"'.$m[0].'"', $cuerpo);
+        $datos = $comoTexto === null ? null : json_decode($comoTexto, true);
+        $valor = is_array($datos) ? ($datos[$campo] ?? null) : null;
+
+        return is_string($valor) ? $valor : null;
+    }
+
     /** @return array<string, mixed> */
     public static function cotizacion(Cotizacion $c, \DateTimeImmutable $ahora): array
     {

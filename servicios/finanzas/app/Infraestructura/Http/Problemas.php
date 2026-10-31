@@ -24,7 +24,17 @@ final class Problemas
         'CLIENTE_NO_REPLICADO' => 503, 'DEPENDENCIA_NO_DISPONIBLE' => 503,
     ];
 
-    private const POR_ESTADO = [400 => 'VALIDACION', 401 => 'NO_AUTENTICADO', 403 => 'SIN_PERMISO', 404 => 'NO_ENCONTRADO', 405 => 'NO_ENCONTRADO'];
+    /** Código de una excepción HTTP del framework (ruta inexistente, cuerpo demasiado grande…) según su estado. */
+    private const POR_ESTADO = [400 => 'VALIDACION', 401 => 'NO_AUTENTICADO', 403 => 'SIN_PERMISO', 404 => 'NO_ENCONTRADO',
+        405 => 'NO_ENCONTRADO', 409 => 'CONFLICTO_ESTADO', 413 => 'VALIDACION', 429 => 'LIMITE_PETICIONES'];
+
+    /** `title` para personas según el estado HTTP (000 §5), como Problemas.titulo de Viajes; el código va en `codigo`. */
+    private const TITULOS = [
+        400 => 'Petición inválida', 401 => 'No autenticado', 403 => 'Sin permiso', 404 => 'No encontrado',
+        405 => 'Método no permitido', 409 => 'Conflicto con el estado actual', 413 => 'Petición demasiado grande',
+        422 => 'Regla de negocio no cumplida', 429 => 'Demasiadas peticiones', 500 => 'Error interno',
+        503 => 'Dependencia no disponible',
+    ];
 
     /**
      * @param  array<string, mixed>  $extra  campos adicionales del Problem Details (por ejemplo `errores`)
@@ -41,13 +51,20 @@ final class Problemas
             'codigo' => $codigo,
         ] + array_filter(['correlationId' => Context::get('correlationId')]) + $extra;
 
-        return new JsonResponse($p, $estado, ['Content-Type' => 'application/problem+json'] + $encabezados);
+        // Un valor recibido que no es UTF-8 válido (y que el detalle repite) sale con U+FFFD en vez de romper el JSON.
+        return new JsonResponse($p, $estado, ['Content-Type' => 'application/problem+json'] + $encabezados, JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
+    public static function titulo(int $estado): string
+    {
+        return self::TITULOS[$estado] ?? ($estado >= 500 ? 'Error interno' : 'Petición rechazada');
     }
 
     public static function desde(\Throwable $e): JsonResponse
     {
         return match (true) {
-            $e instanceof ErrorDeDominio => self::respuesta($e->codigo, $e->codigo, $e->getMessage(), null, self::extensiones($e),
+            $e instanceof ErrorDeDominio => self::respuesta($e->codigo, self::titulo(self::ESTADOS[$e->codigo] ?? 422), $e->getMessage(),
+                null, self::extensiones($e),
                 (self::ESTADOS[$e->codigo] ?? 422) === 503 ? ['Retry-After' => $e->codigo === 'CLIENTE_NO_REPLICADO' ? '2' : '10'] : []),
             $e instanceof ValidationException => self::respuesta('VALIDACION', 'Petición inválida', 'Revisa los campos indicados', 400,
                 ['errores' => collect($e->errors())->flatMap(fn ($m, $c) => array_map(fn ($x) => ['campo' => $c, 'mensaje' => $x], $m))->values()->all()]),
@@ -55,14 +72,26 @@ final class Problemas
             // Idempotencia ya repitió la transacción 3 veces (spec 008).
             $e instanceof VersionDesactualizada => self::respuesta('VERSION_DESACTUALIZADA', 'Versión desactualizada',
                 'Otro cambio modificó los mismos datos; vuelve a intentarlo', 409),
-            $e instanceof HttpExceptionInterface => self::respuesta(self::POR_ESTADO[$e->getStatusCode()] ?? 'CONFLICTO_ESTADO',
-                'Error', $e->getMessage() ?: 'Error', $e->getStatusCode(), [], $e->getHeaders()),
+            $e instanceof HttpExceptionInterface => self::http($e),
             // PostgreSQL caído, reiniciándose o en interbloqueo: la petición se puede repetir.
             FallaTransitoria::es($e) => self::respuesta('DEPENDENCIA_NO_DISPONIBLE', 'Dependencia no disponible',
                 'La base de datos no responde; intenta de nuevo en unos segundos', 503, [], ['Retry-After' => '5']),
             // 000 §5 no tiene un código para un error inesperado: sale 500 con DEPENDENCIA_NO_DISPONIBLE, como en Viajes.
             default => self::respuesta('DEPENDENCIA_NO_DISPONIBLE', 'Error interno', 'Ocurrió un error inesperado', 500),
         };
+    }
+
+    /**
+     * Excepción HTTP del framework. 413 es el cuerpo que pasa `post_max_size` (ValidatePostSize): VALIDACION, con el
+     * detalle en español. Un estado sin código propio cae en VALIDACION (4xx) o DEPENDENCIA_NO_DISPONIBLE (5xx).
+     */
+    private static function http(HttpExceptionInterface $e): JsonResponse
+    {
+        $estado = $e->getStatusCode();
+        $codigo = self::POR_ESTADO[$estado] ?? ($estado >= 500 ? 'DEPENDENCIA_NO_DISPONIBLE' : 'VALIDACION');
+        $detalle = $estado === 413 ? 'El cuerpo de la petición pasa el tamaño máximo permitido' : ($e->getMessage() ?: self::titulo($estado));
+
+        return self::respuesta($codigo, self::titulo($estado), $detalle, $estado, [], $e->getHeaders());
     }
 
     /**

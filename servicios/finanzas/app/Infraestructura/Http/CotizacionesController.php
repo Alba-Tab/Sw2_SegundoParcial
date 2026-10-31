@@ -20,10 +20,11 @@ final class CotizacionesController
 
     public function crear(Request $req): JsonResponse
     {
-        // El número JSON tal como llegó (json_encode da la forma más corta que lo representa): 30.0000001 no se
-        // redondea a "30" antes de que el dominio revise los decimales.
+        // El literal del número tal como llegó en el cuerpo, sin pasar por float: el dominio ve "1E1" o "30.0000001" y
+        // rechaza el exponente o los decimales de más, en vez de recibir "10.0" o "30".
         $toneladas = $req->json('toneladas');
-        $toneladas = is_int($toneladas) || is_float($toneladas) ? (string) json_encode($toneladas) : (string) $toneladas;
+        $toneladas = is_int($toneladas) || is_float($toneladas)
+            ? (Formato::numeroCrudo($req->getContent(), 'toneladas') ?? '') : (string) $toneladas;
 
         return $this->idempotencia->ejecutar($req, 'CREAR_COTIZACION', function () use ($req, $toneladas) {
             $c = $this->crear->ejecutar(SolicitanteHttp::de($req), $req->json('rutaId'), $req->json('tipoCarga'),
