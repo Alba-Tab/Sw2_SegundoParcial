@@ -11,10 +11,10 @@ import { generateKeyPair, SignJWT } from 'jose';
 import mongoose, { mongo } from 'mongoose';
 import { ErrorDeDominio } from '../../src/dominio/comun/error-de-dominio';
 import { AutenticacionMiddleware } from '../../src/infraestructura/http/autenticacion.middleware';
-import { ListarChoferesQueryParams } from '../../src/infraestructura/http/contrato/flota.zod';
+import { CrearUnidadBody, ListarChoferesQueryParams } from '../../src/infraestructura/http/contrato/flota.zod';
 import { FiltroProblemas } from '../../src/infraestructura/http/filtro-problemas';
 import { hashPeticion } from '../../src/infraestructura/http/hash-cuerpo';
-import { claveObligatoria, conBooleanos } from '../../src/infraestructura/http/validar';
+import { claveObligatoria, conBooleanos, validar } from '../../src/infraestructura/http/validar';
 import { esperaParaReencolar } from '../../src/infraestructura/mensajeria/consumidor-eventos';
 import { traceparentValido } from '../../src/infraestructura/observabilidad/contexto';
 
@@ -56,6 +56,22 @@ describe('FiltroProblemas (000 §5)', () => {
     expect(k.cuerpo.errores).toBeUndefined();
     const c = responder(new ErrorDeDominio('CONFLICTO_ESTADO', 'No se puede', { estadoActual: 'EN_VIAJE' }));
     expect(c.cuerpo).toMatchObject({ status: 409, estadoActual: 'EN_VIAJE' });
+  });
+
+  it('title es texto para personas según el estado, no el código (000 §5)', () => {
+    expect(responder(new ErrorDeDominio('PLACA_DUPLICADA', 'La placa ya existe')).cuerpo).toMatchObject({
+      status: 409,
+      codigo: 'PLACA_DUPLICADA',
+      title: 'Conflicto con el estado actual',
+    });
+    expect(responder(new ErrorDeDominio('KILOMETRAJE_INVALIDO', 'El odómetro no puede bajar')).cuerpo.title).toBe(
+      'Regla de negocio no cumplida',
+    );
+    expect(responder(new ErrorDeDominio('VALIDACION', 'monto: x', { campo: 'monto' })).cuerpo.title).toBe('Petición inválida');
+    expect(responder(new ErrorDeDominio('NO_ENCONTRADO', 'La unidad no existe')).cuerpo.title).toBe('No encontrado');
+    expect(responder(new ErrorDeDominio('DEPENDENCIA_NO_DISPONIBLE', 'x')).cuerpo.title).toBe('Dependencia no disponible');
+    expect(responder(new ConflictException()).cuerpo.title).toBe('Conflicto con el estado actual');
+    expect(responder(errorDeBodyParser(413, 'request entity too large', 'entity.too.large')).cuerpo.title).toBe('Cuerpo demasiado grande');
   });
 
   it('respeta el estado de body-parser: cuerpo grande 413, JSON inválido 400, tipo no soportado 415', () => {
@@ -148,6 +164,29 @@ describe('Idempotencia y parámetros (000 §4)', () => {
     expect(hashPeticion(req('POST', '/api/v1/unidades/b/baja', 'jefe-1'), { motivo: 'Vendida', x: 1 })).not.toBe(base);
     expect(hashPeticion(req('POST', '/api/v1/unidades/a/baja', 'jefe-2'), { motivo: 'Vendida', x: 1 })).not.toBe(base);
     expect(hashPeticion(req('PUT', '/api/v1/unidades/a/baja', 'jefe-1'), { motivo: 'Vendida', x: 1 })).not.toBe(base);
+  });
+
+  it('un campo __proto__ en cualquier nivel es 400 con su ruta, aunque zod lo descartaría (D76)', () => {
+    const alta = (atributos: string) =>
+      JSON.parse(
+        `{"tipoUnidad":"REMOLQUE","placa":"8004FUR","tipoRemolque":"FURGON","capacidadToneladas":30,` +
+          `"kmDesdeUltimoMantenimiento":0,"documentos":[{"tipo":"SOAT","venceEl":"2030-01-01"},` +
+          `{"tipo":"INSPECCION_TECNICA","venceEl":"2030-01-01"}],"atributos":${atributos}}`,
+      ) as unknown;
+    // Sin la revisión, zod devuelve atributos sin la clave y el dominio no la ve.
+    expect(Object.keys(CrearUnidadBody.parse(alta('{"volumenM3":85,"__proto__":1}')).atributos)).toEqual(['volumenM3']);
+    const error = (cuerpo: unknown) => {
+      try {
+        validar(CrearUnidadBody, cuerpo);
+      } catch (e) {
+        return e instanceof ErrorDeDominio ? `${e.codigo} ${String(e.datos?.campo)}` : String(e);
+      }
+      return 'sin error';
+    };
+    expect(error(alta('{"volumenM3":85,"__proto__":1}'))).toBe('VALIDACION atributos.__proto__');
+    expect(error(alta('{"volumenM3":85,"__proto__":{"x":1}}'))).toBe('VALIDACION atributos.__proto__');
+    expect(error(JSON.parse('{"__proto__":{"motivo":"x"}}'))).toBe('VALIDACION __proto__');
+    expect(error(alta('{"volumenM3":85}'))).toBe('sin error');
   });
 
   it('Idempotency-Key obligatoria y UUID', () => {
