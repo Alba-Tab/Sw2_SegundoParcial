@@ -9,8 +9,8 @@ export class ReportesRepositorio {
   private readonly exportarGql = inject(ExportarReporteGQL);
   private readonly preguntarGql = inject(PreguntarGQL);
 
-  catalogo() {
-    return this.catalogoGql.fetch();
+  catalogo(verClientes: boolean) {
+    return this.catalogoGql.fetch({ variables: { verClientes } });
   }
 
   reporte(id: ReporteId, params: Record<string, unknown>) {

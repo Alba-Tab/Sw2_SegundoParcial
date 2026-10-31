@@ -1,12 +1,25 @@
 import { TestBed } from '@angular/core/testing';
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { of, throwError, type Observable } from 'rxjs';
+import { Sesion } from 'ui-comun';
 import { ReportesRepositorio } from './data/reportes.repositorio';
 import { ReportesFachada } from './reportes.fachada';
 
-function fachada(catalogo: Observable<unknown>) {
+function fachada(catalogo: Observable<unknown>, roles: string[] = ['gerente'], pedidos: boolean[] = []) {
   TestBed.configureTestingModule({
-    providers: [ReportesFachada, { provide: ReportesRepositorio, useValue: { catalogo: () => catalogo } }],
+    providers: [
+      ReportesFachada,
+      { provide: Sesion, useValue: { roles: () => roles } },
+      {
+        provide: ReportesRepositorio,
+        useValue: {
+          catalogo: (verClientes: boolean) => {
+            pedidos.push(verClientes);
+            return catalogo;
+          },
+        },
+      },
+    ],
   });
   return TestBed.inject(ReportesFachada);
 }
@@ -27,5 +40,11 @@ describe('ReportesFachada: el catálogo no se traga el error', () => {
     const f = fachada(throwError(() => red));
     expect(f.errorCatalogo()).toBe(red);
     expect(f.catalogo()).toBeUndefined();
+  });
+
+  it('a jefe_flota no le pide clientes (Viajes no se los lista)', () => {
+    const pedidos: boolean[] = [];
+    fachada(of({ data: { catalogoReportes: [], rutas: [] } }), ['jefe_flota'], pedidos);
+    expect(pedidos).toEqual([false]);
   });
 });

@@ -11,8 +11,16 @@ export const ROLES_CAMPO = {
   riesgo: ['gerente', 'despachador'],
   /** `Viaje.unidad`. */
   unidad: ['gerente', 'despachador', 'jefe_flota'],
-  /** `Tablero.cuentasPorCobrar`. */
-  cuentasPorCobrar: ['gerente', 'administracion', 'comercial'],
+  /** `Tablero.cuentasPorCobrar` (sin comercial: Finanzas le exige un `clienteId`). */
+  cuentasPorCobrar: ['gerente', 'administracion'],
+  /** `Tablero.viajesEnCurso` y las listas de viajes. */
+  viajesEnCurso: ['gerente', 'despachador', 'jefe_flota', 'comercial'],
+  /** `Tablero.unidadesPorEstado`. */
+  unidadesPorEstado: ['gerente', 'despachador', 'jefe_flota'],
+  /** `Tablero.alertasAbiertas` y `Tablero.datosAl`. */
+  alertasAbiertas: ['gerente', 'despachador', 'jefe_flota', 'administracion'],
+  /** `clientes`. */
+  clientes: ['gerente', 'despachador', 'administracion', 'comercial'],
 } as const satisfies Record<string, readonly string[]>;
 
 export type CampoConRoles = keyof typeof ROLES_CAMPO;

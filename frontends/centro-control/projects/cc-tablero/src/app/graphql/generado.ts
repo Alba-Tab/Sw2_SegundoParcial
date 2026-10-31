@@ -54,7 +54,9 @@ export type TableroQuery = {
   };
 };
 
-export type CatalogoQueryVariables = Exact<{ [key: string]: never }>;
+export type CatalogoQueryVariables = Exact<{
+  verClientes: boolean;
+}>;
 
 export type CatalogoQuery = {
   catalogoReportes: Array<{
@@ -65,7 +67,7 @@ export type CatalogoQuery = {
     maxDias: number | null;
     parametros: any;
   }> | null;
-  clientes: Array<{ clienteId: string; razonSocial: string }> | null;
+  clientes?: Array<{ clienteId: string; razonSocial: string }> | null;
   rutas: Array<{ rutaId: string; nombre: string }> | null;
 };
 
@@ -203,7 +205,7 @@ export class TableroGQL extends Apollo.Query<TableroQuery, TableroQueryVariables
   }
 }
 export const CatalogoDocument = gql`
-  query Catalogo {
+  query Catalogo($verClientes: Boolean!) {
     catalogoReportes {
       reporteId
       titulo
@@ -212,7 +214,7 @@ export const CatalogoDocument = gql`
       maxDias
       parametros
     }
-    clientes {
+    clientes @include(if: $verClientes) {
       clienteId
       razonSocial
     }

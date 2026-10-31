@@ -46,7 +46,8 @@ query Tablero(
   }
 }
 
-query Catalogo {
+# jefe_flota no lista clientes (Viajes, spec 016 "Lectura por rol"): solo usa CONSUMO_COMBUSTIBLE, que no filtra por cliente.
+query Catalogo($verClientes: Boolean!) {
   catalogoReportes {
     reporteId
     titulo
@@ -55,7 +56,7 @@ query Catalogo {
     maxDias
     parametros
   }
-  clientes {
+  clientes @include(if: $verClientes) {
     clienteId
     razonSocial
   }

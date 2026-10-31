@@ -75,11 +75,27 @@ Las 4 apps Angular (`cc-tablero`, `cc-operaciones`, `cc-flota`, `cc-finanzas`) s
 | Regla | Valor |
 |---|---|
 | Cuatro capas (propuesta 7.5) | Token (roles y `clienteId`), menú de la app (comodidad), Gateway (permisos por campo) y servicio dueño (filas; responde `403`) |
-| Permisos por campo | Directiva `@roles` en el esquema. `despachador` y `jefe_flota` no ven finanzas (propuesta 7.2): `Viaje.monto`, `Factura`, `LineaCredito` y `cuentasPorCobrar` salen en `null` con un error `SIN_PERMISO` en su `path`. `comercial` ve todo en lectura y no tiene mutaciones salvo `cancelarServicio` |
+| Permisos por campo | Directiva `@roles` en el esquema, con los roles que acepta el servicio dueño (tabla "Lectura por rol"). Un campo sin permiso sale en `null` con un error `SIN_PERMISO` en su `path`. `despachador` y `jefe_flota` no ven finanzas (propuesta 7.2). `comercial` no tiene mutaciones salvo `cancelarServicio` |
 | Límites | Profundidad máxima 8 y complejidad máxima 1.000 (cada campo vale 1 y una lista multiplica por su `limite`, máximo 100) (D101); si se pasa → error `CONSULTA_DEMASIADO_COMPLEJA` antes de llamar a ningún servicio. Introspección apagada en la nube |
 | Respuesta parcial | Un servicio caído nunca tumba la consulta entera: `null` en sus campos + error con `path`; el Gateway responde `200` |
 | Sin token | `401` (HTTP) en `POST /graphql`; las apps redirigen al login |
 | Cliente en el Centro de Control | La app muestra "Sin acceso"; el Gateway responde `403 SIN_PERMISO` a cualquier consulta con rol `cliente` o `chofer` |
+
+**Lectura por rol.** Son los roles que acepta hoy cada servicio; el esquema los repite con `@roles` para cortar antes en el Gateway. Un campo que no aparece es para cualquier rol interno (`yo`, `rutas`).
+
+| Campos | Roles | Servicio |
+|---|---|---|
+| `viajes`, `viajesEnCurso`, `viaje`, `entregasObservadas`, `intervenciones`, `Tablero.viajesEnCurso` | gerente, despachador, jefe_flota, comercial | Viajes |
+| `Viaje.hitos`, `Viaje.entrega` | gerente, despachador, comercial | Viajes |
+| `servicios`, `clientes` | gerente, despachador, administracion, comercial | Viajes |
+| `Viaje.monto`, `Servicio.monto` | gerente, administracion, comercial | Viajes |
+| `Viaje.unidad`, `unidades`, `unidad`, `mantenimientos`, `choferes`, `cargasCombustible`, `Tablero.unidadesPorEstado` | gerente, despachador, jefe_flota | Flota |
+| `anomaliasCombustible`, `puntajesConduccion` | gerente, jefe_flota | Analítica |
+| `facturas` (comercial con `clienteId`), `factura`, `lineaCredito`, `cotizaciones` | gerente, administracion, comercial | Finanzas |
+| `Tablero.cuentasPorCobrar`, `solicitudesAprobacion` | gerente, administracion | Finanzas |
+| `catalogoReportes`, `reporte`, `exportarReporte`, `alertasPendientes`, `Tablero.alertasAbiertas`, `Tablero.datosAl`, `subscription alertas`, `preguntar` | gerente, despachador, jefe_flota, administracion (cada reporte además con sus roles, spec 015) | Analítica |
+| `Viaje.riesgo` | gerente, despachador | Analítica |
+| `misionesAgente`, `mision`, `accionesPropuestas` | gerente, despachador | Analítica |
 | Datos de otro cliente | El servicio dueño responde `403 SIN_PERMISO` (000 §4); el Gateway lo pasa como error del campo |
 | Consolas operativas (D28) | La Temporal UI (8233) y la consola de RabbitMQ (15672) no forman parte del Centro de Control ni pasan por el Gateway: solo por `tunel-consolas.sh` (SSM); el grupo de seguridad de la EC2 no abre esos puertos |
 | Trazas (D23) | El Gateway crea el *span* raíz de cada operación GraphQL y propaga `traceparent` y `X-Correlation-Id` a cada servicio |

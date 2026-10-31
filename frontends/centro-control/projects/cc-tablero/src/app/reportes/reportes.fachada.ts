@@ -1,7 +1,8 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { catchError, firstValueFrom, of } from 'rxjs';
-import { completo, Intentos, type Resultado } from 'ui-comun';
+import { completo, Intentos, Sesion, type Resultado } from 'ui-comun';
+import { puedeVer } from 'ui-comun/dominio';
 import type { CatalogoQuery, ReporteId } from '../graphql/generado';
 import { ReportesRepositorio } from './data/reportes.repositorio';
 
@@ -34,7 +35,7 @@ export class ConsultaReportes {
 export class ReportesFachada extends ConsultaReportes {
   private readonly respuesta = toSignal(
     inject(ReportesRepositorio)
-      .catalogo()
+      .catalogo(puedeVer(inject(Sesion).roles(), 'clientes'))
       .pipe(catchError((error: unknown) => of({ data: undefined, error }))),
   );
   readonly catalogo = computed(() => completo<CatalogoQuery>(this.respuesta()));
