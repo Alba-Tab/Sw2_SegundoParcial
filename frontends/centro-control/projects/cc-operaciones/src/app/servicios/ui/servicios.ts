@@ -5,7 +5,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
-import { AvisoServicios, BobPipe, CONFIG_CENTRO, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { AvisoServicios, BobPipe, CONFIG_CENTRO, EtiquetaPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
 import { motivoCancelacionValido } from '../domain/servicio';
 import { ServiciosFachada } from '../servicios.fachada';
 
@@ -16,7 +16,17 @@ import { ServiciosFachada } from '../servicios.fachada';
 @Component({
   selector: 'app-servicios',
   providers: [ServiciosFachada],
-  imports: [FormsModule, MatTableModule, MatButtonModule, MatFormFieldModule, MatInputModule, BobPipe, FechaPipe, AvisoServicios],
+  imports: [
+    FormsModule,
+    MatTableModule,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatInputModule,
+    BobPipe,
+    FechaPipe,
+    EtiquetaPipe,
+    AvisoServicios,
+  ],
   template: `
     <h1>Servicios confirmados</h1>
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!servicios().length" />
@@ -28,7 +38,7 @@ import { ServiciosFachada } from '../servicios.fachada';
         >
         <ng-container matColumnDef="carga"
           ><th mat-header-cell *matHeaderCellDef>Carga</th>
-          <td mat-cell *matCellDef="let s">{{ s.tipoCarga }} · {{ s.toneladas }} t</td></ng-container
+          <td mat-cell *matCellDef="let s">{{ s.tipoCarga | etiqueta: 'TipoCarga' }} · {{ s.toneladas }} t</td></ng-container
         >
         <ng-container matColumnDef="fecha"
           ><th mat-header-cell *matHeaderCellDef>Fecha</th>

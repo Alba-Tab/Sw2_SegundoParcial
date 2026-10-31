@@ -5,7 +5,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { AvisoServicios, BobPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { AvisoServicios, BobPipe, Estado, EtiquetaPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
 import { CreditoFachada } from '../credito.fachada';
 import { puedeRechazar } from '../domain/credito';
 
@@ -13,7 +13,18 @@ import { puedeRechazar } from '../domain/credito';
 @Component({
   selector: 'app-aprobaciones',
   providers: [CreditoFachada],
-  imports: [FormsModule, MatCardModule, MatButtonModule, MatFormFieldModule, MatInputModule, BobPipe, FechaPipe, AvisoServicios],
+  imports: [
+    FormsModule,
+    MatCardModule,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatInputModule,
+    BobPipe,
+    FechaPipe,
+    EtiquetaPipe,
+    Estado,
+    AvisoServicios,
+  ],
   template: `
     <h1>Aprobación de crédito</h1>
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!solicitudes().length" />
@@ -23,12 +34,16 @@ import { puedeRechazar } from '../domain/credito';
           <mat-card-header>
             <mat-card-title>{{ s.razonSocial }} · {{ s.monto | bob }}</mat-card-title>
             <mat-card-subtitle
-              ><span class="chip-estado" [attr.data-alerta]="s.estado === 'PENDIENTE'">{{ s.estado }}</span> · vence
-              {{ s.venceEn | fecha: true }}</mat-card-subtitle
+              ><cc-estado grupo="EstadoAprobacion" [valor]="s.estado" /> · vence {{ s.venceEn | fecha: true }}</mat-card-subtitle
             >
           </mat-card-header>
           <mat-card-content>
-            <p>Motivos: {{ s.motivos.join(', ') }}</p>
+            <p>
+              Motivos:
+              @for (m of s.motivos; track m) {
+                {{ m | etiqueta: 'MotivoAprobacion' }}{{ $last ? '' : ', ' }}
+              }
+            </p>
             @for (f of s.facturasVencidas ?? []; track f.facturaId) {
               <p class="secundario">{{ f.numero }} · {{ f.saldo | bob }} · vencida hace {{ f.diasVencida }} días</p>
             }

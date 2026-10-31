@@ -8,6 +8,7 @@ export * from './lib/clave';
 export * from './lib/conexion';
 export * from './lib/configuracion';
 export * from './lib/errores';
+export * from './lib/estado';
 export * from './lib/formato';
 export * from './lib/marco';
 export * from './lib/proveedores';

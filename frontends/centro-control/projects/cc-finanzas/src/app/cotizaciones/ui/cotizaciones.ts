@@ -1,12 +1,12 @@
 import { Component, inject } from '@angular/core';
 import { MatTableModule } from '@angular/material/table';
-import { AvisoServicios, BobPipe, FechaPipe } from 'ui-comun';
+import { AvisoServicios, BobPipe, Estado, EtiquetaPipe, FechaPipe } from 'ui-comun';
 import { CotizacionesFachada } from '../cotizaciones.fachada';
 
 @Component({
   selector: 'app-cotizaciones',
   providers: [CotizacionesFachada],
-  imports: [MatTableModule, BobPipe, FechaPipe, AvisoServicios],
+  imports: [MatTableModule, BobPipe, FechaPipe, EtiquetaPipe, Estado, AvisoServicios],
   template: `
     <h1>Cotizaciones</h1>
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!cotizaciones().length" />
@@ -22,7 +22,7 @@ import { CotizacionesFachada } from '../cotizaciones.fachada';
         >
         <ng-container matColumnDef="carga"
           ><th mat-header-cell *matHeaderCellDef>Carga</th>
-          <td mat-cell *matCellDef="let c">{{ c.tipoCarga }} · {{ c.toneladas }} t</td></ng-container
+          <td mat-cell *matCellDef="let c">{{ c.tipoCarga | etiqueta: 'TipoCarga' }} · {{ c.toneladas }} t</td></ng-container
         >
         <ng-container matColumnDef="monto"
           ><th mat-header-cell *matHeaderCellDef>Monto</th>
@@ -31,12 +31,11 @@ import { CotizacionesFachada } from '../cotizaciones.fachada';
         <ng-container matColumnDef="estado"
           ><th mat-header-cell *matHeaderCellDef>Estado</th>
           <td mat-cell *matCellDef="let c">
-            <span class="chip-estado">{{ c.vencida ? 'VENCIDA' : c.estado }}</span>
-          </td></ng-container
-        >
+            <cc-estado grupo="EstadoCotizacion" [valor]="c.vencida ? 'VENCIDA' : c.estado" /></td
+        ></ng-container>
         <ng-container matColumnDef="creada"
           ><th mat-header-cell *matHeaderCellDef>Creada</th>
-          <td mat-cell *matCellDef="let c">{{ c.creadaEn | fecha: true }} · {{ c.canal }}</td></ng-container
+          <td mat-cell *matCellDef="let c">{{ c.creadaEn | fecha: true }} · {{ c.canal | etiqueta: 'CanalCotizacion' }}</td></ng-container
         >
         <tr mat-header-row *matHeaderRowDef="columnas"></tr>
         <tr mat-row *matRowDef="let c; columns: columnas"></tr>

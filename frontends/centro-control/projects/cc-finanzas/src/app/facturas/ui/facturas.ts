@@ -2,13 +2,13 @@ import { Component, inject } from '@angular/core';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, BobPipe, FechaPipe } from 'ui-comun';
+import { AvisoServicios, BobPipe, Estado, FechaPipe } from 'ui-comun';
 import { FacturasFachada } from '../facturas.fachada';
 
 @Component({
   selector: 'app-facturas',
   providers: [FacturasFachada],
-  imports: [MatTableModule, MatButtonToggleModule, RouterLink, BobPipe, FechaPipe, AvisoServicios],
+  imports: [MatTableModule, MatButtonToggleModule, RouterLink, BobPipe, FechaPipe, Estado, AvisoServicios],
   template: `
     <div class="fila-acciones">
       <h1>Facturas</h1>
@@ -47,9 +47,8 @@ import { FacturasFachada } from '../facturas.fachada';
         <ng-container matColumnDef="estado"
           ><th mat-header-cell *matHeaderCellDef>Estado</th>
           <td mat-cell *matCellDef="let f">
-            <span class="chip-estado">{{ f.estado }}</span>
-          </td></ng-container
-        >
+            <cc-estado grupo="EstadoFactura" [valor]="f.estado" /></td
+        ></ng-container>
         <tr mat-header-row *matHeaderRowDef="columnas"></tr>
         <tr mat-row *matRowDef="let f; columns: columnas"></tr>
       </table>

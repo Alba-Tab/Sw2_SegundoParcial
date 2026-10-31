@@ -63,13 +63,17 @@ export class MapaPagina implements OnDestroy {
     });
     effect(() => {
       const viajes = this.viajes();
+      // Leaflet pinta en SVG con colores en JS: se leen de los tokens para seguir el tema (claro u oscuro).
+      const tokens = getComputedStyle(document.documentElement);
+      const conRiesgo = tokens.getPropertyValue('--mat-sys-error').trim();
+      const normal = tokens.getPropertyValue('--mat-sys-primary').trim();
       this.capa.clearLayers();
       for (const v of viajes) {
         const lat = v.ultimaPosicion?.lat;
         const lng = v.ultimaPosicion?.lng;
         if (lat === undefined || lng === undefined) continue;
         const riesgo = v.riesgo?.enRiesgo;
-        L.circleMarker([lat, lng], { radius: 9, color: riesgo ? '#ba1a1a' : '#3c6090', fillOpacity: 0.8 })
+        L.circleMarker([lat, lng], { radius: 9, color: riesgo ? conRiesgo : normal, fillOpacity: 0.8 })
           .bindPopup(popupViaje(v, `${this.config.urls['cc-operaciones']}/viajes/${encodeURIComponent(v.viajeId)}`))
           .addTo(this.capa);
       }

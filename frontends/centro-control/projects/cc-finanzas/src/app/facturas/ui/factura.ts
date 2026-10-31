@@ -8,7 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { AvisoServicios, BobPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { AvisoServicios, BobPipe, Estado, EtiquetaPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
 import { completarConRecibo } from '../domain/recibo';
 import { MEDIOS_PAGO, pagoNuevo, pagoValido } from '../domain/pago';
 import { FacturaFachada } from '../facturas.fachada';
@@ -31,14 +31,14 @@ import { FacturaFachada } from '../facturas.fachada';
     MatProgressBarModule,
     BobPipe,
     FechaPipe,
+    EtiquetaPipe,
+    Estado,
     AvisoServicios,
   ],
   template: `
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!factura()" />
     @if (factura(); as f) {
-      <h1>
-        {{ f.numero }} · <span class="chip-estado">{{ f.estado }}</span>
-      </h1>
+      <h1>{{ f.numero }} <cc-estado grupo="EstadoFactura" [valor]="f.estado" /></h1>
       <p>{{ f.razonSocial }} · emitida {{ f.emitidaEl | fecha }} · vence {{ f.venceEl | fecha }}</p>
       <p><b>Monto:</b> {{ f.monto | bob }} · <b>Saldo:</b> {{ f.saldo | bob }}</p>
 
@@ -67,7 +67,7 @@ import { FacturaFachada } from '../facturas.fachada';
                 ><mat-label>Medio</mat-label>
                 <mat-select [(ngModel)]="pago.medio">
                   @for (m of medios; track m) {
-                    <mat-option [value]="m">{{ m }}</mat-option>
+                    <mat-option [value]="m">{{ m | etiqueta: 'MedioPago' }}</mat-option>
                   }
                 </mat-select>
               </mat-form-field>
@@ -81,7 +81,7 @@ import { FacturaFachada } from '../facturas.fachada';
       <h2>Pagos</h2>
       @for (p of f.pagos ?? []; track p.pagoId) {
         <p>
-          {{ p.fecha | fecha }} · {{ p.monto | bob }} · {{ p.medio }} · {{ p.referencia }}
+          {{ p.fecha | fecha }} · {{ p.monto | bob }} · {{ p.medio | etiqueta: 'MedioPago' }} · {{ p.referencia }}
           <span class="secundario">{{ p.nota ?? '' }}</span>
         </p>
       } @empty {

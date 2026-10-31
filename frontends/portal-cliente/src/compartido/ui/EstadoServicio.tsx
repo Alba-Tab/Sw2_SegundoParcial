@@ -1,4 +1,16 @@
+import Block from '@mui/icons-material/Block';
+import Cancel from '@mui/icons-material/Cancel';
+import CheckCircle from '@mui/icons-material/CheckCircle';
+import ErrorIcon from '@mui/icons-material/Error';
+import EventAvailable from '@mui/icons-material/EventAvailable';
+import HourglassTop from '@mui/icons-material/HourglassTop';
+import Lock from '@mui/icons-material/Lock';
+import ReceiptLong from '@mui/icons-material/ReceiptLong';
+import Route from '@mui/icons-material/Route';
+import Warning from '@mui/icons-material/Warning';
 import Chip, { type ChipProps } from '@mui/material/Chip';
+import type { ReactElement } from 'react';
+import type { EstadoFactura as ValorEstadoFactura } from '../../api/generado/finanzas';
 
 export type EstadoViaje =
   | 'PROGRAMANDO'
@@ -11,23 +23,44 @@ export type EstadoViaje =
   | 'ENTREGA_RECHAZADA'
   | 'REQUIERE_INTERVENCION';
 
-const ESTADOS: Record<EstadoViaje, { texto: string; color: ChipProps['color'] }> = {
-  PROGRAMANDO: { texto: 'Confirmando', color: 'default' },
-  CONFIRMADO: { texto: 'Confirmado', color: 'primary' },
-  EN_RUTA: { texto: 'En ruta', color: 'info' },
-  ENTREGADO: { texto: 'Entregado', color: 'success' },
-  CERRADO: { texto: 'Cerrado', color: 'success' },
-  CANCELADO: { texto: 'Cancelado', color: 'default' },
-  ENTREGA_OBSERVADA: { texto: 'Entrega en revisión', color: 'warning' },
-  ENTREGA_RECHAZADA: { texto: 'Entrega rechazada', color: 'error' },
-  REQUIERE_INTERVENCION: { texto: 'En revisión por la empresa', color: 'warning' },
+/** Texto, icono y tono de un estado (DESIGN.md, "Estados"): el mismo icono que en el Centro de Control para el mismo significado. */
+interface Etiqueta {
+  texto: string;
+  icono: ReactElement;
+  color: ChipProps['color'];
+}
+
+const ESTADOS: Record<EstadoViaje, Etiqueta> = {
+  PROGRAMANDO: { texto: 'Confirmando', icono: <HourglassTop />, color: 'primary' },
+  CONFIRMADO: { texto: 'Confirmado', icono: <EventAvailable />, color: 'primary' },
+  EN_RUTA: { texto: 'En ruta', icono: <Route />, color: 'primary' },
+  ENTREGADO: { texto: 'Entregado', icono: <CheckCircle />, color: 'success' },
+  CERRADO: { texto: 'Cerrado', icono: <Lock />, color: 'default' },
+  CANCELADO: { texto: 'Cancelado', icono: <Cancel />, color: 'default' },
+  ENTREGA_OBSERVADA: { texto: 'Entrega en revisión', icono: <Warning />, color: 'warning' },
+  ENTREGA_RECHAZADA: { texto: 'Entrega rechazada', icono: <Block />, color: 'error' },
+  REQUIERE_INTERVENCION: { texto: 'En revisión por la empresa', icono: <ErrorIcon />, color: 'warning' },
 };
 
-/** El estado del servicio con su color; "En aprobación" cuando la saga espera la decisión de crédito (spec 003, 2b). */
+const EN_APROBACION: Etiqueta = { texto: 'En aprobación', icono: <HourglassTop />, color: 'warning' };
+
+const ESTADOS_FACTURA: Record<ValorEstadoFactura, Etiqueta> = {
+  EMITIDA: { texto: 'Por pagar', icono: <ReceiptLong />, color: 'primary' },
+  PAGADA_PARCIAL: { texto: 'Pago parcial', icono: <HourglassTop />, color: 'warning' },
+  PAGADA: { texto: 'Pagada', icono: <CheckCircle />, color: 'success' },
+};
+
+// Los iconos de MUI ya llevan aria-hidden: el lector de pantalla lee solo el texto. Lo neutro va con borde, sin relleno.
+const Estado = ({ texto, icono, color }: Etiqueta) => (
+  <Chip label={texto} icon={icono} color={color} size="small" variant={color === 'default' ? 'outlined' : 'filled'} />
+);
+
+/** El estado del servicio; "En aprobación" cuando la saga espera la decisión de crédito (spec 003, 2b). */
 export function EstadoServicio({ estado, etapa }: { estado: EstadoViaje; etapa?: string | null }) {
-  if (estado === 'PROGRAMANDO' && etapa === 'ESPERANDO_APROBACION') {
-    return <Chip label="En aprobación" color="warning" size="small" variant="outlined" />;
-  }
-  const { texto, color } = ESTADOS[estado];
-  return <Chip label={texto} color={color} size="small" variant={estado === 'CANCELADO' ? 'outlined' : 'filled'} />;
+  return <Estado {...(estado === 'PROGRAMANDO' && etapa === 'ESPERANDO_APROBACION' ? EN_APROBACION : ESTADOS[estado])} />;
+}
+
+/** El estado de una factura (spec 008). */
+export function EstadoFactura({ estado }: { estado: ValorEstadoFactura }) {
+  return <Estado {...ESTADOS_FACTURA[estado]} />;
 }

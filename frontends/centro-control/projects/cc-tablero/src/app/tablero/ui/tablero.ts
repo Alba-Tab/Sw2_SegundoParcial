@@ -4,7 +4,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, BobPipe, CONFIG_CENTRO, FechaPipe, pct } from 'ui-comun';
+import { AvisoServicios, BobPipe, CONFIG_CENTRO, Estado, FechaPipe, pct } from 'ui-comun';
 import type { EstadoTarjeta, Pagina } from '../domain/tablero';
 import { TableroFachada } from '../tablero.fachada';
 
@@ -21,7 +21,17 @@ const ENLACES: { ruta: Pagina; titulo: string }[] = [
 @Component({
   selector: 'app-tablero',
   providers: [TableroFachada],
-  imports: [MatCardModule, MatButtonToggleModule, MatProgressBarModule, MatIconModule, RouterLink, BobPipe, FechaPipe, AvisoServicios],
+  imports: [
+    MatCardModule,
+    MatButtonToggleModule,
+    MatProgressBarModule,
+    MatIconModule,
+    RouterLink,
+    BobPipe,
+    FechaPipe,
+    Estado,
+    AvisoServicios,
+  ],
   template: `
     <div class="encabezado">
       <h1>Tablero</h1>
@@ -70,7 +80,7 @@ const ENLACES: { ruta: Pagina; titulo: string }[] = [
                     <a [href]="config.urls['cc-operaciones'] + '/viajes/' + v.viajeId">{{ v.placa }}</a>
                     · {{ v.cliente?.razonSocial }} · {{ v.ruta?.nombre }}
                     @if (v.riesgo?.enRiesgo) {
-                      <span class="chip-estado" data-alerta="true">riesgo {{ pct(v.riesgo.probabilidad) }}</span>
+                      <cc-estado grupo="Riesgo" valor="EN_RIESGO" /> {{ pct(v.riesgo.probabilidad) }}
                     }
                   </p>
                 }
@@ -92,9 +102,7 @@ const ENLACES: { ruta: Pagina; titulo: string }[] = [
               }
               @default {
                 @for (u of t?.unidadesPorEstado ?? []; track u.estado) {
-                  <p class="linea">
-                    <span class="chip-estado">{{ u.estado }}</span> {{ u.cantidad }}
-                  </p>
+                  <p class="linea"><cc-estado grupo="EstadoUnidad" [valor]="u.estado" /> {{ u.cantidad }}</p>
                 }
               }
             }

@@ -23,18 +23,13 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 import { useMemo, useState } from 'react';
-import { type EstadoFactura, type Factura, getListarFacturasQueryKey, listarFacturas } from '../../api/generado/finanzas';
+import { type Factura, getListarFacturasQueryKey, listarFacturas } from '../../api/generado/finanzas';
 import { compararMontos, dinero, fecha } from '../../compartido/formato/formato';
 import { Antiguedad } from '../../compartido/offline/Antiguedad';
 import { useClienteActivo } from '../../compartido/sesion/ClienteActivo';
+import { EstadoFactura } from '../../compartido/ui/EstadoServicio';
 import { Problema } from '../../compartido/ui/Problema';
 import { Credito } from './Credito';
-
-const ESTADOS: Record<EstadoFactura, { texto: string; color: 'default' | 'success' | 'warning' }> = {
-  EMITIDA: { texto: 'Por pagar', color: 'default' },
-  PAGADA_PARCIAL: { texto: 'Pago parcial', color: 'warning' },
-  PAGADA: { texto: 'Pagada', color: 'success' },
-};
 
 const col = createColumnHelper<Factura>();
 
@@ -79,7 +74,7 @@ export function PaginaFacturas() {
       }),
       col.accessor('estado', {
         header: 'Estado',
-        cell: (c) => <Chip label={ESTADOS[c.getValue()].texto} color={ESTADOS[c.getValue()].color} size="small" />,
+        cell: (c) => <EstadoFactura estado={c.getValue()} />,
       }),
     ],
     [],

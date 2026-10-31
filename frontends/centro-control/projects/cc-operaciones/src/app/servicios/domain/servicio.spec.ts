@@ -1,5 +1,4 @@
 import { conLaElegidaPrimero } from '../../acciones/domain/accion';
-import { estadoConAlerta } from '../../viajes/domain/viaje';
 import { motivoCancelacionValido, nombreCliente } from './servicio';
 
 describe('cc-operaciones (dominio)', () => {
@@ -19,11 +18,5 @@ describe('cc-operaciones (dominio)', () => {
     const lista = [{ accionId: 'a' }, { accionId: 'b' }, { accionId: 'c' }];
     expect(conLaElegidaPrimero(lista, 'c').map((a) => a.accionId)).toEqual(['c', 'a', 'b']);
     expect(conLaElegidaPrimero(lista, undefined)).toBe(lista);
-  });
-
-  it('los estados que piden decisión se pintan como alerta', () => {
-    expect(estadoConAlerta('ENTREGA_OBSERVADA')).toBe(true);
-    expect(estadoConAlerta('EN_RUTA')).toBe(false);
-    expect(estadoConAlerta(undefined)).toBe(false);
   });
 });

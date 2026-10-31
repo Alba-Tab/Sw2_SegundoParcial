@@ -2,14 +2,14 @@ import { Component, inject } from '@angular/core';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
-import { AvisoServicios, FechaPipe } from 'ui-comun';
+import { AvisoServicios, Estado, EtiquetaPipe, FechaPipe } from 'ui-comun';
 import { AVISO_KM } from '../domain/unidad';
 import { UnidadesFachada } from '../unidades.fachada';
 
 @Component({
   selector: 'app-unidades',
   providers: [UnidadesFachada],
-  imports: [MatTableModule, RouterLink, FechaPipe, DecimalPipe, AvisoServicios],
+  imports: [MatTableModule, RouterLink, FechaPipe, EtiquetaPipe, Estado, DecimalPipe, AvisoServicios],
   template: `
     <h1>Unidades</h1>
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!unidades().length" />
@@ -23,14 +23,15 @@ import { UnidadesFachada } from '../unidades.fachada';
         >
         <ng-container matColumnDef="tipo"
           ><th mat-header-cell *matHeaderCellDef>Tipo</th>
-          <td mat-cell *matCellDef="let u">{{ u.tipoUnidad }} {{ u.tipoRemolque ?? '' }}</td></ng-container
+          <td mat-cell *matCellDef="let u">
+            {{ u.tipoUnidad | etiqueta: 'TipoUnidad' }} {{ u.tipoRemolque ? (u.tipoRemolque | etiqueta: 'TipoRemolque') : '' }}
+          </td></ng-container
         >
         <ng-container matColumnDef="estado"
           ><th mat-header-cell *matHeaderCellDef>Estado</th>
           <td mat-cell *matCellDef="let u">
-            <span class="chip-estado" [attr.data-alerta]="u.estado === 'MANTENIMIENTO_PENDIENTE'">{{ u.estado }}</span>
-          </td></ng-container
-        >
+            <cc-estado grupo="EstadoUnidad" [valor]="u.estado" /></td
+        ></ng-container>
         <ng-container matColumnDef="km"
           ><th mat-header-cell *matHeaderCellDef>Km desde el mantenimiento</th>
           <td mat-cell *matCellDef="let u" [class.no-disponible]="u.kmDesdeUltimoMantenimiento >= avisoKm">
@@ -41,7 +42,7 @@ import { UnidadesFachada } from '../unidades.fachada';
           ><th mat-header-cell *matHeaderCellDef>Documentos</th>
           <td mat-cell *matCellDef="let u">
             @for (d of u.documentos; track d.tipo) {
-              <span class="secundario">{{ d.tipo }} {{ d.venceEl | fecha }} </span>
+              <span class="secundario">{{ d.tipo | etiqueta: 'TipoDocumento' }} {{ d.venceEl | fecha }} </span>
             }
           </td></ng-container
         >

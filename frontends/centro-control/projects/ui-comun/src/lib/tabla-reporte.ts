@@ -63,7 +63,7 @@ export interface Resultado {
   styles: `
     .datos-al {
       color: var(--mat-sys-on-surface-variant);
-      font-size: 13px;
+      font: var(--mat-sys-body-medium);
       margin: 0 0 8px;
     }
     .grafico {

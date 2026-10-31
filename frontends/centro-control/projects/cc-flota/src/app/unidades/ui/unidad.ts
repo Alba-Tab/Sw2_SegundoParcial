@@ -8,7 +8,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { AvisoServicios, fechaLaPaz, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { AvisoServicios, Estado, EtiquetaPipe, fechaLaPaz, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
 import { CHECKLIST_POR_DEFECTO, cierreInicial, puedeProgramar, type ItemCierre, type NuevoMantenimiento } from '../domain/unidad';
 import { UnidadFachada } from '../unidades.fachada';
 
@@ -26,21 +26,21 @@ import { UnidadFachada } from '../unidades.fachada';
     MatSelectModule,
     MatCheckboxModule,
     FechaPipe,
+    EtiquetaPipe,
+    Estado,
     AvisoServicios,
   ],
   template: `
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!unidad()" />
     @if (unidad(); as u) {
-      <h1>
-        {{ u.placa }} · <span class="chip-estado">{{ u.estado }}</span>
-      </h1>
+      <h1>{{ u.placa }} <cc-estado grupo="EstadoUnidad" [valor]="u.estado" /></h1>
       <p>
-        {{ u.tipoUnidad }} {{ u.tipoRemolque ?? '' }} · {{ (u.kilometraje | number) ?? '—' }} km ·
-        {{ u.kmDesdeUltimoMantenimiento | number }} km desde el último mantenimiento
+        {{ u.tipoUnidad | etiqueta: 'TipoUnidad' }} {{ u.tipoRemolque ? (u.tipoRemolque | etiqueta: 'TipoRemolque') : '' }} ·
+        {{ (u.kilometraje | number) ?? '—' }} km · {{ u.kmDesdeUltimoMantenimiento | number }} km desde el último mantenimiento
       </p>
       <p class="secundario">
         @for (d of u.documentos; track d.tipo) {
-          {{ d.tipo }} vence {{ d.venceEl | fecha }} ·
+          {{ d.tipo | etiqueta: 'TipoDocumento' }} vence {{ d.venceEl | fecha }} ·
         }
       </p>
 
@@ -76,10 +76,8 @@ import { UnidadFachada } from '../unidades.fachada';
       @for (m of mantenimientos(); track m.mantenimientoId) {
         <mat-card class="mantenimiento">
           <mat-card-header>
-            <mat-card-title>{{ m.tipo }} · {{ m.fechaProgramada | fecha }} · {{ m.taller }}</mat-card-title>
-            <mat-card-subtitle
-              ><span class="chip-estado">{{ m.estado }}</span> {{ m.descripcion }}</mat-card-subtitle
-            >
+            <mat-card-title>{{ m.tipo | etiqueta: 'TipoMantenimiento' }} · {{ m.fechaProgramada | fecha }} · {{ m.taller }}</mat-card-title>
+            <mat-card-subtitle><cc-estado grupo="EstadoMantenimiento" [valor]="m.estado" /> {{ m.descripcion }}</mat-card-subtitle>
           </mat-card-header>
           <mat-card-content>
             @if (m.estado === 'EN_CURSO' && sesion.tiene('jefe_flota')) {

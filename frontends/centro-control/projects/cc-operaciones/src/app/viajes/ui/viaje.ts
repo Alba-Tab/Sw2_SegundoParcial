@@ -6,9 +6,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { AvisoServicios, BobPipe, FechaPipe, mensajeDe, pct, Sesion } from 'ui-comun';
+import { AvisoServicios, BobPipe, Estado, EtiquetaPipe, FechaPipe, mensajeDe, pct, Sesion } from 'ui-comun';
 import type { OpcionIntervencion } from '../../graphql/generado';
-import { estadoConAlerta } from '../domain/viaje';
 import { ViajeFachada } from '../viajes.fachada';
 
 /** Detalle del viaje (al que llevan las alertas): bitácora, entrega, riesgo y las decisiones del despachador. */
@@ -24,6 +23,8 @@ import { ViajeFachada } from '../viajes.fachada';
     MatProgressBarModule,
     BobPipe,
     FechaPipe,
+    EtiquetaPipe,
+    Estado,
     AvisoServicios,
   ],
   template: `
@@ -33,16 +34,18 @@ import { ViajeFachada } from '../viajes.fachada';
     }
     <cc-aviso-servicios [error]="r?.error" [campos]="campos" [sinDatos]="!r?.data?.viaje" />
     @if (r?.data?.viaje; as v) {
-      <h1>
-        Viaje {{ v.placa }} · <span class="chip-estado" [attr.data-alerta]="alerta(v.estado)">{{ v.estado }}</span>
-      </h1>
+      <h1>Viaje {{ v.placa }} <cc-estado grupo="EstadoViaje" [valor]="v.estado" /></h1>
       <div class="tarjetas">
         <mat-card>
           <mat-card-content>
             <p><b>Cliente:</b> {{ v.cliente?.razonSocial }}</p>
             <p><b>Ruta:</b> {{ v.ruta?.nombre }} ({{ v.ruta?.distanciaKm }} km)</p>
-            <p><b>Carga:</b> {{ v.tipoCarga }} · {{ v.toneladas }} t · {{ v.fechaViaje | fecha }}</p>
-            <p><b>Chofer:</b> {{ v.choferNombre }} · <b>Unidad:</b> {{ v.unidad?.placa ?? v.placa }} ({{ v.unidad?.estado ?? '—' }})</p>
+            <p><b>Carga:</b> {{ v.tipoCarga | etiqueta: 'TipoCarga' }} · {{ v.toneladas }} t · {{ v.fechaViaje | fecha }}</p>
+            <p>
+              <b>Chofer:</b> {{ v.choferNombre }} · <b>Unidad:</b> {{ v.unidad?.placa ?? v.placa }} ({{
+                v.unidad?.estado | etiqueta: 'EstadoUnidad'
+              }})
+            </p>
             @if (verMonto) {
               <p><b>Monto:</b> {{ v.monto | bob }}</p>
             }
@@ -65,7 +68,7 @@ import { ViajeFachada } from '../viajes.fachada';
         @if (v.entrega; as e) {
           <mat-card>
             <mat-card-header
-              ><mat-card-title>{{ e.tipo === 'RECHAZO' ? 'Rechazo' : 'Entrega' }}</mat-card-title></mat-card-header
+              ><mat-card-title>{{ e.tipo | etiqueta: 'TipoEntrega' }}</mat-card-title></mat-card-header
             >
             <mat-card-content>
               <p>
@@ -113,8 +116,8 @@ import { ViajeFachada } from '../viajes.fachada';
       <h2>Bitácora</h2>
       @for (h of v.hitos ?? []; track h.hitoId) {
         <p class="hito">
-          <span class="chip-estado">{{ h.tipo }}</span> {{ h.registradoEn | fecha: true }} · {{ h.descripcion }}
-          <span class="secundario">({{ h.origen }})</span>
+          <cc-estado grupo="TipoHito" [valor]="h.tipo" /> {{ h.registradoEn | fecha: true }} · {{ h.descripcion }}
+          <span class="secundario">({{ h.origen | etiqueta: 'OrigenHito' }})</span>
         </p>
       } @empty {
         <p class="secundario">Sin hitos.</p>
@@ -142,7 +145,6 @@ export class ViajePagina {
   readonly enviando = signal(false);
   readonly pct = pct;
   readonly campos = { viaje: 'Viajes', unidad: 'Flota', riesgo: 'Analítica' };
-  readonly alerta = estadoConAlerta;
   texto = '';
 
   constructor() {

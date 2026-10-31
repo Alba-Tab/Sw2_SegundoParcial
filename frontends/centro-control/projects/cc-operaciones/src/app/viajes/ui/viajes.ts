@@ -3,21 +3,21 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, FechaPipe } from 'ui-comun';
+import { AvisoServicios, Estado, EtiquetaPipe, FechaPipe } from 'ui-comun';
 import { ESTADOS_VIAJE } from '../domain/viaje';
 import { ViajesFachada } from '../viajes.fachada';
 
 @Component({
   selector: 'app-viajes',
   providers: [ViajesFachada],
-  imports: [MatTableModule, MatSelectModule, MatProgressBarModule, RouterLink, FechaPipe, AvisoServicios],
+  imports: [MatTableModule, MatSelectModule, MatProgressBarModule, RouterLink, FechaPipe, EtiquetaPipe, Estado, AvisoServicios],
   template: `
     <div class="fila-acciones">
       <h1>Viajes</h1>
       <mat-select class="filtro" [value]="estado()" (valueChange)="estado.set($event)" aria-label="Estado">
         <mat-option [value]="null">Todos</mat-option>
         @for (e of estados; track e) {
-          <mat-option [value]="e">{{ e }}</mat-option>
+          <mat-option [value]="e">{{ e | etiqueta: 'EstadoViaje' }}</mat-option>
         }
       </mat-select>
     </div>
@@ -53,9 +53,8 @@ import { ViajesFachada } from '../viajes.fachada';
         <ng-container matColumnDef="estado"
           ><th mat-header-cell *matHeaderCellDef>Estado</th>
           <td mat-cell *matCellDef="let v">
-            <span class="chip-estado">{{ v.estado }}</span>
-          </td></ng-container
-        >
+            <cc-estado grupo="EstadoViaje" [valor]="v.estado" /></td
+        ></ng-container>
         <tr mat-header-row *matHeaderRowDef="columnas"></tr>
         <tr mat-row *matRowDef="let v; columns: columnas"></tr>
       </table>

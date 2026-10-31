@@ -49,7 +49,7 @@ import { Grabadora } from './grabadora';
         [attr.aria-pressed]="grabando()"
         aria-describedby="ayuda-microfono"
       >
-        <mat-icon>{{ grabando() ? 'mic' : 'mic_none' }}</mat-icon>
+        <mat-icon>mic</mat-icon>
         {{ grabando() ? 'Escuchando… suelta para terminar' : 'Mantén pulsado para hablar' }}
       </button>
       <span id="ayuda-microfono" class="secundario">Con el teclado, mantén Espacio o Enter sobre el botón.</span>

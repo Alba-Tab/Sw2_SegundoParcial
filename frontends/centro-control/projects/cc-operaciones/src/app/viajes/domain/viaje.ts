@@ -14,7 +14,3 @@ export const ESTADOS_VIAJE: EstadoViaje[] = [
   'REQUIERE_INTERVENCION',
   'CANCELADO',
 ];
-
-/** Estados que piden una decisión del despachador y se pintan como alerta. */
-export const estadoConAlerta = (estado?: string): boolean =>
-  ['ENTREGA_OBSERVADA', 'REQUIERE_INTERVENCION', 'ENTREGA_RECHAZADA'].includes(estado ?? '');

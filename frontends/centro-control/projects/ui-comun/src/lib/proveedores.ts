@@ -2,6 +2,7 @@ import { type ApplicationConfig, provideAppInitializer, inject, provideBrowserGl
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter, type Routes, withComponentInputBinding } from '@angular/router';
 import { MAT_DATE_LOCALE } from '@angular/material/core';
+import { MAT_ICON_DEFAULT_OPTIONS } from '@angular/material/icon';
 import { proveerApollo } from './apollo';
 import { CONFIG_CENTRO, type ConfigCentro } from './configuracion';
 import { Sesion } from './sesion';
@@ -13,6 +14,8 @@ export function configurarApp(config: ConfigCentro, rutas: Routes): ApplicationC
       provideBrowserGlobalErrorListeners(),
       { provide: CONFIG_CENTRO, useValue: config },
       { provide: MAT_DATE_LOCALE, useValue: 'es-BO' },
+      // Los <mat-icon> usan Material Symbols (base.css), no la fuente clásica material-icons.
+      { provide: MAT_ICON_DEFAULT_OPTIONS, useValue: { fontSet: 'material-symbols-outlined' } },
       provideHttpClient(),
       provideAppInitializer(() => inject(Sesion).iniciar()),
       ...proveerApollo(),

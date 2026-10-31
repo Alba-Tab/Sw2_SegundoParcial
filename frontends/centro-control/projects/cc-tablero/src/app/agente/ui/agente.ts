@@ -2,7 +2,7 @@ import { Component, inject, input, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { AvisoServicios, codigoDe, CONFIG_CENTRO, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { AvisoServicios, codigoDe, CONFIG_CENTRO, Estado, EtiquetaPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
 import { AgenteFachada } from '../agente.fachada';
 import { mensajeDisparo, urlTraza } from '../domain/mision';
 
@@ -13,7 +13,7 @@ import { mensajeDisparo, urlTraza } from '../domain/mision';
 @Component({
   selector: 'app-agente',
   providers: [AgenteFachada],
-  imports: [MatButtonModule, MatExpansionModule, FechaPipe, AvisoServicios],
+  imports: [MatButtonModule, MatExpansionModule, FechaPipe, EtiquetaPipe, Estado, AvisoServicios],
   template: `
     <div class="fila-acciones">
       <h1>Agente "vigilar viajes"</h1>
@@ -26,8 +26,8 @@ import { mensajeDisparo, urlTraza } from '../domain/mision';
         <mat-expansion-panel [expanded]="mision() ? m.misionId === mision() : $first" [class.elegida]="m.misionId === mision()">
           <mat-expansion-panel-header>
             <mat-panel-title>
-              <span class="chip-estado" [attr.data-alerta]="m.estado === 'FALLIDA' || m.estado === 'SALTADA'">{{ m.estado }}</span>
-              &nbsp;{{ m.iniciadaEn | fecha: true }} · {{ m.origen }}
+              <cc-estado grupo="EstadoMision" [valor]="m.estado" />
+              &nbsp;{{ m.iniciadaEn | fecha: true }} · {{ m.origen | etiqueta: 'OrigenMision' }}
             </mat-panel-title>
             <mat-panel-description>
               {{ m.pasos.length }} pasos · {{ m.accionesCreadas ?? 0 }} acciones {{ m.codigo ? '· ' + m.codigo : '' }}

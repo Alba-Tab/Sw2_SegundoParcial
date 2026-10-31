@@ -6,7 +6,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, CONFIG_CENTRO, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { AvisoServicios, CONFIG_CENTRO, Estado, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
 import { AccionesFachada } from '../acciones.fachada';
 import { conLaElegidaPrimero } from '../domain/accion';
 
@@ -17,7 +17,7 @@ import { conLaElegidaPrimero } from '../domain/accion';
 @Component({
   selector: 'app-acciones',
   providers: [AccionesFachada],
-  imports: [FormsModule, MatCardModule, MatButtonModule, MatFormFieldModule, MatInputModule, RouterLink, FechaPipe, AvisoServicios],
+  imports: [FormsModule, MatCardModule, MatButtonModule, MatFormFieldModule, MatInputModule, RouterLink, FechaPipe, Estado, AvisoServicios],
   template: `
     <h1>Acciones propuestas por el agente</h1>
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!visibles().length" />
@@ -27,7 +27,7 @@ import { conLaElegidaPrimero } from '../domain/accion';
           <mat-card-header>
             <mat-card-title>Avisar retraso a {{ a.razonSocial }}</mat-card-title>
             <mat-card-subtitle>
-              <span class="chip-estado" [attr.data-alerta]="a.estado === 'PENDIENTE'">{{ a.estado }}</span>
+              <cc-estado grupo="EstadoAccion" [valor]="a.estado" />
               · {{ a.creadaEn | fecha: true }} · viaje <a [routerLink]="['/viajes', a.viajeId]">{{ a.viaje?.placa ?? a.viajeId }}</a>
               {{ a.viaje?.ruta.destino ? '→ ' + a.viaje.ruta.destino : '' }}
               @if (a.misionId) {

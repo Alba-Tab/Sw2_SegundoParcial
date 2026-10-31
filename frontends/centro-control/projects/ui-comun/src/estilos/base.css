@@ -1,21 +1,36 @@
+/*
+ * Estilos globales de las 4 apps del Centro de Control (DESIGN.md). Cada app lo carga una sola vez desde angular.json,
+ * después del tema de Material y de los tokens. Las fuentes salen del hosting de cada app, nunca de Google Fonts.
+ */
+@import 'material-symbols/outlined.css';
+@import './fuentes.css';
+
 html,
 body {
   height: 100%;
 }
 body {
   margin: 0;
+  font: var(--mat-sys-body-medium);
   font-family: Roboto, 'Helvetica Neue', sans-serif;
   background: var(--mat-sys-surface);
   color: var(--mat-sys-on-surface);
 }
+
+/* Escala de títulos: 28 → 22 → 16 px, cada paso al menos 1,25 veces el siguiente. */
 h1 {
-  font: var(--mat-sys-headline-small);
+  font: var(--mat-sys-headline-medium);
   margin: 0 0 16px;
 }
 h2 {
-  font: var(--mat-sys-title-medium);
-  margin: 24px 0 8px;
+  font: var(--mat-sys-title-large);
+  margin: 32px 0 8px;
 }
+h3 {
+  font: var(--mat-sys-title-medium);
+  margin: 16px 0 4px;
+}
+
 .tarjetas {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -32,8 +47,8 @@ h2 {
   color: var(--mat-sys-error);
 }
 .secundario {
+  font: var(--mat-sys-body-medium);
   color: var(--mat-sys-on-surface-variant);
-  font-size: 13px;
 }
 .tabla-ancha {
   width: 100%;
@@ -41,16 +56,4 @@ h2 {
 }
 table {
   width: 100%;
-}
-.chip-estado {
-  padding: 2px 8px;
-  border-radius: 12px;
-  background: var(--mat-sys-secondary-container);
-  color: var(--mat-sys-on-secondary-container);
-  font-size: 12px;
-  white-space: nowrap;
-}
-.chip-estado[data-alerta='true'] {
-  background: var(--mat-sys-error-container);
-  color: var(--mat-sys-on-error-container);
 }

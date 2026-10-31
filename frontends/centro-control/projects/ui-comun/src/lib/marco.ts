@@ -9,6 +9,8 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterOutlet } from '@angular/router';
 import { Alertas } from './alertas';
 import { APPS_POR_ROL, CONFIG_CENTRO, NOMBRES_APPS, type App } from './configuracion';
+import { etiqueta } from 'ui-comun/dominio';
+import { EtiquetaPipe } from './estado';
 import { FechaPipe } from './formato';
 import { Sesion } from './sesion';
 
@@ -49,6 +51,7 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
     MatTooltipModule,
     MatDividerModule,
     FechaPipe,
+    EtiquetaPipe,
   ],
   template: `
     <mat-toolbar class="barra">
@@ -90,15 +93,20 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
               class="alerta"
               [href]="alertas.url(a)"
               [class.cerrada]="a.estado !== 'ABIERTA'"
-              [attr.data-severidad]="a.severidad"
+              [attr.data-tono]="severidad(a.severidad).tono"
             >
-              <span class="titulo">{{ a.titulo }}</span>
+              <span class="titulo"
+                ><mat-icon>{{ severidad(a.severidad).icono }}</mat-icon
+                >{{ a.titulo }}</span
+              >
               <span class="detalle">{{ a.detalle }}</span>
-              <span class="pie">{{ a.creadaEn | fecha: true }} · {{ a.estado }}</span>
+              <span class="pie"
+                >{{ severidad(a.severidad).texto }} · {{ a.creadaEn | fecha: true }} · {{ a.estado | etiqueta: 'EstadoAlerta' }}</span
+              >
             </a>
             @if (a.estado === 'ABIERTA' && puedeAtender()) {
               <button mat-menu-item class="atender" (click)="$event.stopPropagation(); alertas.atender(a)">
-                <mat-icon>done</mat-icon> Marcar atendida: {{ a.titulo }}
+                <mat-icon>check</mat-icon> Marcar atendida: {{ a.titulo }}
               </button>
             }
           } @empty {
@@ -108,7 +116,7 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
       }
       <button mat-button [matMenuTriggerFor]="menuUsuario"><mat-icon>account_circle</mat-icon> {{ sesion.nombre() }}</button>
       <mat-menu #menuUsuario="matMenu">
-        <span class="aviso">{{ sesion.rolesInternos().join(', ') }}</span>
+        <span class="aviso">{{ roles() }}</span>
         <mat-divider />
         <button mat-menu-item (click)="sesion.cerrar()"><mat-icon>logout</mat-icon> Cerrar sesión</button>
       </mat-menu>
@@ -152,7 +160,7 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
       padding: 8px 16px;
       margin: 0;
       color: var(--mat-sys-on-surface-variant);
-      font-size: 13px;
+      font: var(--mat-sys-body-medium);
     }
     .no-atendida {
       color: var(--mat-sys-error);
@@ -162,21 +170,27 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
       min-height: 56px;
       padding-block: 8px;
       max-width: 420px;
-      border-left: 4px solid var(--mat-sys-primary);
     }
     .alerta span {
       display: block;
       white-space: normal;
     }
     .atender {
-      font-size: 13px;
+      font: var(--mat-sys-body-medium);
       min-height: 36px;
     }
-    .alerta[data-severidad='ALTA'] {
-      border-color: var(--mat-sys-tertiary);
+    /* La severidad se dice con icono, texto y fondo tintado; nunca solo con color. */
+    .alerta[data-tono='aviso'] {
+      background: color-mix(in srgb, var(--mat-sys-advertencia-container) 45%, transparent);
     }
-    .alerta[data-severidad='CRITICA'] {
-      border-color: var(--mat-sys-error);
+    .alerta[data-tono='error'] {
+      background: color-mix(in srgb, var(--mat-sys-error-container) 45%, transparent);
+    }
+    .alerta[data-tono='aviso'] .titulo mat-icon {
+      color: var(--mat-sys-advertencia);
+    }
+    .alerta[data-tono='error'] .titulo mat-icon {
+      color: var(--mat-sys-error);
     }
     .alerta.cerrada {
       opacity: 0.6;
@@ -185,9 +199,17 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
       font-weight: 600;
       color: inherit;
     }
+    .titulo mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+      margin-right: 8px;
+      vertical-align: text-bottom;
+      color: var(--mat-sys-primary);
+    }
     .detalle,
     .pie {
-      font-size: 12px;
+      font: var(--mat-sys-body-small);
       color: var(--mat-sys-on-surface-variant);
     }
   `,
@@ -206,6 +228,13 @@ export class Marco implements OnInit {
   /** comercial no recibe alertas (la suscripción cerraría con 4403). */
   readonly recibeAlertas = computed(() => this.sesion.tiene('gerente', 'despachador', 'jefe_flota', 'administracion'));
   readonly puedeAtender = computed(() => this.sesion.tiene('despachador', 'jefe_flota', 'administracion'));
+  readonly severidad = (s: string) => etiqueta('SeveridadAlerta', s);
+  readonly roles = computed(() =>
+    this.sesion
+      .rolesInternos()
+      .map((r) => etiqueta('Rol', r).texto)
+      .join(', '),
+  );
   /** El número del badge no se lee solo: los lectores de pantalla anuncian esta descripción con el botón. */
   readonly descripcionAlertas = computed(() => {
     const n = this.alertas.abiertas();
