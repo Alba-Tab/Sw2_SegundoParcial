@@ -48,9 +48,9 @@ Dominio y aplicación son TypeScript puro y se prueban con Vitest y puertos fals
 ## Detector de fatiga (T7.7, D60)
 
 - Pantalla "Detector de fatiga" del viaje en ruta: la cámara frontal **en primer plano** (iOS no la deja en segundo plano) con VisionCamera 5 y un *frame processor* (`react-native-worklets`).
-- Cada cuadro (VGA, RGB, ya rotado) se recorta alrededor del rostro, se escala a 192 × 192 y pasa por la malla facial de MediaPipe (`face_landmark.tflite`, 1 MB) con `react-native-fast-tflite`. `scripts/descargar-modelo.sh` baja el modelo junto con el de Whisper. El recorte sigue al rostro del cuadro anterior, como en MediaPipe.
-- Solo salen del hilo de la cámara 16 puntos (ojos y boca) y la caja del rostro; el cuadro se libera ahí mismo y ninguna imagen se guarda.
-- El dominio (`dominio/fatiga.ts`) calcula la apertura de los ojos (EAR < 0,2) y de la boca (MAR > 0,6): ojos cerrados 1,5 s o más, o 3 bostezos de al menos 1 s en 2 minutos → alarma (`assets/alarma.wav` y vibración) y un `EVENTO_CONDUCCION` `ALERTA_FATIGA` en la cola, con la última posición. Una alerta por episodio; un hueco sin rostro de menos de 0,5 s no corta el episodio.
+- Cada cuadro (VGA, RGB, ya rotado) pasa por los tres modelos de MediaPipe Face Landmarker con `react-native-fast-tflite`: BlazeFace busca el rostro (solo cuando no hay uno seguido), la malla de 478 puntos lo confirma y el modelo de gestos da `eyeBlinkLeft/Right` y `jawOpen`. `scripts/descargar-modelo.sh` baja `face_landmarker.task` y saca los tres `.tflite`. El recorte sigue al rostro del cuadro anterior y gira con la cabeza (la línea de los ojos queda horizontal), como en MediaPipe.
+- Solo salen del hilo de la cámara cuatro números (ojos, boca, inclinación y tamaño del rostro) y la caja del rostro; el cuadro se libera ahí mismo y ninguna imagen se guarda.
+- El dominio (`dominio/fatiga.ts`, D60 ampliada) alerta por ojos cerrados 1,5 s, somnolencia (PERCLOS > 30 % del último minuto), cabeceo (20° bajo la posición habitual durante 1 s), rostro no visible 3 s (gorra, mano, mirada fuera) o 3 bostezos en 2 minutos → alarma (`assets/alarma.wav` y vibración) y un `EVENTO_CONDUCCION` `ALERTA_FATIGA` en la cola, con la última posición. Mientras la alerta está abierta, la alarma y la vibración se repiten hasta «Estoy bien» y se encola un solo `ALERTA_FATIGA`.
 - La pantalla dibuja la caja del rostro con la etiqueta de los ojos y el conteo de bostezos (FO6). La prueba con la cámara real queda para el iPhone (el simulador no tiene cámara).
 
 ## Notificaciones push (T7.8, D45)
