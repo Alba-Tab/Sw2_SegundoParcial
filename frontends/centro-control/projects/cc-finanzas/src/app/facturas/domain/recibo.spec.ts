@@ -11,6 +11,11 @@ describe('OCR del recibo', () => {
     expect(interpretar('950.50 y 2.800,00 y 12,00').monto).toBe('2800.00');
   });
 
+  it('lee el monto entero aunque no tenga separador de miles', () => {
+    expect(interpretar('Total Bs 2800,00').monto).toBe('2800.00');
+    expect(interpretar('Monto 12500,50').monto).toBe('12500.50');
+  });
+
   it('propone monto, fecha y referencia del texto leído', () => {
     expect(interpretar('BANCO UNION\nFecha: 28/10/2026\nRef: TRX-99812\nComisión 5,00\nTotal Bs 2.800,00')).toEqual({
       monto: '2800.00',
