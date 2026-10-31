@@ -10,19 +10,23 @@ export const rutas: Routes = [
     canActivate: [soloInternos, soloRoles('administracion', 'gerente')],
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'facturas' },
-      { path: 'facturas', loadComponent: () => import('./paginas/facturas').then((m) => m.FacturasPagina), title: 'Facturas' },
-      { path: 'facturas/:id', loadComponent: () => import('./paginas/factura').then((m) => m.FacturaPagina), title: 'Factura' },
+      { path: 'facturas', loadComponent: () => import('./facturas/ui/facturas').then((m) => m.FacturasPagina), title: 'Facturas' },
+      { path: 'facturas/:id', loadComponent: () => import('./facturas/ui/factura').then((m) => m.FacturaPagina), title: 'Factura' },
       {
         path: 'aprobaciones',
-        loadComponent: () => import('./paginas/aprobaciones').then((m) => m.AprobacionesPagina),
+        loadComponent: () => import('./credito/ui/aprobaciones').then((m) => m.AprobacionesPagina),
         title: 'Aprobación de crédito',
       },
       {
         path: 'cotizaciones',
-        loadComponent: () => import('./paginas/cotizaciones').then((m) => m.CotizacionesPagina),
+        loadComponent: () => import('./cotizaciones/ui/cotizaciones').then((m) => m.CotizacionesPagina),
         title: 'Cotizaciones',
       },
-      { path: 'cobranza', loadComponent: () => import('./paginas/cobranza').then((m) => m.CobranzaPagina), title: 'Cuentas por cobrar' },
+      {
+        path: 'cobranza',
+        loadComponent: () => import('./cobranza/ui/cobranza').then((m) => m.CobranzaPagina),
+        title: 'Cuentas por cobrar',
+      },
     ],
   },
   { path: '**', redirectTo: '' },

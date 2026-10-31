@@ -19,6 +19,19 @@ Cuatro apps Angular 22 independientes y la librería `ui-comun`, en un solo work
 - Idempotencia: `Intentos` da una `claveIdempotencia` por intento. La conserva solo si se reenvían los mismos datos después de una red caída, un 5xx o un `409 IDEMPOTENCIA_EN_PROCESO`; con datos distintos o después de una respuesta definitiva, la clave es nueva.
 - Los montos se muestran como texto con `BobPipe`; nunca se calculan en float.
 
+## Capas por feature
+
+Cada app se organiza por feature (por ejemplo `cc-flota/src/app/unidades/`), con tres capas y una fachada:
+
+| Carpeta | Qué tiene | No puede |
+|---|---|---|
+| `domain/` | Tipos y reglas de presentación puras (`lineasChecklist`, `paramsCobranza`, `motivoCancelacionValido`…), con sus pruebas | Importar Angular, Apollo, rxjs ni otras capas; del código generado, solo `import type`; de `ui-comun`, solo los ayudantes puros de dinero y fechas |
+| `data/` | El repositorio que envuelve los servicios `*GQL` de Apollo (y el OCR en cc-finanzas) | Importar `ui/` ni fachadas |
+| `<feature>.fachada.ts` | Fachada con Signals que la UI lee; se provee por componente, así el sondeo vive y muere con la página | — |
+| `ui/` | Los componentes: plantilla, estado del formulario y avisos | Inyectar `*GQL` ni usar Apollo o `data/` directamente |
+
+`npm run capas` (dentro de `verificar`) revisa estas reglas, como ArchUnit en Viajes o dependency-cruiser en Flota.
+
 ## Voz y agente en cc-tablero (T10.4)
 
 - **Pregunta por voz** (`/voz`, spec 015): se mantiene pulsado para hablar (como máximo 15 s, D94). Whisper `tiny` transcribe en un Web Worker con `transformers.js`, y el texto se puede corregir antes de enviar (D95). El modelo (`npm run modelos`, 43 MB, no se versiona) y el runtime de ONNX se sirven desde el hosting de la app (`/modelos`, `/ort`) con `allowRemoteModels = false`: la pestaña Red no muestra pedidos a un CDN ni el audio saliendo.

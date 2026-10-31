@@ -307,6 +307,12 @@
           "options": {
             "port": 4203
           }
+        },
+        "test": {
+          "builder": "@angular/build:unit-test",
+          "options": {
+            "tsConfig": "projects/cc-flota/tsconfig.spec.json"
+          }
         }
       }
     },
