@@ -6,7 +6,7 @@ import { getMainDefinition } from '@apollo/client/utilities';
 import { provideApollo } from 'apollo-angular';
 import { HttpLink } from 'apollo-angular/http';
 import { createClient } from 'graphql-ws';
-import { Observable } from 'rxjs';
+import { Observable, type Subscription } from 'rxjs';
 import { CONFIG_CENTRO } from './configuracion';
 import { EstadoConexion, esperaReconexion } from './conexion';
 import { Sesion } from './sesion';
@@ -23,6 +23,37 @@ declare module '@apollo/client' {
       }
     }
   }
+}
+
+/**
+ * Con 401 renueva el token y repite la operación una vez (spec 016). Si no hay token nuevo, la operación termina con el
+ * error original, no vacía. Al cancelar (la página se destruyó o el sondeo cambió de variables) se cancela también la
+ * repetición en curso, o no se hace si la renovación todavía no volvió.
+ */
+export function reintentarCon401(renovar: () => Promise<string | undefined>): ErrorLink.ErrorHandler {
+  return ({ error, operation, forward }) => {
+    const status = (error as { statusCode?: number } | undefined)?.statusCode;
+    if (status !== 401 || operation.getContext()['reintentado']) return;
+    return new Observable<ApolloLink.Result>((observador) => {
+      let repeticion: Subscription | undefined;
+      let cancelada = false;
+      renovar().then(
+        (token) => {
+          if (cancelada) return;
+          if (!token) return observador.error(error);
+          operation.setContext({ reintentado: true, headers: { Authorization: `Bearer ${token}` } });
+          repeticion = forward(operation).subscribe(observador);
+        },
+        () => {
+          if (!cancelada) observador.error(error);
+        },
+      );
+      return () => {
+        cancelada = true;
+        repeticion?.unsubscribe();
+      };
+    });
+  };
 }
 
 /**
@@ -45,17 +76,7 @@ export function proveerApollo(): (Provider | EnvironmentProviders)[] {
         return siguiente(operacion);
       });
 
-      const reintento401 = new ErrorLink(({ error, operation, forward }) => {
-        const status = (error as { statusCode?: number } | undefined)?.statusCode;
-        if (status !== 401 || operation.getContext()['reintentado']) return;
-        return new Observable((observador) => {
-          void sesion.renovar().then((token) => {
-            if (!token) return observador.complete();
-            operation.setContext({ reintentado: true, headers: { Authorization: `Bearer ${token}` } });
-            forward(operation).subscribe(observador);
-          });
-        });
-      });
+      const reintento401 = new ErrorLink(reintentarCon401(() => sesion.renovar()));
 
       const ws = new GraphQLWsLink(
         createClient({

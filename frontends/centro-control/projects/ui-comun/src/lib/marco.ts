@@ -1,4 +1,4 @@
-import { Component, computed, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { MatBadgeModule } from '@angular/material/badge';
 import { MatButtonModule } from '@angular/material/button';
 import { MatDividerModule } from '@angular/material/divider';
@@ -14,6 +14,24 @@ import { Sesion } from './sesion';
 
 /** D100: cada 60 s se pide /salud.json de cada app enlazada; si falla, el enlace queda deshabilitado (FR3). */
 export const INTERVALO_SALUD_MS = 60_000;
+
+/**
+ * ¿El hosting de la app responde `/salud.json` con `{"estado":"UP"}`? (FR3, spec 016 paso 16). Se pide con `cors` para
+ * poder leer el status y el cuerpo: con `no-cors` la respuesta es opaca y un hosting deshabilitado ("Site Not Found", 404)
+ * pasaría por disponible. Por eso el hosting de cada app en la nube tiene que servir `/salud.json` con
+ * `Access-Control-Allow-Origin` para los orígenes de las otras apps (lo configura el despliegue); en local, el dev server
+ * de Angular ya lo manda. Un fallo de red, el CORS, un status que no es 2xx, otro cuerpo o 5 s sin respuesta: no disponible.
+ */
+export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, init) => fetch(url, init)): Promise<boolean> {
+  try {
+    const r = await pedir(`${urlApp}/salud.json`, { mode: 'cors', cache: 'no-store', signal: AbortSignal.timeout(5000) });
+    if (!r.ok) return false;
+    const cuerpo = (await r.json()) as { estado?: unknown } | null;
+    return cuerpo?.estado === 'UP';
+  } catch {
+    return false;
+  }
+}
 
 /**
  * Marco común de las 4 apps (propuesta 6.1): barra con los enlaces que el rol permite y su disponibilidad, campana de
@@ -175,6 +193,7 @@ export const INTERVALO_SALUD_MS = 60_000;
   `,
 })
 export class Marco implements OnInit {
+  private readonly destruir = inject(DestroyRef);
   readonly config = inject(CONFIG_CENTRO);
   readonly sesion = inject(Sesion);
   readonly alertas = inject(Alertas);
@@ -196,7 +215,8 @@ export class Marco implements OnInit {
   ngOnInit(): void {
     if (this.recibeAlertas()) void this.alertas.iniciar();
     void this.revisarSalud();
-    setInterval(() => void this.revisarSalud(), INTERVALO_SALUD_MS);
+    const intervalo = setInterval(() => void this.revisarSalud(), INTERVALO_SALUD_MS);
+    this.destruir.onDestroy(() => clearInterval(intervalo));
   }
 
   private async revisarSalud(): Promise<void> {
@@ -205,17 +225,7 @@ export class Marco implements OnInit {
       this.apps()
         .filter((a) => a !== this.config.app)
         .map(async (a) => {
-          // Otro origen sin CORS: con no-cors la respuesta es opaca y no se puede leer `ok`; que resuelva basta para saber que
-          // el hosting responde. Solo un fallo de red o el tiempo de espera marcan la app "no disponible" (FR3).
-          const ok = await fetch(`${this.config.urls[a]}/salud.json`, {
-            mode: 'no-cors',
-            cache: 'no-store',
-            signal: AbortSignal.timeout(5000),
-          }).then(
-            () => true,
-            () => false,
-          );
-          if (!ok) caidas.add(a);
+          if (!(await appDisponible(this.config.urls[a]))) caidas.add(a);
         }),
     );
     this.caidas.set(caidas);
