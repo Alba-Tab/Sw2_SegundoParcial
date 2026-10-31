@@ -36,7 +36,7 @@ curl localhost:8103/health/ready
   - Con mora (D04, sobre la tabla `factura`) o monto alto (D05), la reserva queda `PENDIENTE_APROBACION` con su `SolicitudAprobacion`.
 - **`registrarDecisionCredito`:** si se aprueba, la reserva pasa a `ACTIVA`. Si se rechaza o vence, solo cambia la solicitud. Repetir la misma decisión no es error; una decisión distinta da `CONFLICTO_ESTADO`.
 - **`liberarCredito`:** la reserva queda `LIBERADA`, el monto vuelve al disponible y la cotización vuelve a `VIGENTE` si sigue en plazo. Sin reserva, no hace nada.
-- **Errores (S9):** cada `ErrorDeDominio` sale como `ApplicationFailure`, con `type` igual al código y un `DetalleFallo`. Son reintentables `CLIENTE_NO_REPLICADO` y `DEPENDENCIA_NO_DISPONIBLE`.
+- **Errores (S9):** cada `ErrorDeDominio` sale como `ApplicationFailure`, con `type` igual al código y un `DetalleFallo`. Son reintentables `CLIENTE_NO_REPLICADO` y `DEPENDENCIA_NO_DISPONIBLE`. Los no reintentables van con la categoría `BENIGN`: el worker los deja en INFO (`Actividad con error de negocio`) y RoadRunner no escribe `Activity error.` en ERROR.
 - **Endpoints:** `GET /api/v1/solicitudes-aprobacion` y `/{servicioId}`, este último con las facturas vencidas, para administración y gerente.
 
 ## Factura, liberación por rechazo y cobros (T5.2, specs 006, 007 y 008)
