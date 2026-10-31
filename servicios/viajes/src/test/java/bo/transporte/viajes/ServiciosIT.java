@@ -8,6 +8,13 @@ import bo.transporte.viajes.TemporalDePrueba.FinanzasFalsa;
 import bo.transporte.viajes.TemporalDePrueba.FlotaFalsa;
 import bo.transporte.viajes.adaptadores.temporal.ContratoSaga.DetalleFallo;
 import bo.transporte.viajes.adaptadores.temporal.ContratoSaga.ValidarYReservarCreditoResultado;
+import bo.transporte.viajes.aplicacion.puerto.salida.RegistroIdempotente;
+import bo.transporte.viajes.aplicacion.puerto.salida.ServicioRepositorio;
+import bo.transporte.viajes.aplicacion.puerto.salida.Transacciones;
+import bo.transporte.viajes.aplicacion.servicio.ConfirmacionDeServicio;
+import bo.transporte.viajes.aplicacion.servicio.ServicioAceptado;
+import bo.transporte.viajes.dominio.comun.CanalServicio;
+import bo.transporte.viajes.dominio.viaje.Servicio;
 import io.temporal.failure.ApplicationFailure;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -58,6 +65,18 @@ class ServiciosIT {
 
     @Autowired
     FlotaFalsa flota;
+
+    @Autowired
+    ConfirmacionDeServicio confirmacion;
+
+    @Autowired
+    ServicioRepositorio servicios;
+
+    @Autowired
+    RegistroIdempotente idempotencia;
+
+    @Autowired
+    Transacciones tx;
 
     private final HttpClient http = HttpClient.newHttpClient();
 
@@ -200,6 +219,38 @@ class ServiciosIT {
         assertEquals(
                 "IDEMPOTENCIA_CUERPO_DISTINTO",
                 otroCuerpo.cuerpo().get("codigo").asString());
+    }
+
+    @Test
+    void unaConfirmacionQueTemporalNoRecibioSeReanudaSola() throws Exception {
+        // Como si Temporal hubiera estado caído: servicio y clave EN_PROCESO guardados, sin workflow.
+        Servicio s = Servicio.nuevo(
+                UUID.fromString(CLIENTE),
+                UUID.fromString(COTIZACION),
+                CanalServicio.PORTAL,
+                "sub-" + CLIENTE.substring(30),
+                java.time.Instant.now());
+        UUID clave = UUID.randomUUID();
+        tx.enTransaccion(() -> {
+            servicios.guardar(s);
+            idempotencia.guardarEnProceso(
+                    clave,
+                    ConfirmacionDeServicio.OPERACION,
+                    "0".repeat(64),
+                    202,
+                    new ServicioAceptado(s.servicioId(), s.viajeId(), "PROGRAMANDO"));
+            return null;
+        });
+
+        assertEquals(1, confirmacion.reanudarPendientes(java.time.Duration.ZERO));
+        esperar(s.servicioId().toString(), c -> c.get("confirmacionCompleta").asBoolean());
+        assertEquals(
+                "COMPLETADA",
+                jdbc.sql("SELECT estado FROM operacion_idempotente WHERE clave = :c")
+                        .param("c", clave)
+                        .query(String.class)
+                        .single());
+        assertEquals(0, confirmacion.reanudarPendientes(java.time.Duration.ZERO));
     }
 
     private Respuesta pedirSinExcepcion(UUID clave, String cuerpo) {

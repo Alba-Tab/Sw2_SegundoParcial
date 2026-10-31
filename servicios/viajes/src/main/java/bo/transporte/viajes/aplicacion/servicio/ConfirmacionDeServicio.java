@@ -12,6 +12,7 @@ import bo.transporte.viajes.dominio.comun.CanalServicio;
 import bo.transporte.viajes.dominio.comun.ErrorDeDominio;
 import bo.transporte.viajes.dominio.viaje.Servicio;
 import java.time.Clock;
+import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
 
@@ -76,6 +77,33 @@ public class ConfirmacionDeServicio {
             return null;
         });
         return paso.aceptado();
+    }
+
+    /**
+     * Inicia la saga de las confirmaciones que siguen EN_PROCESO hace más de {@code antiguedad}: Temporal no respondió
+     * y el cliente no reenvió (D43). Mismo workflowId, así que repetirlo es seguro. Devuelve cuántas inició.
+     */
+    public int reanudarPendientes(Duration antiguedad) {
+        int iniciadas = 0;
+        for (UUID clave : idempotencia.enProcesoAntesDe(OPERACION, reloj.instant().minus(antiguedad), 50)) {
+            Servicio s = tx.enTransaccion(() -> idempotencia
+                    .buscar(clave)
+                    .filter(op -> op.estado() == Estado.EN_PROCESO)
+                    .flatMap(op -> servicios.porId(((ServicioAceptado) op.respuesta()).servicioId()))
+                    .orElse(null));
+            if (s == null) continue;
+            try {
+                orquestador.iniciar(s, parametros);
+            } catch (Orquestador.NoDisponible e) {
+                return iniciadas; // Temporal sigue caído: se reintenta en la próxima pasada.
+            }
+            tx.enTransaccion(() -> {
+                idempotencia.completar(clave);
+                return null;
+            });
+            iniciadas++;
+        }
+        return iniciadas;
     }
 
     private Paso registrar(Solicitante quien, UUID cotizacionId, UUID clienteIdCuerpo, UUID clave, String hashCuerpo) {
