@@ -1,22 +1,22 @@
 import { ArgumentsHost, Catch, ExceptionFilter, HttpException, Logger } from '@nestjs/common';
 import type { Response } from 'express';
 import { ErrorDeDominio } from '../../dominio/comun/error-de-dominio';
-import { problema, Problema } from './problemas';
+import { estadoDe, problema, Problema, tituloDe } from './problemas';
 
 /** Segundos que se sugieren en Retry-After con un 503 (000 §4). */
 export const REINTENTAR_EN_S = '30';
 
 /** Código de 000 §5 para cada estado HTTP que puede llegar como HttpException o como error de body-parser. */
-const POR_ESTADO: Record<number, [string, string]> = {
-  400: ['VALIDACION', 'Petición inválida'],
-  401: ['NO_AUTENTICADO', 'No autenticado'],
-  403: ['SIN_PERMISO', 'Sin permiso'],
-  404: ['NO_ENCONTRADO', 'No encontrado'],
-  409: ['CONFLICTO_ESTADO', 'Conflicto de estado'],
-  413: ['VALIDACION', 'Cuerpo demasiado grande'],
-  415: ['VALIDACION', 'Tipo de contenido no soportado'],
-  429: ['LIMITE_PETICIONES', 'Demasiadas peticiones'],
-  503: ['DEPENDENCIA_NO_DISPONIBLE', 'Dependencia no disponible'],
+const POR_ESTADO: Record<number, string> = {
+  400: 'VALIDACION',
+  401: 'NO_AUTENTICADO',
+  403: 'SIN_PERMISO',
+  404: 'NO_ENCONTRADO',
+  409: 'CONFLICTO_ESTADO',
+  413: 'VALIDACION',
+  415: 'VALIDACION',
+  429: 'LIMITE_PETICIONES',
+  503: 'DEPENDENCIA_NO_DISPONIBLE',
 };
 
 /**
@@ -70,7 +70,9 @@ export class FiltroProblemas implements ExceptionFilter {
   }
 
   private aProblema(error: unknown): Problema {
-    if (error instanceof ErrorDeDominio) return conDatos(problema(error.codigo, error.codigo, error.message), error);
+    if (error instanceof ErrorDeDominio) {
+      return conDatos(problema(error.codigo, tituloDe(estadoDe(error.codigo)), error.message), error);
+    }
     if (error instanceof HttpException && error.getStatus() < 500) {
       return this.porEstado(error.getStatus(), error.message);
     }
@@ -87,7 +89,7 @@ export class FiltroProblemas implements ExceptionFilter {
   }
 
   private porEstado(estado: number, mensaje?: string): Problema {
-    const [codigo, titulo] = POR_ESTADO[estado] ?? ['VALIDACION', 'Petición inválida'];
-    return problema(codigo, titulo, mensaje ?? titulo, estado);
+    const codigo = POR_ESTADO[estado] ?? 'VALIDACION';
+    return problema(codigo, tituloDe(estado), mensaje ?? tituloDe(estado), estado);
   }
 }

@@ -29,6 +29,23 @@ export interface Problema {
 
 export const estadoDe = (codigo: string): number => ESTADOS[codigo] ?? 422;
 
+/** `title` para personas según el estado HTTP (000 §5), como Problemas.titulo de Viajes; el código va en `codigo`. */
+const TITULOS: Record<number, string> = {
+  400: 'Petición inválida',
+  401: 'No autenticado',
+  403: 'Sin permiso',
+  404: 'No encontrado',
+  409: 'Conflicto con el estado actual',
+  413: 'Cuerpo demasiado grande',
+  415: 'Tipo de contenido no soportado',
+  422: 'Regla de negocio no cumplida',
+  429: 'Demasiadas peticiones',
+  500: 'Error interno',
+  503: 'Dependencia no disponible',
+};
+
+export const tituloDe = (estado: number): string => TITULOS[estado] ?? (estado >= 500 ? 'Error interno' : 'Petición inválida');
+
 /** Problem Details (RFC 9457) con `codigo` y `correlationId` (000 §5). */
 export function problema(codigo: string, titulo: string, detalle: string, estado = estadoDe(codigo)): Problema {
   const p: Problema = {

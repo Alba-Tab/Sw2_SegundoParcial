@@ -387,6 +387,31 @@ describe('Flota (Mongo rs0 + RabbitMQ)', () => {
       expect(grande.body).toMatchObject({ codigo: 'VALIDACION', status: 413 });
     });
 
+    it('un atributo __proto__ es 400 con su campo y no se guarda la unidad (D76)', async () => {
+      const jefe = await firmar('jefe-1', ['jefe_flota']);
+      const furgon = {
+        tipoUnidad: 'REMOLQUE',
+        placa: '8004FUR',
+        tipoRemolque: 'FURGON',
+        capacidadToneladas: 30,
+        kmDesdeUltimoMantenimiento: 0,
+        documentos: DOCUMENTOS,
+      };
+      // El cuerpo va como texto: así llega el __proto__ tal cual lo manda un cliente.
+      const cuerpo = JSON.stringify(furgon).replace(/}$/, ',"atributos":{"volumenM3":85,"__proto__":1}}');
+      const r = await request(apiConToken.getHttpServer())
+        .post('/api/v1/unidades')
+        .set('Authorization', `Bearer ${jefe}`)
+        .set('Idempotency-Key', '0193a000-0000-7000-8000-0000000d0301')
+        .set('Content-Type', 'application/json')
+        .send(cuerpo)
+        .expect(400);
+      expect(r.body).toMatchObject({ codigo: 'VALIDACION', title: 'Petición inválida' });
+      expect(r.body.errores).toEqual([{ campo: 'atributos.__proto__', mensaje: 'no se acepta como nombre de campo' }]);
+      const conexion = worker.get<Connection>(getConnectionToken());
+      expect(await conexion.collection('unidades').findOne({ placa: '8004FUR' })).toBeNull();
+    });
+
     it('GET /choferes?activo=true|false filtra y no devuelve versionAgregado; otro valor es 400', async () => {
       const conexion = worker.get<Connection>(getConnectionToken());
       const chofer = (id: string, activo: boolean) => ({
