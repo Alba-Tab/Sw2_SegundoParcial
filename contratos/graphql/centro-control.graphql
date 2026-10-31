@@ -4,7 +4,9 @@ REST de Viajes, Flota, Finanzas y Analítica con el token del usuario intercambi
 
 Reglas:
 - `@roles`: permisos por campo (propuesta 7.2). Un campo que el rol no puede ver sale en `null` con un error
-  `SIN_PERMISO` en su `path`; el resto de la respuesta sale igual. Sin la directiva, cualquier rol interno.
+  `SIN_PERMISO` en su `path`; el resto de la respuesta sale igual. Sin la directiva, cualquier rol interno. Los roles
+  de cada campo son los que acepta el servicio dueño (tabla de la spec 016): el Gateway corta antes, el servicio vuelve
+  a validar.
 - Respuesta parcial: si un servicio no responde en 3 s (D98) o devuelve 5xx, sus campos salen en `null` con
   `extensions.codigo = DEPENDENCIA_NO_DISPONIBLE`. Por eso los campos raíz de Query y los que dependen de otro servicio
   son anulables: un servicio caído deja en null solo lo suyo.
@@ -63,14 +65,14 @@ type ConteoEstado {
 type Tablero {
   periodo: Periodo!
   "Viajes"
-  viajesEnCurso: [Viaje!]
+  viajesEnCurso: [Viaje!] @roles(permitidos: [gerente, despachador, jefe_flota, comercial])
   "Flota"
-  unidadesPorEstado: [ConteoEstado!]
-  "Finanzas"
-  cuentasPorCobrar: ResumenCobranza @roles(permitidos: [gerente, administracion, comercial])
+  unidadesPorEstado: [ConteoEstado!] @roles(permitidos: [gerente, despachador, jefe_flota])
+  "Finanzas. Sin comercial: Finanzas le exige un clienteId y el tablero resume a todos los clientes."
+  cuentasPorCobrar: ResumenCobranza @roles(permitidos: [gerente, administracion])
   "Analítica"
-  alertasAbiertas: Int
-  datosAl: Instante
+  alertasAbiertas: Int @roles(permitidos: [gerente, despachador, jefe_flota, administracion])
+  datosAl: Instante @roles(permitidos: [gerente, despachador, jefe_flota, administracion])
 }
 
 type ResumenCobranza {
@@ -137,9 +139,9 @@ type Viaje {
   "Del servicio (Viajes); despachador y jefe de flota no ven montos (propuesta 7.2)."
   monto: Dinero @roles(permitidos: [gerente, administracion, comercial])
   "Bitácora (Viajes), la más nueva primero."
-  hitos(texto: String, limite: Int = 20): [Hito!]
+  hitos(texto: String, limite: Int = 20): [Hito!] @roles(permitidos: [gerente, despachador, comercial])
   "Entrega o rechazo con su POD (Viajes)."
-  entrega: Entrega
+  entrega: Entrega @roles(permitidos: [gerente, despachador, comercial])
   "Probabilidad de retraso (Analítica); null si el viaje no está en ruta."
   riesgo: RiesgoRetraso @roles(permitidos: [gerente, despachador])
   "La unidad tractora (Flota)."
@@ -605,13 +607,13 @@ type Query {
   yo: Usuario!
   tablero(periodo: Periodo!): Tablero!
 
-  viajesEnCurso(limite: Int = 50): [Viaje!]
-  viajes(estado: EstadoViaje, limite: Int = 50): [Viaje!]
-  viaje(id: ID!): Viaje
-  entregasObservadas: [Viaje!]
-  intervenciones: [Viaje!]
-  servicios(estado: EstadoServicio, clienteId: ID, limite: Int = 50): [Servicio!]
-  clientes: [Cliente!]
+  viajesEnCurso(limite: Int = 50): [Viaje!] @roles(permitidos: [gerente, despachador, jefe_flota, comercial])
+  viajes(estado: EstadoViaje, limite: Int = 50): [Viaje!] @roles(permitidos: [gerente, despachador, jefe_flota, comercial])
+  viaje(id: ID!): Viaje @roles(permitidos: [gerente, despachador, jefe_flota, comercial])
+  entregasObservadas: [Viaje!] @roles(permitidos: [gerente, despachador, jefe_flota, comercial])
+  intervenciones: [Viaje!] @roles(permitidos: [gerente, despachador, jefe_flota, comercial])
+  servicios(estado: EstadoServicio, clienteId: ID, limite: Int = 50): [Servicio!] @roles(permitidos: [gerente, despachador, administracion, comercial])
+  clientes: [Cliente!] @roles(permitidos: [gerente, despachador, administracion, comercial])
   rutas: [Ruta!]
 
   unidades(tipo: TipoUnidad, estado: EstadoUnidad, placa: String): [Unidad!] @roles(permitidos: [gerente, despachador, jefe_flota])
@@ -622,14 +624,16 @@ type Query {
   anomaliasCombustible(desde: Fecha!, hasta: Fecha): [AnomaliaCombustible!] @roles(permitidos: [gerente, jefe_flota])
   puntajesConduccion(desde: Fecha, choferId: ID): PuntajesConduccion @roles(permitidos: [gerente, jefe_flota])
 
+  "comercial debe indicar clienteId; sin él, Finanzas responde VALIDACION."
   facturas(clienteId: ID, estado: EstadoFactura, conSaldo: Boolean, limite: Int = 50): [Factura!] @roles(permitidos: [gerente, administracion, comercial])
   factura(id: ID!): Factura @roles(permitidos: [gerente, administracion, comercial])
   lineaCredito(clienteId: ID!): LineaCredito @roles(permitidos: [gerente, administracion, comercial])
   cotizaciones(clienteId: ID, limite: Int = 50): [Cotizacion!] @roles(permitidos: [gerente, administracion, comercial])
   solicitudesAprobacion(estado: String): [SolicitudAprobacion!] @roles(permitidos: [gerente, administracion])
 
-  catalogoReportes: [DescripcionReporte!]
-  reporte(id: ReporteId!, params: ReporteParams): ReporteResultado
+  catalogoReportes: [DescripcionReporte!] @roles(permitidos: [gerente, despachador, jefe_flota, administracion])
+  "Cada reporte tiene además sus propios roles (catalogoReportes.roles); Analítica los valida."
+  reporte(id: ReporteId!, params: ReporteParams): ReporteResultado @roles(permitidos: [gerente, despachador, jefe_flota, administracion])
   alertasPendientes(desde: Cursor, limite: Int = 50): PaginaAlertas @roles(permitidos: [gerente, despachador, jefe_flota, administracion])
   misionesAgente(limite: Int = 20): [Mision!] @roles(permitidos: [gerente, despachador])
   mision(id: ID!): Mision @roles(permitidos: [gerente, despachador])
@@ -696,6 +700,7 @@ type Mutation {
   aprobarAccion(id: ID!, mensaje: String!, claveIdempotencia: ID!): AccionPropuesta! @roles(permitidos: [despachador])
   rechazarAccion(id: ID!, motivo: String, claveIdempotencia: ID!): AccionPropuesta! @roles(permitidos: [despachador])
   exportarReporte(id: ReporteId!, params: ReporteParams, claveIdempotencia: ID!): UrlDescarga!
+    @roles(permitidos: [gerente, despachador, jefe_flota, administracion])
   "No cambia estado: sin claveIdempotencia (spec 015)."
   preguntar(texto: String!): RespuestaVoz! @roles(permitidos: [gerente, despachador, jefe_flota, administracion])
 }

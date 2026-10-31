@@ -38,12 +38,12 @@ describe('tablero por rol', () => {
     });
   });
 
-  it('comercial ve viajes (sin riesgo) y cuentas por cobrar; ni unidades ni alertas', () => {
+  it('comercial ve solo viajes (sin riesgo): ni unidades, ni cobranza, ni alertas', () => {
     expect(bloquesVisibles(['comercial'])).toEqual({
       verViajes: true,
       verRiesgo: false,
       verUnidades: false,
-      verCobranza: true,
+      verCobranza: false,
       verAlertas: false,
     });
   });

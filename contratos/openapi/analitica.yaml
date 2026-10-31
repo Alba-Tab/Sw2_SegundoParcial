@@ -222,7 +222,7 @@ paths:
     get:
       tags: [reportes]
       operationId: listarReportes
-      summary: Catálogo de los 5 reportes con sus parámetros y roles (todo rol interno).
+      summary: Catálogo de los 5 reportes con sus parámetros y roles (gerente, despachador, jefe_flota y administracion).
       responses:
         '200':
           description: Catálogo.
