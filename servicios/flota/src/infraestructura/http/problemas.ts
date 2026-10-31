@@ -15,6 +15,7 @@ const ESTADOS: Record<string, number> = {
   CARGA_EXCEDE_TANQUE: 422,
   KILOMETRAJE_INVALIDO: 422,
   DEPENDENCIA_NO_DISPONIBLE: 503,
+  ERROR_INTERNO: 500,
 };
 
 export interface Problema {
