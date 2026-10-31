@@ -10,6 +10,7 @@ const MENSAJES: Record<string, string> = {
   SIN_PERMISO: 'No tienes permiso para esta operación',
   CONFLICTO_ESTADO: 'El estado cambió; actualiza la pantalla',
   DEPENDENCIA_NO_DISPONIBLE: 'Un servicio no está disponible; intenta en unos segundos',
+  ERROR_INTERNO: 'Ocurrió un error inesperado; intenta de nuevo y, si se repite, avisa a soporte',
   VALIDACION: 'Revisa los datos',
   IDEMPOTENCIA_CUERPO_DISTINTO: 'Esa operación ya se registró con otros datos',
 };

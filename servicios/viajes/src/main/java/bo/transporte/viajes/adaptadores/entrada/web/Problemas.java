@@ -34,6 +34,7 @@ public final class Problemas {
             Map.entry("EVIDENCIA_INCOMPLETA", HttpStatus.UNPROCESSABLE_CONTENT),
             Map.entry("CLIENTE_NO_REPLICADO", HttpStatus.SERVICE_UNAVAILABLE),
             Map.entry("DEPENDENCIA_NO_DISPONIBLE", HttpStatus.SERVICE_UNAVAILABLE),
+            Map.entry("ERROR_INTERNO", HttpStatus.INTERNAL_SERVER_ERROR),
             Map.entry("VINCULACION_PENDIENTE", HttpStatus.SERVICE_UNAVAILABLE));
 
     /** Título legible (000 §5); el código va en {@code codigo}. */
@@ -45,6 +46,7 @@ public final class Problemas {
             case NOT_FOUND -> "No encontrado";
             case CONFLICT -> "Conflicto con el estado actual";
             case SERVICE_UNAVAILABLE -> "Dependencia no disponible";
+            case INTERNAL_SERVER_ERROR -> "Error interno";
             default -> "Regla de negocio no cumplida";
         };
     }

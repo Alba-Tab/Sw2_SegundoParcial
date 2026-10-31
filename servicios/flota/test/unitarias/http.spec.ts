@@ -46,6 +46,13 @@ const errorDeBodyParser = (status: number, mensaje: string, type: string) =>
 describe('FiltroProblemas (000 §5)', () => {
   beforeAll(() => Logger.overrideLogger(false));
 
+  it('un error inesperado es 500 ERROR_INTERNO, sin el mensaje interno', () => {
+    const r = responder(new TypeError('Cannot read properties of undefined (reading "placa")'));
+    expect(r.estado).toBe(500);
+    expect(r.cuerpo).toMatchObject({ codigo: 'ERROR_INTERNO', title: 'Error interno', status: 500 });
+    expect(JSON.stringify(r.cuerpo)).not.toContain('placa');
+  });
+
   it('errores solo en un 400 de validación; en un 422 el campo no va como errores', () => {
     const v = responder(new ErrorDeDominio('VALIDACION', 'monto: debe ser mayor que 0', { campo: 'monto' }));
     expect(v.estado).toBe(400);

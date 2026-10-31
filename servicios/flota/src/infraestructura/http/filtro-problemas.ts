@@ -16,6 +16,7 @@ const POR_ESTADO: Record<number, string> = {
   413: 'VALIDACION',
   415: 'VALIDACION',
   429: 'LIMITE_PETICIONES',
+  500: 'ERROR_INTERNO',
   503: 'DEPENDENCIA_NO_DISPONIBLE',
 };
 
@@ -82,14 +83,13 @@ export class FiltroProblemas implements ExceptionFilter {
     }
     const http = estadoHttp(error);
     if (http) return this.porEstado(http.estado, http.mensaje);
-    // Error inesperado de verdad: 500, con la traza en el log y nunca en la respuesta. 000 §5 todavía no tiene un código
-    // para el 500; se mantiene el que había hasta que se decida.
+    // Error inesperado de verdad: 500 ERROR_INTERNO (000 §5), con la traza en el log y nunca en la respuesta.
     this.log.error(`Error no controlado: ${error instanceof Error ? error.stack : String(error)}`);
-    return problema('DEPENDENCIA_NO_DISPONIBLE', 'Error interno', 'Ocurrió un error inesperado', 500);
+    return problema('ERROR_INTERNO', tituloDe(500), 'Ocurrió un error inesperado');
   }
 
   private porEstado(estado: number, mensaje?: string): Problema {
-    const codigo = POR_ESTADO[estado] ?? 'VALIDACION';
+    const codigo = POR_ESTADO[estado] ?? (estado >= 500 ? 'ERROR_INTERNO' : 'VALIDACION');
     return problema(codigo, tituloDe(estado), mensaje ?? tituloDe(estado), estado);
   }
 }
