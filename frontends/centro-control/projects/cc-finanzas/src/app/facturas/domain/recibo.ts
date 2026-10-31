@@ -12,8 +12,9 @@ export interface DatosRecibo {
 
 export function interpretar(texto: string): DatosRecibo {
   const datos: DatosRecibo = {};
-  // Montos bolivianos: 2.800,00 o 2800.00; se toma el mayor (el total del recibo).
-  const montos = [...texto.matchAll(/(\d{1,3}(?:[.\s]\d{3})*,\d{2}|\d+\.\d{2})/g)].map((m) =>
+  // Montos bolivianos: 2.800,00, 2800,00 o 2800.00; se toma el mayor (el total del recibo). El (?<!\d) evita leer
+  // "800,00" dentro de "2800,00".
+  const montos = [...texto.matchAll(/(?<!\d)(\d{1,3}(?:[.\s]\d{3})+,\d{2}|\d+[,.]\d{2})/g)].map((m) =>
     m[1].includes(',') ? m[1].replace(/[.\s]/g, '').replace(',', '.') : m[1],
   );
   const centavos = (m: string) => aCentavos(m) ?? 0n;
