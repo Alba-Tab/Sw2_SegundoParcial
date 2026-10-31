@@ -6,6 +6,7 @@ const MENSAJES: Record<string, string> = {
   SIN_PERMISO: 'No tienes permiso para ver esto.',
   NO_ENCONTRADO: 'No lo encontramos.',
   DEPENDENCIA_NO_DISPONIBLE: 'El servicio no responde. Intenta de nuevo en un momento.',
+  ERROR_INTERNO: 'Ocurrió un error inesperado. Intenta de nuevo; si se repite, avísanos.',
   CLIENTE_NO_REPLICADO: 'Estamos terminando de preparar tu cuenta. Intenta de nuevo en unos segundos.',
   TONELAJE_EXCEDIDO: 'El máximo por servicio es 30 toneladas.',
 };
