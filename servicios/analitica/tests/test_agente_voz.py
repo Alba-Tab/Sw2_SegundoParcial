@@ -6,7 +6,6 @@ from datetime import date
 from types import SimpleNamespace
 from uuid import uuid4
 
-import httpx2
 import pytest
 from fastapi.testclient import TestClient
 from opentelemetry import trace
@@ -18,12 +17,12 @@ from sqlalchemy import func, select
 from app.api.limite import Limitador, LimitePeticiones
 from app.aplicacion import agente, voz
 from app.dominio.errores import ErrorDeDominio
-from app.dominio.reportes import CATALOGO, Parametros, ReporteId, validar
+from app.dominio.reportes import Parametros, ReporteId, validar
 from app.dominio.voz import Intencion
 from app.infraestructura.bd import Mision, transaccion
 from app.infraestructura.llm import LlmNoDisponible
 from app.infraestructura.observabilidad import cabeceras_traza, con_correlacion
-from app.infraestructura.tokens import ErrorToken, Tokens
+from app.infraestructura.tokens import Tokens
 from tests.conftest import ejemplo, token
 from tests.test_acciones import en_ruta
 from tests.test_alertas import procesar
@@ -294,102 +293,36 @@ class LlmIntencion:
         return {"content": self.intencion}
 
 
-class McpVoz(McpFalso):
-    async def call_tool(self, nombre, args):
-        raise httpx2.ConnectError("mcp-server caído")
+INTENCION_RIESGO = '{"reporteId": "VIAJES_EN_RIESGO", "periodo": null, "filtros": {}}'
 
 
-def test_voz_responde_503_en_problem_details_si_keycloak_o_el_mcp_fallan(cliente, monkeypatch):
-    class TokensCaidos(Tokens):
-        async def para_mcp(self, token_usuario):
-            raise ErrorToken("Keycloak no responde")
-
-    class TokensBien(Tokens):
-        async def para_mcp(self, token_usuario):
-            return "token-mcp"
-
-    @asynccontextmanager
-    async def conectar(token, cabeceras=None):
-        yield McpVoz()
-
-    monkeypatch.setattr(voz, "conectar", conectar)
-    intencion = '{"reporteId": "VIAJES_EN_RIESGO", "periodo": null, "filtros": {}}'
-    for tokens in (TokensCaidos(), TokensBien()):
-        cliente.app.state.voz = voz.Voz(LlmIntencion(intencion), tokens)
-        r = cliente.post(
-            "/api/v1/voz/preguntas", json={"texto": "¿Qué viajes van atrasados?"}, headers=token("gerente")
-        )
-        assert r.status_code == 503 and r.headers["content-type"] == "application/problem+json"
-        assert r.json()["codigo"] == "DEPENDENCIA_NO_DISPONIBLE" and r.headers["retry-after"]
+def test_la_voz_corre_el_reporte_en_analitica_sin_pasar_por_el_mcp(cliente):
+    en_ruta(str(uuid4()))
+    gerente = token("gerente")
+    cliente.app.state.voz = voz.Voz(LlmIntencion(INTENCION_RIESGO))
+    r = cliente.post("/api/v1/voz/preguntas", json={"texto": "¿Qué viajes van atrasados?"}, headers=gerente)
+    assert r.status_code == 200 and r.json()["tipo"] == "RESPUESTA" and r.json()["exportable"] is True
+    directo = cliente.get("/api/v1/reportes/VIAJES_EN_RIESGO", headers=gerente).json()
+    assert r.json()["resultado"]["filas"] == directo["filas"] and directo["filas"]
 
 
 def test_un_error_inesperado_es_500_en_problem_details(monkeypatch):
     from app.main import app
 
     class VozRota(voz.Voz):
-        async def interpretar(self, texto, roles, vocabulario=""):
+        async def interpretar(self, texto, roles):
             raise RuntimeError("se rompió")
 
     with TestClient(app, raise_server_exceptions=False) as c:
-        c.app.state.voz = VozRota(LlmIntencion("{}"), Tokens())
-        r = c.post("/api/v1/voz/interpretaciones", json={"texto": "hola mundo"}, headers=token("gerente"))
+        c.app.state.voz = VozRota(LlmIntencion("{}"))
+        r = c.post("/api/v1/voz/preguntas", json={"texto": "hola mundo"}, headers=token("gerente"))
     assert r.status_code == 500 and r.json()["codigo"] == "ERROR_INTERNO" and "se rompió" not in r.text
 
 
-def resultado_reporte(reporte: str = "CUENTAS_POR_COBRAR") -> dict:
-    return {
-        "reporteId": reporte,
-        "titulo": CATALOGO[ReporteId(reporte)].titulo,
-        "parametros": {"desde": "2026-11-03", "hasta": "2026-11-09"},
-        "columnas": [],
-        "filas": [{"saldo": "7600.00"}],
-        "totales": {"saldo": "7600.00"},
-        "grafico": {"tipo": "BARRAS", "ejeX": "cliente", "series": []},
-        "datosAl": None,
-    }
-
-
-def test_redacciones_valida_el_resultado_y_el_rol(cliente, monkeypatch):
-    cliente.app.state.voz = voz.Voz(LlmIntencion("Se deben 7.600,00 BOB."), Tokens())
-    url = "/api/v1/voz/redacciones"
-    pregunta = "¿Quién me debe esta semana?"
-    sin_filas = {k: v for k, v in resultado_reporte().items() if k != "filas"}
-    for malo in ({"reporteId": "NO_EXISTE"}, sin_filas, {**resultado_reporte(), "filas": "x"}):
-        r = cliente.post(url, json={"pregunta": pregunta, "resultado": malo}, headers=token("gerente"))
-        assert r.status_code == 400 and r.json()["codigo"] == "VALIDACION", malo
-    ajeno = cliente.post(
-        url, json={"pregunta": pregunta, "resultado": resultado_reporte()}, headers=token("despachador")
-    )
-    assert ajeno.status_code == 403 and ajeno.json()["codigo"] == "SIN_PERMISO"
-    ok = cliente.post(url, json={"pregunta": pregunta, "resultado": resultado_reporte()}, headers=token("gerente"))
-    assert ok.status_code == 200 and ok.json()["texto"] == "Se deben 7.600,00 BOB." and ok.json()["exportable"] is False
-
-
-def test_redacciones_no_devuelve_claves_de_mas_ni_cuerpos_enormes(cliente):
-    cliente.app.state.voz = voz.Voz(LlmIntencion("Hay un viaje en riesgo."), Tokens())
-    url, pregunta, gerente = "/api/v1/voz/redacciones", "¿Qué viajes van atrasados?", token("gerente")
-    # Lo que devuelve ejecutarReporte (`grafico.datos` en los reportes agrupados) y la marca `truncado` del MCP pasan
-    # tal cual.
-    en_ruta(str(uuid4()))
-    real = cliente.get("/api/v1/reportes/VIAJES_EN_RIESGO", headers=gerente).json()
-    assert real["filas"]
-    datos = [{"placa": real["filas"][0]["placa"], "probabilidad": real["filas"][0]["probabilidad"]}]
-    for resultado in (real, {**real, "grafico": {**real["grafico"], "datos": datos}, "truncado": True}):
-        r = cliente.post(url, json={"pregunta": pregunta, "resultado": resultado}, headers=gerente)
-        assert r.status_code == 200 and r.json()["resultado"] == resultado
-    # Una clave que no está en el contrato o un texto sin límite → 400; nunca vuelve en `resultado`.
-    for malo in (
-        {**real, "relleno": "x" * 1000},
-        {**real, "titulo": "x" * 121},
-        {**real, "grafico": {**real["grafico"], "otra": 1}},
-        {**real, "columnas": [{**real["columnas"][0], "extra": "x"}]},
-    ):
-        r = cliente.post(url, json={"pregunta": pregunta, "resultado": malo}, headers=gerente)
-        assert r.status_code == 400 and r.json()["codigo"] == "VALIDACION" and "xxxx" not in r.text
+def test_cuerpos_enormes_son_413(cliente):
+    url, gerente = "/api/v1/voz/preguntas", token("gerente")
     # Límite global de 256 KB: con Content-Length y en trozos (sin Content-Length).
-    enorme = cliente.post(
-        url, json={"pregunta": pregunta, "resultado": {**real, "x": "x" * 10_000_000}}, headers=gerente
-    )
+    enorme = cliente.post(url, json={"texto": "x" * 10_000_000}, headers=gerente)
     assert enorme.status_code == 413 and enorme.headers["content-type"] == "application/problem+json"
     assert enorme.json()["codigo"] == "VALIDACION" and enorme.json()["status"] == 413
     trozos = cliente.post(
@@ -401,16 +334,16 @@ def test_redacciones_no_devuelve_claves_de_mas_ni_cuerpos_enormes(cliente):
 def test_limite_de_peticiones_de_voz_por_sub(cliente, monkeypatch):
     reloj = [0.0]
     cliente.app.state.limite_voz = Limitador(2, reloj=lambda: reloj[0])
-    cliente.app.state.voz = voz.Voz(LlmIntencion("Se deben 7.600,00 BOB."), Tokens())
-    cuerpo = {"pregunta": "¿Quién me debe esta semana?", "resultado": resultado_reporte()}
+    cliente.app.state.voz = voz.Voz(LlmIntencion(INTENCION_RIESGO))
+    url, cuerpo = "/api/v1/voz/preguntas", {"texto": "¿Qué viajes van atrasados?"}
     yo, otro = token("gerente", sub="g1"), token("gerente", sub="g2")
-    assert [cliente.post("/api/v1/voz/redacciones", json=cuerpo, headers=yo).status_code for _ in range(2)] == [200] * 2
-    tercera = cliente.post("/api/v1/voz/redacciones", json=cuerpo, headers=yo)
+    assert [cliente.post(url, json=cuerpo, headers=yo).status_code for _ in range(2)] == [200] * 2
+    tercera = cliente.post(url, json=cuerpo, headers=yo)
     assert tercera.status_code == 429 and tercera.json()["codigo"] == "LIMITE_PETICIONES"
     assert tercera.headers["retry-after"] == "60"
-    assert cliente.post("/api/v1/voz/redacciones", json=cuerpo, headers=otro).status_code == 200
+    assert cliente.post(url, json=cuerpo, headers=otro).status_code == 200
     reloj[0] = 60.5
-    assert cliente.post("/api/v1/voz/redacciones", json=cuerpo, headers=yo).status_code == 200
+    assert cliente.post(url, json=cuerpo, headers=yo).status_code == 200
     limitador = Limitador(1, reloj=lambda: reloj[0])
     limitador.registrar("a")
     with pytest.raises(LimitePeticiones):

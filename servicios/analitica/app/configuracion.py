@@ -19,7 +19,6 @@ class Configuracion(BaseSettings):
     audiencia: str = "analitica"
     cors_origenes: str = ""
     # Cliente confidencial `analitica` (intercambio de tokens, RFC 8693) y cliente `agente` (client credentials).
-    oidc_cliente_secreto: str = ""
     agente_cliente_secreto: str = ""
     portal_url: str = "http://localhost:5173"
     # LLM compatible con OpenAI (Ollama, D36) y servidor MCP (specs 014 y 015).

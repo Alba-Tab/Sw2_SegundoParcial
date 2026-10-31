@@ -46,7 +46,7 @@ async def ciclo(app: FastAPI) -> AsyncIterator[None]:
     app.state.modelos = cargar_modelos(configuracion().modelos_dir)
     app.state.llm, tokens = Llm(), Tokens()
     app.state.agente = Agente(app.state.llm, tokens)
-    app.state.voz = Voz(app.state.llm, tokens)
+    app.state.voz = Voz(app.state.llm)
     app.state.limite_voz = Limitador(configuracion().voz_peticiones_por_minuto)
     consumidor = ConsumidorEventos(Proyecciones(app.state.modelos))
     app.state.consumidor = consumidor

@@ -103,7 +103,7 @@ Con el token del agente, `tools/list` devuelve **6** herramientas; con el de un 
 
 | Regla | Valor |
 |---|---|
-| Autenticación | Token con audiencia `mcp-server` y `azp` de un cliente registrado (`agente`, `analitica`; `gateway` solo con el plan B de la spec 015). Sin token → `401` con `WWW-Authenticate`; otro `azp` → `403 SIN_PERMISO` |
+| Autenticación | Token con audiencia `mcp-server` y `azp` de un cliente registrado (`agente`). Sin token → `401` con `WWW-Authenticate`; otro `azp` → `403 SIN_PERMISO` |
 | Sin reenviar tokens | Por cada llamada, el servidor **intercambia** el token recibido (RFC 8693, `libs/intercambio-token`) por uno con la audiencia del servicio (`viajes`, `flota`, `finanzas`, `analitica`), en caché por `sub` y audiencia hasta su vencimiento |
 | Herramientas cerradas | Sin SQL, GraphQL ni filtros generados por el LLM: cada herramienta llama a **una** operación REST fija con parámetros validados y con límites de rango |
 | MongoDB | Flota recibe solo valores escalares: parser de consultas simple (sin objetos anidados) y el repositorio arma `{placa: <string>}`. Cualquier clave o valor que empiece con `$` (`$where`, `$ne`, `$regex`…) → `400 VALIDACION` |

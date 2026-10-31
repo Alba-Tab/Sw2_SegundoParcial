@@ -5,8 +5,8 @@ export function configuracion(env: NodeJS.ProcessEnv = process.env) {
     issuer: (env.OIDC_ISSUER ?? '').replace(/\/$/, ''),
     audiencia: 'mcp-server',
     clienteSecreto: env.OIDC_CLIENTE_SECRETO ?? '',
-    /** Clientes que pueden llamar al MCP (spec 014): el agente y Analítica; el Gateway solo con el plan B de voz. */
-    clientes: (env.MCP_CLIENTES ?? 'agente,analitica').split(',').map((c) => c.trim()),
+    /** Clientes que pueden llamar al MCP (spec 014): solo el agente (la voz de Analítica ya no pasa por aquí, spec 015). */
+    clientes: (env.MCP_CLIENTES ?? 'agente').split(',').map((c) => c.trim()),
     viajesUrl: env.VIAJES_URL ?? 'http://localhost:8101',
     flotaUrl: env.FLOTA_URL ?? 'http://localhost:8102',
     finanzasUrl: env.FINANZAS_URL ?? 'http://localhost:8103',
