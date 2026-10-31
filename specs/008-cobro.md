@@ -29,7 +29,7 @@ Administración registra a mano el pago de una factura (no hay pasarela, propues
    2. valida con el value object `Monto` (no negativo, 2 decimales) y las reglas de abajo;
    3. crea el `Pago`;
    4. `Factura.registrarPago(monto)`: `saldo` baja; estado `PAGADA_PARCIAL` (saldo > 0) o `PAGADA` (saldo = 0);
-   5. `LineaCredito.abonar(monto)`: `utilizado` baja, con bloqueo optimista por `version`;
+   5. `LineaCredito.abonar(monto)`: `utilizado` baja, con la fila bloqueada (`FOR UPDATE`);
    6. auditoría (`canal = CENTRO_CONTROL`, `actorSub`, factura, monto, referencia);
    7. `PagoRegistrado` en el Outbox con `saldoFactura` y `estadoFactura`;
    8. marca la clave `COMPLETADA` con la respuesta.
@@ -51,7 +51,7 @@ Administración registra a mano el pago de una factura (no hay pasarela, propues
 | Factura `PAGADA` | `409 CONFLICTO_ESTADO` |
 | Idempotencia | **Autoridad: `operacion_idempotente`** (000 §4.1). Reenvío con la misma clave → la misma respuesta `201` |
 | Referencia repetida | Índice único `pago(factura_id, medio, referencia)`: con **otra** clave, la misma factura y la misma referencia → `409 PAGO_DUPLICADO` (dos personas cargando el mismo depósito); el Problem Details trae la extensión `pagoId` del pago existente. Una misma transferencia que paga **dos facturas** se registra en cada una (no choca). La propuesta 4.3 ponía "un pago por referencia" como autoridad; queda como regla de negocio, porque 000 §4.1 manda para el reenvío |
-| Línea de crédito | `abonar()`: `utilizado` − monto, nunca menor que 0. Si `version` cambió (otra operación concurrente), Finanzas reintenta la transacción completa hasta 3 veces (releyendo la línea); después, `409 VERSION_DESACTUALIZADA` |
+| Línea de crédito | `abonar()`: `utilizado` − monto, nunca menor que 0. La fila de la línea se lee con `FOR UPDATE`: una operación concurrente espera a que termine la otra |
 | Mora | Se recalcula al leer: `enMora` = alguna factura con `saldo > 0` vencida hace más de 7 días (D04). Pagar la factura vencida quita la mora para la próxima saga (spec 012) |
 | Vencida | `vencida = saldo > 0 y hoy > venceEl`; `diasVencida` en la respuesta |
 | Lo que ve el cliente | Solo sus facturas: en las listas el `clienteId` sale del token y **se ignora** el del parámetro (000 §8); `GET /facturas/{id}` o `/pagos` de una factura ajena → `403 SIN_PERMISO` |

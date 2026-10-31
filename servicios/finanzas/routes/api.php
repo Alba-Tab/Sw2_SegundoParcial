@@ -20,6 +20,7 @@ Route::prefix('api')->middleware([Autenticacion::class, ValidarContrato::class])
     Route::get('v1/lineas-credito/mia', [LineasCreditoController::class, 'mia']);
     Route::get('v1/lineas-credito/{clienteId}', [LineasCreditoController::class, 'deCliente']);
     Route::get('v1/facturas', [FacturasController::class, 'listar']);
+    Route::get('v1/facturas/resumen', [FacturasController::class, 'resumen']);
     Route::get('v1/facturas/{facturaId}', [FacturasController::class, 'obtener']);
     Route::get('v1/facturas/{facturaId}/pagos', [FacturasController::class, 'pagos']);
     Route::post('v1/facturas/{facturaId}/pagos', [FacturasController::class, 'pagar']);

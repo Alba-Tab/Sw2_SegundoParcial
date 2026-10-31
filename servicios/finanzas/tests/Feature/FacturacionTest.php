@@ -1,10 +1,10 @@
 <?php
 
 use App\Aplicacion\Puertos\LineaCreditoRepositorio;
-use App\Aplicacion\Puertos\VersionDesactualizada;
 use App\Dominio\Credito\LineaCredito;
 use App\Infraestructura\Persistencia\LineaCreditoRepositorioDb;
 use App\Infraestructura\Temporal\FinanzasActividades;
+use Illuminate\Database\LostConnectionException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -129,8 +129,8 @@ it('la misma clave y el mismo cuerpo en otra factura no devuelven el pago de la 
         ->and(DB::table('pago')->count())->toBe(1);
 });
 
-/** La línea de crédito real, pero `actualizar` pierde el bloqueo optimista las primeras $fallas veces. */
-function lineaQueChoca(int $fallas): object
+/** La línea de crédito real, pero `actualizar` pierde la conexión las primeras $fallas veces (falla pasajera). */
+function lineaQueSeCae(int $fallas): object
 {
     $linea = new class(app(LineaCreditoRepositorioDb::class), $fallas) implements LineaCreditoRepositorio
     {
@@ -156,7 +156,7 @@ function lineaQueChoca(int $fallas): object
         public function actualizar(LineaCredito $linea): void
         {
             if (++$this->intentos <= $this->fallas) {
-                throw new VersionDesactualizada('otro cambio ganó');
+                throw new LostConnectionException('se cortó la conexión');
             }
             $this->real->actualizar($linea);
         }
@@ -166,19 +166,29 @@ function lineaQueChoca(int $fallas): object
     return $linea;
 }
 
-it('VersionDesactualizada repite la transacción del pago hasta 3 veces y después responde 409', function () {
-    consumidor()->aplicar(entregaConfirmada(reservaActiva($this)['servicio'], (string) Str::uuid7()));
-    $id = DB::table('factura')->value('factura_id');
+it('el resumen de cobranza suma en Finanzas el saldo, las vencidas y las de la ventana', function () {
+    $this->artisan('semilla:cargar')->assertSuccessful();
+    $hoy = $this->ahora->setTimezone(new DateTimeZone('America/La_Paz'))->format('Y-m-d');
+    $hasta = (new DateTimeImmutable($hoy))->modify('+6 days')->format('Y-m-d');
+    $conSaldo = DB::table('factura')->where('saldo', '>', 0);
+    $saldo = number_format((float) (clone $conSaldo)->sum('saldo'), 2, '.', '');
+    $vencidas = (clone $conSaldo)->where('vence_el', '<', $hoy)->count();
+    $ventana = (clone $conSaldo)->whereBetween('vence_el', [$hoy, $hasta])->orderBy('vence_el')->orderBy('numero')->pluck('numero');
+    expect($vencidas)->toBeGreaterThan(0)->and($ventana)->not->toBeEmpty();
 
-    $linea = lineaQueChoca(2);
-    pagar($this, $id, '100.00', 'BNB-600001')->assertStatus(201)->assertJsonPath('saldo.monto', '2700.00');
-    expect($linea->intentos)->toBe(3)->and(DB::table('pago')->count())->toBe(1);
+    $url = "/api/v1/facturas/resumen?venceDesde=$hoy&venceHasta=$hasta";
+    $r = $this->withHeaders(['X-Prueba' => 'sub-g~gerente~'])->withToken('p')->getJson($url)->assertOk()
+        ->assertJsonPath('saldoTotal', ['monto' => $saldo, 'moneda' => 'BOB'])
+        ->assertJsonPath('facturasVencidas', $vencidas)
+        ->assertJsonPath('facturasPorVencer', $ventana->count());
+    expect(array_column($r->json('proximas'), 'numero'))->toBe($ventana->take(5)->all());
+    cumpleContrato($r, '/api/v1/facturas/resumen');
 
-    $linea->intentos = 0;
-    $linea->fallas = 3;
-    pagar($this, $id, '100.00', 'BNB-600002')->assertStatus(409)->assertJsonPath('codigo', 'VERSION_DESACTUALIZADA');
-    expect($linea->intentos)->toBe(3)->and(DB::table('pago')->count())->toBe(1)
-        ->and(DB::table('factura')->where('factura_id', $id)->value('saldo'))->toBe('2700.00');
+    $this->withHeaders(['X-Prueba' => 'sub-d~despachador~'])->withToken('p')->getJson($url)->assertStatus(403);
+    $this->withHeaders(['X-Prueba' => 'sub-a~administracion~'])->withToken('p')
+        ->getJson("/api/v1/facturas/resumen?venceDesde=$hasta&venceHasta=$hoy")->assertStatus(400);
+    $this->withHeaders(['X-Prueba' => 'sub-a~administracion~'])->withToken('p')
+        ->getJson('/api/v1/facturas/resumen')->assertStatus(400);
 });
 
 it('el cliente ve solo sus facturas, con mora calculada; administración filtra por saldo y vencimiento', function () {

@@ -2,6 +2,7 @@
 
 namespace App\Aplicacion\Puertos;
 
+use App\Dominio\Comun\Monto;
 use App\Dominio\Facturacion\Factura;
 
 interface FacturaRepositorio
@@ -22,4 +23,12 @@ interface FacturaRepositorio
      * @return list<Factura> ordenadas por id (UUIDv7) después del cursor
      */
     public function listar(array $filtro, ?string $despuesDe, int $limite): array;
+
+    /**
+     * Sobre las facturas con saldo: saldo total, las vencidas (venceEl < $hoy), las que vencen entre $desde y $hasta, y
+     * las 5 primeras de esa ventana por vencimiento.
+     *
+     * @return array{saldo: Monto, vencidas: int, porVencer: int, proximas: list<Factura>}
+     */
+    public function resumenCobranza(string $hoy, string $desde, string $hasta): array;
 }

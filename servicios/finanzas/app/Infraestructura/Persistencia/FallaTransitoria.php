@@ -2,7 +2,6 @@
 
 namespace App\Infraestructura\Persistencia;
 
-use App\Aplicacion\Puertos\VersionDesactualizada;
 use Illuminate\Database\ConcurrencyErrorDetector;
 use Illuminate\Database\LostConnectionDetector;
 use Illuminate\Database\LostConnectionException;
@@ -10,7 +9,7 @@ use Illuminate\Database\QueryException;
 use PDOException;
 
 /**
- * Distingue un error técnico pasajero (PostgreSQL caído o reiniciándose, interbloqueo, bloqueo optimista perdido) de uno
+ * Distingue un error técnico pasajero (PostgreSQL caído o reiniciándose, interbloqueo) de uno
  * determinista (dato inválido, regla de negocio, error de programación). El pasajero se reintenta (el consumidor lo
  * devuelve a la cola; la API responde 503 o repite la transacción); el determinista no.
  */
@@ -28,7 +27,7 @@ final class FallaTransitoria
     public static function es(\Throwable $e): bool
     {
         for ($x = $e; $x !== null; $x = $x->getPrevious()) {
-            if ($x instanceof VersionDesactualizada || $x instanceof LostConnectionException) {
+            if ($x instanceof LostConnectionException) {
                 return true;
             }
             if ($x instanceof QueryException || $x instanceof PDOException) {

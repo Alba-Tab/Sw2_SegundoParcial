@@ -13,6 +13,6 @@ interface LineaCreditoRepositorio
 
     public function crear(LineaCredito $linea): void;
 
-    /** Guarda si la versión en la base es la anterior (version − 1); si no, lanza VersionDesactualizada. */
+    /** Guarda la línea leída con paraActualizar (su fila sigue bloqueada). */
     public function actualizar(LineaCredito $linea): void;
 }

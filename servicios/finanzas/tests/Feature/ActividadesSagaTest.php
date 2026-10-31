@@ -58,7 +58,6 @@ it('reserva el monto de la cotización, la acepta y un reintento devuelve lo mis
         'toneladas' => 28, 'fechaViaje' => '2026-11-10', 'monto' => ['monto' => '2800.00', 'moneda' => 'BOB']]);
     expect(reservar($servicio, $cot))->toBe($r)
         ->and(linea()->reservado)->toBe('2800.00')
-        ->and(linea()->version)->toBe(1)
         ->and(DB::table('cotizacion')->where('cotizacion_id', $cot)->value('estado'))->toBe('ACEPTADA');
 });
 
@@ -194,7 +193,6 @@ it('rechazada y liberada: el disponible vuelve a 30.000 y la cotización a VIGEN
     actividades()->liberarCredito(['servicioId' => $servicio, 'motivo' => 'CREDITO_RECHAZADO']);
     expect(DB::table('reserva_credito')->first())->toMatchObject(['estado' => 'LIBERADA', 'motivo_liberacion' => 'CREDITO_RECHAZADO'])
         ->and(linea()->reservado)->toBe('0.00')
-        ->and(linea()->version)->toBe(2)
         ->and(DB::table('cotizacion')->where('cotizacion_id', $cot)->value('estado'))->toBe('VIGENTE')
         ->and(DB::table('solicitud_aprobacion')->value('motivo_decision'))->toBe('Mora de 20 días');
 });

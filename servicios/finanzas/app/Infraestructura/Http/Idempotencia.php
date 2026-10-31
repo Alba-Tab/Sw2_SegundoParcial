@@ -2,7 +2,6 @@
 
 namespace App\Infraestructura\Http;
 
-use App\Aplicacion\Puertos\VersionDesactualizada;
 use App\Dominio\Comun\ErrorDeDominio;
 use Closure;
 use Illuminate\Http\JsonResponse;
@@ -16,28 +15,16 @@ use Illuminate\Support\Facades\DB;
  *
  * La huella cubre el método, la ruta, el `sub` del token y el cuerpo: la misma clave en otro recurso, con otro usuario o
  * con otro cuerpo responde 422 IDEMPOTENCIA_CUERPO_DISTINTO y nunca devuelve la respuesta de otra operación.
- *
- * Si otro cambio gana el bloqueo optimista (VersionDesactualizada), la transacción completa se repite hasta 3 veces
- * (spec 008); después sale 409 VERSION_DESACTUALIZADA.
  */
 final class Idempotencia
 {
-    public const INTENTOS = 3;
-
     /** @param Closure(): JsonResponse $operacion */
     public function ejecutar(Request $req, string $tipo, Closure $operacion): JsonResponse
     {
         $clave = (string) $req->header('Idempotency-Key');
         $huella = self::huella($req->method(), '/'.ltrim($req->path(), '/'), self::sujeto($req), $req->json()->all());
-        for ($intento = 1; ; $intento++) {
-            try {
-                return DB::transaction(fn () => $this->dentro($clave, $tipo, $huella, $operacion));
-            } catch (VersionDesactualizada $e) {
-                if ($intento >= self::INTENTOS) {
-                    throw $e;
-                }
-            }
-        }
+
+        return DB::transaction(fn () => $this->dentro($clave, $tipo, $huella, $operacion));
     }
 
     private function dentro(string $clave, string $tipo, string $huella, Closure $operacion): JsonResponse

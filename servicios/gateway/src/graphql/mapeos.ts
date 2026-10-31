@@ -86,10 +86,3 @@ export const mantenimiento = (m: Json): Json => ({ ...m, checklist: m['checklist
  * `listarRutas` (contratos/openapi/viajes.yaml).
  */
 export const items = <T = Json>(r: Json | Json[] | undefined): T[] => (Array.isArray(r) ? r : (r?.['items'] ?? [])) as T[];
-
-/** Suma de montos en centavos con BigInt: el dinero nunca pasa por float (000 §3). */
-export function sumar(montos: (string | null | undefined)[]): string {
-  const centavos = montos.reduce((t, m) => t + (m ? BigInt(m.replace('.', '')) : 0n), 0n);
-  const texto = centavos.toString().padStart(3, '0');
-  return `${texto.slice(0, -2)}.${texto.slice(-2)}`;
-}
