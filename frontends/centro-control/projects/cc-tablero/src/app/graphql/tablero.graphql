@@ -1,7 +1,16 @@
-query Tablero($periodo: Periodo!) {
+# Cada bloque se pide solo al rol que lo puede ver (tablero/domain/tablero.ts): un rol sin permiso no ve una tarjeta en
+# blanco ni genera un SIN_PERMISO por fila en cada sondeo.
+query Tablero(
+  $periodo: Periodo!
+  $verViajes: Boolean!
+  $verRiesgo: Boolean!
+  $verUnidades: Boolean!
+  $verCobranza: Boolean!
+  $verAlertas: Boolean!
+) {
   tablero(periodo: $periodo) {
     periodo
-    viajesEnCurso {
+    viajesEnCurso @include(if: $verViajes) {
       viajeId
       placa
       choferNombre
@@ -11,16 +20,16 @@ query Tablero($periodo: Periodo!) {
       ruta {
         nombre
       }
-      riesgo {
+      riesgo @include(if: $verRiesgo) {
         probabilidad
         enRiesgo
       }
     }
-    unidadesPorEstado {
+    unidadesPorEstado @include(if: $verUnidades) {
       estado
       cantidad
     }
-    cuentasPorCobrar {
+    cuentasPorCobrar @include(if: $verCobranza) {
       saldoTotal
       facturasPorVencer
       facturasVencidas
@@ -32,8 +41,8 @@ query Tablero($periodo: Periodo!) {
         venceEl
       }
     }
-    alertasAbiertas
-    datosAl
+    alertasAbiertas @include(if: $verAlertas)
+    datosAl @include(if: $verAlertas)
   }
 }
 

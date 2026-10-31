@@ -8,7 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { mensajeDe, Sesion, TablaReporte, type Resultado } from 'ui-comun';
+import { AvisoServicios, mensajeDe, Sesion, TablaReporte, type Resultado } from 'ui-comun';
 import type { ReporteId, ReporteParams } from '../../graphql/generado';
 import { paramsLimpios, paramsPorDefecto, usaParametro } from '../domain/reporte';
 import { ReportesFachada } from '../reportes.fachada';
@@ -30,9 +30,14 @@ import { ReportesFachada } from '../reportes.fachada';
     MatSelectModule,
     MatProgressBarModule,
     TablaReporte,
+    AvisoServicios,
   ],
   template: `
     <h1>Reportes</h1>
+    @if (cargandoCatalogo()) {
+      <mat-progress-bar mode="indeterminate" />
+    }
+    <cc-aviso-servicios [error]="errorCatalogo()" [campos]="campos" [sinDatos]="!catalogo()?.catalogoReportes" />
     <div class="catalogo">
       @for (r of permitidos(); track r.reporteId) {
         <button mat-stroked-button [class.elegido]="r.reporteId === elegido()" (click)="elegir(r.reporteId)" [title]="r.descripcion">
@@ -128,6 +133,10 @@ export class ReportesPagina {
   private readonly sesion = inject(Sesion);
 
   readonly catalogo = this.fachada.catalogo;
+  readonly errorCatalogo = this.fachada.errorCatalogo;
+  readonly cargandoCatalogo = this.fachada.cargandoCatalogo;
+  /** Quién responde cada campo del catálogo: los clientes y rutas vienen de Viajes. */
+  readonly campos = { catalogoReportes: 'Analítica', clientes: 'Viajes', rutas: 'Viajes' };
   readonly permitidos = computed(() =>
     (this.catalogo()?.catalogoReportes ?? []).filter((r) => r.roles.some((rol) => this.sesion.tiene(rol))),
   );

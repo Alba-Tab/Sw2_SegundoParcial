@@ -1,8 +1,8 @@
-import { inject, Injectable } from '@angular/core';
+import { computed, inject, Injectable } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { firstValueFrom, map } from 'rxjs';
-import { Intentos, type Resultado } from 'ui-comun';
-import type { ReporteId } from '../graphql/generado';
+import { catchError, firstValueFrom, of } from 'rxjs';
+import { completo, Intentos, type Resultado } from 'ui-comun';
+import type { CatalogoQuery, ReporteId } from '../graphql/generado';
 import { ReportesRepositorio } from './data/reportes.repositorio';
 
 /**
@@ -26,14 +26,20 @@ export class ConsultaReportes {
   }
 }
 
-/** Fachada de la página de reportes: el catálogo (con clientes y rutas) y la consulta. */
+/**
+ * Fachada de la página de reportes: el catálogo (con clientes y rutas) y la consulta. El error del catálogo no se
+ * descarta: con Analítica caída la página lo avisa en vez de quedar sin botones y sin explicación.
+ */
 @Injectable()
 export class ReportesFachada extends ConsultaReportes {
-  readonly catalogo = toSignal(
+  private readonly respuesta = toSignal(
     inject(ReportesRepositorio)
       .catalogo()
-      .pipe(map((r) => r.data)),
+      .pipe(catchError((error: unknown) => of({ data: undefined, error }))),
   );
+  readonly catalogo = computed(() => completo<CatalogoQuery>(this.respuesta()));
+  readonly errorCatalogo = computed(() => this.respuesta()?.error);
+  readonly cargandoCatalogo = computed(() => this.respuesta() === undefined);
 
   constructor() {
     super(inject(ReportesRepositorio));
