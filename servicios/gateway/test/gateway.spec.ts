@@ -564,3 +564,100 @@ describe('suscripción al cerrar', () => {
     expect(consultas).toBe(antes);
   });
 });
+
+describe('revisión 2 del Gateway', () => {
+  /** La operación Tablero de cc-tablero (projects/cc-tablero/src/app/graphql/tablero.graphql), tal cual. */
+  const TABLERO_APP = `query Tablero($periodo: Periodo!) {
+    tablero(periodo: $periodo) {
+      periodo
+      viajesEnCurso { viajeId placa choferNombre cliente { razonSocial } ruta { nombre } riesgo { probabilidad enRiesgo } }
+      unidadesPorEstado { estado cantidad }
+      cuentasPorCobrar { saldoTotal facturasPorVencer facturasVencidas proximas { facturaId numero razonSocial saldo venceEl } }
+      alertasAbiertas
+      datosAl
+    }
+  }`;
+
+  /** 100 viajes en ruta, cada uno con su placa, su riesgo y su bitácora. */
+  const cienViajes = () => {
+    const viajes = Array.from({ length: 100 }, (_, i) => ({ ...VIAJE(`v${i}`, `s${i}`), placa: `${1000 + i}ABC` }));
+    rutas.set('GET /viajes/api/v1/viajes', () => ({ json: { items: viajes, siguienteCursor: null } }));
+    for (const v of viajes) {
+      rutas.set(`GET /analitica/api/v1/predicciones/retraso/${v.viajeId}`, () => ({
+        json: { viajeId: v.viajeId, probabilidad: 0.4, umbral: 0.7, enRiesgo: false, calculadaEn: '2026-11-03T12:00:00Z' },
+      }));
+      rutas.set(`GET /viajes/api/v1/viajes/${v.viajeId}/hitos`, () => ({ json: { items: [] } }));
+    }
+  };
+
+  it('presupuesto: los campos por fila de una lista sin limite no pasan de PRESUPUESTO_LLAMADAS llamadas', async () => {
+    const { PRESUPUESTO_LLAMADAS } = await import('../src/presupuesto');
+    cienViajes();
+    // Complejidad ~50 (la lista del tablero no tiene limite), pero sin tope serían 1 + 100 × 5 = 501 llamadas.
+    const r = await gql(
+      ['gerente'],
+      '{ tablero(periodo: HOY) { viajesEnCurso { viajeId riesgo { probabilidad } unidad { placa } entrega { entregaId } a: hitos(texto: "a") { tipo } b: hitos(texto: "b") { tipo } } } }',
+    );
+    expect(r.status).toBe(200);
+    expect(aServicios()).toHaveLength(PRESUPUESTO_LLAMADAS);
+    // Respuesta parcial: los 100 viajes salen; lo que ya no tenía presupuesto, en null con CONSULTA_DEMASIADO_COMPLEJA.
+    expect(r.body.data.tablero.viajesEnCurso).toHaveLength(100);
+    const codigos = new Set(r.body.errors.map((e: { extensions: { codigo: string } }) => e.extensions.codigo));
+    expect(codigos).toEqual(new Set(['CONSULTA_DEMASIADO_COMPLEJA']));
+    expect(r.body.errors[0].path.slice(0, 2)).toEqual(['tablero', 'viajesEnCurso']);
+    expect(r.body.errors[0].extensions.status).toBe(400);
+
+    // Cada petición trae su propio presupuesto, y la operación real del tablero con 100 viajes entra sin errores.
+    pedidos.length = 0;
+    rutas.set('GET /finanzas/api/v1/facturas', () => ({
+      json: {
+        items: [{ facturaId: 'f1', numero: 'FAC-1', razonSocial: 'A', saldo: { monto: '10.00' }, vencida: false, venceEl: '2026-11-05' }],
+        siguienteCursor: null,
+      },
+    }));
+    const t = await gql(['gerente'], TABLERO_APP, { periodo: 'ESTA_SEMANA' });
+    expect(t.body.errors).toBeUndefined();
+    expect(t.body.data.tablero.viajesEnCurso).toHaveLength(100);
+    expect(t.body.data.tablero.viajesEnCurso[99].riesgo).toEqual({ probabilidad: 0.4, enRiesgo: false });
+    // 1 de viajes, 100 de riesgo, 1 de unidades, 2 de facturas y 1 de alertas (que aServicios() no cuenta).
+    expect(aServicios()).toHaveLength(104);
+  });
+
+  it('un JSON roto o un cuerpo de más de 100 KB en /graphql → Problem Details VALIDACION con un title para personas', async () => {
+    const roto = await request(app.getHttpServer()).post('/graphql').set('Content-Type', 'application/json').send('{roto');
+    expect(roto.status).toBe(400);
+    expect(roto.headers['content-type']).toContain('application/problem+json');
+    expect(roto.body).toEqual({
+      type: 'https://transporte.local/errores/validacion',
+      title: 'La petición no es válida',
+      status: 400,
+      codigo: 'VALIDACION',
+      detail: 'El cuerpo de la petición no es un JSON válido',
+    });
+    const grande = await request(app.getHttpServer())
+      .post('/graphql')
+      .set('Authorization', `Bearer ${await token(['gerente'])}`)
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ query: `{ yo { sub } }${' '.repeat(200_000)}` }));
+    expect(grande.status).toBe(413);
+    expect(grande.headers['content-type']).toContain('application/problem+json');
+    expect(grande.body).toMatchObject({ codigo: 'VALIDACION', status: 413, detail: 'El cuerpo de la petición pasa el límite de 100 KB' });
+    // Ninguno llega a GraphQL ni a los servicios.
+    expect(aServicios()).toHaveLength(0);
+    const sinToken = await request(app.getHttpServer()).post('/graphql').send({ query: '{ yo { sub } }' });
+    expect(sinToken.body).toMatchObject({ codigo: 'NO_AUTENTICADO', title: 'No autenticado' });
+  });
+
+  it('viaje(id) que no existe → null con NO_ENCONTRADO en extensions, como factura y unidad', async () => {
+    const r = await gql(['gerente'], '{ viaje(id: "v404") { viajeId } }');
+    expect(r.body.data.viaje).toBeNull();
+    expect(r.body.errors[0]).toMatchObject({
+      path: ['viaje'],
+      extensions: { codigo: 'NO_ENCONTRADO', status: 404, servicio: 'viajes' },
+    });
+    // Un 404 sin Problem Details también es NO_ENCONTRADO (antes salía VALIDACION).
+    rutas.set('GET /flota/api/v1/unidades/u9', () => ({ status: 404, texto: '' }));
+    const u = await gql(['gerente'], '{ unidad(id: "u9") { unidadId } }');
+    expect(u.body.errors[0].extensions).toMatchObject({ codigo: 'NO_ENCONTRADO', status: 404 });
+  });
+});

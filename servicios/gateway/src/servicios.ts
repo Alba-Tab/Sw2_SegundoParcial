@@ -2,7 +2,7 @@ import { ErrorIntercambio, IntercambioToken } from '@transporte/intercambio-toke
 import { GraphQLError } from 'graphql';
 import type { Contexto } from './autenticacion';
 import type { Configuracion } from './configuracion';
-import { errorGraphql, validacion } from './errores';
+import { codigoPorStatus, errorGraphql, validacion } from './errores';
 
 export type Servicio = 'viajes' | 'flota' | 'finanzas' | 'analitica';
 
@@ -47,8 +47,10 @@ export interface Llamada {
 /**
  * Cliente REST de los 4 servicios. Por cada llamada intercambia el token del usuario por uno con la audiencia del
  * servicio (nunca lo reenvía), propaga `traceparent` y `X-Correlation-Id`, y traduce las fallas:
- * - 4xx → error con el `codigo` del Problem Details del servicio (SIN_PERMISO, CONFLICTO_ESTADO…);
+ * - 4xx → error con el `codigo` del Problem Details del servicio (SIN_PERMISO, CONFLICTO_ESTADO…) o, si no trae, el
+ *   del status (404 → NO_ENCONTRADO);
  * - 5xx, tiempo de espera o red → DEPENDENCIA_NO_DISPONIBLE: el campo sale en null y el resto de la respuesta sigue.
+ * Cada llamada descuenta del presupuesto de la petición, si lo hay (`presupuesto.ts`).
  */
 export class ClienteServicios {
   private readonly bases: Record<Servicio, string>;
@@ -70,6 +72,8 @@ export class ClienteServicios {
   }
 
   async llamar<T>(ctx: Contexto, servicio: Servicio, metodo: string, ruta: RutaRest, llamada: Llamada): Promise<T> {
+    // Antes de pedir el token: sin presupuesto no sale ninguna llamada (CONSULTA_DEMASIADO_COMPLEJA).
+    ctx.presupuesto?.gastar(servicio);
     let token: string;
     try {
       token = llamada.token ?? (await this.intercambio.tokenPara(ctx.usuario.token, servicio));
@@ -106,7 +110,7 @@ export class ClienteServicios {
     if (!respuesta.ok) {
       const problema = (await respuesta.json().catch(() => ({}))) as { codigo?: string; detail?: string; errores?: unknown };
       throw errorGraphql(
-        problema.codigo ?? 'VALIDACION',
+        problema.codigo ?? codigoPorStatus(respuesta.status),
         problema.detail ?? `${NOMBRES[servicio]} respondió ${respuesta.status}`,
         respuesta.status,
         {

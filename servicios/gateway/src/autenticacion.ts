@@ -1,5 +1,6 @@
 import { createRemoteJWKSet, jwtVerify, type JWTPayload } from 'jose';
 import { randomBytes, randomUUID } from 'node:crypto';
+import type { PresupuestoLlamadas } from './presupuesto';
 
 /** Roles con acceso al Centro de Control; `cliente` y `chofer` no (spec 016). */
 export const ROLES_INTERNOS = ['gerente', 'despachador', 'jefe_flota', 'administracion', 'comercial'] as const;
@@ -30,6 +31,8 @@ export interface Contexto {
   cargadores?: unknown;
   /** Van en `extensions.avisos` de la respuesta. */
   avisos?: Aviso[];
+  /** Tope de llamadas a los servicios de una petición HTTP a `/graphql` (ver `presupuesto.ts`). */
+  presupuesto?: PresupuestoLlamadas;
 }
 
 export class TokenInvalido extends Error {

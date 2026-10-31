@@ -58,7 +58,10 @@ paths:
                   additionalProperties: true
       responses:
         '200':
-          description: Respuesta GraphQL; los campos de un servicio caído salen en null con su error en `errors[]`.
+          description: >-
+            Respuesta GraphQL; los campos de un servicio caído salen en null con su error en `errors[]`. Cada petición
+            hace como máximo 200 llamadas a los servicios: agotadas, los campos que faltan salen en null con
+            `CONSULTA_DEMASIADO_COMPLEJA`.
           content:
             application/json:
               schema:
@@ -86,15 +89,26 @@ paths:
                             status:
                               type: integer
         '400':
-          description: Consulta inválida o demasiado compleja (`CONSULTA_DEMASIADO_COMPLEJA`).
+          description: >-
+            Consulta inválida (`VALIDACION`) o demasiado compleja (`CONSULTA_DEMASIADO_COMPLEJA`), en el formato de
+            errores de GraphQL. Un cuerpo que no es JSON no llega a GraphQL y sale en Problem Details con `VALIDACION`.
           content:
             application/json:
               schema:
                 type: object
+            application/problem+json:
+              schema:
+                $ref: './comun.yaml#/components/schemas/Problema'
         '401':
           $ref: './comun.yaml#/components/responses/NoAutenticado'
         '403':
           $ref: './comun.yaml#/components/responses/SinPermiso'
+        '413':
+          description: El cuerpo pasa los 100 KB (`VALIDACION`).
+          content:
+            application/problem+json:
+              schema:
+                $ref: './comun.yaml#/components/schemas/Problema'
   /exportaciones/{token}:
     get:
       tags: [exportaciones]
