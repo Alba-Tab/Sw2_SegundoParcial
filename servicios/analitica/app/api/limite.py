@@ -54,8 +54,7 @@ class Limitador:
 class LimiteCuerpo:
     """Cuerpo de más de `maximo` bytes → 413 en Problem Details (`VALIDACION`), con o sin `Content-Length`.
 
-    Ninguna operación de Analítica necesita más: el resultado que llega a `/voz/redacciones` sale del MCP, que lo corta
-    en 16 KB (D88).
+    Ninguna operación de Analítica necesita más.
     """
 
     def __init__(self, app: ASGIApp, maximo: int = MAX_CUERPO) -> None:

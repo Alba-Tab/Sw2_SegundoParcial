@@ -1,8 +1,7 @@
-"""Misiones del agente (spec 014) y consulta por voz con su plan B de dos saltos (spec 015)."""
+"""Misiones del agente (spec 014) y consulta por voz (spec 015)."""
 
 import asyncio
-from datetime import datetime
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Query, Request
@@ -17,7 +16,6 @@ from app.aplicacion.auditoria import auditar
 from app.aplicacion.idempotencia import guardada, una_vez
 from app.aplicacion.voz import ROLES_VOZ, Voz
 from app.dominio.errores import ErrorDeDominio
-from app.dominio.reportes import CATALOGO, MAX_FILAS_PANTALLA, ReporteId
 from app.infraestructura.bd import Mision, transaccion
 from app.infraestructura.llm import Llm
 
@@ -93,68 +91,20 @@ class Pregunta(BaseModel):
     texto: str = Field(min_length=3, max_length=300)
 
 
-class Columna(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    clave: str = Field(max_length=60)
-    titulo: str = Field(max_length=120)
-    tipo: Literal["TEXTO", "MONTO", "NUMERO", "PORCENTAJE", "FECHA", "INSTANTE", "BOOLEANO"]
-
-
-class Serie(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    clave: str = Field(max_length=60)
-    titulo: str = Field(max_length=120)
-
-
-class Grafico(BaseModel):
-    """`datos` es lo que agrega `ejecutarReporte` para dibujar el gráfico."""
-
-    model_config = ConfigDict(extra="forbid")
-    tipo: Literal["BARRAS", "BARRAS_APILADAS"]
-    ejeX: str = Field(max_length=60)
-    series: list[Serie] = Field(max_length=10)
-    datos: list[dict[str, Any]] | None = Field(default=None, max_length=MAX_FILAS_PANTALLA)
-
-
-class ResultadoReporte(BaseModel):
-    """`ReporteResultado` del contrato: lo manda el Gateway (plan B), así que se valida antes de usarlo.
-
-    Sin claves de más (la respuesta lo devuelve en `resultado`) y con largos máximos; el cuerpo entero tiene además el
-    límite global de 256 KB (413). `truncado` es la marca del MCP cuando recorta filas (16 KB, D88).
-    """
-
-    model_config = ConfigDict(extra="forbid")
-    reporteId: ReporteId
-    titulo: str = Field(max_length=120)
-    parametros: dict[str, Any] = Field(max_length=10)
-    columnas: list[Columna] = Field(max_length=20)
-    filas: list[dict[str, Any]] = Field(max_length=MAX_FILAS_PANTALLA)
-    totales: dict[str, Any] = Field(max_length=20)
-    grafico: Grafico
-    datosAl: datetime | None
-    truncado: bool | None = None
-
-
-class Redaccion(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-    pregunta: str = Field(min_length=3, max_length=300)
-    resultado: ResultadoReporte
-
-
 def _voz(request: Request) -> Voz:
     return request.app.state.voz
 
 
 def _exigir_voz(usuario: Usuario, request: Request) -> None:
     exigir(usuario, *ROLES_VOZ)
-    # Las tres operaciones de voz comparten el límite (app.state.limite_voz): todas usan el mismo Ollama.
+    # Límite por `sub` (app.state.limite_voz): la consulta usa el único Ollama.
     request.app.state.limite_voz.registrar(usuario.sub)
 
 
 @rutas.post("/voz/preguntas")
 async def preguntar(cuerpo: Pregunta, usuario: UsuarioActual, request: Request) -> dict[str, Any]:
     _exigir_voz(usuario, request)
-    respuesta = await _voz(request).preguntar(cuerpo.texto, set(usuario.roles), usuario.token)
+    respuesta = await _voz(request).preguntar(cuerpo.texto, set(usuario.roles))
 
     def registrar() -> None:
         with transaccion() as s:
@@ -167,30 +117,3 @@ async def preguntar(cuerpo: Pregunta, usuario: UsuarioActual, request: Request) 
 
     await run_in_threadpool(registrar)
     return respuesta
-
-
-@rutas.post("/voz/interpretaciones")
-async def interpretar(cuerpo: Pregunta, usuario: UsuarioActual, request: Request) -> dict[str, Any]:
-    """Plan B de K1 (VOZ_CADENA=DOS_SALTOS): solo la intención validada; el Gateway llama al MCP."""
-    _exigir_voz(usuario, request)
-    return await _voz(request).interpretar(cuerpo.texto, set(usuario.roles))
-
-
-@rutas.post("/voz/redacciones")
-async def redactar(cuerpo: Redaccion, usuario: UsuarioActual, request: Request) -> dict[str, Any]:
-    _exigir_voz(usuario, request)
-    reporte = cuerpo.resultado.reporteId
-    # El resultado lo manda quien llama: solo se redacta sobre un reporte que su rol puede ver.
-    if not set(CATALOGO[reporte].roles) & usuario.roles:
-        raise ErrorDeDominio("SIN_PERMISO", "No tienes permiso para ese reporte")
-    r = cuerpo.resultado.model_dump(mode="json", exclude_unset=True)
-    texto = await _voz(request).redactar(cuerpo.pregunta, r)
-    return {
-        "tipo": "RESPUESTA",
-        "texto": texto,
-        "reporteId": reporte.value,
-        "parametros": r["parametros"],
-        "resultado": r,
-        # Datos que no calculó Analítica: no se ofrecen como exportables (el Excel corre el reporte de nuevo).
-        "exportable": False,
-    }

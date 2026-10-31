@@ -1,13 +1,10 @@
-"""Tokens de Keycloak: el del agente (client credentials) y el intercambio RFC 8693 hacia el MCP (spec 014 y 015)."""
+"""Token de Keycloak del agente (client credentials, spec 014)."""
 
 import time
 
 import httpx
-import jwt
 
 from app.configuracion import configuracion
-
-TIPO = "urn:ietf:params:oauth:token-type:access_token"
 
 
 class ErrorToken(Exception):
@@ -52,22 +49,5 @@ class Tokens:
                 "grant_type": "client_credentials",
                 "client_id": "agente",
                 "client_secret": configuracion().agente_cliente_secreto,
-            },
-        )
-
-    async def para_mcp(self, token_usuario: str) -> str:
-        """El token del usuario (audiencia analitica) cambiado por uno con audiencia mcp-server: nunca se reenvía."""
-        datos = jwt.decode(token_usuario, options={"verify_signature": False})
-        return await self._pedir(
-            f"{datos.get('sub')}|mcp-server|{datos.get('exp')}",
-            {
-                "grant_type": "urn:ietf:params:oauth:grant-type:token-exchange",
-                "client_id": "analitica",
-                "client_secret": configuracion().oidc_cliente_secreto,
-                "subject_token": token_usuario,
-                "subject_token_type": TIPO,
-                "requested_token_type": TIPO,
-                "audience": "mcp-server",
-                "scope": "aud-mcp-server",
             },
         )

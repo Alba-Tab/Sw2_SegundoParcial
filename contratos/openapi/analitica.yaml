@@ -386,7 +386,7 @@ paths:
     post:
       tags: [voz]
       operationId: preguntar
-      summary: Pregunta en lenguaje natural → intención validada en código → reporte por el MCP → respuesta redactada. Sin Idempotency-Key (no cambia estado).
+      summary: Pregunta en lenguaje natural → intención validada en código → reporte calculado en Analítica → respuesta redactada. Sin Idempotency-Key (no cambia estado).
       parameters:
         - $ref: './comun.yaml#/components/parameters/CorrelationId'
       requestBody:
@@ -414,68 +414,6 @@ paths:
           $ref: '#/components/responses/LimitePeticiones'
         '503':
           $ref: './comun.yaml#/components/responses/NoDisponible'
-  /api/v1/voz/interpretaciones:
-    post:
-      tags: [voz]
-      operationId: interpretarPregunta
-      summary: Plan B de K1 (VOZ_CADENA=DOS_SALTOS) — solo la intención validada, o la aclaración.
-      parameters:
-        - $ref: './comun.yaml#/components/parameters/CorrelationId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Pregunta'
-      responses:
-        '200':
-          description: Intención validada o aclaración.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/Interpretacion'
-        '400':
-          $ref: './comun.yaml#/components/responses/Validacion'
-        '401':
-          $ref: './comun.yaml#/components/responses/NoAutenticado'
-        '403':
-          $ref: './comun.yaml#/components/responses/SinPermiso'
-        '422':
-          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
-        '429':
-          $ref: '#/components/responses/LimitePeticiones'
-        '503':
-          $ref: './comun.yaml#/components/responses/NoDisponible'
-  /api/v1/voz/redacciones:
-    post:
-      tags: [voz]
-      operationId: redactarRespuesta
-      summary: >-
-        Plan B de K1 — redacta el texto con el resultado del reporte; cada número debe estar en filas o totales. El rol
-        del token debe poder ver ese reporte; la respuesta no es exportable (el resultado lo mandó quien llama).
-      parameters:
-        - $ref: './comun.yaml#/components/parameters/CorrelationId'
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/Redaccion'
-      responses:
-        '200':
-          description: Respuesta completa.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/RespuestaVoz'
-        '400':
-          $ref: './comun.yaml#/components/responses/Validacion'
-        '401':
-          $ref: './comun.yaml#/components/responses/NoAutenticado'
-        '403':
-          $ref: './comun.yaml#/components/responses/SinPermiso'
-        '429':
-          $ref: '#/components/responses/LimitePeticiones'
 
   # ------------------------------------------------------------------ acciones y agente (spec 014)
   /api/v1/acciones:
@@ -1108,36 +1046,6 @@ components:
           $ref: '#/components/schemas/ReporteId'
         parametros:
           $ref: '#/components/schemas/ParametrosReporte'
-    Interpretacion:
-      type: object
-      required: [tipo]
-      properties:
-        tipo:
-          type: string
-          enum: [INTENCION, ACLARACION]
-        reporteId:
-          $ref: '#/components/schemas/ReporteId'
-        parametros:
-          $ref: '#/components/schemas/ParametrosReporte'
-        texto:
-          type: string
-          description: Solo en ACLARACION.
-        opciones:
-          type: array
-          maxItems: 3
-          items:
-            $ref: '#/components/schemas/Opcion'
-    Redaccion:
-      type: object
-      required: [pregunta, resultado]
-      additionalProperties: false
-      properties:
-        pregunta:
-          type: string
-          minLength: 3
-          maxLength: 300
-        resultado:
-          $ref: '#/components/schemas/ReporteResultado'
     RespuestaVoz:
       type: object
       required: [tipo, texto]

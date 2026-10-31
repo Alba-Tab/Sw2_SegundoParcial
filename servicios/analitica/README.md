@@ -63,10 +63,9 @@ consumidor de `analitica.eventos`. Es la única fuente de alertas del Centro de 
 ## Consulta por voz (T10.3, spec 015)
 
 - `POST /api/v1/voz/preguntas`: el LLM devuelve solo la intención en JSON (esquema completo en `format`). El código la valida en el orden de la spec: fuera del catálogo → `422 PREGUNTA_FUERA_DE_ALCANCE`; aclaración; rol → `403`; nombres a ids por coincidencia exacta o por prefijo de palabra ("agro" → 2 opciones); periodo a fechas y límites.
-- El reporte se corre por el MCP (`ejecutar_reporte`) con el token del usuario **intercambiado otra vez** hacia `mcp-server`: cc-tablero → gateway → analitica → mcp-server → analitica. La redacción usa el prompt `redactar_respuesta_reporte`. Si el texto trae un número que no está en las filas o los totales, o el LLM no responde, se usa la plantilla ("8.400" no vale por 8.400,50).
+- El reporte se corre en Analítica con el mismo código que `GET /api/v1/reportes/{id}` y los roles del token (sin pasar por el MCP). La redacción usa un prompt fijo con las filas y los totales. Si el texto trae un número que no está en las filas o los totales, o el LLM no responde, se usa la plantilla ("8.400" no vale por 8.400,50).
 - Cada opción de una `ACLARACION` trae parámetros completos (fechas del periodo o, si no sirven, las de por defecto del reporte): la pantalla la corre sin el LLM.
-- Keycloak o el MCP caídos → `503 DEPENDENCIA_NO_DISPONIBLE` en Problem Details. Las tres rutas de voz tienen un límite de 20 peticiones por minuto y por `sub` (`VOZ_PETICIONES_POR_MINUTO`) → `429 LIMITE_PETICIONES` con `Retry-After`.
-- Plan B de K1 (`VOZ_CADENA=DOS_SALTOS`): `POST /voz/interpretaciones` y `POST /voz/redacciones`, y el Gateway llama al MCP. `redacciones` valida el `ReporteResultado` sin claves de más (solo `grafico.datos` y el `truncado` del MCP) y con largos máximos (400), exige que el rol vea ese reporte (403) y responde `exportable = false`.
+- La consulta tiene un límite de 20 peticiones por minuto y por `sub` (`VOZ_PETICIONES_POR_MINUTO`) → `429 LIMITE_PETICIONES` con `Retry-After`.
 
 ## Trazas y errores
 

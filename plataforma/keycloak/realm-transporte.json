@@ -473,24 +473,14 @@
       "secret": "$(env:KC_SECRETO_ANALITICA)",
       "standardFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "serviceAccountsEnabled": true,
+      "serviceAccountsEnabled": false,
       "fullScopeAllowed": false,
-      "attributes": {
-        "standard.token.exchange.enabled": "true"
-      },
       "defaultClientScopes": [
         "basic",
         "acr",
-        "profile",
-        "email",
         "roles"
       ],
-      "optionalClientScopes": [
-        "aud-mcp-server",
-        "aud-viajes",
-        "aud-finanzas",
-        "aud-flota"
-      ]
+      "optionalClientScopes": []
     },
     {
       "clientId": "mcp-server",

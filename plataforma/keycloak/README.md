@@ -59,10 +59,10 @@ La semilla de los servicios (D102, `plataforma/semilla/`) usa estos mismos ids: 
 | `portal-cliente` | Público, PKCE, registro | `viajes`, `finanzas`; claim `clienteId` | `cliente`, `comercial` |
 | `app-chofer` | Público, PKCE, `offline_access` opcional; redirección `transporte-chofer://*` | `viajes`, `flota` | `chofer` |
 | `demo-cli` | Público, *device grant* (y *direct grant* en local) | `gateway`, `viajes`, `finanzas`, `flota`, `analitica` | Todos menos `agente_lectura` |
-| `gateway`, `analitica`, `mcp-server` | Confidencial, intercambio estándar | La que piden con `audience` y `scope=aud-<cliente>` | Los del usuario |
+| `gateway`, `mcp-server` | Confidencial, intercambio estándar | La que piden con `audience` y `scope=aud-<cliente>` | Los del usuario |
 | `agente` | Confidencial, *client credentials* | `mcp-server` | `agente_lectura` |
 | `viajes` | Confidencial, cuenta de servicio con FGAP v2 y `query-users` | — | — |
-| `finanzas`, `flota` | Solo validan tokens | — | — |
+| `analitica`, `finanzas`, `flota` | Solo validan tokens | — | — |
 
 Notas:
 - `default-roles-transporte` no tiene roles del realm. Conserva `manage-account` y `view-profile` del cliente `account`, para que cada usuario pueda cambiar su contraseña; no llegan a los tokens de las apps porque ningún cliente tiene *full scope*.
