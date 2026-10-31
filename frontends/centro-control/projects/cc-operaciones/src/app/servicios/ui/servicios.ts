@@ -96,10 +96,11 @@ export class ServiciosPagina {
   readonly error = this.fachada.error;
   readonly campos = { servicios: 'Viajes', clientes: 'Viajes' };
   readonly puedeCancelar = computed(() => this.sesion.tiene('despachador', 'comercial'));
+  /** La columna del monto, solo si el rol lo ve (no se le pide al despachador). */
   readonly columnas = computed(() =>
-    this.sesion.tiene('despachador')
-      ? ['cliente', 'carga', 'fecha', 'unidad', 'acciones']
-      : ['cliente', 'carga', 'fecha', 'unidad', 'monto', 'acciones'],
+    this.fachada.verMonto
+      ? ['cliente', 'carga', 'fecha', 'unidad', 'monto', 'acciones']
+      : ['cliente', 'carga', 'fecha', 'unidad', 'acciones'],
   );
   readonly enviando = signal(false);
   /** La fila que está pidiendo confirmación; cada fila tiene su propio motivo. */

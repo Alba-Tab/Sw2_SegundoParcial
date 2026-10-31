@@ -1,7 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { filter, firstValueFrom, switchMap } from 'rxjs';
-import { completo, Intentos } from 'ui-comun';
+import { completo, Intentos, puedeVer, Sesion } from 'ui-comun';
 import type { EstadoViaje, MapaQuery, OpcionIntervencion } from '../graphql/generado';
 import { ViajesRepositorio } from './data/viajes.repositorio';
 
@@ -18,11 +18,17 @@ export class ViajesFachada {
 export class ViajeFachada {
   private readonly repo = inject(ViajesRepositorio);
   private readonly intentos = new Intentos();
+  /** Monto, riesgo y unidad solo al rol que los puede ver: sin un SIN_PERMISO en cada sondeo (los roles no cambian al renovar). */
+  private readonly ver = (() => {
+    const roles = inject(Sesion).roles();
+    return { verMonto: puedeVer(roles, 'monto'), verRiesgo: puedeVer(roles, 'riesgo'), verUnidad: puedeVer(roles, 'unidad') };
+  })();
+  readonly verMonto = this.ver.verMonto;
   readonly id = signal<string | undefined>(undefined);
   readonly datos = toSignal(
     toObservable(this.id).pipe(
       filter((id): id is string => !!id),
-      switchMap((id) => this.repo.observarViaje(id, 20_000)),
+      switchMap((id) => this.repo.observarViaje({ id, ...this.ver }, 20_000)),
     ),
   );
 
@@ -42,14 +48,16 @@ export class ViajeFachada {
 
   recargar(): Promise<unknown> {
     const id = this.id();
-    return id ? firstValueFrom(this.repo.recargarViaje(id)) : Promise.resolve();
+    return id ? firstValueFrom(this.repo.recargarViaje({ id, ...this.ver })) : Promise.resolve();
   }
 }
 
-/** Mapa en vivo (spec 005): la última posición de cada viaje en ruta, cada 15 s. */
+/** Mapa en vivo (spec 005): la última posición de cada viaje en ruta, cada 15 s; el riesgo, solo a quien lo puede ver. */
 @Injectable()
 export class MapaFachada {
-  private readonly datos = toSignal(inject(ViajesRepositorio).observarMapa(15_000));
+  private readonly datos = toSignal(
+    inject(ViajesRepositorio).observarMapa({ verRiesgo: puedeVer(inject(Sesion).roles(), 'riesgo') }, 15_000),
+  );
   readonly viajes = computed(() => completo<MapaQuery>(this.datos())?.viajesEnCurso ?? []);
   readonly error = computed(() => this.datos()?.error);
 }

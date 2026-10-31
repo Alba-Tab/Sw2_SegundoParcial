@@ -68,7 +68,9 @@ export type ViajesQuery = {
   }> | null;
 };
 
-export type MapaQueryVariables = Exact<{ [key: string]: never }>;
+export type MapaQueryVariables = Exact<{
+  verRiesgo: boolean;
+}>;
 
 export type MapaQuery = {
   viajesEnCurso: Array<{
@@ -77,17 +79,20 @@ export type MapaQuery = {
     ultimaPosicion: { lat: number; lng: number } | null;
     cliente: { razonSocial: string };
     ruta: { nombre: string };
-    riesgo: { probabilidad: number; enRiesgo: boolean } | null;
+    riesgo?: { probabilidad: number; enRiesgo: boolean } | null;
   }> | null;
 };
 
 export type ViajeQueryVariables = Exact<{
   id: string | number;
+  verMonto: boolean;
+  verRiesgo: boolean;
+  verUnidad: boolean;
 }>;
 
 export type ViajeQuery = {
   viaje: {
-    monto: string | null;
+    monto?: string | null;
     viajeId: string;
     servicioId: string;
     estado: EstadoViaje;
@@ -99,14 +104,14 @@ export type ViajeQuery = {
     fechaViaje: string;
     iniciadoEn: string | null;
     ultimaPosicionEn: string | null;
-    riesgo: {
+    riesgo?: {
       probabilidad: number;
       umbral: number;
       enRiesgo: boolean;
       calculadaEn: string;
       factores: Array<{ nombre: string; aporte: number }>;
     } | null;
-    unidad: { unidadId: string; placa: string; estado: EstadoUnidad } | null;
+    unidad?: { unidadId: string; placa: string; estado: EstadoUnidad } | null;
     hitos: Array<{ hitoId: string; tipo: string; descripcion: string; origen: string | null; registradoEn: string }> | null;
     entrega: {
       entregaId: string;
@@ -178,6 +183,7 @@ export type IntervencionesQuery = {
 
 export type ServiciosQueryVariables = Exact<{
   estado?: EstadoServicio | null | undefined;
+  verMonto: boolean;
 }>;
 
 export type ServiciosQuery = {
@@ -187,7 +193,7 @@ export type ServiciosQuery = {
     tipoCarga: TipoCarga | null;
     toneladas: number | null;
     fechaViaje: string | null;
-    monto: string | null;
+    monto?: string | null;
     placa: string | null;
     choferNombre: string | null;
     confirmacionCompleta: boolean;
@@ -324,7 +330,7 @@ export class ViajesGQL extends Apollo.Query<ViajesQuery, ViajesQueryVariables> {
   }
 }
 export const MapaDocument = gql`
-  query Mapa {
+  query Mapa($verRiesgo: Boolean!) {
     viajesEnCurso(limite: 50) {
       viajeId
       placa
@@ -338,7 +344,7 @@ export const MapaDocument = gql`
       ruta {
         nombre
       }
-      riesgo {
+      riesgo @include(if: $verRiesgo) {
         probabilidad
         enRiesgo
       }
@@ -357,11 +363,11 @@ export class MapaGQL extends Apollo.Query<MapaQuery, MapaQueryVariables> {
   }
 }
 export const ViajeDocument = gql`
-  query Viaje($id: ID!) {
+  query Viaje($id: ID!, $verMonto: Boolean!, $verRiesgo: Boolean!, $verUnidad: Boolean!) {
     viaje(id: $id) {
       ...ViajeFila
-      monto
-      riesgo {
+      monto @include(if: $verMonto)
+      riesgo @include(if: $verRiesgo) {
         probabilidad
         umbral
         enRiesgo
@@ -371,7 +377,7 @@ export const ViajeDocument = gql`
           aporte
         }
       }
-      unidad {
+      unidad @include(if: $verUnidad) {
         unidadId
         placa
         estado
@@ -457,14 +463,14 @@ export class IntervencionesGQL extends Apollo.Query<IntervencionesQuery, Interve
   }
 }
 export const ServiciosDocument = gql`
-  query Servicios($estado: EstadoServicio) {
+  query Servicios($estado: EstadoServicio, $verMonto: Boolean!) {
     servicios(estado: $estado, limite: 80) {
       servicioId
       clienteId
       tipoCarga
       toneladas
       fechaViaje
-      monto
+      monto @include(if: $verMonto)
       placa
       choferNombre
       confirmacionCompleta

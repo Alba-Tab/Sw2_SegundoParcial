@@ -1,7 +1,7 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
-import { Intentos } from 'ui-comun';
+import { Intentos, puedeVer, Sesion } from 'ui-comun';
 import { ServiciosRepositorio } from './data/servicios.repositorio';
 import { nombreCliente } from './domain/servicio';
 
@@ -10,7 +10,9 @@ import { nombreCliente } from './domain/servicio';
 export class ServiciosFachada {
   private readonly repo = inject(ServiciosRepositorio);
   private readonly intentos = new Intentos();
-  private readonly datos = toSignal(this.repo.observar('CONFIRMADO', 20_000));
+  /** El monto, solo a quien lo puede ver (gerente, administracion, comercial). */
+  readonly verMonto = puedeVer(inject(Sesion).roles(), 'monto');
+  private readonly datos = toSignal(this.repo.observar('CONFIRMADO', this.verMonto, 20_000));
   readonly servicios = computed(() => this.datos()?.data?.servicios ?? []);
   readonly error = computed(() => this.datos()?.error);
 
@@ -23,6 +25,6 @@ export class ServiciosFachada {
   }
 
   recargar(): Promise<unknown> {
-    return firstValueFrom(this.repo.recargar('CONFIRMADO'));
+    return firstValueFrom(this.repo.recargar('CONFIRMADO', this.verMonto));
   }
 }

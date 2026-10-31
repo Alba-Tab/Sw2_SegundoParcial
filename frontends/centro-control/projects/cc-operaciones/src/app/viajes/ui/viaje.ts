@@ -43,7 +43,7 @@ import { ViajeFachada } from '../viajes.fachada';
             <p><b>Ruta:</b> {{ v.ruta?.nombre }} ({{ v.ruta?.distanciaKm }} km)</p>
             <p><b>Carga:</b> {{ v.tipoCarga }} · {{ v.toneladas }} t · {{ v.fechaViaje | fecha }}</p>
             <p><b>Chofer:</b> {{ v.choferNombre }} · <b>Unidad:</b> {{ v.unidad?.placa ?? v.placa }} ({{ v.unidad?.estado ?? '—' }})</p>
-            @if (sesion.tiene('gerente', 'comercial', 'administracion')) {
+            @if (verMonto) {
               <p><b>Monto:</b> {{ v.monto | bob }}</p>
             }
             <p class="secundario">Iniciado {{ v.iniciadoEn | fecha: true }} · última posición {{ v.ultimaPosicionEn | fecha: true }}</p>
@@ -138,6 +138,7 @@ export class ViajePagina {
   readonly sesion = inject(Sesion);
   readonly id = input.required<string>();
   readonly datos = this.fachada.datos;
+  readonly verMonto = this.fachada.verMonto;
   readonly enviando = signal(false);
   readonly pct = pct;
   readonly campos = { viaje: 'Viajes', unidad: 'Flota', riesgo: 'Analítica' };

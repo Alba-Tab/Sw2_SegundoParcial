@@ -45,8 +45,9 @@ query Viajes($estado: EstadoViaje) {
   }
 }
 
-# El popup del mapa: 50 × 17 + 1 = 851 (el mismo valor por defecto que el esquema).
-query Mapa {
+# El popup del mapa: 50 × 17 + 1 = 851 (el mismo valor por defecto que el esquema). `riesgo` solo a quien lo puede ver
+# (Viaje.riesgo: gerente y despachador), para no generar un SIN_PERMISO por fila en cada sondeo.
+query Mapa($verRiesgo: Boolean!) {
   viajesEnCurso(limite: 50) {
     viajeId
     placa
@@ -60,18 +61,19 @@ query Mapa {
     ruta {
       nombre
     }
-    riesgo {
+    riesgo @include(if: $verRiesgo) {
       probabilidad
       enRiesgo
     }
   }
 }
 
-query Viaje($id: ID!) {
+# monto, riesgo y unidad tienen @roles: se piden solo al rol que los puede ver (ui-comun/dominio, ROLES_CAMPO).
+query Viaje($id: ID!, $verMonto: Boolean!, $verRiesgo: Boolean!, $verUnidad: Boolean!) {
   viaje(id: $id) {
     ...ViajeFila
-    monto
-    riesgo {
+    monto @include(if: $verMonto)
+    riesgo @include(if: $verRiesgo) {
       probabilidad
       umbral
       enRiesgo
@@ -81,7 +83,7 @@ query Viaje($id: ID!) {
         aporte
       }
     }
-    unidad {
+    unidad @include(if: $verUnidad) {
       unidadId
       placa
       estado
@@ -128,15 +130,15 @@ query Intervenciones {
   }
 }
 
-# 80 × 10 + 1 más los clientes = 805.
-query Servicios($estado: EstadoServicio) {
+# 80 × 10 + 1 más los clientes = 805. `monto` no se pide al despachador (Servicio.monto: gerente, administracion, comercial).
+query Servicios($estado: EstadoServicio, $verMonto: Boolean!) {
   servicios(estado: $estado, limite: 80) {
     servicioId
     clienteId
     tipoCarga
     toneladas
     fechaViaje
-    monto
+    monto @include(if: $verMonto)
     placa
     choferNombre
     confirmacionCompleta
