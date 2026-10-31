@@ -1,16 +1,19 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, inject, input } from '@angular/core';
 import { MatTableModule } from '@angular/material/table';
-import { AvisoServicios, BobPipe, FechaPipe } from 'ui-comun';
+import { Encabezado, AvisoServicios, BobPipe, FechaPipe } from 'ui-comun';
 import { CombustibleFachada } from '../combustible.fachada';
 
 /** Anomalías de Isolation Forest (FF2) y las últimas cargas. Una alerta abre aquí con la carga marcada. */
 @Component({
   selector: 'app-combustible',
   providers: [CombustibleFachada],
-  imports: [MatTableModule, DecimalPipe, BobPipe, FechaPipe, AvisoServicios],
+  imports: [Encabezado, MatTableModule, DecimalPipe, BobPipe, FechaPipe, AvisoServicios],
   template: `
-    <h1>Combustible</h1>
+    <cc-encabezado
+      titulo="Combustible"
+      [migas]="id() ? [{ texto: 'Combustible', ruta: '/combustible' }, { texto: 'Carga marcada' }] : []"
+    />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!anomalias().length && !cargas().length" />
     <h2>Anomalías de los últimos 30 días</h2>
     <div class="tabla-ancha">

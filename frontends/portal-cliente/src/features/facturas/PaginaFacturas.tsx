@@ -1,3 +1,4 @@
+import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
@@ -13,7 +14,7 @@ import TableRow from '@mui/material/TableRow';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import Typography from '@mui/material/Typography';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { useNavigate } from '@tanstack/react-router';
+import { useNavigate, useParams } from '@tanstack/react-router';
 import {
   createColumnHelper,
   flexRender,
@@ -22,7 +23,7 @@ import {
   type SortingState,
   useReactTable,
 } from '@tanstack/react-table';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { type Factura, getListarFacturasQueryKey, listarFacturas } from '../../api/generado/finanzas';
 import { compararMontos, dinero, fecha } from '../../compartido/formato/formato';
 import { Antiguedad } from '../../compartido/offline/Antiguedad';
@@ -37,6 +38,9 @@ const col = createColumnHelper<Factura>();
 export function PaginaFacturas() {
   const activo = useClienteActivo();
   const navegar = useNavigate();
+  // El correo de FacturaEmitida enlaza a /facturas/{facturaId}: esa fila se resalta y recibe el foco una vez (N6).
+  const { facturaId: elegida } = useParams({ strict: false });
+  const enfocada = useRef<string | undefined>(undefined);
   const [conSaldo, setConSaldo] = useState(false);
   const [orden, setOrden] = useState<SortingState>([{ id: 'venceEl', desc: false }]);
   const params = { ...(activo.modoComercial ? { clienteId: activo.clienteId } : {}), ...(conSaldo ? { conSaldo: true } : {}) };
@@ -108,6 +112,9 @@ export function PaginaFacturas() {
       {paginas.isPending && paginas.fetchStatus === 'fetching' && <CircularProgress aria-label="Cargando" />}
       {paginas.isError && !paginas.data && <Problema error={paginas.error} />}
       {paginas.data && datos.length === 0 && <Typography color="text.secondary">No hay facturas.</Typography>}
+      {elegida && paginas.data && !paginas.hasNextPage && !datos.some((f) => f.facturaId === elegida) && (
+        <Alert severity="info">No encontramos la factura del enlace en esta lista.</Alert>
+      )}
       {datos.length > 0 && (
         <Paper variant="outlined" sx={{ overflowX: 'auto' }}>
           <Table size="small">
@@ -129,18 +136,34 @@ export function PaginaFacturas() {
               ))}
             </TableHead>
             <TableBody>
-              {tabla.getRowModel().rows.map((f) => (
-                <TableRow
-                  key={f.id}
-                  hover
-                  sx={{ cursor: 'pointer' }}
-                  onClick={() => void navegar({ to: '/servicios/$servicioId', params: { servicioId: f.original.servicioId } })}
-                >
-                  {f.getVisibleCells().map((c) => (
-                    <TableCell key={c.id}>{flexRender(c.column.columnDef.cell, c.getContext())}</TableCell>
-                  ))}
-                </TableRow>
-              ))}
+              {tabla.getRowModel().rows.map((f) => {
+                const esElegida = f.original.facturaId === elegida;
+                return (
+                  <TableRow
+                    key={f.id}
+                    hover
+                    selected={esElegida}
+                    aria-current={esElegida ? 'true' : undefined}
+                    tabIndex={esElegida ? -1 : undefined}
+                    ref={
+                      esElegida
+                        ? (n) => {
+                            if (!n || enfocada.current === elegida) return;
+                            enfocada.current = elegida;
+                            n.scrollIntoView?.({ block: 'center' });
+                            n.focus();
+                          }
+                        : undefined
+                    }
+                    sx={{ cursor: 'pointer' }}
+                    onClick={() => void navegar({ to: '/servicios/$servicioId', params: { servicioId: f.original.servicioId } })}
+                  >
+                    {f.getVisibleCells().map((c) => (
+                      <TableCell key={c.id}>{flexRender(c.column.columnDef.cell, c.getContext())}</TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })}
             </TableBody>
           </Table>
         </Paper>

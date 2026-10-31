@@ -1,3 +1,4 @@
+import ArrowBack from '@mui/icons-material/ArrowBack';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
@@ -7,6 +8,7 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useParams } from '@tanstack/react-router';
+import { type ReactNode, useState } from 'react';
 import { type Servicio, useListarRutas, useObtenerServicio } from '../../api/generado/viajes';
 import { dinero, fecha, instante, TIPOS_CARGA } from '../../compartido/formato/formato';
 import { BotonEnlace } from '../../compartido/ui/BotonEnlace';
@@ -29,13 +31,15 @@ export function PaginaServicio() {
   const { servicioId } = useParams({ from: '/servicios/$servicioId' });
   const servicio = useObtenerServicio(servicioId, { query: { refetchInterval: (q) => intervalo(q.state.data) } });
   const rutas = useListarRutas();
+  // Tras cancelar aquí, el resultado queda en la página (no solo se cierra el diálogo) y recibe el foco (N6).
+  const [recienCancelado, setRecienCancelado] = useState(false);
 
-  if (servicio.isPending) return <CircularProgress aria-label="Cargando" />;
-  if (servicio.isError) return <Problema error={servicio.error} />;
+  if (servicio.isPending) return conVolver(<CircularProgress aria-label="Cargando" />);
+  if (servicio.isError) return conVolver(<Problema error={servicio.error} />);
   const s = servicio.data;
   const ruta = rutas.data?.find((r) => r.rutaId === s.rutaId);
 
-  return (
+  return conVolver(
     <Paper variant="outlined" sx={{ p: 3, maxWidth: 760 }}>
       <Stack spacing={2}>
         <Stack direction="row" spacing={1.5} alignItems="center">
@@ -55,7 +59,18 @@ export function PaginaServicio() {
             {s.etapa !== 'ESPERANDO_APROBACION' && <LinearProgress />}
           </Stack>
         )}
-        {s.estado === 'CANCELADO' && <Alert severity="info">{(s.motivo && MOTIVOS[s.motivo]) ?? 'El servicio se canceló.'}</Alert>}
+        {s.estado === 'CANCELADO' && (
+          <Alert
+            severity={recienCancelado ? 'success' : 'info'}
+            role={recienCancelado ? 'status' : undefined}
+            tabIndex={-1}
+            ref={(n) => {
+              if (recienCancelado) n?.focus();
+            }}
+          >
+            {(s.motivo && MOTIVOS[s.motivo]) ?? 'El servicio se canceló.'}
+          </Alert>
+        )}
         {s.estado === 'REQUIERE_INTERVENCION' && (
           <Alert severity="warning">Hubo un problema al confirmar y la empresa lo está revisando. Te avisaremos.</Alert>
         )}
@@ -85,7 +100,9 @@ export function PaginaServicio() {
         {s.entregadoEn && <Typography color="text.secondary">Entregado el {instante(s.entregadoEn)}</Typography>}
         {s.numeroFactura && <Typography>Factura {s.numeroFactura}</Typography>}
 
-        {(s.estado === 'PROGRAMANDO' || s.estado === 'CONFIRMADO') && <CancelarServicio servicioId={s.servicioId} />}
+        {(s.estado === 'PROGRAMANDO' || s.estado === 'CONFIRMADO') && (
+          <CancelarServicio servicioId={s.servicioId} alCancelar={() => setRecienCancelado(true)} />
+        )}
         {s.estado === 'EN_RUTA' && (
           <Typography variant="body2" color="text.secondary">
             El viaje ya salió; para cambios llama a atención comercial.
@@ -98,10 +115,19 @@ export function PaginaServicio() {
             <Pod viajeId={s.viajeId} />
           </>
         )}
-        <BotonEnlace to="/servicios" sx={{ alignSelf: 'flex-start' }}>
-          Mis servicios
-        </BotonEnlace>
       </Stack>
-    </Paper>
+    </Paper>,
+  );
+}
+
+/** "Volver" a la lista arriba de todo, también mientras carga o si falla (N1). */
+function conVolver(contenido: ReactNode) {
+  return (
+    <Stack spacing={2}>
+      <BotonEnlace to="/servicios" startIcon={<ArrowBack />} sx={{ alignSelf: 'flex-start', minHeight: 44 }}>
+        Volver a servicios
+      </BotonEnlace>
+      {contenido}
+    </Stack>
   );
 }

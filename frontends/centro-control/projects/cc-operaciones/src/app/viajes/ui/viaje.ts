@@ -6,7 +6,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { AvisoServicios, BobPipe, Estado, EtiquetaPipe, FechaPipe, mensajeDe, pct, Sesion } from 'ui-comun';
+import { Encabezado, sinErroresDe, AvisoServicios, BobPipe, Estado, EtiquetaPipe, FechaPipe, mensajeDe, pct, Sesion } from 'ui-comun';
 import type { OpcionIntervencion } from '../../graphql/generado';
 import { ViajeFachada } from '../viajes.fachada';
 
@@ -15,6 +15,7 @@ import { ViajeFachada } from '../viajes.fachada';
   selector: 'app-viaje',
   providers: [ViajeFachada],
   imports: [
+    Encabezado,
     FormsModule,
     MatCardModule,
     MatButtonModule,
@@ -32,9 +33,16 @@ import { ViajeFachada } from '../viajes.fachada';
     @if (r?.loading && !r?.data) {
       <mat-progress-bar mode="indeterminate" />
     }
-    <cc-aviso-servicios [error]="r?.error" [campos]="campos" [sinDatos]="!r?.data?.viaje" />
+    @let placa = r?.data?.viaje?.placa;
+    @let titulo = placa ? 'Viaje ' + placa : 'Viaje';
+    <cc-encabezado [titulo]="titulo" [migas]="[{ texto: 'Viajes', ruta: '/viajes' }, { texto: titulo }]">
+      @if (r?.data?.viaje; as v) {
+        <cc-estado grupo="EstadoViaje" [valor]="v.estado" />
+      }
+    </cc-encabezado>
+    <!-- Sin predicción (404 = null, o el campo con error) no es una falla: lo dice la tarjeta de riesgo (W3). -->
+    <cc-aviso-servicios [error]="sinErroresDe(r?.error, 'riesgo')" [campos]="campos" [sinDatos]="!r?.data?.viaje" />
     @if (r?.data?.viaje; as v) {
-      <h1>Viaje {{ v.placa }} <cc-estado grupo="EstadoViaje" [valor]="v.estado" /></h1>
       <div class="tarjetas">
         <mat-card>
           <mat-card-content>
@@ -63,6 +71,11 @@ import { ViajeFachada } from '../viajes.fachada';
               }
               <p class="secundario">Calculado {{ riesgo.calculadaEn | fecha: true }} · umbral {{ pct(riesgo.umbral) }}</p>
             </mat-card-content>
+          </mat-card>
+        } @else if (verRiesgo && v.estado === 'EN_RUTA') {
+          <mat-card>
+            <mat-card-header><mat-card-title>Riesgo de retraso</mat-card-title></mat-card-header>
+            <mat-card-content><p class="secundario">Aún no hay datos para estimar el retraso.</p></mat-card-content>
           </mat-card>
         }
         @if (v.entrega; as e) {
@@ -142,9 +155,11 @@ export class ViajePagina {
   readonly id = input.required<string>();
   readonly datos = this.fachada.datos;
   readonly verMonto = this.fachada.verMonto;
+  readonly verRiesgo = this.fachada.verRiesgo;
+  readonly sinErroresDe = sinErroresDe;
   readonly enviando = signal(false);
   readonly pct = pct;
-  readonly campos = { viaje: 'Viajes', unidad: 'Flota', riesgo: 'Analítica' };
+  readonly campos = { viaje: 'Viajes', unidad: 'Flota' };
   texto = '';
 
   constructor() {

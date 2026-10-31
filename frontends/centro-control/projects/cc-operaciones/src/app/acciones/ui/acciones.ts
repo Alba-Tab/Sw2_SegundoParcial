@@ -6,7 +6,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, CONFIG_CENTRO, Estado, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { Encabezado, AvisoServicios, CONFIG_CENTRO, Estado, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
 import { AccionesFachada } from '../acciones.fachada';
 import { conLaElegidaPrimero } from '../domain/accion';
 
@@ -17,9 +17,23 @@ import { conLaElegidaPrimero } from '../domain/accion';
 @Component({
   selector: 'app-acciones',
   providers: [AccionesFachada],
-  imports: [FormsModule, MatCardModule, MatButtonModule, MatFormFieldModule, MatInputModule, RouterLink, FechaPipe, Estado, AvisoServicios],
+  imports: [
+    Encabezado,
+    FormsModule,
+    MatCardModule,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatInputModule,
+    RouterLink,
+    FechaPipe,
+    Estado,
+    AvisoServicios,
+  ],
   template: `
-    <h1>Acciones propuestas por el agente</h1>
+    <cc-encabezado
+      [titulo]="id() ? 'Acción propuesta' : 'Acciones propuestas por el agente'"
+      [migas]="id() ? [{ texto: 'Acciones del agente', ruta: '/acciones' }, { texto: 'Acción propuesta' }] : []"
+    />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!visibles().length" />
     <div class="lista">
       @for (a of visibles(); track a.accionId) {

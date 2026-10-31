@@ -5,7 +5,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { AvisoServicios, BobPipe, Estado, EtiquetaPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { Encabezado, AvisoServicios, BobPipe, Estado, EtiquetaPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
 import { CreditoFachada } from '../credito.fachada';
 import { puedeRechazar } from '../domain/credito';
 
@@ -14,6 +14,7 @@ import { puedeRechazar } from '../domain/credito';
   selector: 'app-aprobaciones',
   providers: [CreditoFachada],
   imports: [
+    Encabezado,
     FormsModule,
     MatCardModule,
     MatButtonModule,
@@ -26,7 +27,7 @@ import { puedeRechazar } from '../domain/credito';
     AvisoServicios,
   ],
   template: `
-    <h1>Aprobación de crédito</h1>
+    <cc-encabezado titulo="Aprobación de crédito" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!solicitudes().length" />
     <div class="tarjetas">
       @for (s of solicitudes(); track s.servicioId) {

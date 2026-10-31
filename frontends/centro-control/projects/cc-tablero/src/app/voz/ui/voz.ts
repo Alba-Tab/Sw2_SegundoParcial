@@ -6,7 +6,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { codigoDe, mensajeDe, TablaReporte, type Resultado } from 'ui-comun';
+import { Encabezado, codigoDe, mensajeDe, TablaReporte, type Resultado } from 'ui-comun';
 import type { ReporteId } from '../../graphql/generado';
 import { mensajePregunta, mostrarCatalogo, preguntaValida, REPORTES_CATALOGO, type Respuesta } from '../domain/voz';
 import { VozFachada } from '../voz.fachada';
@@ -21,6 +21,7 @@ import { Grabadora } from './grabadora';
   selector: 'app-voz',
   providers: [VozFachada],
   imports: [
+    Encabezado,
     FormsModule,
     MatCardModule,
     MatButtonModule,
@@ -31,7 +32,7 @@ import { Grabadora } from './grabadora';
     TablaReporte,
   ],
   template: `
-    <h1>Pregunta por voz</h1>
+    <cc-encabezado titulo="Pregunta por voz" />
     <div class="fila-acciones">
       <button
         mat-fab

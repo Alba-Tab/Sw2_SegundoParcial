@@ -1,14 +1,14 @@
 import { Component, inject } from '@angular/core';
 import { MatTableModule } from '@angular/material/table';
-import { AvisoServicios, BobPipe, Estado, EtiquetaPipe, FechaPipe } from 'ui-comun';
+import { Encabezado, AvisoServicios, BobPipe, Estado, EtiquetaPipe, FechaPipe } from 'ui-comun';
 import { CotizacionesFachada } from '../cotizaciones.fachada';
 
 @Component({
   selector: 'app-cotizaciones',
   providers: [CotizacionesFachada],
-  imports: [MatTableModule, BobPipe, FechaPipe, EtiquetaPipe, Estado, AvisoServicios],
+  imports: [Encabezado, MatTableModule, BobPipe, FechaPipe, EtiquetaPipe, Estado, AvisoServicios],
   template: `
-    <h1>Cotizaciones</h1>
+    <cc-encabezado titulo="Cotizaciones" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!cotizaciones().length" />
     <div class="tabla-ancha">
       <table mat-table [dataSource]="cotizaciones()">

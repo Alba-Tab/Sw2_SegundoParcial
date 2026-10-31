@@ -2,16 +2,16 @@ import { Component, inject } from '@angular/core';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import { DecimalPipe } from '@angular/common';
-import { AvisoServicios, Estado, EtiquetaPipe, FechaPipe } from 'ui-comun';
+import { Encabezado, AvisoServicios, Estado, EtiquetaPipe, FechaPipe } from 'ui-comun';
 import { AVISO_KM } from '../domain/unidad';
 import { UnidadesFachada } from '../unidades.fachada';
 
 @Component({
   selector: 'app-unidades',
   providers: [UnidadesFachada],
-  imports: [MatTableModule, RouterLink, FechaPipe, EtiquetaPipe, Estado, DecimalPipe, AvisoServicios],
+  imports: [Encabezado, MatTableModule, RouterLink, FechaPipe, EtiquetaPipe, Estado, DecimalPipe, AvisoServicios],
   template: `
-    <h1>Unidades</h1>
+    <cc-encabezado titulo="Unidades" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!unidades().length" />
     <div class="tabla-ancha">
       <table mat-table [dataSource]="unidades()">

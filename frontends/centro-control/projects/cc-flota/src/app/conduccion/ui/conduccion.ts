@@ -1,7 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { MatTableModule } from '@angular/material/table';
-import { AvisoServicios, FechaPipe } from 'ui-comun';
+import { Encabezado, AvisoServicios, FechaPipe } from 'ui-comun';
 import { ConduccionFachada } from '../conduccion.fachada';
 import { PUNTAJE_BAJO } from '../domain/conduccion';
 
@@ -9,9 +9,9 @@ import { PUNTAJE_BAJO } from '../domain/conduccion';
 @Component({
   selector: 'app-conduccion',
   providers: [ConduccionFachada],
-  imports: [MatTableModule, DecimalPipe, FechaPipe, AvisoServicios],
+  imports: [Encabezado, MatTableModule, DecimalPipe, FechaPipe, AvisoServicios],
   template: `
-    <h1>Puntaje de conducción</h1>
+    <cc-encabezado titulo="Puntaje de conducción" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!puntajes()" />
     @if (puntajes(); as p) {
       <p class="secundario">Semana del {{ p.desde | fecha }} al {{ p.hasta | fecha }} · datos al {{ p.datosAl | fecha: true }}</p>

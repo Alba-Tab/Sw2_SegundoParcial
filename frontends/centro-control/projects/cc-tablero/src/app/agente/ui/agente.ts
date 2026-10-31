@@ -2,7 +2,7 @@ import { Component, inject, input, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { AvisoServicios, codigoDe, CONFIG_CENTRO, Estado, EtiquetaPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { Encabezado, AvisoServicios, codigoDe, CONFIG_CENTRO, Estado, EtiquetaPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
 import { AgenteFachada } from '../agente.fachada';
 import { mensajeDisparo, urlTraza } from '../domain/mision';
 
@@ -13,13 +13,12 @@ import { mensajeDisparo, urlTraza } from '../domain/mision';
 @Component({
   selector: 'app-agente',
   providers: [AgenteFachada],
-  imports: [MatButtonModule, MatExpansionModule, FechaPipe, EtiquetaPipe, Estado, AvisoServicios],
+  imports: [Encabezado, MatButtonModule, MatExpansionModule, FechaPipe, EtiquetaPipe, Estado, AvisoServicios],
   template: `
-    <div class="fila-acciones">
-      <h1>Agente "vigilar viajes"</h1>
+    <cc-encabezado titulo="Agente «vigilar viajes»">
       <button mat-flat-button (click)="disparar()" [disabled]="enviando()">Disparar misión</button>
       <a mat-button [href]="config.urls['cc-operaciones'] + '/acciones'">Ver acciones propuestas →</a>
-    </div>
+    </cc-encabezado>
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!misiones().length" />
     <mat-accordion>
       @for (m of misiones(); track m.misionId) {

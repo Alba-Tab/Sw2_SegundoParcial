@@ -3,16 +3,9 @@ import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatCardModule } from '@angular/material/card';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { RouterLink } from '@angular/router';
-import { AvisoServicios, BobPipe, CONFIG_CENTRO, Estado, FechaPipe, pct } from 'ui-comun';
-import type { EstadoTarjeta, Pagina } from '../domain/tablero';
+import { AvisoServicios, BobPipe, CONFIG_CENTRO, Encabezado, Estado, FechaPipe, pct } from 'ui-comun';
+import type { EstadoTarjeta } from '../domain/tablero';
 import { TableroFachada } from '../tablero.fachada';
-
-const ENLACES: { ruta: Pagina; titulo: string }[] = [
-  { ruta: 'reportes', titulo: 'Reportes' },
-  { ruta: 'voz', titulo: 'Pregunta por voz' },
-  { ruta: 'agente', titulo: 'Agente' },
-];
 
 /**
  * Tablero del gerente (spec 016, paso 10): compone Viajes, Flota, Finanzas y Analítica en una consulta. Si un servicio
@@ -26,31 +19,20 @@ const ENLACES: { ruta: Pagina; titulo: string }[] = [
     MatButtonToggleModule,
     MatProgressBarModule,
     MatIconModule,
-    RouterLink,
+    Encabezado,
     BobPipe,
     FechaPipe,
     Estado,
     AvisoServicios,
   ],
   template: `
-    <div class="encabezado">
-      <h1>Tablero</h1>
+    <cc-encabezado titulo="Tablero">
       <mat-button-toggle-group [value]="periodo()" (change)="periodo.set($event.value)" aria-label="Periodo">
         <mat-button-toggle value="HOY">Hoy</mat-button-toggle>
         <mat-button-toggle value="ESTA_SEMANA">Esta semana</mat-button-toggle>
         <mat-button-toggle value="ESTE_MES">Este mes</mat-button-toggle>
       </mat-button-toggle-group>
-      @if (enlaces.length) {
-        <nav class="enlace" aria-label="Más del tablero">
-          @for (e of enlaces; track e.ruta; let ultimo = $last) {
-            <a [routerLink]="'/' + e.ruta">{{ e.titulo }}</a>
-            @if (!ultimo) {
-              ·
-            }
-          }
-        </nav>
-      }
-    </div>
+    </cc-encabezado>
     @if (cargando()) {
       <mat-progress-bar mode="indeterminate" />
     }
@@ -154,19 +136,6 @@ const ENLACES: { ruta: Pagina; titulo: string }[] = [
     </div>
   `,
   styles: `
-    .encabezado {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      flex-wrap: wrap;
-      margin-bottom: 8px;
-    }
-    .encabezado h1 {
-      margin: 0;
-    }
-    .enlace {
-      margin-left: auto;
-    }
     .cifra {
       font: var(--mat-sys-display-small);
       margin: 8px 0;
@@ -185,8 +154,6 @@ export class TableroPagina {
   readonly datos = this.fachada.datos;
   readonly cargando = this.fachada.cargando;
   readonly bloques = this.fachada.bloques;
-  /** Reportes y voz (spec 015) y el agente (spec 014), solo para los roles que los usan. */
-  readonly enlaces = ENLACES.filter((e) => this.fachada.puedeAbrir(e.ruta));
 
   estado(campo: string): EstadoTarjeta {
     return this.fachada.estado(campo);

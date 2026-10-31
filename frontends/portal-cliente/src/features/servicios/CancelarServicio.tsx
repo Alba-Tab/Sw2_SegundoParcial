@@ -13,7 +13,7 @@ import { mensajeDe } from '../../compartido/ui/Problema';
 import { ERRORES_CANCELACION } from './textos';
 
 /** Spec 004: cancelar antes de que el viaje salga, con el motivo del cliente. */
-export function CancelarServicio({ servicioId }: { servicioId: string }) {
+export function CancelarServicio({ servicioId, alCancelar }: { servicioId: string; alCancelar?: () => void }) {
   const consultas = useQueryClient();
   const [abierto, setAbierto] = useState(false);
   const [motivo, setMotivo] = useState('');
@@ -22,6 +22,7 @@ export function CancelarServicio({ servicioId }: { servicioId: string }) {
     onSuccess: (s) => {
       consultas.setQueryData(getObtenerServicioQueryKey(servicioId), s);
       setAbierto(false);
+      alCancelar?.();
     },
   });
   const error = cancelar.error instanceof ErrorApi && cancelar.error.codigo ? ERRORES_CANCELACION[cancelar.error.codigo] : undefined;

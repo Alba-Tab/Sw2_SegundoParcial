@@ -8,7 +8,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { AvisoServicios, Estado, EtiquetaPipe, fechaLaPaz, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { Encabezado, AvisoServicios, Estado, EtiquetaPipe, fechaLaPaz, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
 import { CHECKLIST_POR_DEFECTO, cierreInicial, puedeProgramar, type ItemCierre, type NuevoMantenimiento } from '../domain/unidad';
 import { UnidadFachada } from '../unidades.fachada';
 
@@ -17,6 +17,7 @@ import { UnidadFachada } from '../unidades.fachada';
   selector: 'app-unidad',
   providers: [UnidadFachada],
   imports: [
+    Encabezado,
     FormsModule,
     DecimalPipe,
     MatCardModule,
@@ -31,9 +32,14 @@ import { UnidadFachada } from '../unidades.fachada';
     AvisoServicios,
   ],
   template: `
+    @let titulo = unidad()?.placa ?? 'Unidad';
+    <cc-encabezado [titulo]="titulo" [migas]="[{ texto: 'Unidades', ruta: '/unidades' }, { texto: titulo }]">
+      @if (unidad(); as u) {
+        <cc-estado grupo="EstadoUnidad" [valor]="u.estado" />
+      }
+    </cc-encabezado>
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!unidad()" />
     @if (unidad(); as u) {
-      <h1>{{ u.placa }} <cc-estado grupo="EstadoUnidad" [valor]="u.estado" /></h1>
       <p>
         {{ u.tipoUnidad | etiqueta: 'TipoUnidad' }} {{ u.tipoRemolque ? (u.tipoRemolque | etiqueta: 'TipoRemolque') : '' }} ·
         {{ (u.kilometraje | number) ?? '—' }} km · {{ u.kmDesdeUltimoMantenimiento | number }} km desde el último mantenimiento

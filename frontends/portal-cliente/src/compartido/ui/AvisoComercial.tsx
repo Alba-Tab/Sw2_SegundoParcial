@@ -1,10 +1,11 @@
 import Alert from '@mui/material/Alert';
+import Typography from '@mui/material/Typography';
 import { useObtenerCliente } from '../../api/generado/viajes';
 import { useClienteActivo } from '../sesion/ClienteActivo';
 import { useSesion } from '../sesion/useSesion';
 import { BotonEnlace } from './BotonEnlace';
 
-/** Aviso fijo del modo comercial (propuesta 6.4 y 7.6): a qué cliente se atiende y quién registra. */
+/** Banda fija del modo comercial (propuesta 6.4 y 7.6, N7): a qué cliente se atiende, cómo cambiarlo y quién registra. */
 export function AvisoComercial() {
   const sesion = useSesion();
   const activo = useClienteActivo();
@@ -17,22 +18,22 @@ export function AvisoComercial() {
       severity="warning"
       variant="filled"
       square
-      sx={{ position: 'sticky', top: 64, zIndex: (t) => t.zIndex.appBar - 1 }}
       action={
-        <BotonEnlace to="/clientes" color="inherit" size="small">
+        <BotonEnlace to="/clientes" color="inherit" variant="outlined" sx={{ minHeight: 44 }}>
           {activo.clienteId ? 'Cambiar cliente' : 'Elegir cliente'}
         </BotonEnlace>
       }
     >
-      Modo comercial ·{' '}
       {activo.clienteId ? (
         <>
-          Atiendes a <strong>{nombre ?? '…'}</strong>
+          Atendiendo a: <strong>{nombre ?? '…'}</strong>
         </>
       ) : (
-        'Elige un cliente'
-      )}{' '}
-      · Lo que registres queda a nombre de {sesion.nombre}, por teléfono.
+        'Modo comercial: elige un cliente'
+      )}
+      <Typography variant="body2" component="span" sx={{ display: 'block' }}>
+        Lo que registres queda a nombre de {sesion.nombre}, por teléfono.
+      </Typography>
     </Alert>
   );
 }

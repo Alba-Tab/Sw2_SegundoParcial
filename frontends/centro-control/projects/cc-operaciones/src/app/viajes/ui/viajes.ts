@@ -3,24 +3,23 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, Estado, EtiquetaPipe, FechaPipe } from 'ui-comun';
+import { Encabezado, AvisoServicios, Estado, EtiquetaPipe, FechaPipe } from 'ui-comun';
 import { ESTADOS_VIAJE } from '../domain/viaje';
 import { ViajesFachada } from '../viajes.fachada';
 
 @Component({
   selector: 'app-viajes',
   providers: [ViajesFachada],
-  imports: [MatTableModule, MatSelectModule, MatProgressBarModule, RouterLink, FechaPipe, EtiquetaPipe, Estado, AvisoServicios],
+  imports: [Encabezado, MatTableModule, MatSelectModule, MatProgressBarModule, RouterLink, FechaPipe, EtiquetaPipe, Estado, AvisoServicios],
   template: `
-    <div class="fila-acciones">
-      <h1>Viajes</h1>
+    <cc-encabezado titulo="Viajes">
       <mat-select class="filtro" [value]="estado()" (valueChange)="estado.set($event)" aria-label="Estado">
         <mat-option [value]="null">Todos</mat-option>
         @for (e of estados; track e) {
           <mat-option [value]="e">{{ e | etiqueta: 'EstadoViaje' }}</mat-option>
         }
       </mat-select>
-    </div>
+    </cc-encabezado>
     @let r = datos();
     @if (r?.loading) {
       <mat-progress-bar mode="indeterminate" />

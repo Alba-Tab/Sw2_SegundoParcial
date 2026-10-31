@@ -5,7 +5,8 @@ import { PaginaFacturas } from './PaginaFacturas';
 
 const clienteActivo = vi.hoisted(() => ({ actual: { modoComercial: false, clienteId: undefined as string | undefined } }));
 vi.mock('../../compartido/sesion/ClienteActivo', () => ({ useClienteActivo: () => ({ ...clienteActivo.actual, elegir: () => {} }) }));
-vi.mock('@tanstack/react-router', () => ({ useNavigate: () => vi.fn() }));
+const ruta = vi.hoisted(() => ({ params: {} as { facturaId?: string } }));
+vi.mock('@tanstack/react-router', () => ({ useNavigate: () => vi.fn(), useParams: () => ruta.params }));
 
 const bob = (monto: string) => ({ monto, moneda: 'BOB' });
 const factura = (numero: string, monto: string, saldo: string, venceEl: string, extra: object = {}) => ({
@@ -63,6 +64,27 @@ describe('Facturas y crédito (specs 006 y 008)', () => {
 
     fireEvent.click(screen.getByLabelText('Solo con saldo'));
     await waitFor(() => expect(llamadas.some((l) => l.url === '/api/v1/facturas' && l.metodo === 'GET' && llamadas.length > 2)).toBe(true));
+  });
+
+  it('/facturas/$facturaId: resalta esa factura y le pone el foco (N6)', async () => {
+    ruta.params = { facturaId: 'FAC-000001' };
+    simularApi({
+      'GET /api/v1/lineas-credito/mia': { estado: 200, cuerpo: linea },
+      'GET /api/v1/facturas': {
+        estado: 200,
+        cuerpo: {
+          items: [factura('FAC-000002', '2800.00', '2800.00', '2026-11-30'), factura('FAC-000001', '10640.00', '0.00', '2026-10-31')],
+          siguienteCursor: null,
+        },
+      },
+    });
+    conConsultas(<PaginaFacturas />);
+    const fila = (await screen.findByText('FAC-000001')).closest('tr')!;
+    expect(fila.getAttribute('aria-current')).toBe('true');
+    expect(fila.classList.contains('Mui-selected')).toBe(true);
+    expect(document.activeElement).toBe(fila);
+    expect(screen.getByText('FAC-000002').closest('tr')!.getAttribute('aria-current')).toBeNull();
+    ruta.params = {};
   });
 
   it('modo comercial: pide las facturas y la línea del cliente que atiende', async () => {

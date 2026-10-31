@@ -8,7 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { AvisoServicios, BobPipe, Estado, EtiquetaPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { Encabezado, AvisoServicios, BobPipe, Estado, EtiquetaPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
 import { completarConRecibo } from '../domain/recibo';
 import { MEDIOS_PAGO, pagoNuevo, pagoValido } from '../domain/pago';
 import { FacturaFachada } from '../facturas.fachada';
@@ -21,6 +21,7 @@ import { FacturaFachada } from '../facturas.fachada';
   selector: 'app-factura',
   providers: [FacturaFachada],
   imports: [
+    Encabezado,
     FormsModule,
     MatCardModule,
     MatButtonModule,
@@ -36,9 +37,14 @@ import { FacturaFachada } from '../facturas.fachada';
     AvisoServicios,
   ],
   template: `
+    @let titulo = factura()?.numero ?? 'Factura';
+    <cc-encabezado [titulo]="titulo" [migas]="[{ texto: 'Facturas', ruta: '/facturas' }, { texto: titulo }]">
+      @if (factura(); as f) {
+        <cc-estado grupo="EstadoFactura" [valor]="f.estado" />
+      }
+    </cc-encabezado>
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!factura()" />
     @if (factura(); as f) {
-      <h1>{{ f.numero }} <cc-estado grupo="EstadoFactura" [valor]="f.estado" /></h1>
       <p>{{ f.razonSocial }} · emitida {{ f.emitidaEl | fecha }} · vence {{ f.venceEl | fecha }}</p>
       <p><b>Monto:</b> {{ f.monto | bob }} · <b>Saldo:</b> {{ f.saldo | bob }}</p>
 

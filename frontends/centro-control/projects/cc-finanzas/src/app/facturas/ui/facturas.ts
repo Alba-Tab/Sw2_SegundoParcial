@@ -2,21 +2,20 @@ import { Component, inject } from '@angular/core';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, BobPipe, Estado, FechaPipe } from 'ui-comun';
+import { Encabezado, AvisoServicios, BobPipe, Estado, FechaPipe } from 'ui-comun';
 import { FacturasFachada } from '../facturas.fachada';
 
 @Component({
   selector: 'app-facturas',
   providers: [FacturasFachada],
-  imports: [MatTableModule, MatButtonToggleModule, RouterLink, BobPipe, FechaPipe, Estado, AvisoServicios],
+  imports: [Encabezado, MatTableModule, MatButtonToggleModule, RouterLink, BobPipe, FechaPipe, Estado, AvisoServicios],
   template: `
-    <div class="fila-acciones">
-      <h1>Facturas</h1>
+    <cc-encabezado titulo="Facturas">
       <mat-button-toggle-group [value]="conSaldo()" (change)="conSaldo.set($event.value)">
         <mat-button-toggle [value]="true">Con saldo</mat-button-toggle>
         <mat-button-toggle [value]="null">Todas</mat-button-toggle>
       </mat-button-toggle-group>
-    </div>
+    </cc-encabezado>
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!facturas().length" />
     <div class="tabla-ancha">
       <table mat-table [dataSource]="facturas()">

@@ -1,8 +1,10 @@
 import { createRootRoute, createRoute, createRouter, lazyRouteComponent, redirect } from '@tanstack/react-router';
 import { hasAuthParams } from 'react-oidc-context';
 import { Marco } from './compartido/ui/Marco';
+import { NoEncontrada } from './compartido/ui/NoEncontrada';
 
-const raiz = createRootRoute({ component: Marco });
+// Un enlace roto muestra su propia página dentro del marco, no la portada en silencio (N4).
+const raiz = createRootRoute({ component: Marco, notFoundComponent: NoEncontrada });
 
 const inicio = createRoute({
   getParentRoute: () => raiz,

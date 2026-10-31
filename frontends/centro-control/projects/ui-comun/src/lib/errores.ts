@@ -50,3 +50,14 @@ export function sinPermiso(error: unknown, campo: string): boolean {
 export function completo<T>(resultado: { data?: unknown } | undefined | null): T | undefined {
   return (resultado?.data ?? undefined) as T | undefined;
 }
+
+/**
+ * La respuesta sin los errores de un campo opcional que la página ya explica por su cuenta (p. ej. `riesgo`: sin
+ * predicción no es una falla, W3). Si no queda ninguno, `undefined`.
+ */
+export function sinErroresDe(error: unknown, campo: string): unknown {
+  if (!CombinedGraphQLErrors.is(error)) return error;
+  const resto = error.errors.filter((e) => !e.path?.includes(campo));
+  if (resto.length === error.errors.length) return error;
+  return resto.length ? new CombinedGraphQLErrors({ data: error.data, errors: resto }) : undefined;
+}

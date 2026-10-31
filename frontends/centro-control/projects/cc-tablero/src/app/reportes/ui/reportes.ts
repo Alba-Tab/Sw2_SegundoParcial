@@ -8,7 +8,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { AvisoServicios, mensajeDe, Sesion, TablaReporte, type Resultado } from 'ui-comun';
+import { Encabezado, AvisoServicios, mensajeDe, Sesion, TablaReporte, type Resultado } from 'ui-comun';
 import type { ReporteId, ReporteParams } from '../../graphql/generado';
 import { paramsLimpios, paramsPorDefecto, usaParametro } from '../domain/reporte';
 import { ReportesFachada } from '../reportes.fachada';
@@ -21,6 +21,7 @@ import { ReportesFachada } from '../reportes.fachada';
   selector: 'app-reportes',
   providers: [ReportesFachada],
   imports: [
+    Encabezado,
     FormsModule,
     MatCardModule,
     MatButtonModule,
@@ -33,7 +34,7 @@ import { ReportesFachada } from '../reportes.fachada';
     AvisoServicios,
   ],
   template: `
-    <h1>Reportes</h1>
+    <cc-encabezado titulo="Reportes" />
     @if (cargandoCatalogo()) {
       <mat-progress-bar mode="indeterminate" />
     }

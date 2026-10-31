@@ -6,4 +6,5 @@
 export * from './dinero';
 export * from './etiquetas';
 export * from './formato';
+export * from './navegacion';
 export * from './permisos';

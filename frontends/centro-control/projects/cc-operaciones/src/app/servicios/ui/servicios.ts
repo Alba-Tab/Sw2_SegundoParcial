@@ -5,7 +5,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
-import { AvisoServicios, BobPipe, CONFIG_CENTRO, EtiquetaPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import { Encabezado, AvisoServicios, BobPipe, CONFIG_CENTRO, EtiquetaPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
 import { motivoCancelacionValido } from '../domain/servicio';
 import { ServiciosFachada } from '../servicios.fachada';
 
@@ -17,6 +17,7 @@ import { ServiciosFachada } from '../servicios.fachada';
   selector: 'app-servicios',
   providers: [ServiciosFachada],
   imports: [
+    Encabezado,
     FormsModule,
     MatTableModule,
     MatButtonModule,
@@ -28,7 +29,7 @@ import { ServiciosFachada } from '../servicios.fachada';
     AvisoServicios,
   ],
   template: `
-    <h1>Servicios confirmados</h1>
+    <cc-encabezado titulo="Servicios confirmados" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!servicios().length" />
     <div class="tabla-ancha">
       <table mat-table [dataSource]="servicios()">

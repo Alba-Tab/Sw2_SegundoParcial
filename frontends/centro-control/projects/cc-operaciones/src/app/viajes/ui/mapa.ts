@@ -1,6 +1,6 @@
 import { afterNextRender, Component, effect, ElementRef, inject, OnDestroy, viewChild } from '@angular/core';
 import * as L from 'leaflet';
-import { AvisoServicios, CONFIG_CENTRO, pct } from 'ui-comun';
+import { Encabezado, AvisoServicios, CONFIG_CENTRO, pct } from 'ui-comun';
 import type { ViajeMapa } from '../domain/viaje';
 import { MapaFachada } from '../viajes.fachada';
 
@@ -33,8 +33,8 @@ export function popupViaje(v: ViajeMapa, urlViaje: string): HTMLElement {
 @Component({
   selector: 'app-mapa',
   providers: [MapaFachada],
-  imports: [AvisoServicios],
-  template: `<h1>Mapa en vivo</h1>
+  imports: [Encabezado, AvisoServicios],
+  template: `<cc-encabezado titulo="Mapa en vivo" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!viajes().length" />
     <div #mapa class="mapa" role="application" aria-label="Mapa de viajes en ruta"></div>`,
   styles: `

@@ -85,6 +85,25 @@ describe('Confirmar y seguir (specs 003, 004 y 006)', () => {
     expect(c.encabezados.get('Idempotency-Key')).toBeTruthy();
   });
 
+  it('cancelar con éxito: el resultado queda en la página y recibe el foco (N6)', async () => {
+    simularApi({
+      ...rutas,
+      [`GET /api/v1/servicios/${SERVICIO}`]: { estado: 200, cuerpo: { ...base, estado: 'CONFIRMADO' } },
+      [`POST /api/v1/servicios/${SERVICIO}/cancelacion`]: {
+        estado: 200,
+        cuerpo: { ...base, estado: 'CANCELADO', motivo: 'CANCELADO_POR_USUARIO' },
+      },
+    });
+    conConsultas(<PaginaServicio />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancelar servicio' }));
+    fireEvent.change(screen.getByLabelText('Motivo'), { target: { value: 'Ya no necesito el envío' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Cancelar servicio' }).at(-1)!);
+    const resultado = await screen.findByRole('status');
+    expect(resultado.textContent).toContain('Cancelaste el servicio.');
+    await waitFor(() => expect(document.activeElement).toBe(resultado));
+    expect(screen.getByText('Volver a servicios')).toBeTruthy();
+  });
+
   it('cerrado: la factura y el POD con las URL firmadas de la foto y la firma', async () => {
     simularApi({
       ...rutas,

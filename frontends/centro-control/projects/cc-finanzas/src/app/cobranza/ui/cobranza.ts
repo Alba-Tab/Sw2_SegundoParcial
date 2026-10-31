@@ -1,14 +1,14 @@
 import { Component, inject } from '@angular/core';
-import { AvisoServicios, TablaReporte } from 'ui-comun';
+import { Encabezado, AvisoServicios, TablaReporte } from 'ui-comun';
 import { CobranzaFachada } from '../cobranza.fachada';
 
 /** Cuentas por cobrar (spec 015) desde el modelo de lectura: responde aunque Finanzas esté caída, con "datos al". */
 @Component({
   selector: 'app-cobranza',
   providers: [CobranzaFachada],
-  imports: [TablaReporte, AvisoServicios],
+  imports: [Encabezado, TablaReporte, AvisoServicios],
   template: `
-    <h1>Cuentas por cobrar: vencidas en los últimos 2 meses y por vencer en 30 días</h1>
+    <cc-encabezado titulo="Cuentas por cobrar" subtitulo="Vencidas en los últimos 2 meses y por vencer en 30 días" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!resultado()" />
     @if (resultado(); as r) {
       <cc-tabla-reporte [resultado]="r" />

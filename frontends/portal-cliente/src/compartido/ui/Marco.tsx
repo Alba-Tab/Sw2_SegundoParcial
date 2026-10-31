@@ -57,39 +57,42 @@ export function Marco() {
   const menu = !s.autenticado || s.necesitaEmpresa ? [] : activo.modoComercial ? MENU_COMERCIAL : MENU_CLIENTE;
   return (
     <>
-      <AppBar position="sticky" elevation={0}>
-        <Toolbar sx={{ gap: 1, flexWrap: 'wrap' }}>
-          <Typography variant="h6" component="h1" sx={{ mr: 2 }}>
-            Transporte de carga
-          </Typography>
-          {menu.map((m) => (
-            <BotonEnlace
-              key={m.a}
-              color="inherit"
-              to={m.a}
-              activeProps={{ 'aria-current': 'page', style: { textDecoration: 'underline' } }}
-            >
-              {m.texto}
-            </BotonEnlace>
-          ))}
-          <Box sx={{ flexGrow: 1 }} />
-          {s.autenticado && (
-            <>
-              <Typography variant="body2">{s.nombre}</Typography>
-              <Button
+      {/* La barra y la banda del modo comercial quedan fijas juntas, aunque la barra ocupe dos líneas (N7). */}
+      <Box sx={{ position: 'sticky', top: 0, zIndex: (t) => t.zIndex.appBar }}>
+        <AppBar position="static" elevation={0}>
+          <Toolbar sx={{ gap: 1, flexWrap: 'wrap' }}>
+            <Typography variant="h6" component="h1" sx={{ mr: 2 }}>
+              Transporte de carga
+            </Typography>
+            {menu.map((m) => (
+              <BotonEnlace
+                key={m.a}
                 color="inherit"
-                onClick={() => {
-                  limpiarCache(consultas);
-                  void s.cerrar();
-                }}
+                to={m.a}
+                activeProps={{ 'aria-current': 'page', style: { textDecoration: 'underline' } }}
               >
-                Salir
-              </Button>
-            </>
-          )}
-        </Toolbar>
-      </AppBar>
-      {s.autenticado && cacheLista && <AvisoComercial />}
+                {m.texto}
+              </BotonEnlace>
+            ))}
+            <Box sx={{ flexGrow: 1 }} />
+            {s.autenticado && (
+              <>
+                <Typography variant="body2">{s.nombre}</Typography>
+                <Button
+                  color="inherit"
+                  onClick={() => {
+                    limpiarCache(consultas);
+                    void s.cerrar();
+                  }}
+                >
+                  Salir
+                </Button>
+              </>
+            )}
+          </Toolbar>
+        </AppBar>
+        {s.autenticado && cacheLista && <AvisoComercial />}
+      </Box>
       {soloCache && (
         <Alert severity="info" square>
           Sin conexión: ves lo último que guardaste en este equipo. Para cotizar o confirmar, vuelve a conectarte.

@@ -49,3 +49,8 @@ export async function cargarConfiguracion(): Promise<ConfigCentro> {
   if (!r.ok) throw new Error('No se pudo leer /configuracion.json');
   return (await r.json()) as ConfigCentro;
 }
+
+/** La app de la que se llegó (`?desde=`), si es una del Centro de Control distinta de la actual; lo demás se ignora. */
+export function appOrigen(desde: string | null | undefined, actual: App): App | undefined {
+  return desde && desde !== actual && Object.hasOwn(NOMBRES_APPS, desde) ? (desde as App) : undefined;
+}

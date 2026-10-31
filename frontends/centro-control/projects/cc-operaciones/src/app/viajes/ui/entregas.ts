@@ -1,16 +1,16 @@
 import { Component, inject } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, FechaPipe } from 'ui-comun';
+import { Encabezado, AvisoServicios, FechaPipe } from 'ui-comun';
 import { EntregasFachada } from '../viajes.fachada';
 
 /** Spec 007: entregas fuera de la geocerca o sin firma, para aprobar o rechazar en el detalle del viaje. */
 @Component({
   selector: 'app-entregas',
   providers: [EntregasFachada],
-  imports: [MatCardModule, RouterLink, FechaPipe, AvisoServicios],
+  imports: [Encabezado, MatCardModule, RouterLink, FechaPipe, AvisoServicios],
   template: `
-    <h1>Entregas observadas</h1>
+    <cc-encabezado titulo="Entregas observadas" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!datos()?.data?.entregasObservadas?.length" />
     <div class="tarjetas">
       @for (v of datos()?.data?.entregasObservadas ?? []; track v.viajeId) {

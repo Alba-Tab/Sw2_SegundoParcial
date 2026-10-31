@@ -24,6 +24,7 @@ export class ViajeFachada {
     return { verMonto: puedeVer(roles, 'monto'), verRiesgo: puedeVer(roles, 'riesgo'), verUnidad: puedeVer(roles, 'unidad') };
   })();
   readonly verMonto = this.ver.verMonto;
+  readonly verRiesgo = this.ver.verRiesgo;
   readonly id = signal<string | undefined>(undefined);
   readonly datos = toSignal(
     toObservable(this.id).pipe(

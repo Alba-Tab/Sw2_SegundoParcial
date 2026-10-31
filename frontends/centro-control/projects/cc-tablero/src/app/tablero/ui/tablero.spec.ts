@@ -20,19 +20,17 @@ function montar(roles: string[], respuesta: { data?: unknown; error?: unknown })
   const f = TestBed.createComponent(TableroPagina);
   f.detectChanges();
   const texto = (f.nativeElement as HTMLElement).textContent ?? '';
-  const enlaces = [...(f.nativeElement as HTMLElement).querySelectorAll('nav a')].map((a) => a.textContent?.trim());
-  return { observar, texto, enlaces };
+  return { observar, texto };
 }
 
 describe('Tablero por rol (spec 016, paso 10)', () => {
-  it('el jefe de flota no ve ni pide cuentas por cobrar ni el riesgo, y no tiene el enlace al agente', () => {
-    const { observar, texto, enlaces } = montar(['jefe_flota'], {
+  it('el jefe de flota no ve ni pide cuentas por cobrar ni el riesgo', () => {
+    const { observar, texto } = montar(['jefe_flota'], {
       data: { tablero: { periodo: 'ESTA_SEMANA', viajesEnCurso: [], unidadesPorEstado: [], alertasAbiertas: 2, datosAl: null } },
     });
     expect(observar).toHaveBeenCalledWith(expect.objectContaining({ verCobranza: false, verRiesgo: false, verUnidades: true }), 30_000);
     expect(texto).not.toContain('Cuentas por cobrar');
     expect(texto).toContain('Unidades por estado');
-    expect(enlaces).toEqual(['Reportes', 'Pregunta por voz']);
   });
 
   it('administracion no tiene tarjetas en blanco de viajes ni de unidades', () => {
@@ -44,9 +42,8 @@ describe('Tablero por rol (spec 016, paso 10)', () => {
     expect(texto).toContain('Cuentas por cobrar');
   });
 
-  it('comercial no tiene enlaces a reportes, voz ni agente', () => {
-    const { enlaces, texto } = montar(['comercial'], { data: { tablero: { periodo: 'ESTA_SEMANA', viajesEnCurso: [] } } });
-    expect(enlaces).toEqual([]);
+  it('comercial no ve alertas ni la fecha de los datos', () => {
+    const { texto } = montar(['comercial'], { data: { tablero: { periodo: 'ESTA_SEMANA', viajesEnCurso: [] } } });
     expect(texto).not.toContain('Alertas abiertas');
     expect(texto).not.toContain('Datos al');
   });

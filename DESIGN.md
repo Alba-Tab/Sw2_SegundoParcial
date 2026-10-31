@@ -74,7 +74,7 @@ Material Symbols Outlined (paquete `material-symbols`), cargado en `base.css` y 
 
 ## Patrones de página
 
-**Encabezado.** `h1` con el nombre de la página o del objeto («Viaje ABC-123») y, a la derecha o debajo, su estado (`cc-estado`). Las acciones principales van en `.fila-acciones`, junto al título. Una sola acción primaria (`mat-flat-button`) por pantalla.
+**Encabezado.** `<cc-encabezado>` en toda página: `h1` con el nombre de la página o del objeto («Viaje ABC-123») y su estado (`cc-estado` proyectado), subtítulo opcional y las acciones proyectadas a la derecha. En un detalle lleva migas (`Unidades › ABC-123`) y el botón de volver a la lista; si se llegó desde otra app con `?desde=<app>`, ofrece «Volver a <app>». Una sola acción primaria (`mat-flat-button`) por pantalla. En el portal, el detalle empieza con «Volver a …» (ícono `ArrowBack`).
 
 **Lista.** Tabla de Material dentro de `.tabla-ancha` (scroll horizontal en pantallas angostas). La primera columna enlaza al detalle. El estado va en su columna con `cc-estado`. Si un servicio no responde, `cc-aviso-servicios` dice cuál y la tabla muestra lo que haya.
 

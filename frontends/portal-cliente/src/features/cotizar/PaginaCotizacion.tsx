@@ -1,3 +1,4 @@
+import ArrowBack from '@mui/icons-material/ArrowBack';
 import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
@@ -5,7 +6,7 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useParams } from '@tanstack/react-router';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { useObtenerCotizacion } from '../../api/generado/finanzas';
 import { useListarRutas } from '../../api/generado/viajes';
 import { dinero, fecha, TIPOS_CARGA } from '../../compartido/formato/formato';
@@ -21,13 +22,13 @@ export function PaginaCotizacion() {
   const rutas = useListarRutas();
   const [vencioAqui, setVencioAqui] = useState(false);
 
-  if (cotizacion.isPending) return <CircularProgress aria-label="Cargando" />;
-  if (cotizacion.isError) return <Problema error={cotizacion.error} />;
+  if (cotizacion.isPending) return conVolver(<CircularProgress aria-label="Cargando" />);
+  if (cotizacion.isError) return conVolver(<Problema error={cotizacion.error} />);
   const c = cotizacion.data;
   const ruta = rutas.data?.find((r) => r.rutaId === c.rutaId);
   const vencida = c.vencida || vencioAqui;
 
-  return (
+  return conVolver(
     <Paper variant="outlined" sx={{ p: 3, maxWidth: 560 }}>
       <Stack spacing={2}>
         <Typography variant="h5" component="h2">
@@ -57,6 +58,18 @@ export function PaginaCotizacion() {
           </BotonEnlace>
         </Stack>
       </Stack>
-    </Paper>
+    </Paper>,
+  );
+}
+
+/** "Volver" al formulario de cotizar arriba de todo, también mientras carga o si falla (N1). */
+function conVolver(contenido: ReactNode) {
+  return (
+    <Stack spacing={2}>
+      <BotonEnlace to="/cotizar" startIcon={<ArrowBack />} sx={{ alignSelf: 'flex-start', minHeight: 44 }}>
+        Volver a cotizar
+      </BotonEnlace>
+      {contenido}
+    </Stack>
   );
 }

@@ -1,5 +1,5 @@
 import type { Routes } from '@angular/router';
-import { SinAcceso, soloInternos, soloRoles } from 'ui-comun';
+import { NoEncontrada, SinAcceso, soloInternos, soloRoles } from 'ui-comun';
 import { ROLES_ACCIONES, Seccion } from './seccion';
 
 const p = (carga: () => Promise<unknown>, title: string) => ({ loadComponent: carga as never, title });
@@ -30,5 +30,5 @@ export const rutas: Routes = [
       },
     ],
   },
-  { path: '**', redirectTo: '' },
+  { path: '**', component: NoEncontrada, title: 'Página no encontrada' },
 ];

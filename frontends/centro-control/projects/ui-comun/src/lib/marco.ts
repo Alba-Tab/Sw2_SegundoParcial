@@ -6,10 +6,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
-import { RouterOutlet } from '@angular/router';
+import { RouterLink, RouterOutlet } from '@angular/router';
 import { Alertas } from './alertas';
 import { APPS_POR_ROL, CONFIG_CENTRO, NOMBRES_APPS, type App } from './configuracion';
-import { etiqueta } from 'ui-comun/dominio';
+import { etiqueta, urlAdminKeycloak } from 'ui-comun/dominio';
 import { EtiquetaPipe } from './estado';
 import { FechaPipe } from './formato';
 import { Sesion } from './sesion';
@@ -43,6 +43,7 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
   selector: 'cc-marco',
   imports: [
     RouterOutlet,
+    RouterLink,
     MatToolbarModule,
     MatButtonModule,
     MatIconModule,
@@ -55,11 +56,11 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
   ],
   template: `
     <mat-toolbar class="barra">
-      <span class="marca">Transporte · {{ nombres[config.app] }}</span>
+      <a class="marca" routerLink="/">Transporte · {{ nombres[config.app] }}</a>
       <nav class="enlaces" aria-label="Apps del Centro de Control">
         @for (app of apps(); track app) {
           @if (app === config.app) {
-            <a mat-button class="actual" aria-current="page">{{ nombres[app] }}</a>
+            <a mat-button class="actual" aria-current="page" routerLink="/">{{ nombres[app] }}</a>
           } @else if (caidas().has(app)) {
             <span class="no-disponible" matTooltip="No disponible">{{ nombres[app] }}</span>
           } @else {
@@ -118,6 +119,12 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
       <mat-menu #menuUsuario="matMenu">
         <span class="aviso">{{ roles() }}</span>
         <mat-divider />
+        @if (adminUsuarios(); as url) {
+          <!-- G8: los usuarios internos y sus roles se administran en la consola de Keycloak; solo el gerente. -->
+          <a mat-menu-item [href]="url" target="_blank" rel="noopener"
+            ><mat-icon>manage_accounts</mat-icon> Administrar usuarios <span class="cdk-visually-hidden">(se abre en otra pestaña)</span></a
+          >
+        }
         <button mat-menu-item (click)="sesion.cerrar()"><mat-icon>logout</mat-icon> Cerrar sesión</button>
       </mat-menu>
     </mat-toolbar>
@@ -134,14 +141,25 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
     .marca {
       font-weight: 600;
       margin-right: 16px;
+      color: inherit;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      min-height: 44px;
+    }
+    .marca:hover {
+      text-decoration: underline;
     }
     .enlaces {
       display: flex;
       gap: 4px;
       flex-wrap: wrap;
     }
+    /* La app actual: fondo, peso y una barra inferior; no solo un tono. */
     .actual {
       background: var(--mat-sys-secondary-container);
+      font-weight: 700;
+      box-shadow: inset 0 -3px 0 var(--mat-sys-primary);
     }
     .no-disponible {
       opacity: 0.45;
@@ -227,6 +245,7 @@ export class Marco implements OnInit {
   });
   /** comercial no recibe alertas (la suscripción cerraría con 4403). */
   readonly recibeAlertas = computed(() => this.sesion.tiene('gerente', 'despachador', 'jefe_flota', 'administracion'));
+  readonly adminUsuarios = computed(() => (this.sesion.tiene('gerente') ? urlAdminKeycloak(this.config.oidcIssuer) : undefined));
   readonly puedeAtender = computed(() => this.sesion.tiene('despachador', 'jefe_flota', 'administracion'));
   readonly severidad = (s: string) => etiqueta('SeveridadAlerta', s);
   readonly roles = computed(() =>

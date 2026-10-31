@@ -1,16 +1,16 @@
 import { Component, inject } from '@angular/core';
 import { MatCardModule } from '@angular/material/card';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, FechaPipe } from 'ui-comun';
+import { Encabezado, AvisoServicios, FechaPipe } from 'ui-comun';
 import { IntervencionesFachada } from '../viajes.fachada';
 
 /** Spec 011: viajes cuya compensación se agotó; el despachador reintenta o marca resuelto en el detalle. */
 @Component({
   selector: 'app-intervenciones',
   providers: [IntervencionesFachada],
-  imports: [MatCardModule, RouterLink, FechaPipe, AvisoServicios],
+  imports: [Encabezado, MatCardModule, RouterLink, FechaPipe, AvisoServicios],
   template: `
-    <h1>Intervenciones</h1>
+    <cc-encabezado titulo="Intervenciones" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!datos()?.data?.intervenciones?.length" />
     <div class="tarjetas">
       @for (v of datos()?.data?.intervenciones ?? []; track v.viajeId) {
