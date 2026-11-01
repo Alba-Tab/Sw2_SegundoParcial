@@ -33,7 +33,7 @@ TC=$(login agroexport | jq -r .access_token)
 ok "agroexport: rol cliente" "$(roles "$TC")" cliente
 ok "agroexport: clienteId" "$(claims "$TC" | jq -r .clienteId)" 0193a000-0000-7000-8000-0000000c0001
 GRUPO=$(adm "$A/groups?search=registro-portal&exact=true" | jq -r '.[0].id')
-ok "registro-portal sin usuarios de semilla" "$(adm "$A/groups/$GRUPO/members" | jq length)" 0
+ok "registro-portal vacío (sin semilla ni cuentas de servicio)" "$(adm "$A/groups/$GRUPO/members" | jq length)" 0
 
 echo "== Rol interno: el token de portal-cliente marca la cuenta interna sin darle sus roles (PB-1)"
 PORTAL=$(adm "$A/clients?clientId=portal-cliente" | jq -r '.[0].id')

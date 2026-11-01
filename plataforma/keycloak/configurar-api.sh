@@ -2,6 +2,7 @@
 # Segundo paso del realm, por la API de administración, para lo que keycloak-config-cli 6.5.1 no aplica:
 #  1. Perfil de usuario con el atributo clienteId (vista y edición solo de administradores).
 #  2. Usuarios de semilla con ids fijos (D12, K5): partialImport conserva el id; si el usuario existe, se salta.
+#     Ni ellos ni las cuentas de servicio quedan en registro-portal.
 #  3. FGAP v2 (K4): la cuenta de servicio de `viajes` solo ve y gestiona miembros de registro-portal
 #     y solo asigna el rol `cliente` (los permisos referencian ids de grupo y de rol).
 # Es idempotente. Uso: KC_URL=... KC_ADMIN=... KC_ADMIN_CLAVE=... KC_CLAVE_SEMILLA=... ./configurar-api.sh
@@ -24,6 +25,11 @@ jq --arg clave "$KC_CLAVE_SEMILLA" '.users[].credentials[].value = $clave' usuar
 GRUPO=$(api "$A/groups?search=registro-portal&exact=true" | jq -r '.[0].id')
 for id in $(jq -r '.users[].id' usuarios-semilla.json); do
   api -X DELETE "$A/users/$id/groups/$GRUPO" >/dev/null 2>&1 || true
+done
+# Las cuentas de servicio creadas después de defaultGroups también caen en registro-portal (PB-5): fuera, por id exacto.
+# No por prefijo: una persona puede registrarse con el usuario `service-account-x`.
+for cl in $(api "$A/clients?max=200" | jq -r '.[] | select(.serviceAccountsEnabled == true) | .id'); do
+  api -X DELETE "$A/users/$(api "$A/clients/$cl/service-account-user" | jq -r .id)/groups/$GRUPO" >/dev/null 2>&1 || true
 done
 
 # 3. FGAP v2.
