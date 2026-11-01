@@ -2,45 +2,55 @@
 
 Lo que quedó abierto al cerrar las iteraciones de UX del 31-10 y 01-11-2026 (app del chofer, Centro de Control y portal). Las decisiones que salieron de ellas están en `decisiones.md` (D60, D103, D104); los planes y las revisiones de esas iteraciones se borraron al fusionarlas.
 
-## 1. Gestión de datos maestros (D104, D107, D108, D109)
+## 1. Para publicar lo de las vueltas del 01-11-2026
 
-Hecho en las ramas de la vuelta 1, sin publicar todavía (`specs/revisiones/informe-vuelta-1.md`):
-- **Unidades:** alta, edición con documentos y baja.
-- **Choferes:** nombre, licencia y habilitación; el alta queda en Keycloak.
-- **Rutas:** alta y edición, con `RutaActualizada`; una ruta nueva nace inactiva (D108).
-- **Clientes:** edición, con `ClienteActualizado`.
-- **Línea de crédito:** ajuste y suspensión.
-- **Consultas:** `chofer(id)`, `cliente(id)` y `ruta(id)`.
-- **Gateway y viajes:** el Gateway reenvía las extensiones de error, lee las líneas de crédito por lotes y la lista de viajes trae primero los más recientes.
-- **Ficha del viaje:** enlace al chofer.
+Las seis ramas son locales y están probadas juntas: verificación completa, `probar-realm.sh` y flujos de punta a punta sobre `chore/repo/integracion-vuelta-3`, que no se publica. Orden de merge a `develop`:
+1. `docs/specs/decision-d60-fatiga-y-entrega`
+2. `fix/plataforma/gerente-consola-y-portal`
+3. `fix/app-chofer/decisiones-fatiga-entrega`
+4. `feat/finanzas/ajuste-linea-credito`
+5. `feat/flota/gestion-flota`
+6. `feat/viajes/gestion-rutas-clientes`
 
-En la vuelta 2: paginación por cursor en GraphQL para `clientes`, `choferes` y `mantenimientos` (D109), y los arreglos de la sección 4 del informe.
+Después, una rama aparte con los 4 commits de arreglo que solo aplican con todo junto (están en la rama de integración): `78e2527` (cc-flota usa `PaginasCursor`), `f0166ab` y `c19239d` (filas de «Cargar más» en líneas de crédito) y `eb91e14` (prueba de complejidad). En los merges, `specs/pendientes.md` y la línea 11 de la spec 016 los gana la rama docs.
 
-Fuera de alcance: el alta de choferes y las tarifas (D107).
+Después del merge, en local y en cada nube: `aplicar-realm.sh` y reconstruir las imágenes de viajes, flota, finanzas, gateway y analítica.
 
-## 2. Backend y plataforma
+## 2. Abiertos (todos P3)
 
-| Qué | Efecto hoy | Arreglo |
+| Qué | Dónde | Arreglo |
 |---|---|---|
-| **Viajes corta en los 3 s del Gateway (D98).** A veces la lista llega con `DEPENDENCIA_NO_DISPONIBLE` | La pantalla conserva las últimas filas buenas | Medir con las trazas OTel (perfil `trazas`) Gateway → Viajes → PostgreSQL antes de proponer un arreglo |
-| **`VITE_*` del portal en la nube** | No hay build de nube del portal; las cuatro `VITE_*` apuntarían a localhost | Definirlas en el workflow de Firebase cuando exista (T3b.4, T11.9) |
+| Velocidad estimada con mala precisión: con `speed = -1` y una precisión de 65 a 100 m, un camión a menos de ~50 km/h da 0 conocido y SIN_ROSTRO no vigila (contra D60) | app-chofer, `velocidadEstimada()` | Si el desplazamiento es menor que la precisión, alargar la ventana hasta 20 s y, si no alcanza, devolver `null` |
+| Las filas de «Cargar más» no se sondean, y en cc-finanzas `gestionadas` tapa datos más nuevos | ui-comun, cc-finanzas | Vaciar `gestionadas` cuando llega una página con ese cliente; decidir si las páginas extra se resondean |
+| El texto de D108 en pantalla dice «Sin tarifa de semilla…» también al reactivar rutas de semilla | cc-operaciones, `CONFIRMAR_ACTIVAR` | «Si no tiene tarifa de semilla, el portal no podrá cotizarla» |
+| Sin `ruta(id)` de una inactiva, el comercial y el portal no ven el nombre de la ruta en los servicios viejos | viajes, gateway y portal | Llevar el nombre de la ruta en la respuesta del servicio |
+| Los mensajes de dominio de Flota van en minúscula y los de zod y Viajes en mayúscula | flota | Poner en mayúscula los `ErrorDeDominio('VALIDACION', …)` |
+| `POST /rutas` con un rol ajeno y un cuerpo mal formado da 400, no 403 | viajes, `RutasController` | Revisar el permiso antes de validar el cuerpo |
+| `probar-realm.sh` no prueba que el gerente no se agregue a grupos ni cree usuarios (hoy da 403, sin prueba) | plataforma | Agregar los dos casos |
+| El selector de clientes de Reportes trae solo los primeros 100 (los más viejos) | cc-tablero | Búsqueda por nombre |
+| La CLI `choferes:actualizar` no aplica la regla de licencia con reserva | flota | Pasar por `editarChofer()` |
+| Las fotos de una entrega FALLIDA quedan en el celular hasta cerrar sesión; los celulares con un FALLIDA de antes de D106 conservan la marca | app-chofer | Borrarlas al registrar de nuevo; migración de una sola vez |
+| Viajes a veces pasa de los 3 s del Gateway (D98) | viajes | Medir con las trazas OTel antes de proponer un arreglo |
+| Las `VITE_*` del portal no tienen build de nube | despliegue | Definirlas en el workflow de Firebase (T3b.4, T11.9) |
+| «Volver a la app» desde una alerta lleva a la raíz de la app | ui-comun | `?desde=<app>&ruta=<path>` si se quiere la página |
 
-## 3. Centro de Control y portal
+**Riesgos aceptados (D103):**
+- El gerente, con `manage` sobre el personal interno, puede restablecer contraseñas, escribir atributos de un interno, cerrar sesiones y deshabilitar usuarios.
+- El permiso por usuario se arma al correr `configurar-api.sh`: hay que volver a correrlo después de cambiar `personal-interno`.
 
-- **«Volver a la app» desde una alerta** lleva a la raíz de la app de origen, no a la página. Si se quiere la página: `?desde=<app>&ruta=<path relativo>`.
-- **Sin probar en el navegador:** el login se sirve en `MacBook-Air-de-Brayan.local` (emisor fijo), así que las pruebas automáticas no pueden iniciar sesión en localhost. Quedan las sesiones por rol, la auditoría con axe, el banner sin parpadeo con un servicio caído y el foco tras «Reintentar».
-- **Para revisar:** «Aprobar entrega» no pide confirmación, igual que las demás aprobaciones.
+**Para revisar:** «Aprobar entrega» no pide confirmación, igual que las demás aprobaciones.
 
-## 4. App del chofer
+## 3. Sin probar
 
-**Hecho en la vuelta 1:** fatiga sin GPS y SIN_ROSTRO solo en marcha (D60), reintento de un inicio, una entrega o un rechazo FALLIDA (D106), «Siguiente / Listo» en iOS, alarma en bucle y `react-native-worklets` 0.10.1. En la vuelta 2: velocidad desconocida, alertas sin posición al cerrar sesión, y el 409 en el inicio.
-
-**A verificar en un iPhone o un Android real** (el simulador no tiene cámara frontal ni entrega foto):
-
-- Detector de fatiga: rendimiento por cuadro, rostros chicos a unos 90 cm, el umbral `OJO_CERRADO = 0,5` de noche y con lentes, la gorra que tapa los ojos, y la alarma en bucle.
-- La foto de evidencia y la firma (también la ruta de `captureRef` en Android).
-- La barra «Siguiente / Listo» del teclado numérico en iOS.
-- Un build nativo con `react-native-worklets` 0.10.1.
+- **UI en el navegador:** el login se sirve en `MacBook-Air-de-Brayan.local` (emisor fijo), así que las pruebas automáticas no pueden iniciar sesión en localhost. Faltan las sesiones por rol, axe, «Cargar más» con «Reintentar», la confirmación de D108 y el foco tras «Reintentar».
+- **App del chofer en un iPhone o un Android real:**
+  - Detector de fatiga: rendimiento, rostros chicos, umbral de ojos de noche y con lentes, y la gorra.
+  - Alarma en bucle.
+  - Velocidad estimada con `speed = -1`.
+  - Inicio con 409 por otro viaje en ruta.
+  - Barra «Siguiente / Listo» en iOS.
+  - Build nativo con `react-native-worklets` 0.10.1.
+  - Foto, firma y `captureRef` en Android.
 
 ## 5. Para ICONIX
 
