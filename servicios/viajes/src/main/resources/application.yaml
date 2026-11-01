@@ -22,6 +22,11 @@ spring:
       prefetch: 10
   jackson:
     default-property-inclusion: non_null
+  # F1-4: los mensajes de Bean Validation salen en español (ValidationMessages_es de Hibernate Validator), sin mirar
+  # el Accept-Language de la petición.
+  web:
+    locale: es
+    locale-resolver: fixed
 
 server:
   port: ${PORT:8101}
