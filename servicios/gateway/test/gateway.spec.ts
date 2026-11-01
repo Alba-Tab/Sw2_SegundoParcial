@@ -469,17 +469,19 @@ describe('revisión del Gateway', () => {
     expect(pesada.body.errors[0].extensions.codigo).toBe('CONSULTA_DEMASIADO_COMPLEJA');
   });
 
-  it('E5-1: la razón social de servicios y cotizaciones sale de Viajes, una vez por cliente', async () => {
+  it('E2-8: la razón social de servicios y cotizaciones sale de Viajes en un lote de ids, una vez por cliente', async () => {
+    const [c1, c9] = ['0193b000-0000-7000-8000-0000000000c1', '0193b000-0000-7000-8000-0000000000c9'];
     rutas.set('GET /viajes/api/v1/servicios', () => ({
-      json: { items: [1, 2, 3].map((i) => ({ servicioId: `s${i}`, clienteId: i === 3 ? 'c9' : 'c1', estado: 'CONFIRMADO' })) },
+      json: { items: [1, 2, 3].map((i) => ({ servicioId: `s${i}`, clienteId: i === 3 ? c9 : c1, estado: 'CONFIRMADO' })) },
     }));
-    rutas.set('GET /viajes/api/v1/clientes/c1', () => ({ json: { clienteId: 'c1', razonSocial: 'Agro SRL' } }));
+    rutas.set('GET /viajes/api/v1/clientes', () => ({
+      json: { items: [{ clienteId: c1, razonSocial: 'Agro SRL' }], siguienteCursor: null },
+    }));
     const r = await gql(['despachador'], '{ servicios { servicioId razonSocial } }');
     expect(r.body.data.servicios.map((s: { razonSocial: string | null }) => s.razonSocial)).toEqual(['Agro SRL', 'Agro SRL', null]);
     expect(r.body.errors).toBeUndefined();
-    expect(pedidos.filter((p) => p.ruta.startsWith('/viajes/api/v1/clientes/')).map((p) => p.ruta)).toEqual([
-      '/viajes/api/v1/clientes/c1',
-      '/viajes/api/v1/clientes/c9',
+    expect(pedidos.filter((p) => p.ruta.startsWith('/viajes/api/v1/clientes')).map((p) => decodeURIComponent(p.ruta))).toEqual([
+      `/viajes/api/v1/clientes?ids=${c1},${c9}`,
     ]);
   });
 

@@ -2,6 +2,7 @@ import DataLoader from 'dataloader';
 import { GraphQLError } from 'graphql';
 import type { Contexto } from '../autenticacion';
 import { rutaRest, type ClienteServicios } from '../servicios';
+import { clientesPorLote, LOTE_CLIENTES } from './gestion-viajes';
 import * as m from './mapeos';
 
 /** D97: sin filtro por ids en el servicio, las claves de un tipo se piden en paralelo, como máximo 10 a la vez. */
@@ -49,8 +50,8 @@ export function crearCargadores(servicios: ClienteServicios, ctx: Contexto) {
         .get<Json>(ctx, 'flota', rutaRest`/api/v1/unidades`, { query: { placa, limite: 1 } })
         .then((r) => m.items(r).map(m.unidad)[0] ?? null),
     ),
-    /** La razón social de servicios y cotizaciones (E5-1): `clientes` ya no trae todos. */
-    cliente: cargador((id) => nuloSi404(servicios.get<Json>(ctx, 'viajes', rutaRest`/api/v1/clientes/${id}`))),
+    /** La razón social de servicios y cotizaciones (E5-1), hasta 100 clientes por llamada a Viajes (E2-8). */
+    cliente: new DataLoader<string, Json | null>((ids) => clientesPorLote(servicios, ctx, ids), { maxBatchSize: LOTE_CLIENTES }),
     lineaCredito: cargador((id) =>
       nuloSi404(servicios.get<Json>(ctx, 'finanzas', rutaRest`/api/v1/lineas-credito/${id}`).then(m.lineaCredito)),
     ),
