@@ -277,6 +277,8 @@ type Chofer {
   licenciaVenceEl: Fecha!
   activo: Boolean!
   disponible: Boolean!
+  "Por qué se inhabilitó desde el Centro de Control (D104); null si está activo."
+  motivoInhabilitacion: String
 }
 
 type CargaCombustible {
@@ -622,6 +624,7 @@ type Query {
   unidad(id: ID!): Unidad @roles(permitidos: [gerente, despachador, jefe_flota])
   mantenimientos(estado: String, unidadId: ID): [Mantenimiento!] @roles(permitidos: [gerente, despachador, jefe_flota])
   choferes: [Chofer!] @roles(permitidos: [gerente, despachador, jefe_flota])
+  chofer(id: ID!): Chofer @roles(permitidos: [gerente, despachador, jefe_flota])
   cargasCombustible(placa: String, limite: Int = 50): [CargaCombustible!] @roles(permitidos: [gerente, despachador, jefe_flota])
   anomaliasCombustible(desde: Fecha!, hasta: Fecha): [AnomaliaCombustible!] @roles(permitidos: [gerente, jefe_flota])
   puntajesConduccion(desde: Fecha, choferId: ID): PuntajesConduccion @roles(permitidos: [gerente, jefe_flota])
@@ -672,6 +675,42 @@ input CierreMantenimientoInput {
   claveIdempotencia: ID!
 }
 
+"Alta de un tracto o remolque (spec 010, D104). Flota valida los atributos de cada tipo (D76)."
+input UnidadNuevaInput {
+  tipoUnidad: TipoUnidad!
+  placa: String!
+  "Solo en remolques: FURGON, PLATAFORMA o CISTERNA."
+  tipoRemolque: String
+  "Obligatoria en remolques; prohibida en tractos."
+  capacidadToneladas: Float
+  "Odómetro, solo en tractos."
+  kilometraje: Float
+  kmDesdeUltimoMantenimiento: Float!
+  "Un SOAT y una INSPECCION_TECNICA."
+  documentos: [DocumentoInput!]!
+  atributos: JSON!
+  claveIdempotencia: ID!
+}
+
+"Edición de una unidad y de sus documentos (spec 010, D104): placa, estado y kilómetros no se editan."
+input UnidadEdicionInput {
+  unidadId: ID!
+  capacidadToneladas: Float
+  documentos: [DocumentoInput!]!
+  atributos: JSON!
+  claveIdempotencia: ID!
+}
+
+"Edición de un chofer (D104). Los choferes no tienen alta: llegan de Keycloak y la semilla."
+input ChoferEdicionInput {
+  choferId: ID!
+  nombre: String!
+  "A, B o C."
+  licenciaCategoria: String!
+  licenciaVenceEl: Fecha!
+  claveIdempotencia: ID!
+}
+
 input PagoInput {
   facturaId: ID!
   monto: Dinero!
@@ -695,6 +734,14 @@ type Mutation {
     @roles(permitidos: [despachador])
   programarMantenimiento(input: MantenimientoInput!): Mantenimiento! @roles(permitidos: [jefe_flota])
   cerrarMantenimiento(input: CierreMantenimientoInput!): Mantenimiento! @roles(permitidos: [jefe_flota])
+  crearUnidad(input: UnidadNuevaInput!): Unidad! @roles(permitidos: [jefe_flota])
+  editarUnidad(input: UnidadEdicionInput!): Unidad! @roles(permitidos: [jefe_flota])
+  "La unidad queda INACTIVA, que es final. Motivo de 3 a 200 caracteres."
+  darDeBajaUnidad(unidadId: ID!, motivo: String!, claveIdempotencia: ID!): Unidad! @roles(permitidos: [jefe_flota])
+  editarChofer(input: ChoferEdicionInput!): Chofer! @roles(permitidos: [jefe_flota])
+  "Motivo obligatorio al inhabilitar; con una reserva activa, CONFLICTO_ESTADO."
+  cambiarHabilitacionChofer(choferId: ID!, activo: Boolean!, motivo: String, claveIdempotencia: ID!): Chofer!
+    @roles(permitidos: [jefe_flota])
   registrarPago(input: PagoInput!): Factura! @roles(permitidos: [administracion])
   atenderAlerta(alertaId: ID!, nota: String, claveIdempotencia: ID!): Alerta!
     @roles(permitidos: [despachador, jefe_flota, administracion])

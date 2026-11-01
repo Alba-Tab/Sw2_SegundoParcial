@@ -17,7 +17,8 @@ import { errorGraphql } from './errores';
  * 200 sale de medir cada operación de los `.graphql` de `frontends/centro-control/projects` con 100 filas por lista:
  * - `Tablero`: 105 llamadas (1 de viajes, 100 de riesgo, 1 de unidades, 2 de facturas y 1 de alertas). Con todas las
  *   páginas de los resúmenes (20 de unidades y 20 de cada consulta de facturas) son 162, el peor caso.
- * - `Acciones`: 101. `Mapa` y `EntregasObservadas`: 51. `Viaje`: 6. Las demás, 3 o menos.
+ * - `Acciones`: 101. `Mapa` y `EntregasObservadas`: 51. `Viaje`: 6. `Choferes` y `Mantenimientos`: una por cada 100
+ *   filas, hasta 20 (siguen el cursor). Las demás, 3 o menos.
  */
 export const PRESUPUESTO_LLAMADAS = 200;
 
