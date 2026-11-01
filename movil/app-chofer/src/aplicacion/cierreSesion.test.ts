@@ -5,7 +5,9 @@ import type { Cola, PuntosGps } from './puertos';
 
 const pendiente = (opId: string) => ({ opId, estado: 'PENDIENTE' }) as Operacion;
 
-function armar(o: { pendientes?: number; fallidas?: number; puntos?: number; fallaGps?: boolean; sinRed?: boolean } = {}) {
+function armar(
+  o: { pendientes?: number; fallidas?: number; puntos?: number; fatigas?: number; fallaGps?: boolean; sinRed?: boolean } = {},
+) {
   const pasos: string[] = [];
   const pendientes = Array.from({ length: o.pendientes ?? 0 }, (_, i) => pendiente(`op-${i}`));
   const fallidas = Array.from({ length: o.fallidas ?? 0 }, (_, i) => ({ opId: `f-${i}`, estado: 'FALLIDA' }) as Operacion);
@@ -29,6 +31,7 @@ function armar(o: { pendientes?: number; fallidas?: number; puntos?: number; fal
       },
       olvidar: () => void pasos.push('olvidar memoria'),
     },
+    { leer: () => Array.from({ length: o.fatigas ?? 0 }, (_, i) => ({ viajeId: 'v1', eventoId: `e-${i}`, registradoEn: '' })) },
   );
   return { cierre, pasos };
 }
@@ -54,7 +57,12 @@ describe('cerrar sesión (spec 005)', () => {
   });
 
   it('cuenta lo que se perdería al salir, para pedir confirmación', () => {
-    expect(armar().cierre.sinEnviar()).toEqual({ operaciones: 0, conError: 0, puntos: 0 });
-    expect(armar({ pendientes: 2, fallidas: 1, puntos: 37 }).cierre.sinEnviar()).toEqual({ operaciones: 2, conError: 1, puntos: 37 });
+    expect(armar().cierre.sinEnviar()).toEqual({ operaciones: 0, conError: 0, puntos: 0, fatigas: 0 });
+    expect(armar({ pendientes: 2, fallidas: 1, puntos: 37, fatigas: 2 }).cierre.sinEnviar()).toEqual({
+      operaciones: 2,
+      conError: 1,
+      puntos: 37,
+      fatigas: 2,
+    });
   });
 });

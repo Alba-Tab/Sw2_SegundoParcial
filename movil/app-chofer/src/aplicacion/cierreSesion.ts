@@ -1,11 +1,13 @@
 import type { CasosDeUso } from './casosDeUso';
-import type { Cola, DatosDelChofer, PuntosGps, SesionCerrable, TareasDeFondo } from './puertos';
+import type { Cola, DatosDelChofer, FatigasSinPosicion, PuntosGps, SesionCerrable, TareasDeFondo } from './puertos';
 
 export interface SinEnviar {
   operaciones: number;
   /** Las que el servidor rechazó: se borran también al salir, y el chofer tiene que saberlo. */
   conError: number;
   puntos: number;
+  /** Alertas de fatiga que esperan una posición del GPS para entrar a la cola. */
+  fatigas: number;
 }
 
 /**
@@ -22,14 +24,16 @@ export class CierreSesion {
     private readonly sesion: SesionCerrable,
     private readonly fondo: TareasDeFondo,
     private readonly casos: Pick<CasosDeUso, 'registrarDispositivo' | 'olvidar'>,
+    private readonly fatigas: Pick<FatigasSinPosicion, 'leer'>,
   ) {}
 
-  /** Lo que se perdería al salir: operaciones de la cola y puntos GPS que todavía no llegaron al servidor. */
+  /** Lo que se perdería al salir: operaciones de la cola, puntos GPS y alertas de fatiga que no llegaron al servidor. */
   sinEnviar(): SinEnviar {
     return {
       operaciones: this.cola.todas().length,
       conError: this.cola.visibles().filter((o) => o.estado === 'FALLIDA').length,
       puntos: this.puntos.contar(),
+      fatigas: this.fatigas.leer().length,
     };
   }
 

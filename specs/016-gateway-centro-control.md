@@ -46,13 +46,13 @@ Las 4 apps Angular (`cc-tablero`, `cc-operaciones`, `cc-flota`, `cc-finanzas`) s
 
 6. Cada app manda sus consultas al Gateway con `Authorization: Bearer` (audiencia `gateway`). El Gateway valida firma, `aud` y vencimiento.
 7. Por cada servicio que necesita, intercambia el token por uno a nombre del mismo usuario con la audiencia del servicio (`libs/intercambio-token`), con caché por `sub` y audiencia hasta 30 s antes de su vencimiento.
-8. **DataLoader** por petición: junta las claves iguales de un mismo tipo (por ejemplo, el `clienteId` de 20 viajes) y las pide una vez; si el servicio ofrece un filtro por ids, en una sola llamada, y si no, en paralelo con un máximo de 10 a la vez (D97). Las líneas de crédito van por lotes de hasta 100 con `GET /api/v1/lineas-credito?clienteIds=…`.
+8. **DataLoader** por petición: junta las claves iguales de un mismo tipo (por ejemplo, el `clienteId` de 20 viajes) y las pide una vez; si el servicio ofrece un filtro por ids, en una sola llamada, y si no, en paralelo con un máximo de 10 a la vez (D97).
 9. Cada llamada a un servicio **para componer una pantalla** (consultas) tiene un tiempo de espera de **3 s** (D98). Excepciones, por operación: `preguntar` **60 s** (dos turnos del LLM de 20 s más el reporte); `exportarReporte` **30 s** (hasta 10.000 filas, D93). Las mutaciones simples usan 10 s. El tiempo de espera de las peticiones del servicio Gateway en Cloud Run es de 3.600 s, mayor que todos estos y el que ya necesita la suscripción. Si un servicio no responde o devuelve `5xx`, los campos que dependen de él salen en `null` y la respuesta trae un error en `errors[]` con su `path` y `extensions.codigo = DEPENDENCIA_NO_DISPONIBLE`; **el resto de la respuesta sale igual** (respuesta parcial, propuesta 4.2).
 10. Ejemplo: `tablero(periodo)` compone viajes en curso (Viajes), saldos y facturas por vencer (Finanzas), unidades por estado (Flota) y alertas abiertas (Analítica). Los reportes que unen servicios vienen del modelo de lectura con "datos al hh:mm" (spec 015).
 
 **C. Mutaciones**
 
-11. Toda mutación de negocio recibe el argumento **`claveIdempotencia: ID!`** (en `input` cuando la mutación usa uno). La app genera un UUID **por intento** (al abrir el diálogo o en cada clic de "Confirmar"); el Gateway no guarda nada y lo reenvía como `Idempotency-Key` al servicio dueño, que es la autoridad (000 §4.1). Mutaciones con clave: `cancelarServicio`, `aprobarCredito`, `resolverIntervencion`, `aprobarEntregaObservada`, `rechazarEntregaObservada`, `programarMantenimiento`, `cerrarMantenimiento`, `registrarPago`, `atenderAlerta`, `dispararMision`, `aprobarAccion`, `rechazarAccion`, `exportarReporte`, `ajustarLineaCredito` y `cambiarEstadoLineaCredito`. `preguntar` no lleva clave porque no cambia estado (spec 015).
+11. Toda mutación de negocio recibe el argumento **`claveIdempotencia: ID!`** (en `input` cuando la mutación usa uno). La app genera un UUID **por intento** (al abrir el diálogo o en cada clic de "Confirmar"); el Gateway no guarda nada y lo reenvía como `Idempotency-Key` al servicio dueño, que es la autoridad (000 §4.1). Mutaciones con clave: `cancelarServicio`, `aprobarCredito`, `resolverIntervencion`, `aprobarEntregaObservada`, `rechazarEntregaObservada`, `programarMantenimiento`, `cerrarMantenimiento`, `registrarPago`, `ajustarLineaCredito`, `cambiarEstadoLineaCredito`, `crearUnidad`, `editarUnidad`, `darDeBajaUnidad`, `editarChofer`, `cambiarHabilitacionChofer`, `crearRuta`, `editarRuta`, `editarCliente`, `atenderAlerta`, `dispararMision`, `aprobarAccion`, `rechazarAccion` y `exportarReporte`. Gestión de datos maestros (D104, D107): unidades y choferes, `jefe_flota`; rutas, `gerente` y `despachador`; clientes, `comercial` y `gerente`; línea de crédito, `administracion` y `gerente`. `preguntar` no lleva clave porque no cambia estado (spec 015).
 12. Los errores del servicio llegan en `errors[].extensions` con `codigo` y `status` de 000 §5; la app decide por `codigo`.
 
 **D. Suscripción de alertas**
@@ -81,19 +81,18 @@ Las 4 apps Angular (`cc-tablero`, `cc-operaciones`, `cc-flota`, `cc-finanzas`) s
 | Sin token | `401` (HTTP) en `POST /graphql`; las apps redirigen al login |
 | Cliente en el Centro de Control | La app muestra "Sin acceso"; el Gateway responde `403 SIN_PERMISO` a cualquier consulta con rol `cliente` o `chofer` |
 
-**Lectura por rol.** Son los roles que acepta hoy cada servicio; el esquema los repite con `@roles` para cortar antes en el Gateway. Un campo que no aparece es para cualquier rol interno (`yo`, `rutas`).
+**Lectura por rol.** Son los roles que acepta hoy cada servicio; el esquema los repite con `@roles` para cortar antes en el Gateway. Un campo que no aparece es para cualquier rol interno (`yo`, `rutas`, `ruta`); las rutas inactivas solo las ven gerente y despachador (`incluirInactivas`; para los demás, `ruta(id)` de una inactiva da `NO_ENCONTRADO`). Las listas que crecen sin tope (`clientes`, `choferes`, `mantenimientos`) se paginan por cursor en el esquema (`limite`, `despuesDe` → `items`, `siguienteCursor`); el Gateway no recorre todas las páginas (D109).
 
 | Campos | Roles | Servicio |
 |---|---|---|
 | `viajes`, `viajesEnCurso`, `viaje`, `entregasObservadas`, `intervenciones`, `Tablero.viajesEnCurso` | gerente, despachador, jefe_flota, comercial | Viajes |
 | `Viaje.hitos`, `Viaje.entrega` | gerente, despachador, comercial | Viajes |
-| `servicios`, `clientes` | gerente, despachador, administracion, comercial | Viajes |
+| `servicios`, `clientes`, `cliente` | gerente, despachador, administracion, comercial | Viajes |
 | `Viaje.monto`, `Servicio.monto` | gerente, administracion, comercial | Viajes |
-| `Viaje.unidad`, `unidades`, `unidad`, `mantenimientos`, `choferes`, `cargasCombustible`, `Tablero.unidadesPorEstado` | gerente, despachador, jefe_flota | Flota |
+| `Viaje.unidad`, `unidades`, `unidad`, `mantenimientos`, `choferes`, `chofer`, `cargasCombustible`, `Tablero.unidadesPorEstado` | gerente, despachador, jefe_flota | Flota |
 | `anomaliasCombustible`, `puntajesConduccion` | gerente, jefe_flota | Analítica |
 | `facturas` (comercial con `clienteId`), `factura`, `lineaCredito`, `cotizaciones` | gerente, administracion, comercial | Finanzas |
 | `Tablero.cuentasPorCobrar`, `solicitudesAprobacion` | gerente, administracion | Finanzas (el resumen lo calcula `GET /facturas/resumen`; el Gateway no suma) |
-| `ajustarLineaCredito`, `cambiarEstadoLineaCredito` (mutaciones, spec 012) | gerente, administracion | Finanzas |
 | `catalogoReportes`, `reporte`, `exportarReporte`, `alertasPendientes`, `Tablero.alertasAbiertas`, `Tablero.datosAl`, `subscription alertas`, `preguntar` | gerente, despachador, jefe_flota, administracion (cada reporte además con sus roles, spec 015) | Analítica |
 | `Viaje.riesgo` | gerente, despachador | Analítica |
 | `misionesAgente`, `mision`, `accionesPropuestas` | gerente, despachador | Analítica |
