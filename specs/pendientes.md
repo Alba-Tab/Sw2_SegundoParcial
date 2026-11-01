@@ -22,7 +22,6 @@ Fuera de alcance: el alta de choferes y las tarifas (D107).
 
 | Qué | Efecto hoy | Arreglo |
 |---|---|---|
-| **Administración de usuarios (D103).** En la vuelta 1 el gerente recibió `manage-users` y con eso pudo darse cualquier rol y escribir `clienteId` (F1-1) | Escalada de privilegios | En la vuelta 2: grupo `administra-usuarios` más FGAP v2 limitado al personal interno y a los roles operativos |
 | **Viajes corta en los 3 s del Gateway (D98).** A veces la lista llega con `DEPENDENCIA_NO_DISPONIBLE` | La pantalla conserva las últimas filas buenas | Medir con las trazas OTel (perfil `trazas`) Gateway → Viajes → PostgreSQL antes de proponer un arreglo |
 | **`VITE_*` del portal en la nube** | No hay build de nube del portal; las cuatro `VITE_*` apuntarían a localhost | Definirlas en el workflow de Firebase cuando exista (T3b.4, T11.9) |
 
