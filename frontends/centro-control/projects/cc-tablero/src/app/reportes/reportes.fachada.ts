@@ -1,6 +1,6 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { BehaviorSubject, catchError, firstValueFrom, of, switchMap } from 'rxjs';
+import { BehaviorSubject, catchError, firstValueFrom, of, startWith, switchMap } from 'rxjs';
 import { completo, Intentos, Sesion, type Resultado } from 'ui-comun';
 import { puedeVer } from 'ui-comun/dominio';
 import type { CatalogoQuery, ReporteId } from '../graphql/generado';
@@ -35,11 +35,16 @@ export class ConsultaReportes {
 export class ReportesFachada extends ConsultaReportes {
   private readonly repoCatalogo = inject(ReportesRepositorio);
   private readonly verClientes = puedeVer(inject(Sesion).roles(), 'clientes');
-  /** Cada "Reintentar" vuelve a pedir el catálogo. */
+  /** Cada "Reintentar" vuelve a pedir el catálogo; mientras llega, la página vuelve a mostrar que carga (V2-9). */
   private readonly intento = new BehaviorSubject<void>(undefined);
   private readonly respuesta = toSignal(
     this.intento.pipe(
-      switchMap(() => this.repoCatalogo.catalogo(this.verClientes).pipe(catchError((error: unknown) => of({ data: undefined, error })))),
+      switchMap(() =>
+        this.repoCatalogo.catalogo(this.verClientes).pipe(
+          catchError((error: unknown) => of({ data: undefined, error })),
+          startWith(undefined),
+        ),
+      ),
     ),
   );
   readonly catalogo = computed(() => completo<CatalogoQuery>(this.respuesta()));

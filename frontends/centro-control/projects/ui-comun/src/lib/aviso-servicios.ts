@@ -1,4 +1,4 @@
-import { Component, computed, inject, input } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { Apollo } from 'apollo-angular';
@@ -39,8 +39,12 @@ export function avisosServicio(error: unknown, campos: CamposPorServicio, sinDat
       <p class="aviso-servicio" role="alert"><mat-icon>cloud_off</mat-icon> {{ a }}</p>
     }
     @if (avisos().length) {
-      <button mat-stroked-button class="reintentar" (click)="reintentarAhora()"><mat-icon>replay</mat-icon>Reintentar</button>
+      <button mat-stroked-button class="reintentar" (click)="reintentarAhora()" [disabled]="reintentando()">
+        <mat-icon>replay</mat-icon>Reintentar
+      </button>
     }
+    <!-- Siempre presente para que el lector de pantalla anuncie el cambio (V2-9, V2-10). -->
+    <p class="cdk-visually-hidden" aria-live="polite">{{ reintentando() ? 'Reintentando…' : '' }}</p>
   `,
   styles: `
     .reintentar {
@@ -71,9 +75,18 @@ export class AvisoServicios {
   readonly reintentar = input<() => unknown>();
   private readonly apollo = inject(Apollo, { optional: true });
 
-  reintentarAhora(): void {
+  /** Mientras dura el reintento, el botón se deshabilita y se anuncia "Reintentando…" (V2-9). */
+  readonly reintentando = signal(false);
+
+  async reintentarAhora(): Promise<void> {
     const reintentar = this.reintentar() ?? (() => this.apollo?.client.refetchObservableQueries());
-    // El error de un reintento lo vuelve a mostrar el mismo aviso.
-    void Promise.resolve(reintentar()).catch(() => undefined);
+    this.reintentando.set(true);
+    try {
+      await reintentar();
+    } catch {
+      // El error de un reintento lo vuelve a mostrar el mismo aviso.
+    } finally {
+      this.reintentando.set(false);
+    }
   }
 }

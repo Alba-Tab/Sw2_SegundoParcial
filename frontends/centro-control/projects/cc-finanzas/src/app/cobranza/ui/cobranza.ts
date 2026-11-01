@@ -26,12 +26,13 @@ import { filtrarCuentas } from '../domain/cobranza';
         <mat-icon matPrefix aria-hidden="true">search</mat-icon>
         <input matInput type="search" [value]="busqueda()" (input)="busqueda.set($any($event.target).value)" />
       </mat-form-field>
-      @if (buscando()) {
-        <p class="secundario" role="status">
+      <!-- La región viva está siempre; solo cambia su texto, así se anuncia también la primera búsqueda (V2-10). -->
+      <p class="secundario" role="status">
+        @if (buscando()) {
           {{ r.filas.length === 1 ? '1 cuenta coincide' : r.filas.length + ' cuentas coinciden' }}. La fila Total es de todas las cuentas,
           no solo de las que coinciden.
-        </p>
-      }
+        }
+      </p>
       <cc-tabla-reporte [resultado]="r" [vacio]="buscando() ? 'Ninguna cuenta coincide con la búsqueda.' : 'Sin cuentas por cobrar.'" />
     }
   `,

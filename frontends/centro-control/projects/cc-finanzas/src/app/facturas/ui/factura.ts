@@ -156,6 +156,12 @@ import { FacturaFachada } from '../facturas.fachada';
                   <mat-error>{{ textoError(form.controls.referencia) }}</mat-error>
                 </mat-form-field>
               </div>
+              <mat-form-field class="nota">
+                <mat-label>Nota (opcional)</mat-label>
+                <input matInput formControlName="nota" autocomplete="off" />
+                <mat-hint>Hasta 300 caracteres</mat-hint>
+                <mat-error>{{ textoError(form.controls.nota) }}</mat-error>
+              </mat-form-field>
               @if (confirmando()) {
                 <cc-confirmacion
                   [resumen]="resumen(f)"
@@ -213,6 +219,9 @@ import { FacturaFachada } from '../facturas.fachada';
     .pago {
       margin: 16px 0;
     }
+    .nota {
+      width: 100%;
+    }
     .repetido {
       background: var(--mat-sys-advertencia-container);
     }
@@ -258,6 +267,7 @@ export class FacturaPagina {
     }),
     medio: new FormControl<PagoEnEdicion['medio']>('TRANSFERENCIA', { nonNullable: true }),
     referencia: new FormControl('', { nonNullable: true, validators: [Validators.required, largoEntre(3, 40)] }),
+    nota: new FormControl('', { nonNullable: true, validators: [largoEntre(0, 300)] }),
   });
 
   constructor() {
@@ -321,7 +331,12 @@ export class FacturaPagina {
     this.enviando.set(true);
     try {
       const p = this.form.getRawValue();
-      await this.fachada.registrarPago(facturaId, { ...p, monto: montoConDecimales(p.monto), referencia: p.referencia.trim() });
+      await this.fachada.registrarPago(facturaId, {
+        ...p,
+        monto: montoConDecimales(p.monto),
+        referencia: p.referencia.trim(),
+        nota: p.nota.trim() || undefined,
+      });
       this.avisos.open('Pago registrado: se liberó el crédito', undefined, { duration: 5000 });
       this.repetido.set(undefined);
       this.form.reset({ fecha: p.fecha, medio: p.medio });
@@ -342,9 +357,12 @@ export class FacturaPagina {
     const codigo = codigoDe(e);
     const ext = erroresGraphql(e)[0]?.extensions ?? {};
     if (codigo === 'PAGO_EXCEDE_SALDO') {
+      // Otro pago bajó el saldo: se relee antes de decirlo, y el monto se vuelve a validar contra el saldo nuevo (V2-5).
+      await this.fachada.recargar().catch(() => undefined);
       const saldo = saldoDelError(ext['saldo'], this.factura()?.saldo);
+      this.form.controls.monto.updateValueAndValidity();
+      this.form.controls.monto.markAsTouched();
       this.avisos.open(mensajeDe(e) + (saldo ? ` El saldo es ${this.bob.transform(saldo)}.` : ''), 'Cerrar');
-      void this.fachada.recargar();
       return;
     }
     if (codigo !== 'PAGO_DUPLICADO') {

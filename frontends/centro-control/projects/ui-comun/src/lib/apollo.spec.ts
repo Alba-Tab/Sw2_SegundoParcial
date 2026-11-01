@@ -79,3 +79,39 @@ describe('Apollo: reintento con 401 (spec 016)', () => {
     expect(repeticion.observed).toBe(false);
   });
 });
+
+describe('Apollo: recargar después de un fallo sin datos (vuelta 2, sin comprobar)', () => {
+  it('una consulta network-only que responde limpia el error del watch que había fallado', async () => {
+    const { ApolloClient, ApolloLink: Link, InMemoryCache, gql } = await import('@apollo/client/core');
+    let falla = true;
+    const link = new Link(() =>
+      falla
+        ? new Observable((o) => o.error(new Error('Gateway caído')))
+        : of({ data: { factura: { __typename: 'Factura', id: '1', saldo: '10.00' } } }),
+    );
+    const client = new ApolloClient({
+      link,
+      cache: new InMemoryCache(),
+      defaultOptions: { watchQuery: { errorPolicy: 'all' }, query: { errorPolicy: 'all' } },
+    });
+    const query = gql`
+      query Factura {
+        factura {
+          id
+          saldo
+        }
+      }
+    `;
+    const vistos: { data: unknown; error: unknown }[] = [];
+    const sub = client
+      .watchQuery({ query, fetchPolicy: 'cache-and-network', errorPolicy: 'all' })
+      .subscribe((r) => vistos.push({ data: r.data, error: r.error }));
+    await new Promise((ok) => setTimeout(ok));
+    expect(vistos.at(-1)?.error).toBeTruthy();
+    falla = false;
+    await client.query({ query, fetchPolicy: 'network-only', errorPolicy: 'all' });
+    await new Promise((ok) => setTimeout(ok));
+    sub.unsubscribe();
+    expect(vistos.at(-1)).toEqual({ data: { factura: { __typename: 'Factura', id: '1', saldo: '10.00' } }, error: undefined });
+  });
+});

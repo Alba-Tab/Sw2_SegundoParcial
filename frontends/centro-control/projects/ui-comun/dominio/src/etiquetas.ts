@@ -118,6 +118,8 @@ export const ETIQUETAS = {
     DEPENDENCIA_NO_DISPONIBLE: e('Un servicio no respondió', 'cloud_off', 'aviso'),
     INTERRUMPIDA: e('Se interrumpió', 'error', 'error'),
     ERROR_INTERNO: e('Error interno', 'error', 'error'),
+    // Misión AGOTADA: Analítica la cierra con este código al llegar al tope de pasos (E-9, V2-8).
+    LIMITE: e('Llegó al límite de pasos', 'timer_off', 'aviso'),
   },
   OrigenMision: {
     PROGRAMADA: e('Programada', 'event_repeat'),

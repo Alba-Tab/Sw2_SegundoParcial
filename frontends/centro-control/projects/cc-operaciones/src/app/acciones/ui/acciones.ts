@@ -12,6 +12,7 @@ import {
   Campo,
   CONFIG_CENTRO,
   Confirmacion,
+  ConfirmacionUnica,
   controlLista,
   Encabezado,
   enfocar,
@@ -92,9 +93,12 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
                   <mat-error>{{ textoError(f.controls.mensaje) }}</mat-error>
                 </mat-form-field>
                 <div class="fila-acciones">
-                  <button mat-flat-button (click)="aprobar(a.accionId, zona)" [disabled]="enviando()">
-                    <mat-icon>send</mat-icon>Aprobar y enviar
-                  </button>
+                  <!-- Mientras se confirma el rechazo, aprobar no aplica: se oculta como en crédito (V2-4). -->
+                  @if (rechazando() !== a.accionId) {
+                    <button mat-flat-button (click)="aprobar(a.accionId, zona)" [disabled]="enviando()">
+                      <mat-icon>send</mat-icon>Aprobar y enviar
+                    </button>
+                  }
                   <mat-form-field>
                     <mat-label>Motivo del rechazo</mat-label>
                     <input matInput formControlName="motivo" />
@@ -171,10 +175,11 @@ export class AccionesPagina {
   });
   readonly campos = { accionesPropuestas: 'Analítica', viaje: 'Viajes' };
   readonly enviando = signal(false);
-  /** Rechazar no se deshace: la acción que está pidiendo confirmación. */
-  readonly rechazando = signal<string | null>(null);
   readonly textoError = textoError;
   private readonly forms: Record<string, ReturnType<typeof formularioAccion>> = {};
+  /** Rechazar no se deshace: la acción que está pidiendo confirmación. Una a la vez: pedir otra libera la anterior (V2-3). */
+  private readonly confirmacion = new ConfirmacionUnica((id) => this.forms[id]);
+  readonly rechazando = this.confirmacion.abierta;
   readonly recargar = () => this.fachada.recargar();
 
   /** El formulario de cada acción pendiente, con el mensaje que propuso el agente para editarlo. */
@@ -191,17 +196,15 @@ export class AccionesPagina {
   /** Pide confirmar con el formulario bloqueado: el motivo no cambia después de leer el resumen (E-4). */
   pedirRechazo(id: string, zona: HTMLElement): void {
     if (!listoParaEnviar(this.forms[id].controls.motivo, zona)) return;
-    this.forms[id].disable();
-    this.rechazando.set(id);
+    this.confirmacion.abrir(id);
   }
   /** "No, volver" o un rechazo fallido: desbloquea y el foco vuelve a "Rechazar" (E-3). */
   volver(id: string): void {
-    this.forms[id]?.enable();
-    this.rechazando.set(null);
+    this.confirmacion.cerrar(id);
     enfocar(`rechazar-${id}`);
   }
   rechazar(id: string) {
-    const motivo = this.forms[id].controls.motivo.value.trim() || undefined;
+    const motivo = this.forms[id].controls.motivo.getRawValue().trim() || undefined;
     return this.enviar(() => this.fachada.rechazar(id, motivo), 'Acción rechazada', id);
   }
 
@@ -209,7 +212,8 @@ export class AccionesPagina {
     this.enviando.set(true);
     try {
       await accion();
-      this.rechazando.set(null);
+      // Solo cierra la confirmación de esta acción: aprobar B no deja bloqueada la de A (V2-3).
+      if (rechazo) this.confirmacion.cerrar(rechazo);
       this.avisos.open(ok, undefined, { duration: 5000 });
       await this.fachada.recargar();
       // La acción queda decidida y sus botones desaparecen: el foco va al título de la página.

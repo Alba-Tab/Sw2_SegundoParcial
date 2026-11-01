@@ -240,8 +240,10 @@ export class ServiciosPagina {
   async cancelar(servicioId: string, zona: HTMLElement): Promise<void> {
     if (!exigirTexto(this.motivo, 3, 300, zona)) return;
     this.enviando.set(true);
+    // El motivo no cambia mientras se envía, como en las otras confirmaciones (E-4, V2-13).
+    this.motivo.disable();
     try {
-      await this.fachada.cancelar(servicioId, this.motivo.value.trim());
+      await this.fachada.cancelar(servicioId, this.motivo.getRawValue().trim());
       this.avisos.open('Servicio cancelado: se devolvieron el crédito y la unidad', undefined, { duration: 5000 });
       this.confirmando.set(null);
       await this.fachada.recargar();
@@ -250,6 +252,7 @@ export class ServiciosPagina {
     } catch (e) {
       this.avisos.open(mensajeDe(e), 'Cerrar');
     } finally {
+      this.motivo.enable();
       this.enviando.set(false);
     }
   }

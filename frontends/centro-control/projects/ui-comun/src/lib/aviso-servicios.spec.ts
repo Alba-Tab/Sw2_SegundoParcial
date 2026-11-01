@@ -20,6 +20,17 @@ describe('Reintentar (revisión E-2)', () => {
     f.componentInstance.reintentarAhora();
     expect(recargar).toHaveBeenCalledTimes(1);
   });
+
+  it('mientras reintenta lo dice y vuelve a habilitar aunque falle (V2-9)', async () => {
+    let fallar!: (e: unknown) => void;
+    const f = TestBed.createComponent(AvisoServicios);
+    f.componentRef.setInput('reintentar', () => new Promise((_, no) => (fallar = no)));
+    const promesa = f.componentInstance.reintentarAhora();
+    expect(f.componentInstance.reintentando()).toBe(true);
+    fallar(new Error('sigue caído'));
+    await promesa;
+    expect(f.componentInstance.reintentando()).toBe(false);
+  });
 });
 
 describe('tabla de un reporte', () => {

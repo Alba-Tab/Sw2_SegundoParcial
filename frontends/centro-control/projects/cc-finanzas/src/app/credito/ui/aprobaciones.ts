@@ -11,6 +11,7 @@ import {
   BobPipe,
   Campo,
   Confirmacion,
+  ConfirmacionUnica,
   controlLista,
   Encabezado,
   enfocar,
@@ -152,8 +153,12 @@ export class AprobacionesPagina {
   readonly enviando = signal(false);
   readonly textoError = textoError;
   private readonly motivos: Record<string, FormControl<string>> = {};
-  /** Rechazar un crédito no se deshace (la saga cancela el servicio, spec 012): la solicitud que pide confirmación. */
-  readonly rechazando = signal<string | null>(null);
+  /**
+   * Rechazar un crédito no se deshace (la saga cancela el servicio, spec 012): la solicitud que pide confirmación. Una a
+   * la vez: pedir otra libera el motivo de la anterior (V2-2).
+   */
+  private readonly confirmacion = new ConfirmacionUnica((id) => this.motivoDe(id));
+  readonly rechazando = this.confirmacion.abierta;
   readonly recargar = () => this.fachada.recargar();
 
   motivoDe(servicioId: string): FormControl<string> {
@@ -162,31 +167,25 @@ export class AprobacionesPagina {
 
   /** Con el motivo válido, pide confirmar con el campo bloqueado (E-4, E-11). */
   pedirRechazo(servicioId: string, zona: HTMLElement): void {
-    const control = this.motivoDe(servicioId);
-    if (!exigirTexto(control, 3, 300, zona)) return;
-    control.disable();
-    this.rechazando.set(servicioId);
+    if (!exigirTexto(this.motivoDe(servicioId), 3, 300, zona)) return;
+    this.confirmacion.abrir(servicioId);
   }
 
   /** "No, volver" o un rechazo fallido: el campo se desbloquea y el foco vuelve a "Rechazar" (E-3). */
   volver(servicioId: string): void {
-    this.motivoDe(servicioId).enable();
-    this.rechazando.set(null);
+    this.confirmacion.cerrar(servicioId);
     enfocar(`rechazar-${servicioId}`);
   }
 
   /** El motivo es opcional para aprobar y obligatorio (3 o más) para rechazar. */
   async decidir(servicioId: string, aprobado: boolean, zona: HTMLElement): Promise<void> {
     const control = this.motivoDe(servicioId);
-    control.enable();
-    if (!exigirTexto(control, aprobado ? 0 : 3, 300, zona)) {
-      this.rechazando.set(null);
-      return;
-    }
+    // El rechazo se validó al pedir la confirmación y el motivo sigue bloqueado mientras se envía (V2-7).
+    if (aprobado && !exigirTexto(control, 0, 300, zona)) return;
     this.enviando.set(true);
     try {
-      await this.fachada.decidir(servicioId, aprobado, control.value.trim() || undefined);
-      this.rechazando.set(null);
+      await this.fachada.decidir(servicioId, aprobado, control.getRawValue().trim() || undefined);
+      this.confirmacion.cerrar(servicioId);
       this.avisos.open(aprobado ? 'Crédito aprobado: la saga sigue' : 'Crédito rechazado', undefined, { duration: 5000 });
       await this.fachada.recargar();
       // La solicitud queda decidida y sus botones desaparecen: el foco va al título de la página.

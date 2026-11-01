@@ -1,4 +1,5 @@
-import { afterNextRender, Component, type ElementRef, input, output, viewChild } from '@angular/core';
+import { afterNextRender, Component, type ElementRef, input, output, signal, viewChild } from '@angular/core';
+import type { AbstractControl } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import type { Icono } from 'ui-comun/dominio';
@@ -16,11 +17,12 @@ import type { Icono } from 'ui-comun/dominio';
         <mat-icon>warning</mat-icon><span>{{ resumen() }}</span>
       </p>
       <div class="fila-acciones">
-        <button mat-flat-button (click)="confirmar.emit()" [disabled]="enviando()">
+        <!-- type="button": dentro de un <form> no lo envían (V2-1). -->
+        <button mat-flat-button type="button" (click)="confirmar.emit()" [disabled]="enviando()">
           <mat-icon>{{ icono() }}</mat-icon
           >{{ accion() }}
         </button>
-        <button mat-button (click)="volver.emit()" [disabled]="enviando()">No, volver</button>
+        <button mat-button type="button" (click)="volver.emit()" [disabled]="enviando()">No, volver</button>
       </div>
     </div>
   `,
@@ -54,5 +56,30 @@ export class Confirmacion {
 
   constructor() {
     afterNextRender(() => this.texto().nativeElement.focus());
+  }
+}
+
+/**
+ * Una sola confirmación abierta por página (V2-2, V2-3): abrirla bloquea el control de ese ítem para que el resumen no
+ * cambie (E-4); abrir la de otro ítem libera la anterior, así ningún control queda bloqueado para siempre.
+ */
+export class ConfirmacionUnica {
+  /** El ítem que está pidiendo confirmación, o `null`. */
+  readonly abierta = signal<string | null>(null);
+
+  constructor(private readonly controlDe: (id: string) => AbstractControl | undefined) {}
+
+  abrir(id: string): void {
+    this.cerrar();
+    this.controlDe(id)?.disable();
+    this.abierta.set(id);
+  }
+
+  /** Cierra la confirmación abierta (o solo la de `id`, si es esa) y desbloquea su control. */
+  cerrar(id?: string): void {
+    const previa = this.abierta();
+    if (previa === null || (id !== undefined && id !== previa)) return;
+    this.controlDe(previa)?.enable();
+    this.abierta.set(null);
   }
 }

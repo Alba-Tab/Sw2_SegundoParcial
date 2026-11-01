@@ -7,6 +7,8 @@ export interface PagoEnEdicion {
   fecha: string;
   medio: MedioPago;
   referencia: string;
+  /** Opcional, hasta 300 caracteres (spec 008); vacía no se envía. */
+  nota?: string;
 }
 
 export const MEDIOS_PAGO: MedioPago[] = ['TRANSFERENCIA', 'DEPOSITO', 'EFECTIVO', 'CHEQUE'];

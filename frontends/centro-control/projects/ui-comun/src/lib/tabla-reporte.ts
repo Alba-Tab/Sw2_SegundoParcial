@@ -56,7 +56,7 @@ export function ordenarFilas(filas: readonly Record<string, unknown>[], columna:
         }
       </svg>
     }
-    <div class="tabla">
+    <div class="tabla" role="region" tabindex="0" [attr.aria-label]="r.titulo">
       <!-- Ordenar es local y no toca los totales: siguen siendo los de todas las filas. -->
       <table mat-table [dataSource]="filas()" matSort (matSortChange)="orden.set($event)">
         @for (c of r.columnas; track c.clave) {
