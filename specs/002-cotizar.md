@@ -68,7 +68,7 @@ El cliente (o comercial a su nombre) pide precio para una ruta, un tipo de carga
 
 | Caso | Respuesta |
 |---|---|
-| Ruta inexistente o inactiva | `404 NO_ENCONTRADO` |
+| Ruta inexistente o inactiva | `404 NO_ENCONTRADO` (Finanzas al cotizar; además, Viajes no muestra las rutas inactivas a quien no es gerente ni despachador) |
 | Ruta sin tarifa para ese tipo de carga | `400 VALIDACION` con el campo `tipoCarga` |
 | Más de 30 t | `422 TONELAJE_EXCEDIDO` |
 | Fecha pasada o a más de 60 días | `400 VALIDACION` |

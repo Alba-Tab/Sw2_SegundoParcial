@@ -81,7 +81,7 @@ Las 4 apps Angular (`cc-tablero`, `cc-operaciones`, `cc-flota`, `cc-finanzas`) s
 | Sin token | `401` (HTTP) en `POST /graphql`; las apps redirigen al login |
 | Cliente en el Centro de Control | La app muestra "Sin acceso"; el Gateway responde `403 SIN_PERMISO` a cualquier consulta con rol `cliente` o `chofer` |
 
-**Lectura por rol.** Son los roles que acepta hoy cada servicio; el esquema los repite con `@roles` para cortar antes en el Gateway. Un campo que no aparece es para cualquier rol interno (`yo`, `rutas`, `ruta`). Las listas que crecen sin tope (`clientes`, `choferes`, `mantenimientos`) se paginan por cursor en el esquema (`limite`, `despuesDe` → `items`, `siguienteCursor`); el Gateway no recorre todas las páginas (D109).
+**Lectura por rol.** Son los roles que acepta hoy cada servicio; el esquema los repite con `@roles` para cortar antes en el Gateway. Un campo que no aparece es para cualquier rol interno (`yo`, `rutas`, `ruta`); las rutas inactivas solo las ven gerente y despachador (`incluirInactivas`; para los demás, `ruta(id)` de una inactiva da `NO_ENCONTRADO`). Las listas que crecen sin tope (`clientes`, `choferes`, `mantenimientos`) se paginan por cursor en el esquema (`limite`, `despuesDe` → `items`, `siguienteCursor`); el Gateway no recorre todas las páginas (D109).
 
 | Campos | Roles | Servicio |
 |---|---|---|
