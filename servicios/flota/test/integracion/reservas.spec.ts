@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { getConnectionToken } from '@nestjs/mongoose';
 import { ApplicationFailure } from '@temporalio/common';
+import { RabbitMQContainer, StartedRabbitMQContainer } from '@testcontainers/rabbitmq';
 import { type Connection, mongo as driver } from 'mongoose';
 import type { StartedTestContainer } from 'testcontainers';
 import { uuid7 } from '../../src/dominio/comun/uuid7';
@@ -91,6 +92,7 @@ const chofer = (id: string, nombre: string, extra: object = {}) => ({
 
 describe('Reservas de la saga (Mongo rs0)', () => {
   let mongo: StartedTestContainer;
+  let rabbit: StartedRabbitMQContainer;
   let conexion: Connection;
   let cerrar: () => Promise<void>;
   let flota: ReturnType<ActividadesFlota['mapa']>;
@@ -123,8 +125,10 @@ describe('Reservas de la saga (Mongo rs0)', () => {
   };
 
   beforeAll(async () => {
-    mongo = await iniciarMongoRs0();
+    [mongo, rabbit] = await Promise.all([iniciarMongoRs0(), new RabbitMQContainer('rabbitmq:4.4.0-management').start()]);
     process.env.MONGO_URI = `mongodb://${mongo.getHost()}:${mongo.getMappedPort(27017)}/flota?directConnection=true`;
+    // El relay del Outbox corre en WorkerModule: sin esto publicaría en el RabbitMQ del compose local (PB-3).
+    process.env.AMQP_URL = rabbit.getAmqpUrl();
     process.env.TEMPORAL_WORKER = 'false';
     process.env.CONSUMIR_EVENTOS = 'false';
     process.env.OIDC_ISSUER = '';
@@ -166,7 +170,7 @@ describe('Reservas de la saga (Mongo rs0)', () => {
 
   afterAll(async () => {
     await cerrar?.();
-    await mongo?.stop();
+    await Promise.all([mongo?.stop(), rabbit?.stop()]);
   }, 60_000);
 
   beforeEach(async () => {

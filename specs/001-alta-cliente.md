@@ -71,7 +71,7 @@ Un cliente nuevo se registra en el portal y completa los datos de su empresa; at
 | Reenvío con la misma clave | La respuesta guardada (000 §4.1) | — |
 | Misma clave, otro cuerpo | `422 IDEMPOTENCIA_CUERPO_DISTINTO` | — |
 | Datos inválidos | `400 VALIDACION` con `errores` por campo | Marca los campos |
-| Token con rol `chofer` u otro rol interno sin `comercial` | `403 SIN_PERMISO` | — |
+| Token con rol `chofer` u otro rol interno sin `comercial`, o con el rol `interno` que trae al portal una cuenta interna (gerente, despachador, jefe de flota, administración o chofer) | `403 SIN_PERMISO` | — |
 | Cliente con rol `cliente` pide `GET /api/v1/clientes/{otroId}` | `403 SIN_PERMISO` | — |
 
 ## Criterios de aceptación
@@ -80,6 +80,7 @@ Un cliente nuevo se registra en el portal y completa los datos de su empresa; at
 - **Dado** que Keycloak no responde, **cuando** el usuario envía sus datos, **entonces** el cliente queda creado con `vinculado: false`; **y cuando** Keycloak vuelve y pulsa "Reintentar vinculación", **entonces** el token trae `clienteId` sin crear un segundo cliente.
 - **Dado** un `POST /clientes` exitoso, **cuando** se reenvía con la misma clave y el mismo cuerpo, **entonces** responde lo mismo y existe un solo cliente.
 - **Dado** un usuario con cliente, **cuando** hace `POST /clientes` con otra clave, **entonces** recibe `409 CONFLICTO_ESTADO`.
+- **Dado** un gerente u otra cuenta interna que entra al portal (su token solo trae `interno`), **cuando** envía datos de empresa, **entonces** recibe `403 SIN_PERMISO` y no se crea ningún cliente.
 - **Dado** un usuario `comercial`, **cuando** registra un cliente sin cuenta, **entonces** el cliente queda con `canal = TELEFONO` y `creadoPor` del comercial, y no se toca Keycloak.
 - **Dado** que Finanzas recibe dos veces el mismo `ClienteActualizado` (mismo `eventId`), **entonces** hay una sola línea de crédito.
 

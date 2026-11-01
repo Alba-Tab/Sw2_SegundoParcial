@@ -1,9 +1,9 @@
 import type { Routes } from '@angular/router';
-import { SinAcceso, soloInternos, soloRoles } from 'ui-comun';
+import { NoEncontrada, SinAcceso, soloInternos, soloRoles } from 'ui-comun';
 import { Seccion } from './seccion';
 
 export const rutas: Routes = [
-  { path: 'sin-acceso', component: SinAcceso },
+  { path: 'sin-acceso', component: SinAcceso, title: 'Sin acceso' },
   {
     path: '',
     component: Seccion,
@@ -18,6 +18,11 @@ export const rutas: Routes = [
         title: 'Aprobación de crédito',
       },
       {
+        path: 'lineas-credito',
+        loadComponent: () => import('./lineas/ui/lineas').then((m) => m.LineasPagina),
+        title: 'Líneas de crédito',
+      },
+      {
         path: 'cotizaciones',
         loadComponent: () => import('./cotizaciones/ui/cotizaciones').then((m) => m.CotizacionesPagina),
         title: 'Cotizaciones',
@@ -29,5 +34,5 @@ export const rutas: Routes = [
       },
     ],
   },
-  { path: '**', redirectTo: '' },
+  { path: '**', component: NoEncontrada, title: 'Página no encontrada' },
 ];

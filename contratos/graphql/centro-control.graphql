@@ -133,6 +133,8 @@ type Viaje {
   fechaViaje: Fecha!
   placa: String
   choferNombre: String
+  "El chofer asignado al viaje (Flota), para enlazar su ficha. Null solo en viajes anteriores a este campo."
+  choferId: ID
   iniciadoEn: Instante
   ultimaPosicion: Coordenadas
   ultimaPosicionEn: Instante

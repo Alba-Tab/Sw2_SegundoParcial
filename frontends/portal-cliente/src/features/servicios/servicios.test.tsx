@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
+import type { ComponentType, ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { conConsultas, problema, simularApi } from '../../pruebas/utilidades';
 import { ConfirmarServicio } from './ConfirmarServicio';
@@ -12,7 +13,10 @@ vi.mock('../../compartido/sesion/ClienteActivo', () => ({ useClienteActivo: () =
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navegar,
   useParams: () => ({ servicioId: SERVICIO }),
-  createLink: (c: unknown) => c,
+  // Un <a href> con la ruta sin resolver: basta para ver que es un enlace y adónde va.
+  createLink:
+    (C: ComponentType<{ href: string; children?: ReactNode }>) =>
+    ({ to, children }: { to: string; children?: ReactNode }) => <C href={to}>{children}</C>,
 }));
 
 const base = {
@@ -85,12 +89,70 @@ describe('Confirmar y seguir (specs 003, 004 y 006)', () => {
     expect(c.encabezados.get('Idempotency-Key')).toBeTruthy();
   });
 
+  it('E-10: cancelar tras un corte de red reintenta con la misma clave; tras una respuesta definitiva, otra', async () => {
+    const llamadas = simularApi({
+      ...rutas,
+      [`GET /api/v1/servicios/${SERVICIO}`]: { estado: 200, cuerpo: { ...base, estado: 'CONFIRMADO' } },
+      [`POST /api/v1/servicios/${SERVICIO}/cancelacion`]: [
+        { estado: 0, sinRed: true },
+        { estado: 409, cuerpo: problema(409, 'CONFIRMACION_EN_CURSO') },
+        { estado: 409, cuerpo: problema(409, 'CONFIRMACION_EN_CURSO') },
+      ],
+    });
+    conConsultas(<PaginaServicio />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancelar servicio' }));
+    fireEvent.change(screen.getByLabelText('Motivo'), { target: { value: 'Ya no necesito el envío' } });
+    const confirmar = () => fireEvent.click(screen.getAllByRole('button', { name: 'Cancelar servicio' }).at(-1)!);
+    confirmar();
+    expect(await screen.findByText(/todavía se está confirmando/, undefined, { timeout: 4000 })).toBeTruthy();
+    confirmar();
+    await waitFor(() => expect(llamadas.filter((l) => l.url.endsWith('/cancelacion'))).toHaveLength(3));
+    const [a, b, c] = llamadas.filter((l) => l.url.endsWith('/cancelacion')).map((l) => l.encabezados.get('Idempotency-Key'));
+    expect(a).toBe(b);
+    expect(c).not.toBe(b);
+  });
+
+  it('W4: cancelar sin motivo deja el botón activo, marca el campo, lo enfoca y no llama a Viajes', async () => {
+    const llamadas = simularApi({
+      ...rutas,
+      [`GET /api/v1/servicios/${SERVICIO}`]: { estado: 200, cuerpo: { ...base, estado: 'CONFIRMADO' } },
+    });
+    conConsultas(<PaginaServicio />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancelar servicio' }));
+    expect(screen.getByText(/No se puede deshacer/)).toBeTruthy();
+    const confirmar = screen.getAllByRole('button', { name: 'Cancelar servicio' }).at(-1)!;
+    expect(confirmar.hasAttribute('disabled')).toBe(false);
+    fireEvent.click(confirmar);
+    expect(await screen.findByText('Escribe al menos 3 caracteres.')).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Motivo')));
+    expect(llamadas.some((l) => l.url.endsWith('/cancelacion'))).toBe(false);
+  });
+
+  it('cancelar con éxito: el resultado queda en la página y recibe el foco (N6)', async () => {
+    simularApi({
+      ...rutas,
+      [`GET /api/v1/servicios/${SERVICIO}`]: { estado: 200, cuerpo: { ...base, estado: 'CONFIRMADO' } },
+      [`POST /api/v1/servicios/${SERVICIO}/cancelacion`]: {
+        estado: 200,
+        cuerpo: { ...base, estado: 'CANCELADO', motivo: 'CANCELADO_POR_USUARIO' },
+      },
+    });
+    conConsultas(<PaginaServicio />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancelar servicio' }));
+    fireEvent.change(screen.getByLabelText('Motivo'), { target: { value: 'Ya no necesito el envío' } });
+    fireEvent.click(screen.getAllByRole('button', { name: 'Cancelar servicio' }).at(-1)!);
+    const resultado = await screen.findByRole('status');
+    expect(resultado.textContent).toContain('Cancelaste el servicio.');
+    await waitFor(() => expect(document.activeElement).toBe(resultado));
+    expect(screen.getByText('Volver a servicios')).toBeTruthy();
+  });
+
   it('cerrado: la factura y el POD con las URL firmadas de la foto y la firma', async () => {
     simularApi({
       ...rutas,
       [`GET /api/v1/servicios/${SERVICIO}`]: {
         estado: 200,
-        cuerpo: { ...base, estado: 'CERRADO', numeroFactura: 'FAC-000123', entregadoEn: '2026-11-03T18:00:00Z' },
+        cuerpo: { ...base, estado: 'CERRADO', facturaId: 'fac-1', numeroFactura: 'FAC-000123', entregadoEn: '2026-11-03T18:00:00Z' },
       },
       [`GET /api/v1/viajes/${VIAJE}/entrega`]: {
         estado: 200,
@@ -134,7 +196,8 @@ describe('Confirmar y seguir (specs 003, 004 y 006)', () => {
       },
     });
     conConsultas(<PaginaServicio />);
-    expect(await screen.findByText('Factura FAC-000123')).toBeTruthy();
+    // V3-2: la factura es un enlace a su fila en Facturas.
+    expect((await screen.findByRole('link', { name: 'Factura FAC-000123' })).getAttribute('href')).toBe('/facturas/$facturaId');
     expect(await screen.findByText(/Recibió María Rojas/)).toBeTruthy();
     expect(((await screen.findByAltText('Firma del receptor')) as HTMLImageElement).src).toBe('https://s3/f2');
     expect(((await screen.findByAltText('Foto de la entrega 1')) as HTMLImageElement).src).toBe('https://s3/f1');

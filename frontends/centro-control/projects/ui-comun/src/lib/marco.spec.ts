@@ -86,5 +86,65 @@ describe('Marco: disponibilidad de las apps (FR3, spec 016 paso 16)', () => {
       await vi.advanceTimersByTimeAsync(3 * INTERVALO_SALUD_MS);
       expect(pedir).toHaveBeenCalledTimes(6);
     });
+
+    it('R2F-8: al volver a la pestaña revisa la salud enseguida; oculta, no', async () => {
+      const f = TestBed.createComponent(Marco);
+      f.detectChanges();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(pedir).toHaveBeenCalledTimes(3);
+      const visibilidad = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(pedir).toHaveBeenCalledTimes(3);
+      visibilidad.mockReturnValue('visible');
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(pedir).toHaveBeenCalledTimes(6);
+      visibilidad.mockRestore();
+      f.destroy();
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(pedir).toHaveBeenCalledTimes(6);
+    });
+
+    it('RS-1: el menú «Apps» (bajo 900 px) lista las apps del rol, marca la actual y conserva «no disponible»', async () => {
+      const f = TestBed.createComponent(Marco);
+      f.detectChanges();
+      await vi.advanceTimersByTimeAsync(0);
+      f.detectChanges();
+      const el: HTMLElement = f.nativeElement;
+      const boton = el.querySelector<HTMLButtonElement>('button[aria-label="Apps del Centro de Control"]')!;
+      expect(boton.querySelector('mat-icon')?.textContent).toBe('apps');
+      boton.click();
+      f.detectChanges();
+      const items = [...document.querySelectorAll<HTMLElement>('.mat-mdc-menu-panel [mat-menu-item]')];
+      expect(items.map((i) => i.textContent?.replace('cloud_off', '').trim())).toEqual([
+        'Tablero',
+        'Operaciones',
+        'Flota (no disponible)',
+        'Finanzas',
+      ]);
+      expect(items[0].getAttribute('aria-current')).toBe('page');
+      // R1F-7: deshabilitada pero alcanzable con las flechas, para que el lector diga «(no disponible)».
+      expect(items[2].getAttribute('aria-disabled')).toBe('true');
+      expect(items[2].hasAttribute('disabled')).toBe(false);
+      expect(items[3].getAttribute('href')).toBe('http://fi');
+      // El usuario queda solo con su ícono en angosto, pero el botón sigue teniendo su nombre.
+      expect(el.querySelector('.usuario')?.textContent).toContain('Gerente');
+    });
+
+    it('CA-3: «Saltar al contenido» es la primera parada y enfoca el <main> sin navegar', () => {
+      const f = TestBed.createComponent(Marco);
+      f.detectChanges();
+      const el: HTMLElement = f.nativeElement;
+      document.body.appendChild(el);
+      const saltar = el.querySelector<HTMLAnchorElement>('a, button')!;
+      expect(saltar.textContent?.trim()).toBe('Saltar al contenido');
+      const evento = new MouseEvent('click', { cancelable: true });
+      saltar.dispatchEvent(evento);
+      expect(evento.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(el.querySelector('main#contenido'));
+      el.remove();
+    });
   });
 });

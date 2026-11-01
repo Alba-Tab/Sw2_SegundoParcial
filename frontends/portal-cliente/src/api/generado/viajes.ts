@@ -198,6 +198,11 @@ export interface Viaje {
   fechaViaje: Fecha;
   placa: Placa;
   choferNombre: string;
+  /**
+   * El chofer asignado al viaje (Flota); sirve para enlazar su ficha. Null solo en viajes anteriores a este campo.
+   * @nullable
+   */
+  choferId?: string | null;
   iniciadoEn?: Instante;
   ultimaPosicion?: UltimaPosicion;
 }

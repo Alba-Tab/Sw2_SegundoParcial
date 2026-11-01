@@ -1,61 +1,134 @@
 import { Component, inject } from '@angular/core';
+import { MatIconModule } from '@angular/material/icon';
+import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { DecimalPipe } from '@angular/common';
-import { AvisoServicios, FechaPipe } from 'ui-comun';
-import { AVISO_KM } from '../domain/unidad';
+import {
+  AvisoServicios,
+  columnasConEstado,
+  controlLista,
+  Encabezado,
+  Estado,
+  etiqueta,
+  EtiquetaPipe,
+  FechaPipe,
+  FiltrosLista,
+  PieLista,
+  posicionEstado,
+  vigencia,
+  NumeroPipe,
+} from 'ui-comun';
+import { AVISO_KM, textoUnidad, urgenciaUnidad, type Unidad } from '../domain/unidad';
 import { UnidadesFachada } from '../unidades.fachada';
 
 @Component({
   selector: 'app-unidades',
   providers: [UnidadesFachada],
-  imports: [MatTableModule, RouterLink, FechaPipe, DecimalPipe, AvisoServicios],
+  imports: [
+    MatIconModule,
+    Encabezado,
+    MatTableModule,
+    MatSortModule,
+    RouterLink,
+    FechaPipe,
+    EtiquetaPipe,
+    Estado,
+    NumeroPipe,
+    AvisoServicios,
+    FiltrosLista,
+    PieLista,
+  ],
   template: `
-    <h1>Unidades</h1>
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!unidades().length" />
-    <div class="tabla-ancha">
-      <table mat-table [dataSource]="unidades()">
+    <cc-encabezado titulo="Unidades" />
+    <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!unidades().length" />
+    <cc-filtros-lista
+      [control]="lista"
+      [cargando]="cargando()"
+      busqueda="Buscar por placa o tipo"
+      grupo="EstadoUnidad"
+      nombre="unidades"
+      singular="unidad"
+    />
+    <div class="tabla-ancha" role="region" tabindex="0" aria-label="Unidades">
+      <table
+        mat-table
+        [dataSource]="lista.visibles()"
+        matSort
+        [matSortActive]="lista.orden()"
+        [matSortDirection]="lista.dir()"
+        (matSortChange)="lista.ordenarPor($event)"
+      >
         <ng-container matColumnDef="placa"
-          ><th mat-header-cell *matHeaderCellDef>Placa</th>
+          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Placa</th>
           <td mat-cell *matCellDef="let u">
             <a [routerLink]="['/unidades', u.unidadId]">{{ u.placa }}</a>
           </td></ng-container
         >
         <ng-container matColumnDef="tipo"
-          ><th mat-header-cell *matHeaderCellDef>Tipo</th>
-          <td mat-cell *matCellDef="let u">{{ u.tipoUnidad }} {{ u.tipoRemolque ?? '' }}</td></ng-container
+          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Tipo</th>
+          <td mat-cell *matCellDef="let u">
+            {{ u.tipoUnidad | etiqueta: 'TipoUnidad' }} {{ u.tipoRemolque ? (u.tipoRemolque | etiqueta: 'TipoRemolque') : '' }}
+          </td></ng-container
         >
         <ng-container matColumnDef="estado"
-          ><th mat-header-cell *matHeaderCellDef>Estado</th>
+          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
           <td mat-cell *matCellDef="let u">
-            <span class="chip-estado" [attr.data-alerta]="u.estado === 'MANTENIMIENTO_PENDIENTE'">{{ u.estado }}</span>
-          </td></ng-container
-        >
+            <cc-estado grupo="EstadoUnidad" [valor]="u.estado" /></td
+        ></ng-container>
         <ng-container matColumnDef="km"
-          ><th mat-header-cell *matHeaderCellDef>Km desde el mantenimiento</th>
+          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Km desde el mantenimiento</th>
           <td mat-cell *matCellDef="let u" [class.no-disponible]="u.kmDesdeUltimoMantenimiento >= avisoKm">
-            {{ u.kmDesdeUltimoMantenimiento | number }}
-          </td></ng-container
-        >
-        <ng-container matColumnDef="documentos"
-          ><th mat-header-cell *matHeaderCellDef>Documentos</th>
-          <td mat-cell *matCellDef="let u">
-            @for (d of u.documentos; track d.tipo) {
-              <span class="secundario">{{ d.tipo }} {{ d.venceEl | fecha }} </span>
+            <!-- Cerca del mantenimiento: ícono y texto además del color (JV-1). -->
+            @if (u.kmDesdeUltimoMantenimiento >= avisoKm) {
+              <mat-icon class="icono-en-linea">warning</mat-icon>
+            }
+            {{ u.kmDesdeUltimoMantenimiento | numero }}
+            @if (u.kmDesdeUltimoMantenimiento >= avisoKm) {
+              <span class="cdk-visually-hidden">, cerca del mantenimiento</span>
             }
           </td></ng-container
         >
-        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
-        <tr mat-row *matRowDef="let u; columns: columnas"></tr>
+        <ng-container matColumnDef="documentos"
+          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Documentos</th>
+          <td mat-cell *matCellDef="let u">
+            @for (d of u.documentos; track d.tipo) {
+              <span class="secundario">{{ d.tipo | etiqueta: 'TipoDocumento' }} {{ d.venceEl | fecha }} </span>
+              @if (vigencia(d.venceEl) !== 'VIGENTE') {
+                <cc-estado grupo="Vigencia" [valor]="vigencia(d.venceEl)" />
+              }
+            }</td
+        ></ng-container>
+        <tr mat-header-row *matHeaderRowDef="columnas()"></tr>
+        <tr mat-row *matRowDef="let u; columns: columnas()"></tr>
       </table>
     </div>
+    <cc-pie-lista [control]="lista" nombre="unidades" vacio="No hay unidades registradas." [error]="error()" [cargando]="cargando()" />
   `,
 })
 export class UnidadesPagina {
   private readonly fachada = inject(UnidadesFachada);
   readonly unidades = this.fachada.unidades;
   readonly error = this.fachada.error;
+  readonly datosAl = this.fachada.datosAl;
+  readonly cargando = this.fachada.cargando;
   readonly campos = { unidades: 'Flota' };
-  readonly columnas = ['placa', 'tipo', 'estado', 'km', 'documentos'];
+  readonly columnas = columnasConEstado(['placa', 'tipo', 'estado', 'km', 'documentos']);
   readonly avisoKm = AVISO_KM;
+  readonly vigencia = (venceEl: string) => vigencia(venceEl);
+  readonly lista = controlLista<Unidad>({
+    filas: this.unidades,
+    texto: textoUnidad,
+    estado: (u) => u.estado,
+    orden: {
+      placa: (u) => u.placa,
+      tipo: (u) => etiqueta('TipoUnidad', u.tipoUnidad).texto,
+      estado: (u) => posicionEstado('EstadoUnidad', u.estado),
+      km: (u) => u.kmDesdeUltimoMantenimiento,
+      urgencia: (u) => urgenciaUnidad(u),
+      // El documento que vence primero.
+      documentos: (u) => u.documentos.map((d) => d.venceEl).sort()[0],
+    },
+    // Lo que no puede salir primero (JV-1); los encabezados siguen ordenando por su columna.
+    ordenInicial: { orden: 'urgencia', dir: 'asc' },
+  });
 }

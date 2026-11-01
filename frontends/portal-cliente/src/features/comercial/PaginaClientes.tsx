@@ -1,5 +1,4 @@
 import Button from '@mui/material/Button';
-import CircularProgress from '@mui/material/CircularProgress';
 import List from '@mui/material/List';
 import ListItemButton from '@mui/material/ListItemButton';
 import ListItemText from '@mui/material/ListItemText';
@@ -11,6 +10,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { useDeferredValue, useState } from 'react';
 import { useListarClientes } from '../../api/generado/viajes';
 import { useClienteActivo } from '../../compartido/sesion/ClienteActivo';
+import { Cargando } from '../../compartido/ui/Cargando';
 import { Problema } from '../../compartido/ui/Problema';
 import { FormularioEmpresa } from '../cuenta/FormularioEmpresa';
 
@@ -41,12 +41,19 @@ export function PaginaClientes() {
   return (
     <Paper variant="outlined" sx={{ p: 3, maxWidth: 640 }}>
       <Stack spacing={2}>
-        <Typography variant="h5" component="h2">
+        <Typography variant="h5" component="h1">
           ¿A qué cliente atiendes?
         </Typography>
         <TextField label="Buscar por razón social o NIT" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-        {clientes.isPending && <CircularProgress size={24} aria-label="Buscando" />}
-        {clientes.isError && <Problema error={clientes.error} />}
+        {clientes.isPending && <Cargando filas={3} />}
+        {clientes.isError && <Problema error={clientes.error} reintentar={clientes.refetch} />}
+        {/* Siempre en el DOM: el lector anuncia cuando la búsqueda deja de encontrar (V5-3, WCAG 4.1.3). */}
+        <Typography role="status" color="text.secondary" sx={{ '&:empty': { display: 'none' } }}>
+          {clientes.data?.items.length === 0 &&
+            (q
+              ? `Ningún cliente coincide con «${q}». Puedes registrarlo sin cuenta.`
+              : 'Todavía no hay clientes. Puedes registrar uno sin cuenta.')}
+        </Typography>
         <List dense>
           {clientes.data?.items.map((c) => (
             <ListItemButton

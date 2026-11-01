@@ -1,4 +1,5 @@
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { mensajeCodigo, SIN_CONEXION } from 'ui-comun/dominio';
 
 /** El `codigo` de 000 §5 que el Gateway pone en `extensions`: las pantallas deciden por él, no por el texto. */
 export function codigoDe(error: unknown): string | undefined {
@@ -6,23 +7,17 @@ export function codigoDe(error: unknown): string | undefined {
   return undefined;
 }
 
-const MENSAJES: Record<string, string> = {
-  SIN_PERMISO: 'No tienes permiso para esta operación',
-  CONFLICTO_ESTADO: 'El estado cambió; actualiza la pantalla',
-  DEPENDENCIA_NO_DISPONIBLE: 'Un servicio no está disponible; intenta en unos segundos',
-  ERROR_INTERNO: 'Ocurrió un error inesperado; intenta de nuevo y, si se repite, avisa a soporte',
-  VALIDACION: 'Revisa los datos',
-  IDEMPOTENCIA_CUERPO_DISTINTO: 'Esa operación ya se registró con otros datos',
-};
-
+/**
+ * Lo que se dice en pantalla por un error (PRODUCT.md, "Tono"): la frase del `codigo` (ui-comun/dominio, errores.ts),
+ * nunca el `message` del servidor. Sin respuesta GraphQL (red caída, Gateway sin responder), que no hay conexión.
+ */
 export function mensajeDe(error: unknown): string {
-  if (CombinedGraphQLErrors.is(error)) {
-    const e = error.errors[0];
-    const codigo = e?.extensions?.['codigo'] as string | undefined;
-    return e?.message || (codigo && MENSAJES[codigo]) || 'No se pudo completar la operación';
-  }
-  return error instanceof Error ? error.message : 'No se pudo completar la operación';
+  return CombinedGraphQLErrors.is(error) ? mensajeCodigo(codigoDe(error)) : SIN_CONEXION;
 }
+
+/** Mientras no llega la primera respuesta, la página muestra el esqueleto (no "no hay datos"). */
+export const cargandoDe = (resultado: { loading?: boolean; data?: unknown } | undefined | null): boolean =>
+  !resultado || (!!resultado.loading && !resultado.data);
 
 export function erroresGraphql(error: unknown) {
   return CombinedGraphQLErrors.is(error) ? error.errors : [];
@@ -38,6 +33,11 @@ export function servicioCaido(error: unknown, campo: string): boolean {
   return errorEnCampo(error, campo, 'DEPENDENCIA_NO_DISPONIBLE');
 }
 
+/** El campo falló por algo pasajero del servicio dueño: caído o con `ERROR_INTERNO`, como lo trata `esTransitorio` (R2F-7). */
+export function falloPasajero(error: unknown, campo: string): boolean {
+  return servicioCaido(error, campo) || errorEnCampo(error, campo, 'ERROR_INTERNO');
+}
+
 /** El campo salió en null porque el rol no lo puede ver (`@roles` del Gateway o el 403 del servicio dueño). */
 export function sinPermiso(error: unknown, campo: string): boolean {
   return errorEnCampo(error, campo, 'SIN_PERMISO');
@@ -49,4 +49,23 @@ export function sinPermiso(error: unknown, campo: string): boolean {
  */
 export function completo<T>(resultado: { data?: unknown } | undefined | null): T | undefined {
   return (resultado?.data ?? undefined) as T | undefined;
+}
+
+/**
+ * La respuesta sin los errores de un campo opcional que la página ya explica por su cuenta (p. ej. `riesgo`: sin
+ * predicción no es una falla, W3). Si no queda ninguno, `undefined`.
+ */
+export function sinErroresDe(error: unknown, campo: string): unknown {
+  if (!CombinedGraphQLErrors.is(error)) return error;
+  const resto = error.errors.filter((e) => !e.path?.includes(campo));
+  if (resto.length === error.errors.length) return error;
+  return resto.length ? new CombinedGraphQLErrors({ data: error.data, errors: resto }) : undefined;
+}
+
+/** Los índices de una lista cuyas filas salieron con ese campo en null por un error (`clientes[i].lineaCredito`, D-1). */
+export function filasConError(error: unknown, lista: string, campo: string): Set<number> {
+  const filas = erroresGraphql(error)
+    .filter((e) => e.path?.[0] === lista && e.path.includes(campo) && typeof e.path[1] === 'number')
+    .map((e) => e.path![1] as number);
+  return new Set(filas);
 }

@@ -1,12 +1,13 @@
 """T8.8: `python -m app.demo reiniciar` deja la semilla de la defensa y 3 meses de historia, sin eventos."""
 
-from datetime import timedelta
+from datetime import date, timedelta
+from uuid import UUID
 
 from sqlalchemy import func, select
 
 from app import demo
 from app.aplicacion.consultas import hoy
-from app.infraestructura.bd import HechoCombustible, InboxEvento, Outbox, Ruta, transaccion
+from app.infraestructura.bd import HechoCombustible, HechoFactura, HechoViaje, InboxEvento, Outbox, Ruta, transaccion
 from tests.conftest import token
 
 
@@ -41,3 +42,18 @@ def test_reiniciar_carga_semilla_y_sinteticos(cliente):
         f"/api/v1/reportes/CONSUMO_COMBUSTIBLE?desde={h - timedelta(days=91)}&hasta={h}", headers=token("jefe_flota")
     ).json()
     assert len(consumo["filas"]) == 8 and consumo["totales"]["anomalias"] > 0
+
+
+def test_recargar_la_semilla_mueve_las_fechas_de_las_facturas(monkeypatch):
+    # Como Finanzas: recargar otro día mueve emitida_el y vence_el, así la misma factura vence igual en ambos (PB-2).
+    moroso = UUID("01933f00-0000-7000-8000-000000000001")
+    for hoy_ in (date(2026, 10, 30), date(2026, 10, 31)):
+        monkeypatch.setattr(demo, "dia", lambda dias, h=hoy_: h + timedelta(days=int(dias)))
+        with transaccion() as s:
+            demo.semilla(s)
+    with transaccion() as s:
+        f = s.get(HechoFactura, moroso)
+        assert (f.vence_el, f.saldo, f.estado) == (date(2026, 10, 11), 5000, "EMITIDA")
+        # Los viajes de la semilla también se mueven, así Rentabilidad los cuenta en el mismo día que Finanzas.
+        v = s.get(HechoViaje, UUID("01933e00-0000-7000-8000-000000000101"))
+        assert v.terminado_en.date() == f.emitida_el

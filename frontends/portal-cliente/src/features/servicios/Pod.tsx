@@ -20,11 +20,11 @@ export function Pod({ viajeId }: { viajeId: string }) {
   });
 
   if (entrega.isPending) return <CircularProgress size={24} aria-label="Cargando la entrega" />;
-  if (entrega.isError) return <Problema error={entrega.error} />;
+  if (entrega.isError) return <Problema error={entrega.error} reintentar={entrega.refetch} />;
   const e = entrega.data;
   return (
     <Stack spacing={1.5}>
-      <Typography variant="h6" component="h3">
+      <Typography variant="h6" component="h2">
         {e.tipo === 'ENTREGA' ? 'Prueba de entrega' : 'Rechazo en destino'}
       </Typography>
       <Typography color="text.secondary">

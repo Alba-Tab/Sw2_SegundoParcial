@@ -157,6 +157,17 @@ export type LineaCreditoQuery = {
   lineaCredito: { limite: string; reservado: string; utilizado: string; disponible: string; enMora: boolean } | null;
 };
 
+export type LineasCreditoQueryVariables = Exact<{ [key: string]: never }>;
+
+export type LineasCreditoQuery = {
+  clientes: Array<{
+    clienteId: string;
+    razonSocial: string;
+    nit: string | null;
+    lineaCredito: { limite: string; reservado: string; utilizado: string; disponible: string; enMora: boolean } | null;
+  }> | null;
+};
+
 export type CobranzaQueryVariables = Exact<{
   params?: ReporteParams | null | undefined;
 }>;
@@ -349,6 +360,33 @@ export const LineaCreditoDocument = gql`
 })
 export class LineaCreditoGQL extends Apollo.Query<LineaCreditoQuery, LineaCreditoQueryVariables> {
   override document = LineaCreditoDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const LineasCreditoDocument = gql`
+  query LineasCredito {
+    clientes {
+      clienteId
+      razonSocial
+      nit
+      lineaCredito {
+        limite
+        reservado
+        utilizado
+        disponible
+        enMora
+      }
+    }
+  }
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class LineasCreditoGQL extends Apollo.Query<LineasCreditoQuery, LineasCreditoQueryVariables> {
+  override document = LineasCreditoDocument;
 
   constructor(apollo: Apollo.Apollo) {
     super(apollo);

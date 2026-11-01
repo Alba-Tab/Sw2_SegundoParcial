@@ -101,6 +101,24 @@ query LineaCredito($clienteId: ID!) {
   }
 }
 
+# G6: la línea de cada cliente va anidada en `clientes` (una sola petición del navegador). `clientes` trae como máximo
+# 100 (LIMITE_MAXIMO del Gateway, sin cursor) y el Gateway pide a Finanzas una línea por cliente; la pantalla dice
+# si llegó al tope y cuántas líneas vinieron con error (revisión D-1, D-2).
+query LineasCredito {
+  clientes {
+    clienteId
+    razonSocial
+    nit
+    lineaCredito {
+      limite
+      reservado
+      utilizado
+      disponible
+      enMora
+    }
+  }
+}
+
 query Cobranza($params: ReporteParams) {
   reporte(id: CUENTAS_POR_COBRAR, params: $params) {
     reporteId

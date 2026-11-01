@@ -1,6 +1,6 @@
 import { TestBed } from '@angular/core/testing';
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
-import { of, throwError, type Observable } from 'rxjs';
+import { defer, of, Subject, throwError, type Observable } from 'rxjs';
 import { Sesion } from 'ui-comun';
 import { ReportesRepositorio } from './data/reportes.repositorio';
 import { ReportesFachada } from './reportes.fachada';
@@ -40,6 +40,25 @@ describe('ReportesFachada: el catálogo no se traga el error', () => {
     const f = fachada(throwError(() => red));
     expect(f.errorCatalogo()).toBe(red);
     expect(f.catalogo()).toBeUndefined();
+  });
+
+  it('reintentar resuelve con la respuesta nueva y, mientras tanto, conserva el aviso (V4-3)', async () => {
+    const red = new TypeError('Failed to fetch');
+    let respuesta: Observable<unknown> = throwError(() => red);
+    const pendiente = new Subject<unknown>();
+    const f = fachada(defer(() => respuesta));
+    expect(f.errorCatalogo()).toBe(red);
+    respuesta = pendiente;
+    let listo = false;
+    const promesa = f.recargarCatalogo().then(() => (listo = true));
+    expect(f.cargandoCatalogo()).toBe(true);
+    expect(f.errorCatalogo()).toBe(red);
+    await Promise.resolve();
+    expect(listo).toBe(false);
+    pendiente.next({ data: { catalogoReportes: [], clientes: [], rutas: [] } });
+    await promesa;
+    expect(f.errorCatalogo()).toBeUndefined();
+    expect(f.cargandoCatalogo()).toBe(false);
   });
 
   it('a jefe_flota no le pide clientes (Viajes no se los lista)', () => {
