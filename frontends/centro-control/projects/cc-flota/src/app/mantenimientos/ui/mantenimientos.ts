@@ -40,7 +40,7 @@ import { MantenimientosFachada } from '../mantenimientos.fachada';
     PieLista,
   ],
   template: `
-    <cc-encabezado titulo="Mantenimientos" subtitulo="Para programar uno nuevo, abre la unidad." />
+    <cc-encabezado titulo="Mantenimientos" subtitulo="Para programar uno nuevo, abre la unidad" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!mantenimientos().length" />
     <cc-filtros-lista
       [control]="lista"

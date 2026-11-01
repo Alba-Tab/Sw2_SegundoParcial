@@ -22,7 +22,7 @@ export function AvisoComercial() {
       severity="warning"
       variant="filled"
       square
-      // En un celular la banda queda en una línea (V1-14, V3-9): sin ícono y el nombre cortado con «…»; el completo, en title.
+      // En un celular la banda queda en una línea (V1-14, V3-9): sin ícono y el nombre cortado con «…».
       icon={esCelular ? false : undefined}
       sx={{ '& .MuiAlert-message': { minWidth: 0 } }}
       action={
@@ -32,8 +32,17 @@ export function AvisoComercial() {
       }
     >
       {activo.clienteId ? (
-        // El lector de pantalla lee el texto entero: el corte es solo visual.
-        <Box title={`Atendiendo a: ${nombre ?? ''}`} sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+        // El lector lee el texto entero: el corte es solo visual. En un celular no hay hover para un title: al tocar
+        // (o enfocar) el nombre, se abre en las líneas que necesite (V5-5). Desde sm, sin corte.
+        <Box
+          tabIndex={esCelular ? 0 : undefined}
+          sx={{
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: { xs: 'nowrap', sm: 'normal' },
+            '&:focus': { whiteSpace: 'normal' },
+          }}
+        >
           Atendiendo a: <strong>{nombre ?? '…'}</strong>
         </Box>
       ) : (

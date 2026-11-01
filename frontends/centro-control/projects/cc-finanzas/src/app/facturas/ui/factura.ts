@@ -118,7 +118,7 @@ import { FacturaFachada } from '../facturas.fachada';
             <div class="fila-acciones">
               <!-- Un botón de verdad (no un label) para que se alcance con el teclado; abre el selector de archivo. -->
               <button mat-stroked-button type="button" (click)="archivo.click()" [disabled]="leyendo() || confirmando()">
-                <mat-icon>document_scanner</mat-icon>Leer recibo (OCR)
+                <mat-icon>document_scanner</mat-icon>Leer el recibo de la foto
               </button>
               <input #archivo type="file" accept="image/*" (change)="ocr($event)" hidden />
               @if (leyendo()) {

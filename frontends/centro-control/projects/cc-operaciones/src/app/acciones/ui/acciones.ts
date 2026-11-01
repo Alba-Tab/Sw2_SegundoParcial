@@ -69,11 +69,11 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
             <mat-card-subtitle>
               <cc-estado grupo="EstadoAccion" [valor]="a.estado" />
               · {{ a.creadaEn | fecha: true }} · {{ a.viaje?.placa ?? 'Sin unidad' }}
-              {{ a.viaje?.ruta.destino ? '→ ' + a.viaje.ruta.destino : '' }} ·
+              {{ a.viaje?.ruta.destino ? 'hacia ' + a.viaje.ruta.destino : '' }} ·
               <!-- El enlace dice adónde lleva; la placa (o su falta) va fuera (V3-13). -->
               <a [routerLink]="['/viajes', a.viajeId]" [queryParams]="{ de: 'acciones' }">Ver viaje</a>
               @if (a.misionId) {
-                · <a [href]="config.urls['cc-tablero'] + '/agente?mision=' + a.misionId">ver la misión del agente</a>
+                · <a [href]="config.urls['cc-tablero'] + '/agente?mision=' + a.misionId">Ver la misión del agente</a>
               }
             </mat-card-subtitle>
           </mat-card-header>

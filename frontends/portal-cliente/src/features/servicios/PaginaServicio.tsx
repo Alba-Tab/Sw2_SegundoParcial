@@ -1,5 +1,7 @@
 import ArrowBack from '@mui/icons-material/ArrowBack';
+import OpenInNew from '@mui/icons-material/OpenInNew';
 import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import LinearProgress from '@mui/material/LinearProgress';
 import Link from '@mui/material/Link';
@@ -109,6 +111,11 @@ export function PaginaServicio() {
               rel="noreferrer"
             >
               {s.ultimaPosicion.lat.toFixed(4)}, {s.ultimaPosicion.lng.toFixed(4)}
+              <OpenInNew fontSize="inherit" sx={{ ml: 0.5, verticalAlign: 'middle' }} />
+              {/* Como «Ver como cliente» del Centro de Control: avisa que se abre en otra pestaña (V5-6). */}
+              <Box component="span" sx={OCULTO}>
+                (se abre en otra pestaña)
+              </Box>
             </Link>
           </Typography>
         )}
@@ -156,3 +163,16 @@ function conVolver(contenido: ReactNode) {
     </Stack>
   );
 }
+
+/** Solo para el lector de pantalla (el mismo recorte que `cdk-visually-hidden`). */
+const OCULTO = {
+  border: 0,
+  clip: 'rect(0 0 0 0)',
+  height: '1px',
+  margin: '-1px',
+  overflow: 'hidden',
+  padding: 0,
+  position: 'absolute',
+  whiteSpace: 'nowrap',
+  width: '1px',
+} as const;

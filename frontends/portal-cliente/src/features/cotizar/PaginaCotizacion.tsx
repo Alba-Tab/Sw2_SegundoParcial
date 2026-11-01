@@ -49,7 +49,7 @@ export function PaginaCotizacion() {
           <Alert
             severity="info"
             action={
-              <BotonEnlace to="/servicios" color="inherit" size="small">
+              <BotonEnlace to="/servicios" color="inherit" size="small" sx={{ minHeight: 44 }}>
                 Ver servicios
               </BotonEnlace>
             }

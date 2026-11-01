@@ -28,7 +28,7 @@ import { mensajeDisparo, urlTraza } from '../domain/mision';
   template: `
     <cc-encabezado titulo="Agente «vigilar viajes»">
       <button mat-flat-button (click)="disparar()" [disabled]="enviando()" disabledInteractive>Disparar misión</button>
-      <a mat-button [href]="config.urls['cc-operaciones'] + '/acciones'">Ver acciones propuestas →</a>
+      <a mat-button [href]="config.urls['cc-operaciones'] + '/acciones'">Ver acciones propuestas</a>
     </cc-encabezado>
     @if (cargando()) {
       <cc-esqueleto />
