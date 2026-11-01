@@ -17,8 +17,11 @@ Route::prefix('api')->middleware([Autenticacion::class, ValidarContrato::class])
     Route::post('v1/cotizaciones', [CotizacionesController::class, 'crear']);
     Route::get('v1/cotizaciones', [CotizacionesController::class, 'listar']);
     Route::get('v1/cotizaciones/{cotizacionId}', [CotizacionesController::class, 'obtener']);
+    Route::get('v1/lineas-credito', [LineasCreditoController::class, 'deClientes']);
     Route::get('v1/lineas-credito/mia', [LineasCreditoController::class, 'mia']);
     Route::get('v1/lineas-credito/{clienteId}', [LineasCreditoController::class, 'deCliente']);
+    Route::put('v1/lineas-credito/{clienteId}', [LineasCreditoController::class, 'ajustar']);
+    Route::post('v1/lineas-credito/{clienteId}/estado', [LineasCreditoController::class, 'cambiarEstado']);
     Route::get('v1/facturas', [FacturasController::class, 'listar']);
     Route::get('v1/facturas/resumen', [FacturasController::class, 'resumen']);
     Route::get('v1/facturas/{facturaId}', [FacturasController::class, 'obtener']);

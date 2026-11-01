@@ -143,6 +143,11 @@ function lineaQueSeCae(int $fallas): object
             return $this->real->porCliente($clienteId);
         }
 
+        public function porClientes(array $clienteIds): array
+        {
+            return $this->real->porClientes($clienteIds);
+        }
+
         public function paraActualizar(string $clienteId): ?LineaCredito
         {
             return $this->real->paraActualizar($clienteId);

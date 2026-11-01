@@ -160,6 +160,7 @@ Formato **Problem Details (RFC 9457)**, `Content-Type: application/problem+json`
 | `LIMITE_PETICIONES` | 429 | — (servidor MCP, 30 por minuto; incluye `Retry-After`; spec 014) |
 | `EXPORTACION_VENCIDA` | 404 | — (enlace de Excel de más de 10 min; spec 015) |
 | `CONSULTA_DEMASIADO_COMPLEJA` | 400 | — (consulta GraphQL que pasa los límites de profundidad o complejidad; va en `extensions.codigo`; spec 016) |
+| `LIMITE_MENOR_QUE_USADO` | 409 | — (ajuste de una línea de crédito por debajo de `reservado + utilizado`; trae `usado`; spec 012) |
 
 Cada spec agrega los suyos aquí, en la misma tabla.
 
