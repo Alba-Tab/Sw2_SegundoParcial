@@ -109,6 +109,13 @@ type Ruta {
   origen: String!
   destino: String!
   distanciaKm: Float!
+  "Coordenadas del origen y del destino (G4: para editar la ruta)."
+  origenCoordenadas: Coordenadas
+  destinoCoordenadas: Coordenadas
+  "Radio de la geocerca del destino, de 50 a 5000 m (D06)."
+  radioMetros: Int
+  "Una ruta inactiva no se cotiza ni se programa; sigue en los viajes que ya la usan."
+  activa: Boolean
 }
 
 type Cliente {
@@ -615,8 +622,12 @@ type Query {
   entregasObservadas: [Viaje!] @roles(permitidos: [gerente, despachador, jefe_flota, comercial])
   intervenciones: [Viaje!] @roles(permitidos: [gerente, despachador, jefe_flota, comercial])
   servicios(estado: EstadoServicio, clienteId: ID, limite: Int = 50): [Servicio!] @roles(permitidos: [gerente, despachador, administracion, comercial])
+  "Todos los clientes activos: el Gateway sigue el cursor de Viajes (hasta 2.000, dentro de los 3 s de D98)."
   clientes: [Cliente!] @roles(permitidos: [gerente, despachador, administracion, comercial])
-  rutas: [Ruta!]
+  cliente(id: ID!): Cliente @roles(permitidos: [gerente, despachador, administracion, comercial])
+  "Las activas; con incluirInactivas, también las inactivas (gestión de rutas, G4)."
+  rutas(incluirInactivas: Boolean = false): [Ruta!]
+  ruta(id: ID!): Ruta
 
   unidades(tipo: TipoUnidad, estado: EstadoUnidad, placa: String): [Unidad!] @roles(permitidos: [gerente, despachador, jefe_flota])
   unidad(id: ID!): Unidad @roles(permitidos: [gerente, despachador, jefe_flota])
@@ -682,6 +693,41 @@ input PagoInput {
   claveIdempotencia: ID!
 }
 
+input CoordenadasInput {
+  lat: Float!
+  lng: Float!
+}
+
+input LugarInput {
+  nombre: String!
+  coordenadas: CoordenadasInput!
+}
+
+"El destino lleva el radio de su geocerca, de 50 a 5000 m (D06)."
+input DestinoInput {
+  nombre: String!
+  coordenadas: CoordenadasInput!
+  radioMetros: Int!
+}
+
+"Alta o edición de una ruta (G4); Viajes publica RutaActualizada."
+input RutaInput {
+  nombre: String!
+  origen: LugarInput!
+  destino: DestinoInput!
+  distanciaKm: Float!
+  activa: Boolean!
+  claveIdempotencia: ID!
+}
+
+"Edición de un cliente (G7) con las validaciones del alta (spec 001); Viajes publica ClienteActualizado."
+input ClienteEdicionInput {
+  razonSocial: String!
+  nit: String!
+  correo: String!
+  claveIdempotencia: ID!
+}
+
 type Mutation {
   cancelarServicio(servicioId: ID!, motivo: String!, claveIdempotencia: ID!): Servicio!
     @roles(permitidos: [despachador, comercial])
@@ -703,6 +749,9 @@ type Mutation {
   rechazarAccion(id: ID!, motivo: String, claveIdempotencia: ID!): AccionPropuesta! @roles(permitidos: [despachador])
   exportarReporte(id: ReporteId!, params: ReporteParams, claveIdempotencia: ID!): UrlDescarga!
     @roles(permitidos: [gerente, despachador, jefe_flota, administracion])
+  crearRuta(input: RutaInput!): Ruta! @roles(permitidos: [gerente, despachador])
+  editarRuta(rutaId: ID!, input: RutaInput!): Ruta! @roles(permitidos: [gerente, despachador])
+  editarCliente(clienteId: ID!, input: ClienteEdicionInput!): Cliente! @roles(permitidos: [comercial, gerente])
   "No cambia estado: sin claveIdempotencia (spec 015)."
   preguntar(texto: String!): RespuestaVoz! @roles(permitidos: [gerente, despachador, jefe_flota, administracion])
 }

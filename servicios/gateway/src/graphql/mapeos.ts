@@ -14,6 +14,10 @@ export function ruta(r: Json): Json {
     origen: r['origen']?.['nombre'] ?? r['origen'] ?? '',
     destino: r['destino']?.['nombre'] ?? r['destino'] ?? '',
     distanciaKm: Number(r['distanciaKm'] ?? 0),
+    origenCoordenadas: r['origen']?.['coordenadas'] ?? null,
+    destinoCoordenadas: r['destino']?.['coordenadas'] ?? null,
+    radioMetros: r['destino']?.['radioMetros'] ?? null,
+    activa: r['activa'] ?? null,
   };
 }
 

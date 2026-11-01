@@ -6,6 +6,7 @@ import { registrar, traceIdDe } from '../log';
 import { ESPERA, noDisponible, rutaRest, type ClienteServicios, type Llamada, type RutaRest, type Servicio } from '../servicios';
 import type { Cargadores } from './cargadores';
 import { Cursor, Dinero, Fecha, Instante, JSONEscalar } from './escalares';
+import { resolversGestionViajes } from './gestion-viajes';
 import { LIMITE_MAXIMO } from './limites';
 import * as m from './mapeos';
 import { alertasNuevas } from './suscripcion';
@@ -107,6 +108,8 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
     }
   }
 
+  const gestionViajes = resolversGestionViajes(s);
+
   /** El POST ya devuelve el recurso (contrato); solo si vino vacío se relee. */
   const oReleer = async (r: Json | undefined, releer: () => Promise<Json>) => (r && Object.keys(r).length ? r : releer());
 
@@ -140,10 +143,12 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
             }),
           )
           .map(m.servicio),
-      clientes: async (_: unknown, __: Args, ctx: Ctx) =>
-        m.items(await s.get<Json>(ctx, 'viajes', rutaRest`/api/v1/clientes`, { query: { limite: LIMITE_MAXIMO } })),
+      // B2: todas las páginas (el esquema no cambia y las fichas usan cliente(id)); cada página cuenta en el presupuesto.
+      clientes: (_: unknown, __: Args, ctx: Ctx) => todas(ctx, 'viajes', rutaRest`/api/v1/clientes`),
       // listarRutas devuelve un arreglo plano, no una página (contratos/openapi/viajes.yaml).
-      rutas: async (_: unknown, __: Args, ctx: Ctx) => m.items(await s.get<Json>(ctx, 'viajes', rutaRest`/api/v1/rutas`)).map(m.ruta),
+      rutas: async (_: unknown, { incluirInactivas }: Args, ctx: Ctx) =>
+        m.items(await s.get<Json>(ctx, 'viajes', rutaRest`/api/v1/rutas`, { query: { incluirInactivas } })).map(m.ruta),
+      ...gestionViajes.Query,
 
       unidades: async (_: unknown, { tipo, estado, placa }: Args, ctx: Ctx) =>
         m
@@ -361,6 +366,7 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
       },
       preguntar: (_: unknown, { texto }: Args, ctx: Ctx) =>
         s.post<Json>(ctx, 'analitica', rutaRest`/api/v1/voz/preguntas`, { cuerpo: { texto }, tiempoMs: ESPERA.preguntar }),
+      ...gestionViajes.Mutation,
     },
 
     Subscription: {
