@@ -8,7 +8,7 @@ Configuración del realm como código (T2.2). Se aplica en dos pasos, los dos id
 | `perfil-usuario.json` | Perfil de usuario con `clienteId` (vista y edición solo de administradores) | `configurar-api.sh` (keycloak-config-cli 6.5.1 no lo aplica) |
 | `usuarios-semilla.json` | Usuarios de semilla con **ids fijos** (D12, K5) | `configurar-api.sh` por `partialImport` (keycloak-config-cli ignora el `id`); si el usuario ya existe, se salta |
 | `configurar-api.sh` | Perfil, usuarios de semilla y permisos FGAP v2 de `viajes` (K4) | Lo llama `aplicar-realm.sh` |
-| `probar-realm.sh` | Smoke de 28 pruebas: claims, cadena de 3 intercambios, agente, K3, FGAP v2, device grant y cierre de sesión | A mano, después de aplicar |
+| `probar-realm.sh` | Smoke de 31 pruebas: claims, rol `interno` en el token del portal, cadena de 3 intercambios, agente, K3, FGAP v2, device grant y cierre de sesión | A mano, después de aplicar |
 
 Los JSON solo llevan marcadores `$(env:KC_SECRETO_*)` y `$(env:KC_CLAVE_*)`. Si falta una variable, keycloak-config-cli falla (`Cannot resolve variable`) y no aplica nada.
 
@@ -55,9 +55,9 @@ La semilla de los servicios (D102, `plataforma/semilla/`) usa estos mismos ids: 
 
 | Cliente | Tipo | Audiencia | Roles en el token |
 |---|---|---|---|
-| `cc-tablero`, `cc-operaciones`, `cc-flota`, `cc-finanzas` | Público, PKCE | `gateway` | Internos (sin `cliente` ni `chofer`) |
-| `portal-cliente` | Público, PKCE, registro | `viajes`, `finanzas`; claim `clienteId` | `cliente`, `comercial` |
-| `app-chofer` | Público, PKCE, `offline_access` opcional; redirección `transporte-chofer://*` | `viajes`, `flota` | `chofer` |
+| `cc-tablero`, `cc-operaciones`, `cc-flota`, `cc-finanzas` | Público, PKCE | `gateway` | Internos (sin `cliente` ni `chofer`), más `interno` |
+| `portal-cliente` | Público, PKCE, registro | `viajes`, `finanzas`; claim `clienteId` | `cliente`, `comercial` o, para una cuenta interna, solo `interno` |
+| `app-chofer` | Público, PKCE, `offline_access` opcional; redirección `transporte-chofer://*` | `viajes`, `flota` | `chofer`, `interno` |
 | `demo-cli` | Público, *device grant* (y *direct grant* en local) | `gateway`, `viajes`, `finanzas`, `flota`, `analitica` | Todos menos `agente_lectura` |
 | `gateway`, `analitica`, `mcp-server` | Confidencial, intercambio estándar | La que piden con `audience` y `scope=aud-<cliente>` | Los del usuario |
 | `agente` | Confidencial, *client credentials* | `mcp-server` | `agente_lectura` |
@@ -65,6 +65,7 @@ La semilla de los servicios (D102, `plataforma/semilla/`) usa estos mismos ids: 
 | `finanzas`, `flota` | Solo validan tokens | — | — |
 
 Notas:
+- `interno` no da permisos en ningún servicio. Es hijo compuesto de `gerente`, `despachador`, `jefe_flota`, `administracion` y `chofer`, y `portal-cliente` solo tiene en su *scope* `cliente`, `comercial` e `interno`. Así, una cuenta interna que entra al portal llega con `interno` y sin sus roles (dar `gerente` o `administracion` al portal abriría lectura total desde un cliente público), el portal puede reconocerla y Viajes rechaza su alta de cliente con `403 SIN_PERMISO` (spec 001). Como Keycloak expande los compuestos del *scope*, `interno` también aparece en los tokens de los clientes que ya tienen alguno de esos roles (`cc-*`, `app-chofer`, `demo-cli` y los intercambios); `comercial` no lo recibe.
 - `default-roles-transporte` no tiene roles del realm. Conserva `manage-account` y `view-profile` del cliente `account`, para que cada usuario pueda cambiar su contraseña; no llegan a los tokens de las apps porque ningún cliente tiene *full scope*.
 - El registro está habilitado a nivel de realm, así que el enlace "Registrarse" también aparece en el login de las apps internas. Un usuario que se registra desde ahí no tiene roles, y las apps internas lo rechazan. El tema propio que oculte el enlace queda para F9.
 - El salto de SSO entre apps en el navegador (FK2, FK3) se prueba en F9 con las apps reales.
