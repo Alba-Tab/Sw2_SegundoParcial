@@ -45,6 +45,8 @@ export interface Viajes {
   marcarCanceladoAlSincronizar(viajeId: string): void;
   /** La entrega o el rechazo ya está en la cola: el viaje deja de estar en ruta en el celular. */
   marcarEntregaLocal(viajeId: string, tipo: 'ENTREGA' | 'RECHAZO'): void;
+  /** El inicio, la entrega o el rechazo quedó FALLIDA: se quita su marca y el chofer puede registrarlo de nuevo. */
+  liberarMarca(viajeId: string, tipo: 'INICIO' | 'ENTREGA' | 'RECHAZO'): void;
 }
 
 export interface Api {

@@ -166,11 +166,18 @@ export class MotorSincronizacion {
     }
   }
 
+  /**
+   * Un inicio, entrega o rechazo FALLIDA libera su marca local (decisión del 01-11-2026): vuelve el botón y el chofer lo
+   * registra de nuevo con otra clave. Si el viaje ya no está en ruta, Viajes responde 409 otra vez y se muestra.
+   */
   private cerrar(op: Operacion, estado: 'CONFIRMADA' | 'FALLIDA', codigo: string | null) {
     op.estado = estado;
     op.codigoError = codigo;
     op.cerradaEn = this.reloj.ahora().toISOString();
     this.cola.actualizar(op);
+    if (estado === 'FALLIDA' && (op.tipo === 'INICIO' || op.tipo === 'ENTREGA' || op.tipo === 'RECHAZO')) {
+      this.viajes.liberarMarca(op.viajeId, op.tipo);
+    }
   }
 
   /**

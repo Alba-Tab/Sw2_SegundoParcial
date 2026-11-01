@@ -56,6 +56,10 @@ class ViajesEnMemoria implements Viajes {
   marcarIniciado = (id: string) => void (this.v.get(id)!.iniciadoLocal = true);
   marcarCanceladoAlSincronizar = (id: string) => void (this.v.get(id)!.canceladoAlSincronizar = true);
   marcarEntregaLocal = (id: string, t: 'ENTREGA' | 'RECHAZO') => void (this.v.get(id)!.entregaLocal = t);
+  liberarMarca = (id: string, t: 'INICIO' | 'ENTREGA' | 'RECHAZO') => {
+    if (t === 'INICIO') this.v.get(id)!.iniciadoLocal = false;
+    else this.v.get(id)!.entregaLocal = null;
+  };
 }
 
 /** Responde con lo que haya en la cola de respuestas de cada clave (`TIPO:opId` o `GPS`), y registra cada envío. */
@@ -433,6 +437,49 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     api.estado = 'ENTREGADO';
     await motor.sincronizar();
     expect(cola.ops[0]).toMatchObject({ estado: 'FALLIDA', codigoError: 'CONFLICTO_ESTADO' });
+  });
+
+  it('una entrega FALLIDA libera la marca: se registra de nuevo con otra clave y, si el viaje ya no está en ruta, el 409 queda a la vista', async () => {
+    casos.iniciarViaje('v1', null);
+    casos.registrarLectura('v1', { lat: -17.8, lng: -63.2, velocidadMs: 0, precisionMetros: 4, en: ahora.getTime() });
+    const primera = casos.entregar('v1', ['foto1.jpg'], null, null, null);
+    api.responder(`ENTREGA:${primera}`, { estado: 422, codigo: 'VALIDACION' });
+    await motor.sincronizar();
+    expect(cola.ops.find((o) => o.opId === primera)).toMatchObject({ estado: 'FALLIDA', codigoError: 'VALIDACION' });
+    expect(viajes.porId('v1')?.entregaLocal).toBeNull();
+
+    const segunda = casos.entregar('v1', ['foto2.jpg'], null, null, null);
+    expect(segunda).not.toBe(primera);
+    const cuerpos = [primera, segunda].map((id) => cola.ops.find((o) => o.opId === id)!.cuerpo.entregaId);
+    expect(cuerpos[0]).not.toBe(cuerpos[1]);
+    expect(viajes.porId('v1')?.entregaLocal).toBe('ENTREGA');
+    api.responder(`ENTREGA:${segunda}`, { estado: 409, codigo: 'CONFLICTO_ESTADO' });
+    api.estado = 'ENTREGADO';
+    await motor.sincronizar();
+    expect(cola.ops.find((o) => o.opId === segunda)).toMatchObject({ estado: 'FALLIDA', codigoError: 'CONFLICTO_ESTADO' });
+    expect(viajes.porId('v1')?.entregaLocal).toBeNull();
+  });
+
+  it('un rechazo FALLIDA también libera la marca; uno confirmado no', async () => {
+    casos.iniciarViaje('v1', null);
+    casos.registrarLectura('v1', { lat: -17.8, lng: -63.2, velocidadMs: 0, precisionMetros: 4, en: ahora.getTime() });
+    const rechazo = casos.rechazar('v1', 'Carga mojada', ['foto1.jpg']);
+    api.responder(`RECHAZO:${rechazo}`, { estado: 422, codigo: 'VALIDACION' });
+    await motor.sincronizar();
+    expect(viajes.porId('v1')?.entregaLocal).toBeNull();
+    casos.rechazar('v1', 'Carga mojada', ['foto2.jpg']);
+    await motor.sincronizar();
+    expect(viajes.porId('v1')?.entregaLocal).toBe('RECHAZO');
+  });
+
+  it('un inicio FALLIDA libera la marca y el chofer puede iniciar de nuevo', async () => {
+    const inicio = casos.iniciarViaje('v1', null);
+    api.responder(`INICIO:${inicio}`, { estado: 422, codigo: 'VALIDACION' });
+    await motor.sincronizar();
+    expect(viajes.porId('v1')?.iniciadoLocal).toBe(false);
+    const otro = casos.iniciarViaje('v1', null);
+    expect(otro).not.toBe(inicio);
+    expect(viajes.porId('v1')?.iniciadoLocal).toBe(true);
   });
 
   it('un envío que lanza no rompe la tanda: esa operación se reintenta y los otros viajes siguen', async () => {

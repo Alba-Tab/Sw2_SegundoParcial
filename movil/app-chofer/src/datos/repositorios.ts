@@ -189,6 +189,13 @@ export class ViajesSqlite implements Viajes {
   marcarEntregaLocal(viajeId: string, tipo: 'ENTREGA' | 'RECHAZO'): void {
     bd.update(viaje).set({ entregaLocal: tipo }).where(eq(viaje.viajeId, viajeId)).run();
   }
+
+  liberarMarca(viajeId: string, tipo: 'INICIO' | 'ENTREGA' | 'RECHAZO'): void {
+    bd.update(viaje)
+      .set(tipo === 'INICIO' ? { iniciadoLocal: false } : { entregaLocal: null })
+      .where(eq(viaje.viajeId, viajeId))
+      .run();
+  }
 }
 
 function aViaje(f: typeof viaje.$inferSelect): ViajeLocal {
