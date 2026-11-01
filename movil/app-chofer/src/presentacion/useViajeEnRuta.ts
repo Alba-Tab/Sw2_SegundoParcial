@@ -15,10 +15,15 @@ export function useViajeEnRuta(viajeId: string | null, alFrenar: () => void) {
 
   useEffect(() => {
     if (!viajeId) {
-      void detenerGps().then(() => setGps('detenido'));
+      void detenerGps()
+        .catch(() => {})
+        .then(() => setGps('detenido'));
       return;
     }
-    void iniciarGps().then(setGps);
+    // Si no arranca (permiso revocado, Android que no deja el servicio desde el fondo), la pantalla lo dice.
+    void iniciarGps()
+      .then(setGps)
+      .catch(() => setGps('detenido'));
     const detector = new DetectorFrenadas();
     DeviceMotion.setUpdateInterval(100);
     const sub = DeviceMotion.addListener((m) => {

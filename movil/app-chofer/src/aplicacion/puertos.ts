@@ -6,8 +6,13 @@ import type { ViajeLocal } from '../dominio/viaje';
 
 /** Puertos de la app (Clean): la aplicación no conoce SQLite, fetch ni Expo. */
 
+/** Corre `fn` en una transacción de la base del celular: si lanza, no queda nada escrito. */
+export type EnTransaccion = <T>(fn: () => T) => T;
+
 export interface Cola {
   todas(): Operacion[];
+  /** Pendientes, fallidas y descartadas: lo que el chofer ve en Pendientes. */
+  visibles(): Operacion[];
   agregar(op: Operacion): void;
   actualizar(op: Operacion): void;
   /** Las pendientes del viaje pasan a DESCARTADA (viaje cancelado sin señal, D54). */
@@ -24,7 +29,8 @@ export interface PuntosGps {
   viajes(): string[];
   borrar(viajeId: string, seqs: number[]): void;
   borrarHasta(viajeId: string, seq: number): void;
-  contar(): number;
+  /** Puntos por enviar, de un viaje o de todos. */
+  contar(viajeId?: string): number;
 }
 
 export interface Viajes {
@@ -116,6 +122,7 @@ export interface Evidencias {
   agregar(e: EvidenciaLocal): void;
   porId(evidenciaId: string): EvidenciaLocal | null;
   marcarCompleta(evidenciaId: string): void;
+  borrar(evidenciaId: string): void;
 }
 
 /** La subida abierta en Viajes: URL firmadas de las partes que faltan y las que S3 ya tiene (ListParts). */
@@ -137,6 +144,9 @@ export interface Archivos {
   /** Copia el archivo al almacenamiento de la app y devuelve su ruta y tamaño. */
   guardar(origen: string, nombre: string): { archivo: string; tamanoBytes: number };
   leer(archivo: string, desde: number, hasta: number): Uint8Array;
+  existe(archivo: string): boolean;
+  /** Borra la copia; si ya no está, no hace nada. */
+  borrar(archivo: string): void;
 }
 
 export type NuevaOperacion = { viajeId: string; tipo: TipoOperacion; cuerpo: Record<string, unknown> };

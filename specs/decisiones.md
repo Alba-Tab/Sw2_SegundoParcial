@@ -131,7 +131,7 @@ Valores que las specs 005–010 y 013–016 necesitaban y que ni la propuesta ni
 | D57 | 005 | Un punto GPS se acepta con `registradaEn` ≥ `iniciadoEn` − 10 min | confirmada |
 | D58 | 005 | Con velocidad > 5 km/h la app solo permite dictar | confirmada |
 | D59 | 005 | Frenada brusca: 0,4 g (D08) sostenida 300 ms con velocidad > 20 km/h, una cada 10 s | confirmada |
-| D60 | 005 | Fatiga: ojos cerrados ≥ 1,5 s o 3 bostezos en 2 min | confirmada |
+| D60 | 005 | Fatiga (ampliada 2026-10-31): ojos cerrados ≥ 1,5 s, PERCLOS > 30 % en 60 s, cabeceo ≥ 20° durante 1 s, rostro no visible 3 s o 3 bostezos en 2 min. El evento sigue siendo `ALERTA_FATIGA`, sin motivo | confirmada |
 | D61 | 005 | Sincronización: una petición a la vez por viaje, un lote de GPS a la vez, hasta 2 partes de foto en paralelo | confirmada |
 | D62 | 005 | Tiempo de espera de la app: 15 s por petición, 60 s por parte de foto | confirmada |
 | D63 | 006, 014 | n8n inserta el `eventId` en `n8n_inbox` después del envío SMTP: "al menos una vez" (puede repetir un correo si cae entre los dos pasos) | confirmada |

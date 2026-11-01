@@ -22,6 +22,7 @@ import { SubidaEvidencias } from './subidaEvidencias';
 class ColaEnMemoria implements Cola {
   ops: Operacion[] = [];
   todas = () => this.ops.filter((o) => o.estado === 'PENDIENTE');
+  visibles = () => this.ops.filter((o) => o.estado !== 'CONFIRMADA');
   agregar = (o: Operacion) => void this.ops.push(o);
   actualizar = () => {};
   descartarViaje = (viajeId: string) => {
@@ -43,7 +44,7 @@ class PuntosEnMemoria implements PuntosGps {
   viajes = () => [...new Set(this.p.map((x) => x.viajeId))];
   borrar = (v: string, seqs: number[]) => void (this.p = this.p.filter((x) => x.viajeId !== v || !seqs.includes(x.seq)));
   borrarHasta = (v: string, s: number) => void (this.p = this.p.filter((x) => x.viajeId !== v || x.seq > s));
-  contar = () => this.p.length;
+  contar = (viajeId?: string) => this.p.filter((x) => !viajeId || x.viajeId === viajeId).length;
 }
 
 class ViajesEnMemoria implements Viajes {
@@ -106,6 +107,7 @@ class EvidenciasEnMemoria implements Evidencias {
   agregar = (x: EvidenciaLocal) => void this.e.set(x.evidenciaId, x);
   porId = (id: string) => this.e.get(id) ?? null;
   marcarCompleta = (id: string) => void (this.e.get(id)!.estado = 'COMPLETA');
+  borrar = (id: string) => void this.e.delete(id);
 }
 
 /** S3 en memoria: recuerda qué partes llegaron; `cortarEn` hace fallar una subida de parte (corte de red). */
@@ -159,6 +161,7 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
   let ahora: Date, conRed: boolean, sesionVencida: boolean, n: number;
   let evidencias: EvidenciasEnMemoria, apiEvidencias: ApiEvidenciasFalsa, posicion: PosicionEnMemoria;
   let motor: MotorSincronizacion, casos: CasosDeUso;
+  let borrados: string[];
 
   beforeEach(() => {
     cola = new ColaEnMemoria();
@@ -181,9 +184,15 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     const dispositivo = { id: () => 'celular', plataforma: () => 'IOS' as const };
     evidencias = new EvidenciasEnMemoria();
     apiEvidencias = new ApiEvidenciasFalsa();
+    borrados = [];
     const archivos = {
-      guardar: (o: string, n: string) => ({ archivo: `doc/${n}`, tamanoBytes: o.includes('grande') ? 12 * 1024 * 1024 : 2048 }),
+      guardar: (o: string, n: string) => {
+        if (o.includes('rota')) throw new Error('foto rota');
+        return { archivo: `doc/${n}`, tamanoBytes: o.includes('grande') ? 12 * 1024 * 1024 : 2048 };
+      },
       leer: (_a: string, d: number, h: number) => new Uint8Array(h - d),
+      existe: () => true,
+      borrar: (a: string) => void borrados.push(a),
     };
     const subida = new SubidaEvidencias(evidencias, apiEvidencias, archivos);
     motor = new MotorSincronizacion(cola, puntos, viajes, api, sesion, red, reloj, ids, dispositivo, subida, () => 0.5);
@@ -324,6 +333,8 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
   });
 
   it('T7.4: el hito va a la cola con el texto revisado y la posición; sin GPS o con texto corto, no', () => {
+    expect(() => casos.registrarHito('v1', 'BLOQUEO', 'Bloqueo en el puente', 'VOZ')).toThrow(/ya no está en ruta/);
+    casos.iniciarViaje('v1', null);
     expect(() => casos.registrarHito('v1', 'BLOQUEO', 'Bloqueo en el puente', 'VOZ')).toThrow(/GPS/);
     casos.registrarLectura('v1', { lat: -17.7, lng: -63.18, velocidadMs: 0, precisionMetros: 5, en: ahora.getTime() });
     expect(() => casos.registrarHito('v1', 'BLOQUEO', ' ab ', 'TEXTO')).toThrow(/3 a 500/);
@@ -458,6 +469,7 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
   });
 
   it('T7.6: el monto escrito con coma o sin decimales se normaliza como texto; uno inválido no entra a la cola', () => {
+    casos.iniciarViaje('v1', null);
     const cargar = (monto: string) => casos.cargarCombustible('v1', { litros: 100, monto, kilometraje: 1, foto: null });
     const montoDe = (opId: string) => cola.ops.find((o) => o.opId === opId)?.cuerpo.monto;
     expect(montoDe(cargar('675,5'))).toEqual({ monto: '675.50', moneda: 'BOB' });
@@ -465,5 +477,28 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     expect(montoDe(cargar('999999999999.99'))).toEqual({ monto: '999999999999.99', moneda: 'BOB' });
     for (const malo of ['1.234', '1,2,3', '-5', '1e3', '', '0,00', '1234567890123', 'Infinity']) expect(() => cargar(malo)).toThrow();
     expect(cola.ops.filter((o) => o.tipo === 'CARGA_COMBUSTIBLE')).toHaveLength(3);
+  });
+
+  it('A-2: si falla la segunda foto de la entrega, no queda ninguna evidencia ni operación a medias', () => {
+    casos.iniciarViaje('v1', null);
+    casos.registrarLectura('v1', { lat: -17.7, lng: -63.18, velocidadMs: 0, precisionMetros: 5, en: ahora.getTime() });
+    const antes = cola.ops.length;
+    expect(() => casos.entregar('v1', ['foto1.jpg', 'rota.jpg'], null, null, null)).toThrow(/rota/);
+    expect(evidencias.e.size).toBe(0);
+    expect(cola.ops).toHaveLength(antes);
+    expect(borrados).toHaveLength(1);
+  });
+
+  it('C-1: si falla la cola después de copiar las fotos, se borran las copias y sale el error original', () => {
+    casos.iniciarViaje('v1', null);
+    casos.registrarLectura('v1', { lat: -17.7, lng: -63.18, velocidadMs: 0, precisionMetros: 5, en: ahora.getTime() });
+    const agregar = cola.agregar;
+    cola.agregar = () => {
+      throw new Error('disco lleno');
+    };
+    expect(() => casos.entregar('v1', ['foto1.jpg', 'foto2.jpg'], null, null, null)).toThrow('disco lleno');
+    cola.agregar = agregar;
+    expect(borrados).toHaveLength(2);
+    expect(evidencias.e.size).toBe(0);
   });
 });

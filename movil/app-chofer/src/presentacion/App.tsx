@@ -1,14 +1,16 @@
+import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
+import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
 import { BackHandler, useColorScheme, View } from 'react-native';
-import { ActivityIndicator, Appbar, Button, Dialog, PaperProvider, Portal, Snackbar, Text } from 'react-native-paper';
+import { ActivityIndicator, Appbar, Button, Dialog, Menu, PaperProvider, Portal, Snackbar, Text } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import migraciones from '../../drizzle/migrations';
 import type { SinEnviar } from '../aplicacion/cierreSesion';
 import { bd } from '../datos/bd';
 import { cierre } from '../datos/cierre';
-import { casos, sesion, viajes } from '../datos/contenedor';
+import { casos, cola, puntos, sesion, viajes } from '../datos/contenedor';
 import { viaje } from '../datos/esquema';
 import { estadoVisible } from '../dominio/viaje';
 import { useLiveQuery } from 'drizzle-orm/expo-sqlite';
@@ -24,32 +26,39 @@ import { PantallaSesion } from './pantallas/PantallaSesion';
 import { PantallaViaje } from './pantallas/PantallaViaje';
 import { PantallaViajes } from './pantallas/PantallaViajes';
 import { temaClaro, temaOscuro } from './tema';
+import { plural } from './textos';
 import { useSincronizacion } from './useSincronizacion';
 import { useViajeEnRuta } from './useViajeEnRuta';
 
-type Pantalla =
-  { nombre: 'viajes' } | { nombre: 'pendientes' } | { nombre: 'viaje' | 'hito' | 'entrega' | 'carga' | 'fatiga'; viajeId: string };
+type PantallaBase = { nombre: 'viajes' } | { nombre: 'viaje' | 'hito' | 'entrega' | 'carga' | 'fatiga'; viajeId: string };
+/** Pendientes se abre desde cualquier pantalla y vuelve a la que estaba. */
+type Pantalla = PantallaBase | { nombre: 'pendientes'; volverA: PantallaBase };
 
 const TITULOS: Record<Pantalla['nombre'], string> = {
   viajes: 'Mis viajes',
   viaje: 'Viaje',
   hito: 'Bitácora',
   entrega: 'Entrega',
-  carga: 'Carga de combustible',
-  fatiga: 'Detector de fatiga',
+  carga: 'Combustible',
+  fatiga: 'Fatiga',
   pendientes: 'Pendientes',
 };
 
 export function App() {
   const oscuro = useColorScheme() === 'dark';
   const migracion = useMigrations(bd, migraciones);
+  // La fuente de los íconos se carga antes del primer render: sin ella los botones salen vacíos un instante.
+  const [fuentes, errorFuentes] = useFonts(MaterialCommunityIcons.font);
+  if (migracion.error) console.error(migracion.error);
   return (
     <SafeAreaProvider>
       <PaperProvider theme={oscuro ? temaOscuro : temaClaro}>
         <StatusBar style="auto" />
         {migracion.error ? (
-          <Text style={{ padding: 24 }}>No se pudo preparar la base del celular: {migracion.error.message}</Text>
-        ) : !migracion.success ? (
+          <Text variant="bodyLarge" style={{ padding: 24 }}>
+            No se pudo preparar el celular. Cierra la app y ábrela de nuevo; si sigue, avisa al despachador.
+          </Text>
+        ) : !migracion.success || !(fuentes || errorFuentes) ? (
           <ActivityIndicator style={{ flex: 1 }} />
         ) : (
           <ConSesion />
@@ -62,7 +71,10 @@ export function App() {
 function ConSesion() {
   const [estado, setEstado] = useState<'cargando' | 'sin-sesion' | 'vencida' | 'activa' | 'saliendo'>('cargando');
   useEffect(() => {
-    void sesion.haySesion().then((hay) => setEstado(hay ? 'activa' : 'sin-sesion'));
+    void sesion
+      .haySesion()
+      .then((hay) => setEstado(hay ? 'activa' : 'sin-sesion'))
+      .catch(() => setEstado('sin-sesion'));
   }, []);
 
   const iniciar = async () => {
@@ -86,21 +98,25 @@ function ConSesion() {
   return <Principal alVencerSesion={() => setEstado('vencida')} salir={salir} />;
 }
 
-const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
-
 function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; salir: () => void }) {
   const [pantalla, setPantalla] = useState<Pantalla>({ nombre: 'viajes' });
   const [aviso, setAviso] = useState<string | null>(null);
   const [confirmarSalida, setConfirmarSalida] = useState<SinEnviar | null>(null);
+  const [menu, setMenu] = useState(false);
   const alCancelarse = useCallback(() => setAviso('Viaje cancelado; llama al despachador'), []);
   const alAlertarFatiga = useCallback(
-    (enCola: boolean) => setAviso(enCola ? 'Alerta de fatiga registrada; detente a descansar' : 'Detente a descansar'),
+    (enCola: boolean) =>
+      setAviso(
+        enCola
+          ? 'Alerta de fatiga registrada; detente a descansar'
+          : 'Detente a descansar. Sin ubicación todavía: la alerta no quedó registrada',
+      ),
     [],
   );
   // Lo que no llegó al servidor se borra al salir: antes se avisa y se pide confirmación.
   const pedirSalida = () => {
     const sinEnviar = cierre.sinEnviar();
-    if (sinEnviar.operaciones + sinEnviar.puntos > 0) setConfirmarSalida(sinEnviar);
+    if (sinEnviar.operaciones + sinEnviar.conError + sinEnviar.puntos > 0) setConfirmarSalida(sinEnviar);
     else salir();
   };
   const sync = useSincronizacion(alCancelarse, alVencerSesion);
@@ -125,36 +141,81 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
     [],
   );
 
+  const volver = useCallback(
+    () =>
+      setPantalla((p) =>
+        p.nombre === 'pendientes'
+          ? p.volverA
+          : 'viajeId' in p && p.nombre !== 'viaje'
+            ? { nombre: 'viaje', viajeId: p.viajeId }
+            : { nombre: 'viajes' },
+      ),
+    [],
+  );
+  const verPendientes = () => setPantalla((p) => (p.nombre === 'pendientes' ? p : { nombre: 'pendientes', volverA: p }));
+
   useEffect(() => {
     const atras = BackHandler.addEventListener('hardwareBackPress', () => {
       if (pantalla.nombre === 'viajes') return false;
-      setPantalla(
-        'viajeId' in pantalla && pantalla.nombre !== 'viaje' ? { nombre: 'viaje', viajeId: pantalla.viajeId } : { nombre: 'viajes' },
-      );
+      volver();
       return true;
     });
     return () => atras.remove();
-  }, [pantalla]);
+  }, [pantalla, volver]);
+
+  const total = sync.pendientes + sync.puntos;
+  // Pedido a mano: además del ícono, se dice cómo terminó.
+  const enviarAMano = async () => {
+    const r = await sync.sincronizar();
+    if (!r) return setAviso('No se pudo enviar; se reintenta solo');
+    const quedan = cola.todas().length + puntos.contar();
+    setAviso(
+      r.sinConexion ? 'Sin señal: se envía solo cuando vuelva' : quedan ? `Quedan ${quedan} por enviar; se reintenta solo` : 'Envío al día',
+    );
+  };
+  const iconoEnvio = !sync.enLinea ? 'cloud-off-outline' : total ? 'cloud-upload-outline' : 'cloud-check-outline';
 
   return (
     <View style={{ flex: 1 }}>
       <Appbar.Header>
-        {pantalla.nombre !== 'viajes' && (
-          <Appbar.BackAction
-            onPress={() =>
-              setPantalla(
-                'viajeId' in pantalla && pantalla.nombre !== 'viaje'
-                  ? { nombre: 'viaje', viajeId: pantalla.viajeId }
-                  : { nombre: 'viajes' },
-              )
-            }
-          />
-        )}
+        {pantalla.nombre !== 'viajes' && <Appbar.BackAction accessibilityLabel="Volver" onPress={volver} />}
         <Appbar.Content title={TITULOS[pantalla.nombre]} />
-        <Appbar.Action icon="sync" accessibilityLabel="Sincronizar ahora" onPress={() => void sync.sincronizar()} />
-        <Appbar.Action icon="logout" accessibilityLabel="Cerrar sesión" onPress={pedirSalida} />
+        <Appbar.Action
+          icon={sync.enviando ? () => <ActivityIndicator size={20} /> : iconoEnvio}
+          disabled={sync.enviando}
+          accessibilityLabel={
+            !sync.enLinea
+              ? 'Sin conexión. Reintentar envío'
+              : total
+                ? `${total} por enviar. Enviar ahora`
+                : 'Todo enviado. Revisar de nuevo'
+          }
+          onPress={() => void enviarAMano()}
+        />
+        <Menu
+          visible={menu}
+          onDismiss={() => setMenu(false)}
+          anchor={<Appbar.Action icon="dots-vertical" accessibilityLabel="Más opciones" onPress={() => setMenu(true)} />}
+        >
+          <Menu.Item
+            leadingIcon="format-list-checks"
+            title="Pendientes de envío"
+            onPress={() => {
+              setMenu(false);
+              verPendientes();
+            }}
+          />
+          <Menu.Item
+            leadingIcon="logout"
+            title="Cerrar sesión"
+            onPress={() => {
+              setMenu(false);
+              pedirSalida();
+            }}
+          />
+        </Menu>
       </Appbar.Header>
-      <BarraSincronizacion {...sync} verPendientes={() => setPantalla({ nombre: 'pendientes' })} />
+      <BarraSincronizacion {...sync} verPendientes={verPendientes} enPendientes={pantalla.nombre === 'pendientes'} />
       {pantalla.nombre === 'viajes' && (
         <PantallaViajes enLinea={sync.enLinea} abrir={(viajeId) => setPantalla({ nombre: 'viaje', viajeId })} />
       )}
@@ -164,6 +225,8 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
           gps={gps}
           sincronizar={() => void sync.sincronizar()}
           abrir={(nombre) => setPantalla({ nombre, viajeId: pantalla.viajeId })}
+          volver={volver}
+          verPendientes={verPendientes}
         />
       )}
       {pantalla.nombre === 'hito' && (
@@ -197,7 +260,7 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
         />
       )}
       {pantalla.nombre === 'fatiga' && <PantallaFatiga viajeId={pantalla.viajeId} alAlertar={alAlertarFatiga} />}
-      {pantalla.nombre === 'pendientes' && <PantallaPendientes />}
+      {pantalla.nombre === 'pendientes' && <PantallaPendientes sincronizar={enviarAMano} enviando={sync.enviando} />}
       <Snackbar visible={aviso !== null} onDismiss={() => setAviso(null)} duration={8000}>
         {aviso ?? ''}
       </Snackbar>
@@ -209,6 +272,7 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
               {confirmarSalida &&
                 [
                   confirmarSalida.operaciones ? plural(confirmarSalida.operaciones, 'registro', 'registros') : null,
+                  confirmarSalida.conError ? plural(confirmarSalida.conError, 'registro con error', 'registros con error') : null,
                   confirmarSalida.puntos ? plural(confirmarSalida.puntos, 'punto GPS', 'puntos GPS') : null,
                 ]
                   .filter(Boolean)

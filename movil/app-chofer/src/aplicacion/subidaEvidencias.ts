@@ -19,7 +19,9 @@ export class SubidaEvidencias {
   async asegurar(ids: string[], token: string): Promise<ResultadoSubida> {
     for (const id of ids) {
       const e = this.evidencias.porId(id);
-      if (!e || e.estado === 'COMPLETA') continue;
+      if (e?.estado === 'COMPLETA') continue;
+      // Sin la fila o sin el archivo no hay qué subir: reintentar sería para siempre; queda FALLIDA en Pendientes.
+      if (!e || !this.archivos.existe(e.archivo)) return { listo: false, respuesta: { estado: 422, codigo: 'EVIDENCIA_PERDIDA' } };
       const r = await this.subir(e, token);
       if (!r.listo) return r;
     }
@@ -31,6 +33,12 @@ export class SubidaEvidencias {
     if (!subida) return { listo: false, respuesta };
     if (subida.estado === 'COMPLETA') return this.completa(e);
 
+    // Un archivo dañado no se arregla reintentando: queda FALLIDA en Pendientes en vez de reintentarse para siempre.
+    try {
+      this.archivos.leer(e.archivo, 0, Math.min(1, e.tamanoBytes));
+    } catch {
+      return { listo: false, respuesta: { estado: 422, codigo: 'EVIDENCIA_PERDIDA' } };
+    }
     const partes: Parte[] = [...subida.subidas];
     const pendientes = [...subida.partes];
     while (pendientes.length) {
@@ -56,6 +64,8 @@ export class SubidaEvidencias {
 
   private completa(e: EvidenciaLocal): ResultadoSubida {
     this.evidencias.marcarCompleta(e.evidenciaId);
+    // Ya está en S3: la copia del celular no se vuelve a leer.
+    this.archivos.borrar(e.archivo);
     return { listo: true };
   }
 }

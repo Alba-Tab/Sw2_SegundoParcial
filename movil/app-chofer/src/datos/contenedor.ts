@@ -4,6 +4,7 @@ import { SubidaEvidencias } from '../aplicacion/subidaEvidencias';
 import { ApiEvidenciasHttp } from './apiEvidencias';
 import { ApiViajes } from './apiViajes';
 import { archivos } from './archivos';
+import { bd } from './bd';
 import { dispositivo, ids, red, reloj } from './plataforma';
 import { ColaSqlite, EvidenciasSqlite, PosicionSqlite, PuntosSqlite, ViajesSqlite } from './repositorios';
 import { SesionKeycloak } from './sesion';
@@ -18,4 +19,17 @@ const api = new ApiViajes();
 const subida = new SubidaEvidencias(evidencias, new ApiEvidenciasHttp(), archivos);
 
 export const motor = new MotorSincronizacion(cola, puntos, viajes, api, sesion, red, reloj, ids, dispositivo, subida);
-export const casos = new CasosDeUso(cola, puntos, viajes, api, sesion, reloj, ids, dispositivo, evidencias, archivos, new PosicionSqlite());
+export const casos = new CasosDeUso(
+  cola,
+  puntos,
+  viajes,
+  api,
+  sesion,
+  reloj,
+  ids,
+  dispositivo,
+  evidencias,
+  archivos,
+  new PosicionSqlite(),
+  (fn) => bd.transaction(() => fn()),
+);

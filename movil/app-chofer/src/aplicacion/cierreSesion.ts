@@ -3,6 +3,8 @@ import type { Cola, DatosDelChofer, PuntosGps, SesionCerrable, TareasDeFondo } f
 
 export interface SinEnviar {
   operaciones: number;
+  /** Las que el servidor rechazó: se borran también al salir, y el chofer tiene que saberlo. */
+  conError: number;
   puntos: number;
 }
 
@@ -24,7 +26,11 @@ export class CierreSesion {
 
   /** Lo que se perdería al salir: operaciones de la cola y puntos GPS que todavía no llegaron al servidor. */
   sinEnviar(): SinEnviar {
-    return { operaciones: this.cola.todas().length, puntos: this.puntos.contar() };
+    return {
+      operaciones: this.cola.todas().length,
+      conError: this.cola.visibles().filter((o) => o.estado === 'FALLIDA').length,
+      puntos: this.puntos.contar(),
+    };
   }
 
   async salir(): Promise<void> {

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { DetectorFatiga, ear, mar, type Punto, OJO_IZQUIERDO } from './fatiga';
+import { DetectorFatiga, type Medidas } from './fatiga';
 
-const abiertos = { ear: 0.3, mar: 0.1 };
-const cerrados = { ear: 0.1, mar: 0.1 };
-const bostezo = { ear: 0.3, mar: 0.8 };
+const abiertos: Medidas = { ojos: 0.1, boca: 0.1, cabeceo: 0, alto: 0.3 };
+const cerrados: Medidas = { ...abiertos, ojos: 0.9 };
+const bostezo: Medidas = { ...abiertos, boca: 0.8 };
 
 /** Cuadros cada 100 ms desde `desde` hasta `hasta` (incluido); devuelve las alertas. */
-function serie(d: DetectorFatiga, desde: number, hasta: number, m: { ear: number; mar: number } | null) {
+function serie(d: DetectorFatiga, desde: number, hasta: number, m: Medidas | null) {
   const alertas = [];
   for (let t = desde; t <= hasta; t += 100) {
     const a = d.muestra(t, m);
@@ -14,20 +14,6 @@ function serie(d: DetectorFatiga, desde: number, hasta: number, m: { ear: number
   }
   return alertas;
 }
-
-describe('medidas de la malla', () => {
-  it('EAR: alto de los párpados sobre el ancho del ojo', () => {
-    const puntos: Record<number, Punto> = { 33: [0, 0], 160: [1, 1], 158: [2, 1], 133: [3, 0], 153: [2, -1], 144: [1, -1] };
-    expect(ear((i) => puntos[i], OJO_IZQUIERDO)).toBeCloseTo(2 / 3);
-    const cerrado: Record<number, Punto> = { ...puntos, 160: [1, 0.1], 158: [2, 0.1], 153: [2, -0.1], 144: [1, -0.1] };
-    expect(ear((i) => cerrado[i], OJO_IZQUIERDO)).toBeLessThan(0.2);
-  });
-
-  it('MAR: alto de la boca sobre su ancho', () => {
-    const boca: Record<number, Punto> = { 13: [5, 0], 14: [5, 4], 78: [0, 2], 308: [10, 2] };
-    expect(mar((i) => boca[i])).toBeCloseTo(0.4);
-  });
-});
 
 describe('detector de fatiga (D60)', () => {
   it('ojos cerrados 1,5 s o más: una alerta por episodio', () => {
@@ -90,5 +76,92 @@ describe('detector de fatiga (D60)', () => {
     serie(d, 131_300, 131_400, abiertos);
     expect(serie(d, 140_000, 140_500, bostezo)).toEqual([]);
     expect(d.bostezosRecientes(140_500)).toBe(1);
+  });
+
+  it('sin rostro 3 s (gorra, mano, mirada fuera): una alerta hasta que vuelve el rostro', () => {
+    const d = new DetectorFatiga();
+    serie(d, 0, 500, abiertos);
+    expect(serie(d, 600, 3500, null)).toEqual([]);
+    expect(serie(d, 3600, 8000, null)).toEqual([{ t: 3600, a: 'SIN_ROSTRO' }]);
+    serie(d, 8100, 8200, abiertos);
+    expect(serie(d, 8300, 11_300, null)).toEqual([{ t: 11_300, a: 'SIN_ROSTRO' }]);
+  });
+
+  it('PERCLOS: parpadeos lentos que suman más del 30 % del minuto, sin llegar a 1,5 s seguidos', () => {
+    const d = new DetectorFatiga();
+    const alertas = [];
+    // Ciclos de 3 s: 1 s cerrados y 2 s abiertos (33 %).
+    for (let t = 0; t < 40_000; t += 3000) {
+      alertas.push(...serie(d, t, t + 900, cerrados), ...serie(d, t + 1000, t + 2900, abiertos));
+    }
+    expect(alertas.map((x) => x.a)).toEqual(['SOMNOLENCIA']);
+    expect(alertas[0].t).toBeGreaterThanOrEqual(30_000);
+  });
+
+  it('parpadeo normal (10 %) no es somnolencia', () => {
+    const d = new DetectorFatiga();
+    const alertas = [];
+    for (let t = 0; t < 70_000; t += 3000) {
+      alertas.push(...serie(d, t, t + 200, cerrados), ...serie(d, t + 300, t + 2900, abiertos));
+    }
+    expect(alertas).toEqual([]);
+  });
+
+  it('cabeceo: la cabeza cae 20° respecto de su posición habitual durante 1 s', () => {
+    const d = new DetectorFatiga();
+    // El celular va más abajo que la cara: 15° de base no es cabeceo.
+    expect(serie(d, 0, 5000, { ...abiertos, cabeceo: 15 })).toEqual([]);
+    expect(serie(d, 5100, 5900, { ...abiertos, cabeceo: 40 })).toEqual([]);
+    expect(serie(d, 6000, 8000, { ...abiertos, cabeceo: 40 })).toEqual([{ t: 6100, a: 'CABECEO' }]);
+  });
+
+  it('ojos tapados: el rostro se encoge de golpe a la mitad y a los 3 s cuenta como no visible', () => {
+    const d = new DetectorFatiga();
+    serie(d, 0, 2000, abiertos);
+    const tapado = { ...abiertos, alto: 0.15 };
+    expect(serie(d, 2100, 5000, tapado)).toEqual([]);
+    expect(serie(d, 5100, 6000, tapado)).toEqual([{ t: 5100, a: 'SIN_ROSTRO' }]);
+  });
+
+  it('alejarse despacio del celular no cuenta como rostro tapado', () => {
+    const d = new DetectorFatiga();
+    const alertas = [];
+    for (let t = 0, alto = 0.3; t < 60_000; t += 100, alto *= 0.9995) alertas.push(...serie(d, t, t, { ...abiertos, alto }));
+    expect(alertas).toEqual([]);
+  });
+
+  it('se recuesta y se queda así: una alerta de rostro no visible y a los 10 s vuelve a vigilar', () => {
+    const d = new DetectorFatiga();
+    serie(d, 0, 2000, abiertos);
+    const lejos = { ...abiertos, alto: 0.16 };
+    expect(serie(d, 2100, 15_000, lejos).map((x) => x.a)).toEqual(['SIN_ROSTRO']);
+    expect(d.rostroVisible).toBe(true);
+    expect(serie(d, 15_100, 17_000, { ...lejos, ojos: 0.9 })).toEqual([{ t: 16_600, a: 'OJOS_CERRADOS' }]);
+  });
+
+  it('cabeceo lento (10°/s a 30 cuadros por segundo) también alerta', () => {
+    const d = new DetectorFatiga();
+    const alertas = [];
+    for (let t = 0; t < 5000; t += 33) alertas.push(...serie(d, t, t, abiertos));
+    for (let t = 5000, g = 0; t < 12_000; t += 33, g = Math.min(45, g + 0.33)) {
+      const a = d.muestra(t, { ...abiertos, cabeceo: g });
+      if (a) alertas.push(a);
+    }
+    expect(alertas).toEqual(['CABECEO']);
+  });
+
+  it('baja la cabeza 25° y se queda así: una alerta, y a los 30 s vuelve a vigilar desde la nueva postura', () => {
+    const d = new DetectorFatiga();
+    serie(d, 0, 3000, abiertos);
+    const abajo = { ...abiertos, cabeceo: 25 };
+    expect(serie(d, 3100, 60_000, abajo).map((x) => x.a)).toEqual(['CABECEO']);
+    expect(serie(d, 60_100, 62_000, { ...abiertos, cabeceo: 50 })).toEqual([{ t: 61_100, a: 'CABECEO' }]);
+  });
+
+  it('el tamaño habitual sale de los primeros 2 s: acercarse al abrir y luego acomodarse no es rostro tapado', () => {
+    const d = new DetectorFatiga();
+    serie(d, 0, 300, { ...abiertos, alto: 0.5 });
+    const alertas = serie(d, 400, 10_000, abiertos);
+    expect(alertas).toEqual([]);
   });
 });

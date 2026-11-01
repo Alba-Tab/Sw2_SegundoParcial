@@ -27,3 +27,12 @@ export const OPERACIONES: Record<string, string> = {
   ENTREGA: 'Entrega',
   RECHAZO: 'Rechazo en destino',
 };
+
+const MESES = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+/** `2026-12-19` → `19 dic 2026` (la fecha del viaje es un día, sin hora ni zona: no pasa por Date). */
+export function fechaCorta(iso: string): string {
+  const [anio, mes, dia] = iso.split('-');
+  return MESES[Number(mes) - 1] ? `${Number(dia)} ${MESES[Number(mes) - 1]} ${anio}` : iso;
+}
+
+export const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
