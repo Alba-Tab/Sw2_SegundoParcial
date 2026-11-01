@@ -4,7 +4,7 @@ import { errorGraphql } from './errores';
  * Tope de llamadas REST a los servicios por petición GraphQL.
  *
  * La complejidad (D101) cuenta como 1 cada campo de una fila, pero varios campos de `Viaje` son una llamada por fila
- * (`monto`, `hitos`, `entrega`, `riesgo`, `unidad`), igual que `AccionPropuesta.viaje` y `Cliente.lineaCredito`. Así,
+ * (`monto`, `hitos`, `entrega`, `riesgo`, `unidad`), igual que `AccionPropuesta.viaje` (`Cliente.lineaCredito` va en lotes de 100). Así,
  * `tablero { viajesEnCurso { hitos riesgo unidad entrega } }` con 100 viajes pedía 400 llamadas con complejidad bajo
  * 1.000, y con alias de `hitos(texto:)` muchas más. Contar esas listas como 100 no sirve: la operación del tablero
  * llegaría a 1.711.

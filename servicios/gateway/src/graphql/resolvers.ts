@@ -6,6 +6,7 @@ import { registrar, traceIdDe } from '../log';
 import { ESPERA, noDisponible, rutaRest, type ClienteServicios, type Llamada, type RutaRest, type Servicio } from '../servicios';
 import type { Cargadores } from './cargadores';
 import { Cursor, Dinero, Fecha, Instante, JSONEscalar } from './escalares';
+import { mutacionesLineaCredito } from './gestion-finanzas';
 import { LIMITE_MAXIMO } from './limites';
 import * as m from './mapeos';
 import { alertasNuevas } from './suscripcion';
@@ -324,6 +325,7 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
         });
         return m.factura(await oReleer(r, () => s.get<Json>(ctx, 'finanzas', rutaRest`/api/v1/facturas/${facturaId}`)));
       },
+      ...mutacionesLineaCredito(s),
       atenderAlerta: (_: unknown, { alertaId, nota, claveIdempotencia }: Args, ctx: Ctx) =>
         s.post<Json>(ctx, 'analitica', rutaRest`/api/v1/alertas/${alertaId}/atencion`, {
           cuerpo: nota ? { nota } : {},

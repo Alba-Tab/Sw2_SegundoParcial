@@ -71,6 +71,10 @@ export class ClienteServicios {
     return this.llamar<T>(ctx, servicio, 'POST', ruta, { tiempoMs: ESPERA.mutacion, ...llamada });
   }
 
+  put<T>(ctx: Contexto, servicio: Servicio, ruta: RutaRest, llamada: Llamada = {}): Promise<T> {
+    return this.llamar<T>(ctx, servicio, 'PUT', ruta, { tiempoMs: ESPERA.mutacion, ...llamada });
+  }
+
   async llamar<T>(ctx: Contexto, servicio: Servicio, metodo: string, ruta: RutaRest, llamada: Llamada): Promise<T> {
     // Antes de pedir el token: sin presupuesto no sale ninguna llamada (CONSULTA_DEMASIADO_COMPLEJA).
     ctx.presupuesto?.gastar(servicio);
