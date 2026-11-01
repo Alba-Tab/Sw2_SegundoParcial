@@ -1,7 +1,8 @@
 import { signal } from '@angular/core';
 import { TestBed, type ComponentFixture } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
-import { of } from 'rxjs';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { of, throwError } from 'rxjs';
 import { CONFIG_CENTRO, Sesion, type ConfigCentro } from 'ui-comun';
 import { LineasRepositorio } from '../data/lineas.repositorio';
 import { LineasPagina } from './lineas';
@@ -29,6 +30,7 @@ function montar(siguienteCursor: string | null = null, siguientes: typeof client
     cambiarEstado: vi.fn((clienteId: string, suspendida: boolean) =>
       of({ data: { cambiarEstadoLineaCredito: { clienteId, suspendida } } }),
     ),
+    linea: vi.fn(() => of({ loading: false, data: { lineaCredito: linea } })),
   };
   TestBed.configureTestingModule({
     providers: [
@@ -112,5 +114,51 @@ describe('gestión de la línea de crédito (G6, spec 012)', () => {
     await f.whenStable();
     f.detectChanges();
     expect(fila(raiz, 'Soya del Este').textContent).toContain('Suspendida');
+  });
+
+  it('E2-7: si el ajuste de una fila de «Cargar más» choca (LIMITE_MENOR_QUE_USADO), relee esa línea y la muestra', async () => {
+    const otro = { clienteId: 'c2', razonSocial: 'Soya del Este', nit: '2034567011', lineaCredito: linea };
+    const { f, repo, raiz } = montar('k1', [otro]);
+    const choque = new CombinedGraphQLErrors({
+      data: null,
+      errors: [
+        { message: 'x', path: ['ajustarLineaCredito'], extensions: { codigo: 'LIMITE_MENOR_QUE_USADO', usado: { monto: '25000.00' } } },
+      ],
+    });
+    repo.ajustar.mockReturnValueOnce(throwError(() => choque));
+    repo.linea.mockReturnValueOnce(
+      of({ loading: false, data: { lineaCredito: { ...linea, reservado: '22200.00', disponible: '5000.00' } } }),
+    );
+    await clic(f, boton(raiz, 'Cargar más clientes'));
+    await f.whenStable();
+    f.detectChanges();
+    await clic(f, boton(raiz, 'la línea de Soya del Este'));
+    await escribir(f, 'limite', '20000');
+    await escribir(f, 'motivo', 'Revisión anual');
+    await clic(f, boton(raiz, 'Cambiar el límite'));
+    await clic(f, boton(raiz, 'Sí, cambiar el límite'));
+    await f.whenStable();
+    f.detectChanges();
+    await f.whenStable();
+    f.detectChanges();
+    expect(repo.linea).toHaveBeenCalledWith('c2');
+    expect(fila(raiz, 'Soya del Este').textContent).toContain('22.200,00');
+  });
+
+  it('E2-7: en la primera página no relee aparte (la relee el refetch)', async () => {
+    const { f, repo, raiz } = montar();
+    const choque = new CombinedGraphQLErrors({
+      data: null,
+      errors: [{ message: 'x', path: ['ajustarLineaCredito'], extensions: { codigo: 'CONFLICTO_ESTADO' } }],
+    });
+    repo.ajustar.mockReturnValueOnce(throwError(() => choque));
+    await clic(f, boton(raiz, 'Gestionar'));
+    await escribir(f, 'limite', '50000');
+    await escribir(f, 'motivo', 'Revisión anual');
+    await clic(f, boton(raiz, 'Cambiar el límite'));
+    await clic(f, boton(raiz, 'Sí, cambiar el límite'));
+    await f.whenStable();
+    expect(repo.ajustar).toHaveBeenCalled();
+    expect(repo.linea).not.toHaveBeenCalled();
   });
 });

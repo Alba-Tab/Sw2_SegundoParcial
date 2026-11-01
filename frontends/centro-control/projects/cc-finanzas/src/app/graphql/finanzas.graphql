@@ -88,6 +88,7 @@ query Solicitudes($estado: String) {
   }
 }
 
+# E2-7: la línea de un cliente de una página extra, releída tras LIMITE_MENOR_QUE_USADO o CONFLICTO_ESTADO.
 query LineaCredito($clienteId: ID!) {
   lineaCredito(clienteId: $clienteId) {
     limite
@@ -95,6 +96,7 @@ query LineaCredito($clienteId: ID!) {
     utilizado
     disponible
     enMora
+    suspendida
   }
 }
 

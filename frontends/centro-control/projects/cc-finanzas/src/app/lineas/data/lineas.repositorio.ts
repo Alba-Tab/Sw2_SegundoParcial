@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { AjustarLineaCreditoGQL, CambiarEstadoLineaCreditoGQL, LineasCreditoGQL } from '../../graphql/generado';
+import { AjustarLineaCreditoGQL, CambiarEstadoLineaCreditoGQL, LineaCreditoGQL, LineasCreditoGQL } from '../../graphql/generado';
 
 /** Repositorio sobre Apollo de las líneas de crédito de todos los clientes y su gestión (G6, spec 012). */
 @Injectable({ providedIn: 'root' })
@@ -7,6 +7,7 @@ export class LineasRepositorio {
   private readonly gql = inject(LineasCreditoGQL);
   private readonly ajustarGql = inject(AjustarLineaCreditoGQL);
   private readonly estadoGql = inject(CambiarEstadoLineaCreditoGQL);
+  private readonly lineaGql = inject(LineaCreditoGQL);
 
   /** La primera página de clientes, con sondeo. Devuelve el `QueryRef`: `recargar` hace `refetch` sobre él (V4-1). */
   observar(cadaMs: number) {
@@ -16,6 +17,11 @@ export class LineasRepositorio {
   /** «Cargar más» (E5-1): la página siguiente, una vez y sin sondeo. */
   pagina(despuesDe: string) {
     return this.gql.fetch({ variables: { despuesDe } });
+  }
+
+  /** La línea de un cliente, sin caché (E2-7). */
+  linea(clienteId: string) {
+    return this.lineaGql.fetch({ variables: { clienteId }, fetchPolicy: 'network-only' });
   }
 
   ajustar(clienteId: string, limite: string, motivo: string, clave: string) {

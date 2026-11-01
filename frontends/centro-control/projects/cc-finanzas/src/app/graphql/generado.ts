@@ -154,7 +154,7 @@ export type LineaCreditoQueryVariables = Exact<{
 }>;
 
 export type LineaCreditoQuery = {
-  lineaCredito: { limite: string; reservado: string; utilizado: string; disponible: string; enMora: boolean } | null;
+  lineaCredito: { limite: string; reservado: string; utilizado: string; disponible: string; enMora: boolean; suspendida: boolean } | null;
 };
 
 export type LineasCreditoQueryVariables = Exact<{
@@ -392,6 +392,7 @@ export const LineaCreditoDocument = gql`
       utilizado
       disponible
       enMora
+      suspendida
     }
   }
 `;

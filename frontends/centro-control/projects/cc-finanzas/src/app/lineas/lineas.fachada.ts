@@ -1,7 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
-import { cargandoDe, completo, conservarUltimoBueno, Intentos, PaginasCursor } from 'ui-comun';
+import { cargandoDe, codigoDe, completo, conservarUltimoBueno, Intentos, PaginasCursor } from 'ui-comun';
 import type { LineasCreditoQuery } from '../graphql/generado';
 import { LineasRepositorio } from './data/lineas.repositorio';
 import { conLinea, type Linea } from './domain/linea';
@@ -51,19 +51,34 @@ export class LineasFachada {
   });
 
   async ajustar(clienteId: string, limite: string, motivo: string) {
-    const r = await this.intentos.enviar(`ajustarLineaCredito:${clienteId}`, { limite, motivo }, (clave) =>
-      this.repo.ajustar(clienteId, limite, motivo, clave),
-    );
+    const r = await this.intentos
+      .enviar(`ajustarLineaCredito:${clienteId}`, { limite, motivo }, (clave) => this.repo.ajustar(clienteId, limite, motivo, clave))
+      .catch((e) => this.releerYLanzar(clienteId, e));
     this.gestionada(clienteId, r.data?.ajustarLineaCredito);
     return r;
   }
 
   async cambiarEstado(clienteId: string, suspendida: boolean, motivo: string) {
-    const r = await this.intentos.enviar(`cambiarEstadoLineaCredito:${clienteId}`, { suspendida, motivo }, (clave) =>
-      this.repo.cambiarEstado(clienteId, suspendida, motivo, clave),
-    );
+    const r = await this.intentos
+      .enviar(`cambiarEstadoLineaCredito:${clienteId}`, { suspendida, motivo }, (clave) =>
+        this.repo.cambiarEstado(clienteId, suspendida, motivo, clave),
+      )
+      .catch((e) => this.releerYLanzar(clienteId, e));
     this.gestionada(clienteId, r.data?.cambiarEstadoLineaCredito);
     return r;
+  }
+
+  /**
+   * E2-7: otra operación cambió la línea. `recargar` solo relee la primera página, así que la línea de una fila de
+   * «Cargar más» se relee aparte y se guarda en `gestionadas`. Una relectura fallida no tapa el error original.
+   */
+  private async releerYLanzar(clienteId: string, e: unknown): Promise<never> {
+    const codigo = codigoDe(e);
+    if (!this.enPrimera().has(clienteId) && (codigo === 'LIMITE_MENOR_QUE_USADO' || codigo === 'CONFLICTO_ESTADO')) {
+      const r = await firstValueFrom(this.repo.linea(clienteId)).catch(() => undefined);
+      this.gestionada(clienteId, r?.data?.lineaCredito);
+    }
+    throw e;
   }
 
   private gestionada(clienteId: string, linea: Partial<Linea> | null | undefined): void {
