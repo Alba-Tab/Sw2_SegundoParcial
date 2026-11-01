@@ -21,7 +21,8 @@ export class RutasFachada {
   async crear(valores: ValoresRuta): Promise<string | undefined> {
     const input = aInputRuta(valores, true);
     const r = await this.intentos.enviar('crearRuta', input, (clave) => this.repo.crear({ ...input, claveIdempotencia: clave }));
-    await this.consulta.refetch();
+    // E10-1: la escritura ya se aplicó; si la relectura falla no es un error del envío (otra clave duplicaría el cambio).
+    await this.consulta.refetch().catch(() => undefined);
     return r.data?.crearRuta.rutaId;
   }
 }
@@ -47,7 +48,8 @@ export class RutaFachada {
   async editar(rutaId: string, valores: ValoresRuta): Promise<void> {
     const input = aInputRuta(valores);
     await this.intentos.enviar(`editarRuta:${rutaId}`, input, (clave) => this.repo.editar(rutaId, { ...input, claveIdempotencia: clave }));
-    await this.recargar();
+    // E10-1: la escritura ya se aplicó; si la relectura falla no es un error del envío (otra clave duplicaría el cambio).
+    await this.recargar().catch(() => undefined);
   }
 
   /** `refetch` del mismo `watch`: al resolver, `ruta()` ya trae la respuesta nueva (V4-1). */

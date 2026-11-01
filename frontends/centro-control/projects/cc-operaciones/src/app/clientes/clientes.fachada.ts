@@ -53,7 +53,8 @@ export class ClienteFachada {
     await this.intentos.enviar(`editarCliente:${clienteId}`, input, (clave) =>
       this.repo.editar(clienteId, { ...input, claveIdempotencia: clave }),
     );
-    await this.recargar();
+    // E10-1: la escritura ya se aplicó; si la relectura falla no es un error del envío (otra clave duplicaría el cambio).
+    await this.recargar().catch(() => undefined);
   }
 
   /** `refetch` del mismo `watch`: al resolver, `cliente()` ya trae la respuesta nueva (V4-1). */

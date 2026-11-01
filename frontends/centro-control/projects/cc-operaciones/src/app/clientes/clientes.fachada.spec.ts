@@ -60,4 +60,13 @@ describe('clientes: edición (G7)', () => {
     });
     expect(repo.refetch).toHaveBeenCalled();
   });
+
+  it('E10-1: si la relectura falla, la edición igual termina bien (no se ofrece reenviar con otra clave)', async () => {
+    const repo = preparar(['gerente']);
+    repo.refetch.mockRejectedValueOnce(new Error('sin red'));
+    const fachada = TestBed.inject(ClienteFachada);
+    fachada.id.set(ID);
+    TestBed.tick();
+    await expect(fachada.editar(ID, { razonSocial: 'Agro SRL', nit: '1020304', correo: 'a@agro.bo' })).resolves.toBeUndefined();
+  });
 });
