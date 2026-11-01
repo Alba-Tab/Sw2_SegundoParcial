@@ -1,5 +1,5 @@
 import { conLaElegidaPrimero } from '../../acciones/domain/accion';
-import { CLIENTE_FUERA_DE_LISTA, estadoServicio, nombreCliente, puedeCancelarServicio } from './servicio';
+import { estadoServicio, nombreCliente, puedeCancelarServicio } from './servicio';
 
 describe('cc-operaciones (dominio)', () => {
   it('spec 004: solo se cancela un servicio confirmado con la saga terminada', () => {
@@ -14,9 +14,9 @@ describe('cc-operaciones (dominio)', () => {
     expect(estadoServicio(null)).toBeNull();
   });
 
-  it('muestra la razón social de la copia de clientes; si no está, lo dice sin mostrar el id', () => {
-    expect(nombreCliente([{ clienteId: 'c1', razonSocial: 'Soya SA' }, null], 'c1')).toBe('Soya SA');
-    expect(nombreCliente(undefined, 'c2')).toBe(CLIENTE_FUERA_DE_LISTA);
+  it('muestra la razón social del servicio; si Viajes no la dio, "Sin dato" sin mostrar el id', () => {
+    expect(nombreCliente({ razonSocial: 'Soya SA' })).toBe('Soya SA');
+    expect(nombreCliente({ razonSocial: null })).toBe('Sin dato');
   });
 
   it('la acción abierta desde una alerta va primero', () => {

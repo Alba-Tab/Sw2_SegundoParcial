@@ -25,6 +25,8 @@ const MENSAJES: Record<string, string> = {
   DEPENDENCIA_NO_DISPONIBLE: 'El servicio no responde. Intenta de nuevo en un momento.',
   ERROR_INTERNO: 'Ocurrió un error inesperado. Intenta de nuevo; si se repite, avísanos.',
   TONELAJE_EXCEDIDO: 'El máximo por servicio es 30 toneladas.',
+  RUTA_SIN_TARIFA:
+    'Esa ruta todavía no tiene precio para este tipo de carga. Elige otro tipo de carga u otra ruta, o llama a atención comercial.',
   APROBACION_VENCIDA: 'La aprobación de crédito no llegó a tiempo.',
   CONFIRMACION_EN_CURSO: 'Tu servicio todavía se está confirmando. Espera a que termine.',
   CANCELACION_NO_PERMITIDA: 'El viaje ya salió. Para cancelarlo, llama a atención comercial.',

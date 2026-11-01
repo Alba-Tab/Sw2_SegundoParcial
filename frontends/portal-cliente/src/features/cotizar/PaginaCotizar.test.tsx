@@ -72,6 +72,21 @@ describe('Cotizar (spec 002)', () => {
     clienteActivo.actual = { modoComercial: false, clienteId: undefined };
   });
 
+  it('una ruta sin tarifa para esa carga (422 RUTA_SIN_TARIFA) se explica en palabras del cliente', async () => {
+    simularApi({
+      'GET /api/v1/rutas': { estado: 200, cuerpo: rutas },
+      'POST /api/v1/cotizaciones': { estado: 422, cuerpo: problema(422, 'RUTA_SIN_TARIFA') },
+    });
+    conConsultas(<PaginaCotizar />);
+    const ruta = await screen.findByRole('combobox', { name: /Ruta/ });
+    await waitFor(() => expect(ruta.getAttribute('aria-disabled')).toBeNull());
+    fireEvent.mouseDown(ruta);
+    fireEvent.click(within(await screen.findByRole('listbox')).getByText(/Santa Cruz – Aula/));
+    fireEvent.change(screen.getByLabelText(/Toneladas/), { target: { value: '20' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Cotizar' }));
+    expect(await screen.findByText(/todavía no tiene precio para este tipo de carga/)).toBeTruthy();
+  });
+
   it('avisa más de 30 toneladas sin llamar a Finanzas', async () => {
     const llamadas = simularApi({ 'GET /api/v1/rutas': { estado: 200, cuerpo: rutas } });
     conConsultas(<PaginaCotizar />);

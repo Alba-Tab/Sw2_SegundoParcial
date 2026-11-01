@@ -8,6 +8,7 @@ import type { Cargadores } from './cargadores';
 import { Cursor, Dinero, Fecha, Instante, JSONEscalar } from './escalares';
 import { mutacionesLineaCredito } from './gestion-finanzas';
 import { resolversGestionFlota } from './gestion-flota';
+import { resolversGestionViajes } from './gestion-viajes';
 import { LIMITE_MAXIMO } from './limites';
 import * as m from './mapeos';
 import { alertasNuevas } from './suscripcion';
@@ -110,6 +111,8 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
     }
   }
 
+  const gestionViajes = resolversGestionViajes(s);
+
   /** El POST ya devuelve el recurso (contrato); solo si vino vacío se relee. */
   const oReleer = async (r: Json | undefined, releer: () => Promise<Json>) => (r && Object.keys(r).length ? r : releer());
 
@@ -143,10 +146,11 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
             }),
           )
           .map(m.servicio),
-      clientes: async (_: unknown, __: Args, ctx: Ctx) =>
-        m.items(await s.get<Json>(ctx, 'viajes', rutaRest`/api/v1/clientes`, { query: { limite: LIMITE_MAXIMO } })),
       // listarRutas devuelve un arreglo plano, no una página (contratos/openapi/viajes.yaml).
-      rutas: async (_: unknown, __: Args, ctx: Ctx) => m.items(await s.get<Json>(ctx, 'viajes', rutaRest`/api/v1/rutas`)).map(m.ruta),
+      rutas: async (_: unknown, { incluirInactivas }: Args, ctx: Ctx) =>
+        m.items(await s.get<Json>(ctx, 'viajes', rutaRest`/api/v1/rutas`, { query: { incluirInactivas } })).map(m.ruta),
+      ...gestionViajes.Query,
+      clientes: (_: unknown, { limite, despuesDe }: Args, ctx: Ctx) => gestionViajes.clientes(ctx, limiteValido(limite, 50), despuesDe),
 
       unidades: async (_: unknown, { tipo, estado, placa }: Args, ctx: Ctx) =>
         m
@@ -256,6 +260,8 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
       riesgo: (v: Json, __: Args, ctx: Ctx) => (v['estado'] === 'EN_RUTA' ? ctx.cargadores.riesgo.load(v['viajeId']) : null),
       unidad: (v: Json, __: Args, ctx: Ctx) => (v['placa'] ? ctx.cargadores.unidadPorPlaca.load(v['placa']) : null),
     },
+    Servicio: gestionViajes.Servicio,
+    Cotizacion: gestionViajes.Cotizacion,
     Cliente: {
       lineaCredito: (c: Json, __: Args, ctx: Ctx) => ctx.cargadores.lineaCredito.load(c['clienteId']),
     },
@@ -375,6 +381,7 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
       },
       preguntar: (_: unknown, { texto }: Args, ctx: Ctx) =>
         s.post<Json>(ctx, 'analitica', rutaRest`/api/v1/voz/preguntas`, { cuerpo: { texto }, tiempoMs: ESPERA.preguntar }),
+      ...gestionViajes.Mutation,
     },
 
     Subscription: {

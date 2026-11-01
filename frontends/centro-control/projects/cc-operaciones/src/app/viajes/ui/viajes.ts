@@ -37,7 +37,7 @@ import { Vistas, VISTAS } from '../../vistas';
       nombre="viajes"
       singular="viaje"
       [limite]="80"
-      corte="antiguos"
+      corte="recientes"
       [estadoEnServidor]="true"
     />
     <div class="tabla-ancha" role="region" tabindex="0" aria-label="Viajes">

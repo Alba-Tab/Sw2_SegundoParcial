@@ -1275,4 +1275,40 @@ class ServiciosIT {
                         .query(Long.class)
                         .single());
     }
+
+    @Test
+    void listarViajesDevuelveLosMasRecientesPrimeroYElCursorSigueHaciaAtras() throws Exception {
+        List<String> ids = List.of(
+                "01933a00-0000-7000-8000-000000000101",
+                "01933a00-0000-7000-8000-000000000102",
+                "01933a00-0000-7000-8000-000000000103");
+        for (String id : ids) {
+            jdbc.sql("""
+                            INSERT INTO servicio (servicio_id, viaje_id, cliente_id, cotizacion_id, canal, creado_por,
+                                                  workflow_id, confirmacion_completa, creado_en)
+                            VALUES (CAST(:id AS uuid), CAST(:id AS uuid), CAST(:cliente AS uuid), CAST(:id AS uuid),
+                                    'PORTAL', 's', :id, true, now())""").param("id", id).param("cliente", CLIENTE).update();
+            jdbc.sql("""
+                            INSERT INTO viaje (viaje_id, servicio_id, cliente_id, cotizacion_id, estado, ruta_id, tipo_carga,
+                                               toneladas, fecha_viaje, monto, placa, chofer_nombre, creado_en, actualizado_en)
+                            VALUES (CAST(:id AS uuid), CAST(:id AS uuid), CAST(:cliente AS uuid), CAST(:id AS uuid),
+                                    'CONFIRMADO', :ruta, 'GRANOS', 10, current_date, 100, '1234ABC', 'Juan', now(), now())""")
+                    .param("id", id)
+                    .param("cliente", CLIENTE)
+                    .param("ruta", TemporalDePrueba.RUTA_AULA)
+                    .update();
+        }
+        String despacho = TokensDePrueba.token("d", "despachador", null);
+        var primera = pedir("GET", "/api/v1/viajes?limite=2", despacho, null, null);
+        assertEquals(
+                ids.get(2), primera.cuerpo().get("items").get(0).get("viajeId").asString());
+        assertEquals(
+                ids.get(1), primera.cuerpo().get("items").get(1).get("viajeId").asString());
+        String cursor = primera.cuerpo().get("siguienteCursor").asString();
+        var segunda = pedir("GET", "/api/v1/viajes?limite=2&cursor=" + cursor, despacho, null, null);
+        assertEquals(1, segunda.cuerpo().get("items").size());
+        assertEquals(
+                ids.get(0), segunda.cuerpo().get("items").get(0).get("viajeId").asString());
+        assertFalse(segunda.cuerpo().hasNonNull("siguienteCursor"));
+    }
 }

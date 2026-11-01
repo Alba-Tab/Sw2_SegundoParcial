@@ -20,7 +20,10 @@ function montar() {
     removeListener: nada,
   }));
   const repo = {
-    observar: () => ({ valueChanges: of({ loading: false, data: { clientes } }), refetch: vi.fn(async () => ({})) }),
+    observar: () => ({
+      valueChanges: of({ loading: false, data: { clientes: { items: clientes, siguienteCursor: null } } }),
+      refetch: vi.fn(async () => ({})),
+    }),
     ajustar: vi.fn(() => of({ data: {} })),
     cambiarEstado: vi.fn(() => of({ data: {} })),
   };

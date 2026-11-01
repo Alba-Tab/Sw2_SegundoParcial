@@ -3,6 +3,7 @@ package bo.transporte.viajes.aplicacion.cliente;
 import bo.transporte.viajes.aplicacion.comun.Solicitante;
 import bo.transporte.viajes.aplicacion.puerto.salida.ClienteRepositorio;
 import bo.transporte.viajes.dominio.comun.ErrorDeDominio;
+import java.util.Collection;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -26,6 +27,13 @@ public class ConsultaDeClientes {
         var lote = clientes.listar(texto, despuesDe, limite + 1);
         var items = lote.stream().limit(limite).map(ClienteVista::de).toList();
         return new Pagina(items, lote.size() > limite ? items.getLast().clienteId() : null);
+    }
+
+    /** E2-8: los clientes de esos ids (activos o no) en una consulta, para el DataLoader del Gateway; sin cursor. */
+    public Pagina porIds(Solicitante quien, Collection<UUID> ids) {
+        if (!quien.tieneAlguno(LISTAN)) throw new ErrorDeDominio("SIN_PERMISO", "Sin permiso para listar clientes");
+        return new Pagina(
+                clientes.porIds(Set.copyOf(ids)).stream().map(ClienteVista::de).toList(), null);
     }
 
     public ClienteVista mio(Solicitante quien) {

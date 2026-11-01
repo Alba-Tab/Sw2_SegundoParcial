@@ -324,7 +324,12 @@ public class ProgramarViajeImpl implements ProgramarViaje {
                         "finanzas",
                         15,
                         Duration.ofMinutes(30),
-                        noReintentar("COTIZACION_VENCIDA", "COTIZACION_AJENA", "CREDITO_INSUFICIENTE")));
+                        // Solo cambia la política de reintentos, no los comandos: el replay no necesita getVersion.
+                        noReintentar(
+                                "COTIZACION_VENCIDA",
+                                "COTIZACION_AJENA",
+                                "CREDITO_INSUFICIENTE",
+                                "CREDITO_RECHAZADO")));
         finanzasDecision = Workflow.newActivityStub(
                 ActividadesSaga.Finanzas.class, opciones("finanzas", 15, Duration.ofMinutes(30), REINTENTO));
         finanzasCompensacion = Workflow.newActivityStub(

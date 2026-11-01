@@ -181,6 +181,24 @@ class PeticionesInvalidasIT {
                 "El método DELETE no existe en esta ruta",
                 metodo.cuerpo().get("detail").asString());
 
+        // F1-4: Bean Validation en español aunque el navegador pida inglés.
+        var corto = http.send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + puerto + "/api/v1/clientes"))
+                        .header("Authorization", "Bearer " + TokensDePrueba.token("sub-portal", "", null))
+                        .header("Content-Type", "application/json")
+                        .header("Accept-Language", "en-US")
+                        .header("Idempotency-Key", UUID.randomUUID().toString())
+                        .POST(HttpRequest.BodyPublishers.ofString(
+                                "{\"razonSocial\":\"AB\",\"nit\":\"1023456\",\"correo\":\"a@b.bo\","
+                                        + "\"telefono\":\"+59133456789\",\"direccion\":\"Av. Banzer\"}"))
+                        .build(),
+                HttpResponse.BodyHandlers.ofString());
+        assertEquals(400, corto.statusCode());
+        JsonNode errorCorto = json.readTree(corto.body()).get("errores").get(0);
+        assertEquals("razonSocial", errorCorto.get("campo").asString());
+        assertEquals(
+                "el tamaño debe estar entre 3 y 120", errorCorto.get("mensaje").asString());
+
         for (var r : List.of(tipo, ruta, falta, roto, malTipo, metodo)) {
             String detalle = r.cuerpo().get("detail").asString();
             assertFalse(detalle.contains("Failed") || detalle.contains("Required"), detalle);

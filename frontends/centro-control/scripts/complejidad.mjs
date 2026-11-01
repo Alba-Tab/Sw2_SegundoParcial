@@ -2,7 +2,7 @@
 // cuenta cada operación de projects/*/src/**/*.graphql contra contratos/graphql/centro-control.graphql con la misma
 // regla del Gateway (servicios/gateway/src/graphql/limites.ts) y falla si alguna se pasa:
 //   - cada campo vale 1 más lo de adentro;
-//   - una lista con argumento `limite` vale 1 + limite × max(1, lo de adentro), con limite acotado a 1–100 (sin
+//   - una lista (o una página `…Pagina`) con argumento `limite` vale 1 + limite × max(1, lo de adentro), con limite acotado a 1–100 (sin
 //     valor: el valor por defecto del esquema, o 20; una variable cuenta como 100, el peor caso);
 //   - Apollo agrega `__typename` a cada selección (objeto o fragmento), y también vale 1.
 // Da lo mismo que graphql-query-complexity con esa regla. Uso: node scripts/complejidad.mjs (corre en npm run verificar).
@@ -62,7 +62,9 @@ function complejidad(seleccion, tipo, fragmentos, vistos = new Set(), raiz = fal
       isCompositeType(getNamedType(campo.type)) && s.selectionSet
         ? complejidad(s.selectionSet, getNamedType(campo.type), fragmentos, vistos)
         : 0;
-    const conLimite = esLista(campo.type) && campo.args.some((a) => a.name === 'limite');
+    // Una página con cursor (`…Pagina`, E5-1) cuenta como una lista: su `items` trae hasta `limite` filas.
+    const pagina = /Pagina$/.test(getNamedType(campo.type).name);
+    const conLimite = (esLista(campo.type) || pagina) && campo.args.some((a) => a.name === 'limite');
     total += conLimite ? 1 + limiteContado(campo, s) * Math.max(1, interno) : 1 + interno;
   }
   return raiz || conTypename ? total : total + 1;
@@ -80,7 +82,9 @@ for (const proyecto of readdirSync(join(raiz, 'projects'))) {
       const tipo = esquema.getRootType(op.operation);
       const total = complejidad(op.selectionSet, tipo, fragmentos, new Set(), true);
       if (total > MAXIMO) fallas++;
-      filas.push(`${total > MAXIMO ? '✘' : '✔'} ${String(total).padStart(5)}  ${op.name?.value ?? '(anónima)'}  ${relative(raiz, archivo)}`);
+      filas.push(
+        `${total > MAXIMO ? '✘' : '✔'} ${String(total).padStart(5)}  ${op.name?.value ?? '(anónima)'}  ${relative(raiz, archivo)}`,
+      );
     }
   }
 }

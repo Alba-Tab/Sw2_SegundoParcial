@@ -17,6 +17,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -214,6 +215,10 @@ class ClientesIT {
         var nitMalo = pedir("POST", "/api/v1/clientes", NUEVO, UUID.randomUUID(), empresa("12a"));
         assertEquals(400, nitMalo.estado());
         assertEquals("VALIDACION", nitMalo.cuerpo().get("codigo").asString());
+        // F2-4: el NIT dice qué se espera, no la expresión regular.
+        assertEquals(
+                "Solo números, de 5 a 20 dígitos",
+                nitMalo.cuerpo().get("errores").get(0).get("mensaje").asString());
 
         var sinClave = pedir("POST", "/api/v1/clientes", NUEVO, null, empresa("1023456019"));
         assertEquals(400, sinClave.estado());
@@ -249,6 +254,27 @@ class ClientesIT {
                 pedir("GET", "/api/v1/clientes/" + ajeno, cliente, null, null).estado());
         assertEquals(
                 404, pedir("GET", "/api/v1/clientes/mio", NUEVO, null, null).estado());
+
+        // E2-8: por lotes de ids, sin cursor; un id que no existe no sale.
+        var lote = pedir(
+                "GET", "/api/v1/clientes?ids=" + propio + "," + ajeno + "," + UUID.randomUUID(), comercial, null, null);
+        assertEquals(200, lote.estado());
+        assertEquals(2, lote.cuerpo().get("items").size());
+        assertFalse(lote.cuerpo().hasNonNull("siguienteCursor"));
+        String muchos = String.join(
+                ",",
+                java.util.stream.Stream.generate(UUID::randomUUID)
+                        .limit(101)
+                        .map(UUID::toString)
+                        .toList());
+        assertEquals(
+                400,
+                pedir("GET", "/api/v1/clientes?ids=" + muchos, comercial, null, null)
+                        .estado());
+        assertEquals(
+                403,
+                pedir("GET", "/api/v1/clientes?ids=" + propio, cliente, null, null)
+                        .estado());
     }
 
     @Test
@@ -269,5 +295,227 @@ class ClientesIT {
                 404,
                 pedir("GET", "/api/v1/rutas/" + UUID.randomUUID(), NUEVO, null, null)
                         .estado());
+    }
+
+    /** {@code activa} null: sin el campo, como en el alta (la ruta nace inactiva). */
+    private static String ruta(String nombre, int radio, String km, Boolean activa) {
+        return """
+                {"nombre":"%s","origen":{"nombre":"Santa Cruz","coordenadas":{"lat":-17.78,"lng":-63.18}},
+                 "destino":{"nombre":"La Paz","coordenadas":{"lat":-16.5,"lng":-68.15},"radioMetros":%d},
+                 "distanciaKm":%s%s}""".formatted(nombre, radio, km, activa == null ? "" : ",\"activa\":" + activa);
+    }
+
+    private JsonNode eventosDeRuta(String rutaId) {
+        return json.readTree(jdbc.sql(
+                        "SELECT COALESCE(json_agg(sobre ORDER BY id), '[]')::text FROM outbox_eventos WHERE tipo = 'RutaActualizada'"
+                                + " AND sobre->'datos'->>'rutaId' = :id")
+                .param("id", rutaId)
+                .query(String.class)
+                .single());
+    }
+
+    @Test
+    void gerenteYDespachadorCreanYEditanRutasConSuEventoYSuVersion() throws Exception {
+        String gerente = TokensDePrueba.token("sub-gerente", "gerente", null);
+        UUID clave = UUID.randomUUID();
+        var alta = pedir("POST", "/api/v1/rutas", gerente, clave, ruta("SCZ – LPZ", 300, "850.06", null));
+        assertEquals(201, alta.estado());
+        String id = alta.cuerpo().get("rutaId").asString();
+        assertFalse(alta.cuerpo().get("activa").asBoolean(), "F1-2: nace inactiva hasta tener tarifa");
+        assertEquals(
+                "/api/v1/rutas/" + id,
+                alta.cruda().headers().firstValue("Location").orElseThrow());
+        assertEquals(
+                0,
+                new java.math.BigDecimal("850.1")
+                        .compareTo(alta.cuerpo().get("distanciaKm").decimalValue()));
+        var reenvio = pedir("POST", "/api/v1/rutas", gerente, clave, ruta("SCZ – LPZ", 300, "850.06", null));
+        assertEquals(201, reenvio.estado());
+        assertEquals(id, reenvio.cuerpo().get("rutaId").asString());
+        assertEquals(1L, jdbc.sql("SELECT count(*) FROM ruta").query(Long.class).single());
+        assertEquals(1, eventosDeRuta(id).size());
+        assertEquals(
+                1, eventosDeRuta(id).get(0).get("datos").get("versionAgregado").asInt());
+
+        String despacho = TokensDePrueba.token("sub-despacho", "despachador", null);
+        var edicion =
+                pedir("PUT", "/api/v1/rutas/" + id, despacho, UUID.randomUUID(), ruta("SCZ – LPZ", 500, "851", true));
+        assertEquals(200, edicion.estado());
+        assertTrue(edicion.cuerpo().get("activa").asBoolean());
+        assertEquals(500, edicion.cuerpo().get("destino").get("radioMetros").asInt());
+        var eventos = eventosDeRuta(id);
+        assertEquals(2, eventos.size());
+        assertFalse(eventos.get(0).get("datos").get("activa").asBoolean());
+        assertEquals(2, eventos.get(1).get("datos").get("versionAgregado").asInt());
+        assertTrue(eventos.get(1).get("datos").get("activa").asBoolean());
+        assertEquals(
+                List.of("CREAR_RUTA", "EDITAR_RUTA"),
+                jdbc.sql("SELECT accion FROM auditoria WHERE entidad = 'Ruta' ORDER BY id")
+                        .query(String.class)
+                        .list());
+
+        pedir("PUT", "/api/v1/rutas/" + id, despacho, UUID.randomUUID(), ruta("SCZ – LPZ", 500, "851", false));
+        assertEquals(
+                0, pedir("GET", "/api/v1/rutas", despacho, null, null).cuerpo().size());
+        assertEquals(
+                1,
+                pedir("GET", "/api/v1/rutas?incluirInactivas=true", despacho, null, null)
+                        .cuerpo()
+                        .size());
+        assertEquals(
+                200, pedir("GET", "/api/v1/rutas/" + id, despacho, null, null).estado());
+
+        // F2-3: las inactivas solo para gerente y despachador; los demás no las ven.
+        String comercial = TokensDePrueba.token("sub-comercial", "comercial", null);
+        assertEquals(
+                0,
+                pedir("GET", "/api/v1/rutas?incluirInactivas=true", comercial, null, null)
+                        .cuerpo()
+                        .size());
+        assertEquals(
+                404, pedir("GET", "/api/v1/rutas/" + id, comercial, null, null).estado());
+    }
+
+    @Test
+    void rutasSoloParaGerenteYDespachadorConLimitesPorCampo() throws Exception {
+        String chofer = TokensDePrueba.token("sub-chofer", "chofer", null);
+        String comercial = TokensDePrueba.token("sub-comercial", "comercial", null);
+        String gerente = TokensDePrueba.token("sub-gerente", "gerente", null);
+        assertEquals(
+                403,
+                pedir("POST", "/api/v1/rutas", chofer, UUID.randomUUID(), ruta("Ruta", 300, "10", null))
+                        .estado());
+        assertEquals(
+                403,
+                pedir("POST", "/api/v1/rutas", comercial, UUID.randomUUID(), ruta("Ruta", 300, "10", null))
+                        .estado());
+        // E2-11: el rol se valida antes que el cuerpo (403, no 400 por `activa`).
+        assertEquals(
+                403,
+                pedir("POST", "/api/v1/rutas", chofer, UUID.randomUUID(), ruta("Ruta", 300, "10", true))
+                        .estado());
+        assertEquals(
+                403,
+                pedir(
+                                "PUT",
+                                "/api/v1/rutas/" + UUID.randomUUID(),
+                                chofer,
+                                UUID.randomUUID(),
+                                ruta("Ruta", 300, "10", null))
+                        .estado());
+
+        var radio = pedir("POST", "/api/v1/rutas", gerente, UUID.randomUUID(), ruta("Ruta", 40, "10", null));
+        assertEquals(400, radio.estado());
+        assertEquals("VALIDACION", radio.cuerpo().get("codigo").asString());
+        var nombre = pedir("POST", "/api/v1/rutas", gerente, UUID.randomUUID(), ruta("  A ", 300, "10", null));
+        assertEquals(400, nombre.estado());
+        assertEquals(
+                400,
+                pedir("POST", "/api/v1/rutas", gerente, null, ruta("Ruta", 300, "10", null))
+                        .estado());
+        var conActiva = pedir("POST", "/api/v1/rutas", gerente, UUID.randomUUID(), ruta("Ruta", 300, "10", true));
+        assertEquals(400, conActiva.estado());
+        assertEquals(
+                "activa", conActiva.cuerpo().get("errores").get(0).get("campo").asString());
+        // F2-4: el mensaje del campo sin "activa: " delante.
+        assertEquals(
+                "No va en el alta: la ruta nace inactiva hasta tener su tarifa",
+                conActiva.cuerpo().get("errores").get(0).get("mensaje").asString());
+        assertEquals(
+                404,
+                pedir(
+                                "PUT",
+                                "/api/v1/rutas/" + UUID.randomUUID(),
+                                gerente,
+                                UUID.randomUUID(),
+                                ruta("Ruta", 300, "10", true))
+                        .estado());
+        var sinActiva = pedir(
+                "PUT", "/api/v1/rutas/" + UUID.randomUUID(), gerente, UUID.randomUUID(), ruta("Ruta", 300, "10", null));
+        assertEquals(400, sinActiva.estado());
+        assertEquals(
+                "activa", sinActiva.cuerpo().get("errores").get(0).get("campo").asString());
+        assertEquals(
+                0L,
+                jdbc.sql("SELECT count(*) FROM outbox_eventos")
+                        .query(Long.class)
+                        .single());
+    }
+
+    private static String edicion(String razon, String nit, String correo) {
+        return """
+                {"razonSocial":"%s","nit":"%s","correo":"%s"}""".formatted(razon, nit, correo);
+    }
+
+    @Test
+    void comercialYGerenteEditanElClienteConLasReglasDelAltaYSuEvento() throws Exception {
+        String comercial = TokensDePrueba.token("sub-comercial", "comercial", null);
+        String id = pedir("POST", "/api/v1/clientes", comercial, UUID.randomUUID(), empresa("1000001"))
+                .cuerpo()
+                .get("clienteId")
+                .asString();
+        String otro = pedir("POST", "/api/v1/clientes", comercial, UUID.randomUUID(), empresa("1000002"))
+                .cuerpo()
+                .get("clienteId")
+                .asString();
+        jdbc.sql("DELETE FROM outbox_eventos").update();
+
+        UUID clave = UUID.randomUUID();
+        String cuerpo = edicion("Agroexport Bolivia SRL", "1000009", "pagos@agroexport.example");
+        var r = pedir("PUT", "/api/v1/clientes/" + id, comercial, clave, cuerpo);
+        assertEquals(200, r.estado());
+        assertEquals("Agroexport Bolivia SRL", r.cuerpo().get("razonSocial").asString());
+        assertEquals("+59133456789", r.cuerpo().get("telefono").asString(), "el teléfono no cambia");
+        assertEquals(
+                200,
+                pedir("PUT", "/api/v1/clientes/" + id, comercial, clave, cuerpo).estado());
+        JsonNode sobre = json.readTree(jdbc.sql("SELECT sobre::text FROM outbox_eventos")
+                .query(String.class)
+                .single());
+        assertEquals("ClienteActualizado", sobre.get("tipo").asString());
+        assertEquals(2, sobre.get("datos").get("versionAgregado").asInt());
+        assertEquals(
+                "pagos@agroexport.example", sobre.get("datos").get("correo").asString());
+
+        String gerente = TokensDePrueba.token("sub-gerente", "gerente", null);
+        var mismoNit = pedir(
+                "PUT",
+                "/api/v1/clientes/" + otro,
+                gerente,
+                UUID.randomUUID(),
+                edicion("Otra SRL", "1000009", "o@x.example"));
+        assertEquals(409, mismoNit.estado());
+        assertEquals(id, mismoNit.cuerpo().get("clienteId").asString());
+        var nitMalo = pedir(
+                "PUT",
+                "/api/v1/clientes/" + otro,
+                gerente,
+                UUID.randomUUID(),
+                edicion("Otra SRL", "12a", "o@x.example"));
+        assertEquals(400, nitMalo.estado());
+        String despacho = TokensDePrueba.token("sub-despacho", "despachador", null);
+        assertEquals(
+                403,
+                pedir(
+                                "PUT",
+                                "/api/v1/clientes/" + otro,
+                                despacho,
+                                UUID.randomUUID(),
+                                edicion("Otra SRL", "1000003", "o@x.example"))
+                        .estado());
+        assertEquals(
+                404,
+                pedir(
+                                "PUT",
+                                "/api/v1/clientes/" + UUID.randomUUID(),
+                                gerente,
+                                UUID.randomUUID(),
+                                edicion("Otra SRL", "1000003", "o@x.example"))
+                        .estado());
+        assertEquals(
+                1L,
+                jdbc.sql("SELECT count(*) FROM outbox_eventos")
+                        .query(Long.class)
+                        .single());
     }
 }

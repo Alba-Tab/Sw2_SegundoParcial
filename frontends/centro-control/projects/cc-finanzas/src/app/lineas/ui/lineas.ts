@@ -14,7 +14,7 @@ import {
   enfocar,
   Estado,
   FiltrosLista,
-  LIMITE_GATEWAY,
+  mensajeDe,
   PieLista,
   posicionEstado,
 } from 'ui-comun';
@@ -50,9 +50,6 @@ import { GestionLinea } from './gestion-linea';
       [sinDatos]="!lineas().length"
       [extra]="avisoIncompletas()"
     />
-    @if (clientesLeidos() >= limiteClientes) {
-      <p class="secundario">Se revisan los primeros {{ limiteClientes }} clientes: si hay más, sus líneas no salen aquí.</p>
-    }
     <cc-filtros-lista
       [control]="lista"
       [cargando]="cargando()"
@@ -126,6 +123,16 @@ import { GestionLinea } from './gestion-linea';
       [error]="error()"
       [cargando]="cargando()"
     />
+    @if (paginas.siguienteCursor()) {
+      <!-- E5-1: la búsqueda y el orden usan solo los clientes ya cargados. -->
+      <p class="secundario">Hay más clientes; la búsqueda y el orden solo usan las líneas ya cargadas.</p>
+      @if (paginas.error(); as e) {
+        <p class="aviso-lista" role="alert">No se pudieron cargar más clientes. {{ mensaje(e) }}</p>
+      }
+      <button mat-stroked-button (click)="paginas.cargarMas()" [disabled]="paginas.cargandoMas()" disabledInteractive>
+        {{ paginas.error() ? 'Reintentar' : 'Cargar más clientes' }}
+      </button>
+    }
   `,
 })
 export class LineasPagina {
@@ -138,8 +145,8 @@ export class LineasPagina {
     const n = this.fachada.incompletas();
     return n ? `No se pudo leer la línea de ${n} ${n === 1 ? 'cliente' : 'clientes'}: la lista está incompleta.` : null;
   });
-  readonly clientesLeidos = this.fachada.clientesLeidos;
-  readonly limiteClientes = LIMITE_GATEWAY;
+  readonly paginas = this.fachada.paginas;
+  readonly mensaje = mensajeDe;
   /** Una línea caída la cuenta el aviso de la lista: sin banner repetido (V1-11). */
   readonly campos = { clientes: 'Viajes', lineaCredito: '' };
   readonly columnas = columnasConEstado(['cliente', 'limite', 'reservado', 'utilizado', 'disponible', 'estado', 'acciones']);

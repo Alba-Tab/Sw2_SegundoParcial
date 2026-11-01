@@ -55,6 +55,29 @@ class ClienteRepositorioJdbc implements ClienteRepositorio {
     }
 
     @Override
+    public Optional<Cliente> paraActualizar(UUID clienteId) {
+        return jdbc.sql("SELECT " + COLUMNAS + " FROM cliente WHERE cliente_id = :id FOR UPDATE")
+                .param("id", clienteId)
+                .query(this::fila)
+                .optional();
+    }
+
+    @Override
+    public void actualizar(Cliente c) {
+        var d = c.datos();
+        jdbc.sql("UPDATE cliente SET razon_social = :razonSocial, nit = :nit, correo = :correo, telefono = :telefono,"
+                        + " direccion = :direccion, version_agregado = :version WHERE cliente_id = :id")
+                .param("id", c.clienteId())
+                .param("razonSocial", d.razonSocial())
+                .param("nit", d.nit())
+                .param("correo", d.correo())
+                .param("telefono", d.telefono())
+                .param("direccion", d.direccion())
+                .param("version", c.versionAgregado())
+                .update();
+    }
+
+    @Override
     public Optional<Cliente> porId(UUID clienteId) {
         return jdbc.sql("SELECT " + COLUMNAS + " FROM cliente WHERE cliente_id = :id")
                 .param("id", clienteId)

@@ -45,11 +45,12 @@ query Factura($id: ID!) {
   }
 }
 
-# D101: 80 × 11 + 1 más clientes y rutas = 889.
+# D101: 80 × 12 + 1 más rutas = 965. La razón social viene en cada cotización (E5-1: `clientes` es por páginas).
 query Cotizaciones {
   cotizaciones(limite: 80) {
     cotizacionId
     clienteId
+    razonSocial
     rutaId
     tipoCarga
     toneladas
@@ -58,10 +59,6 @@ query Cotizaciones {
     vencida
     canal
     creadaEn
-  }
-  clientes {
-    clienteId
-    razonSocial
   }
   rutas {
     rutaId
@@ -101,22 +98,25 @@ query LineaCredito($clienteId: ID!) {
   }
 }
 
-# G6: la línea de cada cliente va anidada en `clientes` (una sola petición del navegador). `clientes` trae como máximo
-# 100 (LIMITE_MAXIMO del Gateway, sin cursor) y el Gateway pide a Finanzas una línea por cliente; la pantalla dice
-# si llegó al tope y cuántas líneas vinieron con error (revisión D-1, D-2).
-query LineasCredito {
-  clientes {
-    clienteId
-    razonSocial
-    nit
-    lineaCredito {
-      limite
-      reservado
-      utilizado
-      disponible
-      enMora
-      suspendida
+# G6: la línea de cada cliente va anidada en `clientes` (una sola petición del navegador); el Gateway pide a Finanzas
+# las líneas de la página en un lote (B5). E5-1: de a 50 clientes, con «Cargar más» por `despuesDe`; la pantalla dice
+# cuántas líneas vinieron con error (revisión D-1, E2-2).
+query LineasCredito($despuesDe: Cursor) {
+  clientes(limite: 50, despuesDe: $despuesDe) {
+    items {
+      clienteId
+      razonSocial
+      nit
+      lineaCredito {
+        limite
+        reservado
+        utilizado
+        disponible
+        enMora
+        suspendida
+      }
     }
+    siguienteCursor
   }
 }
 

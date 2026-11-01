@@ -4,7 +4,6 @@ import { switchMap } from 'rxjs';
 import { cargandoDe, conservarUltimoBueno, Intentos, puedeVer, Sesion } from 'ui-comun';
 import type { EstadoServicio } from '../graphql/generado';
 import { ServiciosRepositorio } from './data/servicios.repositorio';
-import { nombreCliente } from './domain/servicio';
 
 /** Fachada de los servicios, cada 20 s, filtrados por estado en Viajes (null: todos), y su cancelación. */
 @Injectable()
@@ -25,10 +24,6 @@ export class ServiciosFachada {
   readonly error = computed(() => this.datos()?.error);
   readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
-
-  nombreCliente(clienteId: string): string {
-    return nombreCliente(this.datos()?.data?.clientes, clienteId);
-  }
 
   cancelar(servicioId: string, motivo: string) {
     return this.intentos.enviar(`cancelarServicio:${servicioId}`, { motivo }, (clave) => this.repo.cancelar(servicioId, motivo, clave));

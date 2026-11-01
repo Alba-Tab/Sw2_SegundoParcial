@@ -69,7 +69,7 @@ El cliente (o comercial a su nombre) pide precio para una ruta, un tipo de carga
 | Caso | Respuesta |
 |---|---|
 | Ruta inexistente o inactiva | `404 NO_ENCONTRADO` (Finanzas al cotizar; además, Viajes no muestra las rutas inactivas a quien no es gerente ni despachador) |
-| Ruta sin tarifa para ese tipo de carga | `400 VALIDACION` con el campo `tipoCarga` |
+| Ruta sin tarifa para ese tipo de carga | `422 RUTA_SIN_TARIFA` (una ruta nueva del Centro de Control nace inactiva hasta tener tarifa; las tarifas siguen de semilla, D10) |
 | Más de 30 t | `422 TONELAJE_EXCEDIDO` |
 | Fecha pasada o a más de 60 días | `400 VALIDACION` |
 | Cliente aún no replicado en Finanzas (acaba de registrarse) | `503 CLIENTE_NO_REPLICADO` con `Retry-After: 2`; el portal reintenta solo |

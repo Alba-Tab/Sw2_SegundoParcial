@@ -354,6 +354,137 @@ describe('revisión del Gateway', () => {
     ]);
   });
 
+  // ---- gestión de datos maestros de Viajes (G4, G7, B1, B2; D104)
+  const RUTA_REST = {
+    rutaId: 'r1',
+    nombre: 'Santa Cruz – La Paz',
+    origen: { nombre: 'Santa Cruz', coordenadas: { lat: -17.78, lng: -63.18 } },
+    destino: { nombre: 'La Paz', coordenadas: { lat: -16.5, lng: -68.15 }, radioMetros: 300 },
+    distanciaKm: 850,
+    activa: false,
+  };
+  const RUTA_INPUT = {
+    nombre: 'Santa Cruz – La Paz',
+    origen: { nombre: 'Santa Cruz', coordenadas: { lat: -17.78, lng: -63.18 } },
+    destino: { nombre: 'La Paz', coordenadas: { lat: -16.5, lng: -68.15 }, radioMetros: 300 },
+    distanciaKm: 850,
+    claveIdempotencia: 'clave-ruta',
+  };
+  const CAMPOS_RUTA = 'rutaId activa radioMetros destino destinoCoordenadas { lat lng } origenCoordenadas { lat }';
+
+  it('G4: crearRuta y editarRuta van a Viajes con Idempotency-Key, solo para gerente y despachador', async () => {
+    rutas.set('POST /viajes/api/v1/rutas', () => ({ status: 201, json: RUTA_REST }));
+    rutas.set('PUT /viajes/api/v1/rutas/r1', () => ({ json: RUTA_REST }));
+    const crear = `mutation($i: RutaInput!) { crearRuta(input: $i) { ${CAMPOS_RUTA} } }`;
+    const editar = `mutation($i: RutaInput!) { editarRuta(rutaId: "r1", input: $i) { rutaId activa } }`;
+    expect((await gql(['jefe_flota'], crear, { i: RUTA_INPUT })).body.errors[0].extensions.codigo).toBe('SIN_PERMISO');
+    expect((await gql(['comercial'], editar, { i: RUTA_INPUT })).body.errors[0].extensions.codigo).toBe('SIN_PERMISO');
+    expect(pedidos.filter((p) => p.ruta.startsWith('/viajes/'))).toHaveLength(0);
+
+    const r = await gql(['gerente'], crear, { i: RUTA_INPUT });
+    expect(r.body.data.crearRuta).toEqual({
+      rutaId: 'r1',
+      activa: false,
+      radioMetros: 300,
+      destino: 'La Paz',
+      destinoCoordenadas: { lat: -16.5, lng: -68.15 },
+      origenCoordenadas: { lat: -17.78 },
+    });
+    const post = pedidos.find((p) => p.metodo === 'POST' && p.ruta === '/viajes/api/v1/rutas')!;
+    expect(post.cabeceras['idempotency-key']).toBe('clave-ruta');
+    const { claveIdempotencia: _, ...cuerpo } = RUTA_INPUT;
+    expect(JSON.parse(post.cuerpo)).toEqual(cuerpo);
+
+    expect((await gql(['despachador'], editar, { i: { ...RUTA_INPUT, activa: false } })).body.data.editarRuta).toEqual({
+      rutaId: 'r1',
+      activa: false,
+    });
+    const put = pedidos.find((p) => p.metodo === 'PUT')!;
+    expect(put.ruta).toBe('/viajes/api/v1/rutas/r1');
+    expect(JSON.parse(put.cuerpo).activa).toBe(false);
+    expect(put.cabeceras['idempotency-key']).toBe('clave-ruta');
+  });
+
+  it('G7: editarCliente hace PUT en Viajes (comercial y gerente) y el 409 del NIT llega con su código', async () => {
+    rutas.set('PUT /viajes/api/v1/clientes/c1', (_req, cuerpo) =>
+      JSON.parse(cuerpo).nit === '1000002'
+        ? { status: 409, json: { codigo: 'CONFLICTO_ESTADO', detail: 'Ya existe un cliente activo con ese NIT' } }
+        : { json: { clienteId: 'c1', razonSocial: 'Agro SRL', nit: '1000001', correo: 'a@b.example', canal: 'PORTAL' } },
+    );
+    const editar = `mutation($i: ClienteEdicionInput!) { editarCliente(clienteId: "c1", input: $i) { clienteId razonSocial nit } }`;
+    const input = { razonSocial: 'Agro SRL', nit: '1000001', correo: 'a@b.example', claveIdempotencia: 'k-cliente' };
+    expect((await gql(['despachador'], editar, { i: input })).body.errors[0].extensions.codigo).toBe('SIN_PERMISO');
+    const r = await gql(['comercial'], editar, { i: input });
+    expect(r.body.data.editarCliente).toEqual({ clienteId: 'c1', razonSocial: 'Agro SRL', nit: '1000001' });
+    const put = pedidos.find((p) => p.metodo === 'PUT')!;
+    expect(put.cabeceras['idempotency-key']).toBe('k-cliente');
+    expect(JSON.parse(put.cuerpo)).toEqual({ razonSocial: 'Agro SRL', nit: '1000001', correo: 'a@b.example' });
+    const c = await gql(['gerente'], editar, { i: { ...input, nit: '1000002' } });
+    expect(c.body.errors[0].extensions).toMatchObject({ codigo: 'CONFLICTO_ESTADO', status: 409 });
+  });
+
+  it('B1: cliente(id) y ruta(id) leen por id; rutas(incluirInactivas) lo pasa a Viajes', async () => {
+    rutas.set('GET /viajes/api/v1/clientes/c1', () => ({ json: { clienteId: 'c1', razonSocial: 'Agro SRL', nit: '1000001' } }));
+    rutas.set('GET /viajes/api/v1/rutas/r1', () => ({ json: RUTA_REST }));
+    rutas.set('GET /viajes/api/v1/rutas', () => ({ json: [RUTA_REST] }));
+    const r = await gql(['despachador'], `{ cliente(id: "c1") { razonSocial nit } ruta(id: "r1") { nombre radioMetros } }`);
+    expect(r.body.data).toEqual({
+      cliente: { razonSocial: 'Agro SRL', nit: '1000001' },
+      ruta: { nombre: 'Santa Cruz – La Paz', radioMetros: 300 },
+    });
+    await gql(['despachador'], '{ rutas(incluirInactivas: true) { rutaId activa } }');
+    expect(pedidos.some((p) => p.ruta === '/viajes/api/v1/rutas?incluirInactivas=true')).toBe(true);
+    const n = await gql(['despachador'], '{ cliente(id: "c404") { clienteId } }');
+    expect(n.body.errors[0].extensions).toMatchObject({ codigo: 'NO_ENCONTRADO', status: 404 });
+  });
+
+  it('E5-1: clientes es una página con cursor; despuesDe viaja como cursor y la complejidad cuenta el limite', async () => {
+    rutas.set('GET /viajes/api/v1/clientes', (_req, _c, url) =>
+      url.searchParams.get('cursor') === 'p2'
+        ? { json: { items: [{ clienteId: 'c3', razonSocial: 'C' }], siguienteCursor: null } }
+        : {
+            json: {
+              items: [
+                { clienteId: 'c1', razonSocial: 'A' },
+                { clienteId: 'c2', razonSocial: 'B' },
+              ],
+              siguienteCursor: 'p2',
+            },
+          },
+    );
+    const pagina = 'query($d: Cursor) { clientes(limite: 2, despuesDe: $d) { items { clienteId } siguienteCursor } }';
+    const primera = await gql(['comercial'], pagina);
+    expect(primera.body.data.clientes).toEqual({ items: [{ clienteId: 'c1' }, { clienteId: 'c2' }], siguienteCursor: 'p2' });
+    const segunda = await gql(['comercial'], pagina, { d: 'p2' });
+    expect(segunda.body.data.clientes).toEqual({ items: [{ clienteId: 'c3' }], siguienteCursor: null });
+    expect(pedidos.filter((p) => p.ruta.startsWith('/viajes/api/v1/clientes')).map((p) => p.ruta)).toEqual([
+      '/viajes/api/v1/clientes?limite=2',
+      '/viajes/api/v1/clientes?limite=2&cursor=p2',
+    ]);
+    const largo = await gql(['comercial'], '{ clientes(limite: 500) { items { clienteId } } }');
+    expect(largo.body.errors[0].extensions.codigo).toBe('VALIDACION');
+    // 100 filas × 11 campos pasan de 1.000 (D101): la página cuenta como una lista.
+    const campos = 'clienteId razonSocial nit correo canal a: nit b: nit c: nit d: nit e: nit';
+    const pesada = await gql(['comercial'], `{ clientes(limite: 100) { items { ${campos} } } }`);
+    expect(pesada.body.errors[0].extensions.codigo).toBe('CONSULTA_DEMASIADO_COMPLEJA');
+  });
+
+  it('E2-8: la razón social de servicios y cotizaciones sale de Viajes en un lote de ids, una vez por cliente', async () => {
+    const [c1, c9] = ['0193b000-0000-7000-8000-0000000000c1', '0193b000-0000-7000-8000-0000000000c9'];
+    rutas.set('GET /viajes/api/v1/servicios', () => ({
+      json: { items: [1, 2, 3].map((i) => ({ servicioId: `s${i}`, clienteId: i === 3 ? c9 : c1, estado: 'CONFIRMADO' })) },
+    }));
+    rutas.set('GET /viajes/api/v1/clientes', () => ({
+      json: { items: [{ clienteId: c1, razonSocial: 'Agro SRL' }], siguienteCursor: null },
+    }));
+    const r = await gql(['despachador'], '{ servicios { servicioId razonSocial } }');
+    expect(r.body.data.servicios.map((s: { razonSocial: string | null }) => s.razonSocial)).toEqual(['Agro SRL', 'Agro SRL', null]);
+    expect(r.body.errors).toBeUndefined();
+    expect(pedidos.filter((p) => p.ruta.startsWith('/viajes/api/v1/clientes')).map((p) => decodeURIComponent(p.ruta))).toEqual([
+      `/viajes/api/v1/clientes?ids=${c1},${c9}`,
+    ]);
+  });
+
   it('un id con ../, ? o / no cambia la operación REST: VALIDACION sin llamar al servicio', async () => {
     for (const id of ['../rutas', '..', 'v1?x=1', 'v1/hitos', 'v1#a', '%2e%2e']) {
       const r = await gql(['gerente'], 'query($id: ID!) { viaje(id: $id) { viajeId } }', { id });

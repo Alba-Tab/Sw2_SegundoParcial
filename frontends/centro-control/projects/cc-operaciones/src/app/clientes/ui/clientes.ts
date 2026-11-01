@@ -17,7 +17,7 @@ import {
   etiqueta,
   EtiquetaPipe,
   FiltrosLista,
-  LIMITE_GATEWAY,
+  mensajeDe,
   PieLista,
   posicionEstado,
   Sesion,
@@ -60,7 +60,6 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
         grupo="EstadoLineaCredito"
         nombre="clientes"
         singular="cliente"
-        [limite]="limite"
       />
     } @else {
       <cc-filtros-lista
@@ -69,7 +68,6 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
         busqueda="Buscar por razón social, NIT o correo"
         nombre="clientes"
         singular="cliente"
-        [limite]="limite"
       />
     }
     @if (sinLeerCredito().size; as n) {
@@ -128,6 +126,16 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
       </table>
     </div>
     <cc-pie-lista [control]="lista" nombre="clientes" vacio="No hay clientes registrados." [error]="error()" [cargando]="cargando()" />
+    @if (paginas.siguienteCursor()) {
+      <!-- E5-1: la búsqueda y el orden usan solo los clientes ya cargados. -->
+      <p class="secundario">Se muestran los primeros {{ clientes().length }} clientes; la búsqueda y el orden solo usan esos.</p>
+      @if (paginas.error(); as e) {
+        <p class="aviso-lista" role="alert">No se pudieron cargar más clientes. {{ mensaje(e) }}</p>
+      }
+      <button mat-stroked-button (click)="paginas.cargarMas()" [disabled]="paginas.cargandoMas()" disabledInteractive>
+        {{ paginas.error() ? 'Reintentar' : 'Cargar más clientes' }}
+      </button>
+    }
   `,
 })
 export class ClientesPagina {
@@ -138,11 +146,13 @@ export class ClientesPagina {
   readonly cargando = this.fachada.cargando;
   readonly verCredito = this.fachada.verCredito;
   readonly sinLeerCredito = this.fachada.sinLeerCredito;
-  readonly limite = LIMITE_GATEWAY;
+  readonly paginas = this.fachada.paginas;
+  readonly mensaje = mensajeDe;
   readonly campos = { clientes: 'Viajes', lineaCredito: 'Finanzas' };
   readonly columnas = columnasConEstado(['razonSocial', 'nit', 'correo', 'canal', ...(this.verCredito ? ['disponible', 'estado'] : [])]);
   readonly estadoLinea = estadoLineaCredito;
   readonly urlLineas = urlEnApp(inject(CONFIG_CENTRO), inject(Sesion).roles(), 'cc-finanzas', '/lineas-credito');
+
   readonly lista = controlLista<FilaCliente>({
     filas: this.clientes,
     texto: textoCliente,

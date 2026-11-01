@@ -73,7 +73,11 @@ class ManejadorDeProblemas extends ResponseEntityExceptionHandler {
             if (!clave.equals("campo")) p.setProperty(clave, valor);
         });
         if (e.codigo().equals("VALIDACION") && e.datos().get("campo") instanceof String campo) {
-            p.setProperty("errores", List.of(new Problemas.ErrorDeCampo(campo, e.getMessage())));
+            // F2-4: el detalle lleva "campo: mensaje"; bajo el campo va solo el mensaje.
+            String mensaje = e.getMessage().startsWith(campo + ": ")
+                    ? e.getMessage().substring(campo.length() + 2)
+                    : e.getMessage();
+            p.setProperty("errores", List.of(new Problemas.ErrorDeCampo(campo, mensaje)));
         }
         var respuesta = ResponseEntity.status(p.getStatus());
         if (p.getStatus() == 503) respuesta.header(HttpHeaders.RETRY_AFTER, "10");
@@ -144,9 +148,18 @@ class ManejadorDeProblemas extends ResponseEntityExceptionHandler {
     protected ResponseEntity<Object> handleMethodArgumentNotValid(
             MethodArgumentNotValidException e, HttpHeaders h, HttpStatusCode s, WebRequest r) {
         var errores = e.getBindingResult().getFieldErrors().stream()
-                .map(f -> new Problemas.ErrorDeCampo(f.getField(), f.getDefaultMessage()))
+                .map(f -> new Problemas.ErrorDeCampo(f.getField(), mensajeDeCampo(f)))
                 .toList();
         return ResponseEntity.badRequest().body(Problemas.validacion(errores));
+    }
+
+    /** F2-4: un @Pattern dice en palabras qué se espera, nunca la expresión regular. */
+    private static final Map<String, String> FORMATOS = Map.of("nit", "Solo números, de 5 a 20 dígitos");
+
+    private static String mensajeDeCampo(org.springframework.validation.FieldError f) {
+        if (!"Pattern".equals(f.getCode())) return f.getDefaultMessage();
+        String campo = f.getField().substring(f.getField().lastIndexOf('.') + 1);
+        return FORMATOS.getOrDefault(campo, "No tiene el formato esperado");
     }
 
     @Override

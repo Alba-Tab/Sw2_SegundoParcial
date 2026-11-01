@@ -67,6 +67,15 @@ public final class Cliente {
         return new Cliente(clienteId, sub, datos, canal, creadoPor, creadoEn, versionAgregado, activo, vinculado);
     }
 
+    /**
+     * Edición desde el Centro de Control (G7): cambian razón social, NIT y correo; teléfono, dirección, canal y cuenta
+     * quedan. Sube {@code versionAgregado} para que las copias descarten la versión anterior.
+     */
+    public Cliente editado(String razonSocial, String nit, String correo) {
+        var nuevos = new DatosCliente(razonSocial, nit, correo, datos.telefono(), datos.direccion());
+        return new Cliente(clienteId, sub, nuevos, canal, creadoPor, creadoEn, versionAgregado + 1, activo, vinculado);
+    }
+
     public void marcarVinculado() {
         if (sub == null) throw new IllegalStateException("Un cliente sin cuenta no se vincula en Keycloak");
         vinculado = true;

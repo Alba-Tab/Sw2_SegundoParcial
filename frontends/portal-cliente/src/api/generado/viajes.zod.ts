@@ -89,6 +89,8 @@ export const CrearClienteResponse = zod
  */
 export const listarClientesQueryQMax = 120;
 
+export const listarClientesQueryIdsMax = 100;
+
 export const listarClientesQueryLimiteDefault = 20;
 export const listarClientesQueryLimiteMax = 100;
 
@@ -96,6 +98,14 @@ export const listarClientesQueryCursorMax = 500;
 
 export const ListarClientesQueryParams = zod.object({
   q: zod.string().max(listarClientesQueryQMax).optional().describe('Busca por razón social o NIT.'),
+  ids: zod
+    .array(zod.uuid())
+    .min(1)
+    .max(listarClientesQueryIdsMax)
+    .optional()
+    .describe(
+      'Hasta 100 UUID separados por coma (E2-8, lo usa el DataLoader del Gateway). Devuelve esos clientes, activos\no no y en cualquier orden, en una sola página (`siguienteCursor` null); un id que no existe no sale (no es\nerror). Con `ids` se ignoran `q`, `limite` y `cursor`.\n',
+    ),
   limite: zod.int().min(1).max(listarClientesQueryLimiteMax).default(listarClientesQueryLimiteDefault),
   cursor: zod.string().max(listarClientesQueryCursorMax).optional().describe('Valor opaco devuelto en `siguienteCursor`.'),
 });
@@ -255,8 +265,78 @@ export const ObtenerClienteResponse = zod
   );
 
 /**
- * @summary Rutas activas (cualquier usuario autenticado). Spec 002.
+ * Mismas validaciones que el alta (spec 001); un NIT de otro cliente activo responde 409 `CONFLICTO_ESTADO`.
+ * Teléfono, dirección, canal y cuenta no cambian. En una transacción sube `versionAgregado`, audita y deja
+ * `ClienteActualizado` en el Outbox (Finanzas y Analítica actualizan su copia).
+ * @summary Edita razón social, NIT y correo desde el Centro de Control (comercial, gerente). G7, D104.
  */
+export const ActualizarClienteParams = zod.object({
+  clienteId: zod.uuid(),
+});
+
+export const ActualizarClienteHeader = zod.object({
+  'Idempotency-Key': zod.uuid().describe('UUID generado por el cliente, uno por intento (000 §4.1).'),
+  'X-Correlation-Id': zod.uuid().optional().describe('Si no viene, lo genera el primer servicio y lo propaga (000 §4).'),
+});
+
+export const actualizarClienteBodyRazonSocialMin = 3;
+export const actualizarClienteBodyRazonSocialMax = 120;
+
+export const actualizarClienteBodyNitRegExp = new RegExp('^[0-9]{5,20}$');
+
+export const ActualizarClienteBody = zod
+  .object({
+    razonSocial: zod.string().min(actualizarClienteBodyRazonSocialMin).max(actualizarClienteBodyRazonSocialMax),
+    nit: zod.string().regex(actualizarClienteBodyNitRegExp),
+    correo: zod.email(),
+  })
+  .describe('Lo que se edita desde el Centro de Control (G7); mismas reglas que en ClienteNuevo.');
+
+export const actualizarClienteResponseOneRazonSocialMin = 3;
+export const actualizarClienteResponseOneRazonSocialMax = 120;
+
+export const actualizarClienteResponseOneNitRegExp = new RegExp('^[0-9]{5,20}$');
+export const actualizarClienteResponseOneTelefonoMin = 6;
+export const actualizarClienteResponseOneTelefonoMax = 20;
+
+export const actualizarClienteResponseOneDireccionMin = 3;
+export const actualizarClienteResponseOneDireccionMax = 200;
+
+export const actualizarClienteResponseTwoCreadoPorMax = 64;
+
+export const ActualizarClienteResponse = zod
+  .object({
+    razonSocial: zod.string().min(actualizarClienteResponseOneRazonSocialMin).max(actualizarClienteResponseOneRazonSocialMax),
+    nit: zod.string().regex(actualizarClienteResponseOneNitRegExp),
+    correo: zod.email().describe('Correo de facturación; a él se envían los avisos.'),
+    telefono: zod.string().min(actualizarClienteResponseOneTelefonoMin).max(actualizarClienteResponseOneTelefonoMax),
+    direccion: zod.string().min(actualizarClienteResponseOneDireccionMin).max(actualizarClienteResponseOneDireccionMax),
+  })
+  .and(
+    zod.object({
+      clienteId: zod.uuid(),
+      canal: zod.enum(['PORTAL', 'TELEFONO']),
+      tieneCuenta: zod.boolean(),
+      vinculado: zod.boolean().describe('Keycloak ya tiene `clienteId` y el rol `cliente`. Siempre false si tieneCuenta es false.'),
+      creadoPor: zod.string().min(1).max(actualizarClienteResponseTwoCreadoPorMax).optional().describe('Claim `sub` de Keycloak.'),
+      creadoEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+    }),
+  );
+
+/**
+ * @summary Rutas activas (cualquier usuario autenticado), por nombre. Spec 002.
+ */
+export const listarRutasQueryIncluirInactivasDefault = false;
+
+export const ListarRutasQueryParams = zod.object({
+  incluirInactivas: zod
+    .boolean()
+    .default(listarRutasQueryIncluirInactivasDefault)
+    .describe(
+      'También las inactivas, para la gestión de rutas del Centro de Control (G4). Solo con rol gerente o despachador; con otro rol se ignora.',
+    ),
+});
+
 export const listarRutasResponseOrigenCoordenadasLatMin = -90;
 export const listarRutasResponseOrigenCoordenadasLatMax = 90;
 
@@ -307,7 +387,121 @@ export const ListarRutasResponseItem = zod.object({
 export const ListarRutasResponse = zod.array(ListarRutasResponseItem);
 
 /**
- * @summary Una ruta.
+ * La ruta **nace inactiva** (`activa: false`): las tarifas siguen de semilla (D10) y sin tarifa no se puede
+ * cotizar; se activa con la edición. Sin `activa` en el cuerpo: si viene, 400 `VALIDACION`. En una transacción
+ * crea la ruta con `versionAgregado = 1`, audita y deja `RutaActualizada` en el Outbox (Finanzas y Analítica
+ * crean su copia). La distancia se guarda con un decimal.
+ * @summary Alta de una ruta (gerente, despachador). G4, D104.
+ */
+export const CrearRutaHeader = zod.object({
+  'Idempotency-Key': zod.uuid().describe('UUID generado por el cliente, uno por intento (000 §4.1).'),
+  'X-Correlation-Id': zod.uuid().optional().describe('Si no viene, lo genera el primer servicio y lo propaga (000 §4).'),
+});
+
+export const crearRutaBodyNombreMin = 3;
+export const crearRutaBodyNombreMax = 80;
+
+export const crearRutaBodyOrigenNombreMin = 2;
+export const crearRutaBodyOrigenNombreMax = 80;
+
+export const crearRutaBodyOrigenCoordenadasLatMin = -90;
+export const crearRutaBodyOrigenCoordenadasLatMax = 90;
+
+export const crearRutaBodyOrigenCoordenadasLngMin = -180;
+export const crearRutaBodyOrigenCoordenadasLngMax = 180;
+
+export const crearRutaBodyDestinoNombreMin = 2;
+export const crearRutaBodyDestinoNombreMax = 80;
+
+export const crearRutaBodyDestinoCoordenadasLatMin = -90;
+export const crearRutaBodyDestinoCoordenadasLatMax = 90;
+
+export const crearRutaBodyDestinoCoordenadasLngMin = -180;
+export const crearRutaBodyDestinoCoordenadasLngMax = 180;
+
+export const crearRutaBodyDestinoRadioMetrosMin = 50;
+export const crearRutaBodyDestinoRadioMetrosMax = 5000;
+
+export const crearRutaBodyDistanciaKmExclusiveMin = 0;
+export const crearRutaBodyDistanciaKmMax = 5000;
+
+export const CrearRutaBody = zod
+  .object({
+    nombre: zod.string().min(crearRutaBodyNombreMin).max(crearRutaBodyNombreMax),
+    origen: zod.object({
+      nombre: zod.string().min(crearRutaBodyOrigenNombreMin).max(crearRutaBodyOrigenNombreMax),
+      coordenadas: zod.object({
+        lat: zod.number().min(crearRutaBodyOrigenCoordenadasLatMin).max(crearRutaBodyOrigenCoordenadasLatMax),
+        lng: zod.number().min(crearRutaBodyOrigenCoordenadasLngMin).max(crearRutaBodyOrigenCoordenadasLngMax),
+      }),
+    }),
+    destino: zod.object({
+      nombre: zod.string().min(crearRutaBodyDestinoNombreMin).max(crearRutaBodyDestinoNombreMax),
+      coordenadas: zod.object({
+        lat: zod.number().min(crearRutaBodyDestinoCoordenadasLatMin).max(crearRutaBodyDestinoCoordenadasLatMax),
+        lng: zod.number().min(crearRutaBodyDestinoCoordenadasLngMin).max(crearRutaBodyDestinoCoordenadasLngMax),
+      }),
+      radioMetros: zod
+        .int()
+        .min(crearRutaBodyDestinoRadioMetrosMin)
+        .max(crearRutaBodyDestinoRadioMetrosMax)
+        .describe('Radio de la geocerca (D06).'),
+    }),
+    distanciaKm: zod.number().gt(crearRutaBodyDistanciaKmExclusiveMin).max(crearRutaBodyDistanciaKmMax),
+    activa: zod.boolean().optional().describe('Solo en la edición, donde es obligatoria; en el alta no va (la ruta nace inactiva).'),
+  })
+  .describe('Alta o edición de una ruta (G4). Los mismos límites que RutaActualizada.v1.');
+
+export const crearRutaResponseOrigenCoordenadasLatMin = -90;
+export const crearRutaResponseOrigenCoordenadasLatMax = 90;
+
+export const crearRutaResponseOrigenCoordenadasLngMin = -180;
+export const crearRutaResponseOrigenCoordenadasLngMax = 180;
+
+export const crearRutaResponseDestinoOneCoordenadasLatMin = -90;
+export const crearRutaResponseDestinoOneCoordenadasLatMax = 90;
+
+export const crearRutaResponseDestinoOneCoordenadasLngMin = -180;
+export const crearRutaResponseDestinoOneCoordenadasLngMax = 180;
+
+export const crearRutaResponseDestinoTwoRadioMetrosMin = 50;
+export const crearRutaResponseDestinoTwoRadioMetrosMax = 5000;
+
+export const crearRutaResponseDistanciaKmExclusiveMin = 0;
+
+export const CrearRutaResponse = zod.object({
+  rutaId: zod.uuid(),
+  nombre: zod.string(),
+  origen: zod.object({
+    nombre: zod.string(),
+    coordenadas: zod.object({
+      lat: zod.number().min(crearRutaResponseOrigenCoordenadasLatMin).max(crearRutaResponseOrigenCoordenadasLatMax),
+      lng: zod.number().min(crearRutaResponseOrigenCoordenadasLngMin).max(crearRutaResponseOrigenCoordenadasLngMax),
+    }),
+  }),
+  destino: zod
+    .object({
+      nombre: zod.string(),
+      coordenadas: zod.object({
+        lat: zod.number().min(crearRutaResponseDestinoOneCoordenadasLatMin).max(crearRutaResponseDestinoOneCoordenadasLatMax),
+        lng: zod.number().min(crearRutaResponseDestinoOneCoordenadasLngMin).max(crearRutaResponseDestinoOneCoordenadasLngMax),
+      }),
+    })
+    .and(
+      zod.object({
+        radioMetros: zod
+          .int()
+          .min(crearRutaResponseDestinoTwoRadioMetrosMin)
+          .max(crearRutaResponseDestinoTwoRadioMetrosMax)
+          .describe('Radio de la geocerca (D06).'),
+      }),
+    ),
+  distanciaKm: zod.number().gt(crearRutaResponseDistanciaKmExclusiveMin),
+  activa: zod.boolean(),
+});
+
+/**
+ * @summary Una ruta. Una inactiva solo la ven gerente y despachador; para los demás responde 404.
  */
 export const ObtenerRutaParams = zod.object({
   rutaId: zod.uuid(),
@@ -358,6 +552,124 @@ export const ObtenerRutaResponse = zod.object({
       }),
     ),
   distanciaKm: zod.number().gt(obtenerRutaResponseDistanciaKmExclusiveMin),
+  activa: zod.boolean(),
+});
+
+/**
+ * Documento completo, con `activa` obligatoria (sin ella, 400 `VALIDACION`). Activar una ruta sin tarifa en
+ * Finanzas hace que cotizarla responda 422 `RUTA_SIN_TARIFA`. En una transacción, con la fila bloqueada, sube
+ * `versionAgregado`, audita y deja `RutaActualizada` en el Outbox. Los viajes ya programados conservan la ruta;
+ * una ruta inactiva no se cotiza.
+ * @summary Edición de una ruta, también para activarla o desactivarla (gerente, despachador). G4, D104.
+ */
+export const ActualizarRutaParams = zod.object({
+  rutaId: zod.uuid(),
+});
+
+export const ActualizarRutaHeader = zod.object({
+  'Idempotency-Key': zod.uuid().describe('UUID generado por el cliente, uno por intento (000 §4.1).'),
+  'X-Correlation-Id': zod.uuid().optional().describe('Si no viene, lo genera el primer servicio y lo propaga (000 §4).'),
+});
+
+export const actualizarRutaBodyNombreMin = 3;
+export const actualizarRutaBodyNombreMax = 80;
+
+export const actualizarRutaBodyOrigenNombreMin = 2;
+export const actualizarRutaBodyOrigenNombreMax = 80;
+
+export const actualizarRutaBodyOrigenCoordenadasLatMin = -90;
+export const actualizarRutaBodyOrigenCoordenadasLatMax = 90;
+
+export const actualizarRutaBodyOrigenCoordenadasLngMin = -180;
+export const actualizarRutaBodyOrigenCoordenadasLngMax = 180;
+
+export const actualizarRutaBodyDestinoNombreMin = 2;
+export const actualizarRutaBodyDestinoNombreMax = 80;
+
+export const actualizarRutaBodyDestinoCoordenadasLatMin = -90;
+export const actualizarRutaBodyDestinoCoordenadasLatMax = 90;
+
+export const actualizarRutaBodyDestinoCoordenadasLngMin = -180;
+export const actualizarRutaBodyDestinoCoordenadasLngMax = 180;
+
+export const actualizarRutaBodyDestinoRadioMetrosMin = 50;
+export const actualizarRutaBodyDestinoRadioMetrosMax = 5000;
+
+export const actualizarRutaBodyDistanciaKmExclusiveMin = 0;
+export const actualizarRutaBodyDistanciaKmMax = 5000;
+
+export const ActualizarRutaBody = zod
+  .object({
+    nombre: zod.string().min(actualizarRutaBodyNombreMin).max(actualizarRutaBodyNombreMax),
+    origen: zod.object({
+      nombre: zod.string().min(actualizarRutaBodyOrigenNombreMin).max(actualizarRutaBodyOrigenNombreMax),
+      coordenadas: zod.object({
+        lat: zod.number().min(actualizarRutaBodyOrigenCoordenadasLatMin).max(actualizarRutaBodyOrigenCoordenadasLatMax),
+        lng: zod.number().min(actualizarRutaBodyOrigenCoordenadasLngMin).max(actualizarRutaBodyOrigenCoordenadasLngMax),
+      }),
+    }),
+    destino: zod.object({
+      nombre: zod.string().min(actualizarRutaBodyDestinoNombreMin).max(actualizarRutaBodyDestinoNombreMax),
+      coordenadas: zod.object({
+        lat: zod.number().min(actualizarRutaBodyDestinoCoordenadasLatMin).max(actualizarRutaBodyDestinoCoordenadasLatMax),
+        lng: zod.number().min(actualizarRutaBodyDestinoCoordenadasLngMin).max(actualizarRutaBodyDestinoCoordenadasLngMax),
+      }),
+      radioMetros: zod
+        .int()
+        .min(actualizarRutaBodyDestinoRadioMetrosMin)
+        .max(actualizarRutaBodyDestinoRadioMetrosMax)
+        .describe('Radio de la geocerca (D06).'),
+    }),
+    distanciaKm: zod.number().gt(actualizarRutaBodyDistanciaKmExclusiveMin).max(actualizarRutaBodyDistanciaKmMax),
+    activa: zod.boolean().optional().describe('Solo en la edición, donde es obligatoria; en el alta no va (la ruta nace inactiva).'),
+  })
+  .describe('Alta o edición de una ruta (G4). Los mismos límites que RutaActualizada.v1.');
+
+export const actualizarRutaResponseOrigenCoordenadasLatMin = -90;
+export const actualizarRutaResponseOrigenCoordenadasLatMax = 90;
+
+export const actualizarRutaResponseOrigenCoordenadasLngMin = -180;
+export const actualizarRutaResponseOrigenCoordenadasLngMax = 180;
+
+export const actualizarRutaResponseDestinoOneCoordenadasLatMin = -90;
+export const actualizarRutaResponseDestinoOneCoordenadasLatMax = 90;
+
+export const actualizarRutaResponseDestinoOneCoordenadasLngMin = -180;
+export const actualizarRutaResponseDestinoOneCoordenadasLngMax = 180;
+
+export const actualizarRutaResponseDestinoTwoRadioMetrosMin = 50;
+export const actualizarRutaResponseDestinoTwoRadioMetrosMax = 5000;
+
+export const actualizarRutaResponseDistanciaKmExclusiveMin = 0;
+
+export const ActualizarRutaResponse = zod.object({
+  rutaId: zod.uuid(),
+  nombre: zod.string(),
+  origen: zod.object({
+    nombre: zod.string(),
+    coordenadas: zod.object({
+      lat: zod.number().min(actualizarRutaResponseOrigenCoordenadasLatMin).max(actualizarRutaResponseOrigenCoordenadasLatMax),
+      lng: zod.number().min(actualizarRutaResponseOrigenCoordenadasLngMin).max(actualizarRutaResponseOrigenCoordenadasLngMax),
+    }),
+  }),
+  destino: zod
+    .object({
+      nombre: zod.string(),
+      coordenadas: zod.object({
+        lat: zod.number().min(actualizarRutaResponseDestinoOneCoordenadasLatMin).max(actualizarRutaResponseDestinoOneCoordenadasLatMax),
+        lng: zod.number().min(actualizarRutaResponseDestinoOneCoordenadasLngMin).max(actualizarRutaResponseDestinoOneCoordenadasLngMax),
+      }),
+    })
+    .and(
+      zod.object({
+        radioMetros: zod
+          .int()
+          .min(actualizarRutaResponseDestinoTwoRadioMetrosMin)
+          .max(actualizarRutaResponseDestinoTwoRadioMetrosMax)
+          .describe('Radio de la geocerca (D06).'),
+      }),
+    ),
+  distanciaKm: zod.number().gt(actualizarRutaResponseDistanciaKmExclusiveMin),
   activa: zod.boolean(),
 });
 
@@ -693,6 +1005,7 @@ export const DecidirAprobacionCreditoBody = zod.object({
 export const DecidirAprobacionCreditoResponse = zod.void();
 
 /**
+ * Del más reciente al más viejo (por `viajeId`, UUIDv7); el cursor sigue hacia los más viejos.
  * @summary Viajes con su última posición para el mapa en vivo (despachador, comercial, gerente, jefe_flota, agente_lectura). Spec 005.
  */
 export const listarViajesQueryLimiteDefault = 20;

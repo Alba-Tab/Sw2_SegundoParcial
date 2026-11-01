@@ -2,7 +2,7 @@ import { aCentavos, desdeCentavos, estadoLineaCredito, sumarMontos } from 'ui-co
 import type { LineasCreditoQuery } from '../../graphql/generado';
 
 /** G6: un cliente con su línea de crédito; administración y gerente ajustan el límite o la suspenden (spec 012). */
-export type ClienteConLinea = NonNullable<LineasCreditoQuery['clientes']>[number];
+export type ClienteConLinea = NonNullable<LineasCreditoQuery['clientes']>['items'][number];
 export type Linea = NonNullable<ClienteConLinea['lineaCredito']>;
 
 /** Solo los clientes con línea: sin ella (o si Finanzas no la dio) no hay nada que mostrar en esta lista. */

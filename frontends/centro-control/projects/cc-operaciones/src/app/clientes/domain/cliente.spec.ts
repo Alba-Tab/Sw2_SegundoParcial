@@ -1,5 +1,5 @@
 import { filtrar } from 'ui-comun/dominio';
-import { buscarCliente, nombreRuta, textoCliente, type FilaCliente } from './cliente';
+import { CORREO, mensajeCampoCliente, NIT, nombreRuta, textoCliente, type FilaCliente } from './cliente';
 
 describe('clientes (dominio)', () => {
   const lista = [
@@ -13,10 +13,19 @@ describe('clientes (dominio)', () => {
     expect(filtrar(lista, 'compras@', textoCliente).map((c) => c.clienteId)).toEqual(['c1']);
   });
 
-  it('la ficha sale de la lista; la ruta se nombra con la copia de rutas', () => {
-    expect(buscarCliente(lista, 'c2')?.razonSocial).toBe('Logística Andina');
-    expect(buscarCliente(lista, 'x')).toBeUndefined();
+  it('la ruta se nombra con la copia de rutas', () => {
     expect(nombreRuta([{ rutaId: 'r1', nombre: 'SCZ - LPZ' }], 'r1')).toBe('SCZ - LPZ');
     expect(nombreRuta([], null)).toBe('');
+  });
+
+  it('NIT y correo con las reglas del alta (spec 001), y su frase bajo el campo', () => {
+    expect(['12345', '12345678901234567890'].every((n) => NIT.test(n))).toBe(true);
+    expect(['1234', '123456789012345678901', '1023-456', '12a45'].some((n) => NIT.test(n))).toBe(false);
+    expect(CORREO.test('cobranzas@agro.bo')).toBe(true);
+    expect(CORREO.test('cobranzas@agro')).toBe(false);
+    expect(mensajeCampoCliente('nit', { pattern: true })).toContain('5 a 20 dígitos');
+    expect(mensajeCampoCliente('correo', { pattern: true })).toContain('correo válido');
+    expect(mensajeCampoCliente('nit', { nitRepetido: true })).toBe('Ya hay otro cliente activo con ese NIT.');
+    expect(mensajeCampoCliente('razonSocial', { required: true })).toBe('Este dato es obligatorio.');
   });
 });

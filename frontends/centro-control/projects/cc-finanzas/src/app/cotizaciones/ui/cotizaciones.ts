@@ -18,7 +18,7 @@ import {
   NumeroPipe,
 } from 'ui-comun';
 import { CotizacionesFachada } from '../cotizaciones.fachada';
-import { estadoCotizacion } from '../domain/cotizacion';
+import { estadoCotizacion, nombreCliente } from '../domain/cotizacion';
 
 @Component({
   selector: 'app-cotizaciones',
@@ -58,7 +58,7 @@ import { estadoCotizacion } from '../domain/cotizacion';
       >
         <ng-container matColumnDef="cliente"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Cliente</th>
-          <td mat-cell *matCellDef="let c">{{ nombre(c.clienteId) }}</td></ng-container
+          <td mat-cell *matCellDef="let c">{{ nombre(c) }}</td></ng-container
         >
         <ng-container matColumnDef="ruta"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Ruta</th>
@@ -94,17 +94,17 @@ export class CotizacionesPagina {
   readonly error = this.fachada.error;
   readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
-  readonly campos = { cotizaciones: 'Finanzas', clientes: 'Viajes', rutas: 'Viajes' };
+  readonly campos = { cotizaciones: 'Finanzas', rutas: 'Viajes' };
   readonly estado = estadoCotizacion;
   readonly columnas = columnasConEstado(['cliente', 'ruta', 'carga', 'monto', 'estado', 'creada']);
-  nombre = (id: string) => this.fachada.nombreCliente(id);
+  nombre = nombreCliente;
   ruta = (id: string) => this.fachada.nombreRuta(id);
   readonly lista = controlLista({
     filas: this.cotizaciones,
-    texto: (c) => [this.nombre(c.clienteId), this.ruta(c.rutaId), etiqueta('TipoCarga', c.tipoCarga).texto].join(' '),
+    texto: (c) => [this.nombre(c), this.ruta(c.rutaId), etiqueta('TipoCarga', c.tipoCarga).texto].join(' '),
     estado: estadoCotizacion,
     orden: {
-      cliente: (c) => this.nombre(c.clienteId),
+      cliente: (c) => this.nombre(c),
       ruta: (c) => this.ruta(c.rutaId),
       carga: (c) => etiqueta('TipoCarga', c.tipoCarga).texto,
       monto: (c) => aCentavos(c.monto),

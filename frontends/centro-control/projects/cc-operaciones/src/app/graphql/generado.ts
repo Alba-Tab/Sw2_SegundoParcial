@@ -5,6 +5,26 @@ export type Incremental<T> = T | { [P in keyof T]?: P extends ' $fragmentName' |
 import { gql } from 'apollo-angular';
 import { Injectable } from '@angular/core';
 import * as Apollo from 'apollo-angular';
+/** Edición de un cliente (G7) con las validaciones del alta (spec 001); Viajes publica ClienteActualizado. */
+export type ClienteEdicionInput = {
+  claveIdempotencia: string | number;
+  correo: string;
+  nit: string;
+  razonSocial: string;
+};
+
+export type CoordenadasInput = {
+  lat: number;
+  lng: number;
+};
+
+/** El destino lleva el radio de su geocerca, de 50 a 5000 m (D06). */
+export type DestinoInput = {
+  coordenadas: CoordenadasInput;
+  nombre: string;
+  radioMetros: number;
+};
+
 export type EstadoAccion = 'APROBADA' | 'ARCHIVADA' | 'EJECUTADA' | 'PENDIENTE' | 'RECHAZADA';
 
 export type EstadoServicio =
@@ -31,7 +51,23 @@ export type EstadoViaje =
   | 'PROGRAMANDO'
   | 'REQUIERE_INTERVENCION';
 
+export type LugarInput = {
+  coordenadas: CoordenadasInput;
+  nombre: string;
+};
+
 export type OpcionIntervencion = 'MARCAR_RESUELTO' | 'REINTENTAR_COMPENSACION';
+
+/** Alta o edición de una ruta (G4); Viajes publica RutaActualizada. */
+export type RutaInput = {
+  /** Solo en editarRuta, donde es obligatoria. crearRuta no la lleva: la ruta nace inactiva hasta tener su tarifa (D10). */
+  activa?: boolean | null | undefined;
+  claveIdempotencia: string | number;
+  destino: DestinoInput;
+  distanciaKm: number;
+  nombre: string;
+  origen: LugarInput;
+};
 
 export type TipoCarga = 'CONTENEDOR' | 'GRANOS' | 'INSUMOS' | 'INSUMOS_LIQUIDOS';
 
@@ -191,6 +227,7 @@ export type ServiciosQuery = {
   servicios: Array<{
     servicioId: string;
     clienteId: string;
+    razonSocial: string | null;
     estado: EstadoServicio;
     tipoCarga: TipoCarga | null;
     toneladas: number | null;
@@ -200,22 +237,25 @@ export type ServiciosQuery = {
     choferNombre: string | null;
     confirmacionCompleta: boolean;
   }> | null;
-  clientes: Array<{ clienteId: string; razonSocial: string }> | null;
 };
 
 export type ClientesQueryVariables = Exact<{
   verCredito: boolean;
+  despuesDe?: string | null | undefined;
 }>;
 
 export type ClientesQuery = {
-  clientes: Array<{
-    clienteId: string;
-    razonSocial: string;
-    nit: string | null;
-    correo: string | null;
-    canal: string | null;
-    lineaCredito?: { limite: string; disponible: string; enMora: boolean } | null;
-  }> | null;
+  clientes: {
+    siguienteCursor: string | null;
+    items: Array<{
+      clienteId: string;
+      razonSocial: string;
+      nit: string | null;
+      correo: string | null;
+      canal: string | null;
+      lineaCredito?: { limite: string; disponible: string; enMora: boolean; suspendida: boolean } | null;
+    }>;
+  } | null;
 };
 
 export type ClienteQueryVariables = Exact<{
@@ -225,8 +265,8 @@ export type ClienteQueryVariables = Exact<{
 }>;
 
 export type ClienteQuery = {
-  clientes: Array<{ clienteId: string; razonSocial: string; nit: string | null; correo: string | null; canal: string | null }> | null;
-  lineaCredito?: { limite: string; reservado: string; utilizado: string; disponible: string; enMora: boolean } | null;
+  cliente: { clienteId: string; razonSocial: string; nit: string | null; correo: string | null; canal: string | null } | null;
+  lineaCredito?: { limite: string; reservado: string; utilizado: string; disponible: string; enMora: boolean; suspendida: boolean } | null;
   servicios: Array<{
     servicioId: string;
     viajeId: string | null;
@@ -242,9 +282,95 @@ export type ClienteQuery = {
   rutas: Array<{ rutaId: string; nombre: string }> | null;
 };
 
+export type ClienteFichaFragment = {
+  clienteId: string;
+  razonSocial: string;
+  nit: string | null;
+  correo: string | null;
+  canal: string | null;
+};
+
+export type EditarClienteMutationVariables = Exact<{
+  clienteId: string | number;
+  input: ClienteEdicionInput;
+}>;
+
+export type EditarClienteMutation = {
+  editarCliente: { clienteId: string; razonSocial: string; nit: string | null; correo: string | null; canal: string | null };
+};
+
 export type RutasQueryVariables = Exact<{ [key: string]: never }>;
 
-export type RutasQuery = { rutas: Array<{ rutaId: string; nombre: string; origen: string; destino: string; distanciaKm: number }> | null };
+export type RutasQuery = {
+  rutas: Array<{ rutaId: string; nombre: string; origen: string; destino: string; distanciaKm: number; activa: boolean | null }> | null;
+};
+
+export type RutaFichaFragment = {
+  rutaId: string;
+  nombre: string;
+  origen: string;
+  destino: string;
+  distanciaKm: number;
+  activa: boolean | null;
+  radioMetros: number | null;
+  origenCoordenadas: { lat: number; lng: number } | null;
+  destinoCoordenadas: { lat: number; lng: number } | null;
+};
+
+export type RutaQueryVariables = Exact<{
+  id: string | number;
+}>;
+
+export type RutaQuery = {
+  ruta: {
+    rutaId: string;
+    nombre: string;
+    origen: string;
+    destino: string;
+    distanciaKm: number;
+    activa: boolean | null;
+    radioMetros: number | null;
+    origenCoordenadas: { lat: number; lng: number } | null;
+    destinoCoordenadas: { lat: number; lng: number } | null;
+  } | null;
+};
+
+export type CrearRutaMutationVariables = Exact<{
+  input: RutaInput;
+}>;
+
+export type CrearRutaMutation = {
+  crearRuta: {
+    rutaId: string;
+    nombre: string;
+    origen: string;
+    destino: string;
+    distanciaKm: number;
+    activa: boolean | null;
+    radioMetros: number | null;
+    origenCoordenadas: { lat: number; lng: number } | null;
+    destinoCoordenadas: { lat: number; lng: number } | null;
+  };
+};
+
+export type EditarRutaMutationVariables = Exact<{
+  rutaId: string | number;
+  input: RutaInput;
+}>;
+
+export type EditarRutaMutation = {
+  editarRuta: {
+    rutaId: string;
+    nombre: string;
+    origen: string;
+    destino: string;
+    distanciaKm: number;
+    activa: boolean | null;
+    radioMetros: number | null;
+    origenCoordenadas: { lat: number; lng: number } | null;
+    destinoCoordenadas: { lat: number; lng: number } | null;
+  };
+};
 
 export type AccionesQueryVariables = Exact<{
   estado?: EstadoAccion | null | undefined;
@@ -343,6 +469,34 @@ export const ViajeFilaFragmentDoc = gql`
       nombre
       destino
       distanciaKm
+    }
+  }
+`;
+export const ClienteFichaFragmentDoc = gql`
+  fragment ClienteFicha on Cliente {
+    clienteId
+    razonSocial
+    nit
+    correo
+    canal
+  }
+`;
+export const RutaFichaFragmentDoc = gql`
+  fragment RutaFicha on Ruta {
+    rutaId
+    nombre
+    origen
+    destino
+    distanciaKm
+    activa
+    radioMetros
+    origenCoordenadas {
+      lat
+      lng
+    }
+    destinoCoordenadas {
+      lat
+      lng
     }
   }
 `;
@@ -513,6 +667,7 @@ export const ServiciosDocument = gql`
     servicios(estado: $estado, limite: 80) {
       servicioId
       clienteId
+      razonSocial
       estado
       tipoCarga
       toneladas
@@ -521,10 +676,6 @@ export const ServiciosDocument = gql`
       placa
       choferNombre
       confirmacionCompleta
-    }
-    clientes {
-      clienteId
-      razonSocial
     }
   }
 `;
@@ -540,18 +691,22 @@ export class ServiciosGQL extends Apollo.Query<ServiciosQuery, ServiciosQueryVar
   }
 }
 export const ClientesDocument = gql`
-  query Clientes($verCredito: Boolean!) {
-    clientes {
-      clienteId
-      razonSocial
-      nit
-      correo
-      canal
-      lineaCredito @include(if: $verCredito) {
-        limite
-        disponible
-        enMora
+  query Clientes($verCredito: Boolean!, $despuesDe: Cursor) {
+    clientes(limite: 50, despuesDe: $despuesDe) {
+      items {
+        clienteId
+        razonSocial
+        nit
+        correo
+        canal
+        lineaCredito @include(if: $verCredito) {
+          limite
+          disponible
+          enMora
+          suspendida
+        }
       }
+      siguienteCursor
     }
   }
 `;
@@ -568,12 +723,8 @@ export class ClientesGQL extends Apollo.Query<ClientesQuery, ClientesQueryVariab
 }
 export const ClienteDocument = gql`
   query Cliente($clienteId: ID!, $verCredito: Boolean!, $verMonto: Boolean!) {
-    clientes {
-      clienteId
-      razonSocial
-      nit
-      correo
-      canal
+    cliente(id: $clienteId) {
+      ...ClienteFicha
     }
     lineaCredito(clienteId: $clienteId) @include(if: $verCredito) {
       limite
@@ -581,6 +732,7 @@ export const ClienteDocument = gql`
       utilizado
       disponible
       enMora
+      suspendida
     }
     servicios(clienteId: $clienteId, limite: 50) {
       servicioId
@@ -599,6 +751,7 @@ export const ClienteDocument = gql`
       nombre
     }
   }
+  ${ClienteFichaFragmentDoc}
 `;
 
 @Injectable({
@@ -611,14 +764,34 @@ export class ClienteGQL extends Apollo.Query<ClienteQuery, ClienteQueryVariables
     super(apollo);
   }
 }
+export const EditarClienteDocument = gql`
+  mutation EditarCliente($clienteId: ID!, $input: ClienteEdicionInput!) {
+    editarCliente(clienteId: $clienteId, input: $input) {
+      ...ClienteFicha
+    }
+  }
+  ${ClienteFichaFragmentDoc}
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class EditarClienteGQL extends Apollo.Mutation<EditarClienteMutation, EditarClienteMutationVariables> {
+  override document = EditarClienteDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
 export const RutasDocument = gql`
   query Rutas {
-    rutas {
+    rutas(incluirInactivas: true) {
       rutaId
       nombre
       origen
       destino
       distanciaKm
+      activa
     }
   }
 `;
@@ -628,6 +801,63 @@ export const RutasDocument = gql`
 })
 export class RutasGQL extends Apollo.Query<RutasQuery, RutasQueryVariables> {
   override document = RutasDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const RutaDocument = gql`
+  query Ruta($id: ID!) {
+    ruta(id: $id) {
+      ...RutaFicha
+    }
+  }
+  ${RutaFichaFragmentDoc}
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class RutaGQL extends Apollo.Query<RutaQuery, RutaQueryVariables> {
+  override document = RutaDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const CrearRutaDocument = gql`
+  mutation CrearRuta($input: RutaInput!) {
+    crearRuta(input: $input) {
+      ...RutaFicha
+    }
+  }
+  ${RutaFichaFragmentDoc}
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class CrearRutaGQL extends Apollo.Mutation<CrearRutaMutation, CrearRutaMutationVariables> {
+  override document = CrearRutaDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const EditarRutaDocument = gql`
+  mutation EditarRuta($rutaId: ID!, $input: RutaInput!) {
+    editarRuta(rutaId: $rutaId, input: $input) {
+      ...RutaFicha
+    }
+  }
+  ${RutaFichaFragmentDoc}
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class EditarRutaGQL extends Apollo.Mutation<EditarRutaMutation, EditarRutaMutationVariables> {
+  override document = EditarRutaDocument;
 
   constructor(apollo: Apollo.Apollo) {
     super(apollo);

@@ -8,9 +8,14 @@ export class LineasRepositorio {
   private readonly ajustarGql = inject(AjustarLineaCreditoGQL);
   private readonly estadoGql = inject(CambiarEstadoLineaCreditoGQL);
 
-  /** Devuelve el `QueryRef`: `recargar` hace `refetch` sobre él (V4-1). */
+  /** La primera página de clientes, con sondeo. Devuelve el `QueryRef`: `recargar` hace `refetch` sobre él (V4-1). */
   observar(cadaMs: number) {
     return this.gql.watch({ pollInterval: cadaMs });
+  }
+
+  /** «Cargar más» (E5-1): la página siguiente, una vez y sin sondeo. */
+  pagina(despuesDe: string) {
+    return this.gql.fetch({ variables: { despuesDe } });
   }
 
   ajustar(clienteId: string, limite: string, motivo: string, clave: string) {

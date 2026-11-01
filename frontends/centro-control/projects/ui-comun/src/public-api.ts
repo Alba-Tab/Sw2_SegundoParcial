@@ -18,6 +18,7 @@ export * from './lib/formato';
 export * from './lib/lista';
 export * from './lib/marco';
 export * from './lib/no-encontrada';
+export * from './lib/paginas-cursor';
 export * from './lib/proveedores';
 export * from './lib/sesion';
 export * from './lib/sondeo';

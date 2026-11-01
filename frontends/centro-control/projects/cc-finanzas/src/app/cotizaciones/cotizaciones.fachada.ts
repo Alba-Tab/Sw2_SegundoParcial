@@ -3,7 +3,7 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { cargandoDe, completo } from 'ui-comun';
 import type { CotizacionesQuery } from '../graphql/generado';
 import { CotizacionesRepositorio } from './data/cotizaciones.repositorio';
-import { nombreCliente, nombreRuta } from './domain/cotizacion';
+import { nombreRuta } from './domain/cotizacion';
 
 /** Fachada de cotizaciones, cada 30 s. */
 @Injectable()
@@ -14,10 +14,6 @@ export class CotizacionesFachada {
   readonly error = computed(() => this.datos()?.error);
   readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
-
-  nombreCliente(id: string): string {
-    return nombreCliente(this.d()?.clientes, id);
-  }
 
   nombreRuta(id: string): string {
     return nombreRuta(this.d()?.rutas, id);

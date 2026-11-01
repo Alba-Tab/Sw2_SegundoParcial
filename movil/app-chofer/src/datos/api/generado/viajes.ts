@@ -63,6 +63,20 @@ export type Cliente = ClienteNuevo & {
   creadoEn: Instante;
 };
 
+/**
+ * Lo que se edita desde el Centro de Control (G7); mismas reglas que en ClienteNuevo.
+ */
+export interface ClienteEdicion {
+  /**
+   * @minLength 3
+   * @maxLength 120
+   */
+  razonSocial: string;
+  /** @pattern ^[0-9]{5,20}$ */
+  nit: string;
+  correo: string;
+}
+
 export interface PaginaClientes {
   items: Cliente[];
   /** @nullable */
@@ -85,6 +99,50 @@ export interface Coordenadas {
 export interface Lugar {
   nombre: string;
   coordenadas: Coordenadas;
+}
+
+export interface LugarNuevo {
+  /**
+   * @minLength 2
+   * @maxLength 80
+   */
+  nombre: string;
+  coordenadas: Coordenadas;
+}
+
+export type RutaNuevaDestino = {
+  /**
+   * @minLength 2
+   * @maxLength 80
+   */
+  nombre: string;
+  coordenadas: Coordenadas;
+  /**
+   * Radio de la geocerca (D06).
+   * @minimum 50
+   * @maximum 5000
+   */
+  radioMetros: number;
+};
+
+/**
+ * Alta o edición de una ruta (G4). Los mismos límites que RutaActualizada.v1.
+ */
+export interface RutaNueva {
+  /**
+   * @minLength 3
+   * @maxLength 80
+   */
+  nombre: string;
+  origen: LugarNuevo;
+  destino: RutaNuevaDestino;
+  /**
+   * @maximum 5000
+   * @exclusiveMinimum 0
+   */
+  distanciaKm: number;
+  /** Solo en la edición, donde es obligatoria; en el alta no va (la ruta nace inactiva). */
+  activa?: boolean;
 }
 
 export type RutaDestino = Lugar & {
@@ -745,6 +803,14 @@ export type ListarClientesParams = {
    */
   q?: string;
   /**
+   * Hasta 100 UUID separados por coma (E2-8, lo usa el DataLoader del Gateway). Devuelve esos clientes, activos
+   * o no y en cualquier orden, en una sola página (`siguienteCursor` null); un id que no existe no sale (no es
+   * error). Con `ids` se ignoran `q`, `limite` y `cursor`.
+   * @minItems 1
+   * @maxItems 100
+   */
+  ids?: Uuid[];
+  /**
    * @minimum 1
    * @maximum 100
    */
@@ -754,6 +820,13 @@ export type ListarClientesParams = {
    * @maxLength 500
    */
   cursor?: string;
+};
+
+export type ListarRutasParams = {
+  /**
+   * También las inactivas, para la gestión de rutas del Centro de Control (G4). Solo con rol gerente o despachador; con otro rol se ignora.
+   */
+  incluirInactivas?: boolean;
 };
 
 export type ListarServiciosParams = {
@@ -1110,6 +1183,92 @@ export const obtenerCliente = async (clienteId: string, options?: Parameters<typ
   });
 };
 
+export type actualizarClienteResponse200 = {
+  data: Cliente;
+  status: 200;
+};
+
+export type actualizarClienteResponse400 = {
+  data: Problema;
+  status: 400;
+};
+
+export type actualizarClienteResponse401 = {
+  data: Problema;
+  status: 401;
+};
+
+export type actualizarClienteResponse403 = {
+  data: Problema;
+  status: 403;
+};
+
+export type actualizarClienteResponse404 = {
+  data: Problema;
+  status: 404;
+};
+
+export type actualizarClienteResponse409 = {
+  data: Problema;
+  status: 409;
+};
+
+export type actualizarClienteResponse422 = {
+  data: Problema;
+  status: 422;
+};
+
+export type actualizarClienteResponseSuccess = actualizarClienteResponse200 & {
+  headers: Headers;
+};
+export type actualizarClienteResponseError = (
+  | actualizarClienteResponse400
+  | actualizarClienteResponse401
+  | actualizarClienteResponse403
+  | actualizarClienteResponse404
+  | actualizarClienteResponse409
+  | actualizarClienteResponse422
+) & {
+  headers: Headers;
+};
+
+export type actualizarClienteResponse = actualizarClienteResponseSuccess | actualizarClienteResponseError;
+
+export const getActualizarClienteUrl = (clienteId: string) => {
+  return `/api/v1/clientes/${clienteId}`;
+};
+
+/**
+ * Mismas validaciones que el alta (spec 001); un NIT de otro cliente activo responde 409 `CONFLICTO_ESTADO`.
+ * Teléfono, dirección, canal y cuenta no cambian. En una transacción sube `versionAgregado`, audita y deja
+ * `ClienteActualizado` en el Outbox (Finanzas y Analítica actualizan su copia).
+ * @summary Edita razón social, NIT y correo desde el Centro de Control (comercial, gerente). G7, D104.
+ */
+export const actualizarCliente = async (
+  clienteId: string,
+  clienteEdicion: ClienteEdicion,
+  options?: Parameters<typeof pedirViajes>[1],
+): Promise<actualizarClienteResponse> => {
+  const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]));
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return pedirViajes<actualizarClienteResponse>(getActualizarClienteUrl(clienteId), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(clienteEdicion),
+  });
+};
+
 export type listarRutasResponse200 = {
   data: Ruta[];
   status: 200;
@@ -1129,17 +1288,103 @@ export type listarRutasResponseError = listarRutasResponse401 & {
 
 export type listarRutasResponse = listarRutasResponseSuccess | listarRutasResponseError;
 
-export const getListarRutasUrl = () => {
+export const getListarRutasUrl = (params?: ListarRutasParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/rutas?${stringifiedParams}` : `/api/v1/rutas`;
+};
+
+/**
+ * @summary Rutas activas (cualquier usuario autenticado), por nombre. Spec 002.
+ */
+export const listarRutas = async (
+  params?: ListarRutasParams,
+  options?: Parameters<typeof pedirViajes>[1],
+): Promise<listarRutasResponse> => {
+  return pedirViajes<listarRutasResponse>(getListarRutasUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export type crearRutaResponse201 = {
+  data: Ruta;
+  status: 201;
+};
+
+export type crearRutaResponse400 = {
+  data: Problema;
+  status: 400;
+};
+
+export type crearRutaResponse401 = {
+  data: Problema;
+  status: 401;
+};
+
+export type crearRutaResponse403 = {
+  data: Problema;
+  status: 403;
+};
+
+export type crearRutaResponse409 = {
+  data: Problema;
+  status: 409;
+};
+
+export type crearRutaResponse422 = {
+  data: Problema;
+  status: 422;
+};
+
+export type crearRutaResponseSuccess = crearRutaResponse201 & {
+  headers: Headers;
+};
+export type crearRutaResponseError = (
+  crearRutaResponse400 | crearRutaResponse401 | crearRutaResponse403 | crearRutaResponse409 | crearRutaResponse422
+) & {
+  headers: Headers;
+};
+
+export type crearRutaResponse = crearRutaResponseSuccess | crearRutaResponseError;
+
+export const getCrearRutaUrl = () => {
   return `/api/v1/rutas`;
 };
 
 /**
- * @summary Rutas activas (cualquier usuario autenticado). Spec 002.
+ * La ruta **nace inactiva** (`activa: false`): las tarifas siguen de semilla (D10) y sin tarifa no se puede
+ * cotizar; se activa con la edición. Sin `activa` en el cuerpo: si viene, 400 `VALIDACION`. En una transacción
+ * crea la ruta con `versionAgregado = 1`, audita y deja `RutaActualizada` en el Outbox (Finanzas y Analítica
+ * crean su copia). La distancia se guarda con un decimal.
+ * @summary Alta de una ruta (gerente, despachador). G4, D104.
  */
-export const listarRutas = async (options?: Parameters<typeof pedirViajes>[1]): Promise<listarRutasResponse> => {
-  return pedirViajes<listarRutasResponse>(getListarRutasUrl(), {
+export const crearRuta = async (rutaNueva: RutaNueva, options?: Parameters<typeof pedirViajes>[1]): Promise<crearRutaResponse> => {
+  const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]));
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return pedirViajes<crearRutaResponse>(getCrearRutaUrl(), {
     ...options,
-    method: 'GET',
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(rutaNueva),
   });
 };
 
@@ -1172,12 +1417,99 @@ export const getObtenerRutaUrl = (rutaId: Uuid) => {
 };
 
 /**
- * @summary Una ruta.
+ * @summary Una ruta. Una inactiva solo la ven gerente y despachador; para los demás responde 404.
  */
 export const obtenerRuta = async (rutaId: Uuid, options?: Parameters<typeof pedirViajes>[1]): Promise<obtenerRutaResponse> => {
   return pedirViajes<obtenerRutaResponse>(getObtenerRutaUrl(rutaId), {
     ...options,
     method: 'GET',
+  });
+};
+
+export type actualizarRutaResponse200 = {
+  data: Ruta;
+  status: 200;
+};
+
+export type actualizarRutaResponse400 = {
+  data: Problema;
+  status: 400;
+};
+
+export type actualizarRutaResponse401 = {
+  data: Problema;
+  status: 401;
+};
+
+export type actualizarRutaResponse403 = {
+  data: Problema;
+  status: 403;
+};
+
+export type actualizarRutaResponse404 = {
+  data: Problema;
+  status: 404;
+};
+
+export type actualizarRutaResponse409 = {
+  data: Problema;
+  status: 409;
+};
+
+export type actualizarRutaResponse422 = {
+  data: Problema;
+  status: 422;
+};
+
+export type actualizarRutaResponseSuccess = actualizarRutaResponse200 & {
+  headers: Headers;
+};
+export type actualizarRutaResponseError = (
+  | actualizarRutaResponse400
+  | actualizarRutaResponse401
+  | actualizarRutaResponse403
+  | actualizarRutaResponse404
+  | actualizarRutaResponse409
+  | actualizarRutaResponse422
+) & {
+  headers: Headers;
+};
+
+export type actualizarRutaResponse = actualizarRutaResponseSuccess | actualizarRutaResponseError;
+
+export const getActualizarRutaUrl = (rutaId: Uuid) => {
+  return `/api/v1/rutas/${rutaId}`;
+};
+
+/**
+ * Documento completo, con `activa` obligatoria (sin ella, 400 `VALIDACION`). Activar una ruta sin tarifa en
+ * Finanzas hace que cotizarla responda 422 `RUTA_SIN_TARIFA`. En una transacción, con la fila bloqueada, sube
+ * `versionAgregado`, audita y deja `RutaActualizada` en el Outbox. Los viajes ya programados conservan la ruta;
+ * una ruta inactiva no se cotiza.
+ * @summary Edición de una ruta, también para activarla o desactivarla (gerente, despachador). G4, D104.
+ */
+export const actualizarRuta = async (
+  rutaId: Uuid,
+  rutaNueva: RutaNueva,
+  options?: Parameters<typeof pedirViajes>[1],
+): Promise<actualizarRutaResponse> => {
+  const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]));
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return pedirViajes<actualizarRutaResponse>(getActualizarRutaUrl(rutaId), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(rutaNueva),
   });
 };
 
@@ -1572,6 +1904,7 @@ export const getListarViajesUrl = (params?: ListarViajesParams) => {
 };
 
 /**
+ * Del más reciente al más viejo (por `viajeId`, UUIDv7); el cursor sigue hacia los más viejos.
  * @summary Viajes con su última posición para el mapa en vivo (despachador, comercial, gerente, jefe_flota, agente_lectura). Spec 005.
  */
 export const listarViajes = async (

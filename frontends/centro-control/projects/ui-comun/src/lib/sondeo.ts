@@ -3,12 +3,21 @@ import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { falloPasajero, filasConError } from './errores';
 
 /**
- * Campos de las filas de una lista raíz que otro servicio llena (`clientes[i].lineaCredito` sale de Finanzas): si ese
- * servicio cae, la fila llega con el campo en null y la tabla que lo muestra se vacía. Se reponen por la clave de la fila.
+ * Campos de las filas de una lista raíz que otro servicio llena (`clientes.items[i].lineaCredito` sale de Finanzas): si
+ * ese servicio cae, la fila llega con el campo en null y la tabla que lo muestra se vacía. Se reponen por la clave de la
+ * fila. La clave del registro es la ruta de la lista, con puntos si está dentro de una página ("clientes.items").
  */
 export type Anidados = Record<string, { clave: string; campos: readonly string[] }>;
 
 type Fila = Record<string, unknown>;
+
+const leer = (raiz: unknown, ruta: readonly string[]): unknown => ruta.reduce<unknown>((o, k) => (o as Fila | null | undefined)?.[k], raiz);
+
+/** Copia de `raiz` con `valor` en `ruta` (sin tocar la respuesta de Apollo, que es inmutable). */
+const escribir = (raiz: Fila, [k, ...resto]: readonly string[], valor: unknown): Fila => ({
+  ...raiz,
+  [k]: resto.length ? escribir((raiz[k] ?? {}) as Fila, resto, valor) : valor,
+});
 
 /** Repone en las filas con error de `lista` los campos anidados desde la última respuesta buena, emparejando por clave. */
 function reponerAnidados(error: unknown, lista: string, actual: unknown, previo: unknown, a: Anidados[string]): Fila[] | null {
@@ -57,7 +66,7 @@ export function conservarUltimoBueno<R extends { data?: unknown; error?: unknown
             return r;
           }
           if (!bueno) return r;
-          const mezcla: Record<string, unknown> = { ...data };
+          let mezcla: Record<string, unknown> = { ...data };
           let repuesto = false;
           // R1F-6: solo un fallo de red o del Gateway, o uno pasajero del servicio del campo (caído o ERROR_INTERNO,
           // R2F-7). Con NO_ENCONTRADO o SIN_PERMISO
@@ -70,8 +79,9 @@ export function conservarUltimoBueno<R extends { data?: unknown; error?: unknown
             repuesto = true;
           }
           for (const [lista, a] of Object.entries(anidados)) {
-            const filas = reponerAnidados(r.error, lista, mezcla[lista], bueno[lista], a);
-            if (filas) [mezcla[lista], repuesto] = [filas, true];
+            const ruta = lista.split('.');
+            const filas = reponerAnidados(r.error, lista, leer(mezcla, ruta), leer(bueno, ruta), a);
+            if (filas) [mezcla, repuesto] = [escribir(mezcla, ruta, filas), true];
           }
           return repuesto ? { ...r, data: mezcla as R['data'], datosAl: buenoEn } : r;
         }),

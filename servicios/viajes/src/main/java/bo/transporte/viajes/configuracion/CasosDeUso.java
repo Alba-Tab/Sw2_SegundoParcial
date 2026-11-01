@@ -2,7 +2,9 @@ package bo.transporte.viajes.configuracion;
 
 import bo.transporte.viajes.aplicacion.cliente.AltaDeCliente;
 import bo.transporte.viajes.aplicacion.cliente.ConsultaDeClientes;
+import bo.transporte.viajes.aplicacion.cliente.EdicionDeCliente;
 import bo.transporte.viajes.aplicacion.cliente.VinculacionDeCliente;
+import bo.transporte.viajes.aplicacion.comun.OperacionIdempotente;
 import bo.transporte.viajes.aplicacion.dispositivo.AvisosPush;
 import bo.transporte.viajes.aplicacion.dispositivo.DispositivosDelChofer;
 import bo.transporte.viajes.aplicacion.puerto.salida.AlmacenEvidencias;
@@ -25,6 +27,7 @@ import bo.transporte.viajes.aplicacion.puerto.salida.UltimaPosicionRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.ViajeRepositorio;
 import bo.transporte.viajes.aplicacion.puerto.salida.VinculadorIdentidad;
 import bo.transporte.viajes.aplicacion.ruta.ConsultaDeRutas;
+import bo.transporte.viajes.aplicacion.ruta.GestionDeRutas;
 import bo.transporte.viajes.aplicacion.saga.DecisionDeCredito;
 import bo.transporte.viajes.aplicacion.saga.ResolucionDeIntervencion;
 import bo.transporte.viajes.aplicacion.servicio.CancelacionDeServicio;
@@ -81,6 +84,26 @@ class CasosDeUso {
     @Bean
     ConsultaDeRutas consultaDeRutas(RutaRepositorio rutas) {
         return new ConsultaDeRutas(rutas);
+    }
+
+    @Bean
+    OperacionIdempotente operacionIdempotente(RegistroIdempotente idempotencia, Transacciones tx) {
+        return new OperacionIdempotente(idempotencia, tx);
+    }
+
+    @Bean
+    GestionDeRutas gestionDeRutas(
+            RutaRepositorio rutas, RegistroDeEventos eventos, Auditoria auditoria, OperacionIdempotente operacion) {
+        return new GestionDeRutas(rutas, eventos, auditoria, operacion);
+    }
+
+    @Bean
+    EdicionDeCliente edicionDeCliente(
+            ClienteRepositorio clientes,
+            RegistroDeEventos eventos,
+            Auditoria auditoria,
+            OperacionIdempotente operacion) {
+        return new EdicionDeCliente(clientes, eventos, auditoria, operacion);
     }
 
     @Bean

@@ -30,7 +30,7 @@ import {
   textoError,
   NumeroPipe,
 } from 'ui-comun';
-import { estadoServicio, puedeCancelarServicio, type Servicio } from '../domain/servicio';
+import { estadoServicio, nombreCliente, puedeCancelarServicio, type Servicio } from '../domain/servicio';
 import { ServiciosFachada } from '../servicios.fachada';
 
 /**
@@ -90,7 +90,7 @@ import { ServiciosFachada } from '../servicios.fachada';
       >
         <ng-container matColumnDef="cliente"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Cliente</th>
-          <td mat-cell *matCellDef="let s">{{ nombre(s.clienteId) }}</td></ng-container
+          <td mat-cell *matCellDef="let s">{{ nombre(s) }}</td></ng-container
         >
         <ng-container matColumnDef="estado"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
@@ -190,7 +190,7 @@ export class ServiciosPagina {
   readonly error = this.fachada.error;
   readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
-  readonly campos = { servicios: 'Viajes', clientes: 'Viajes' };
+  readonly campos = { servicios: 'Viajes' };
   readonly puedeCancelar = computed(() => this.sesion.tiene('despachador', 'comercial'));
   /** La columna del monto, solo si el rol lo ve (no se le pide al despachador). */
   readonly columnas = computed(() =>
@@ -200,10 +200,10 @@ export class ServiciosPagina {
   );
   readonly lista = controlLista({
     filas: this.servicios,
-    texto: (s) => [this.nombre(s.clienteId ?? ''), s.placa, s.choferNombre, etiqueta('TipoCarga', s.tipoCarga).texto].join(' '),
+    texto: (s) => [this.nombre(s), s.placa, s.choferNombre, etiqueta('TipoCarga', s.tipoCarga).texto].join(' '),
     estado: (s) => s.estado,
     orden: {
-      cliente: (s) => this.nombre(s.clienteId ?? ''),
+      cliente: (s) => this.nombre(s),
       estado: (s) => posicionEstado('EstadoServicio', s.estado),
       carga: (s) => etiqueta('TipoCarga', s.tipoCarga).texto,
       fecha: (s) => s.fechaViaje,
@@ -229,13 +229,13 @@ export class ServiciosPagina {
     effect(() => this.fachada.estado.set(estadoServicio(this.lista.filtro().estado)));
   }
 
-  nombre(clienteId: string): string {
-    return this.fachada.nombreCliente(clienteId);
+  nombre(s: { razonSocial?: string | null }): string {
+    return nombreCliente(s);
   }
 
   resumen(s: Servicio): string {
     const monto = this.fachada.verMonto && s.monto ? ` y se devuelven ${this.bob.transform(s.monto)} a su línea de crédito` : '';
-    return `Se cancela el servicio de ${this.nombre(s.clienteId ?? '')} del ${this.fecha.transform(s.fechaViaje)}: se libera la unidad ${s.placa ?? ''}${monto}. No se puede deshacer.`;
+    return `Se cancela el servicio de ${this.nombre(s)} del ${this.fecha.transform(s.fechaViaje)}: se libera la unidad ${s.placa ?? ''}${monto}. No se puede deshacer.`;
   }
 
   /** Abre la confirmación de la fila con el foco en el motivo; al cerrarla, el foco vuelve a "Cancelar…". */

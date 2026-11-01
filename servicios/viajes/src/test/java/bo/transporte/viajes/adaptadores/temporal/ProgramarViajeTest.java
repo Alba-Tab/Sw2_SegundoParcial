@@ -190,6 +190,25 @@ class ProgramarViajeTest {
     }
 
     @Test
+    void lineaSuspendidaEsCreditoRechazadoYNoSeReintentaAunqueFinanzasNoLoMarque() {
+        // E9-1: aunque la falla llegue como reintentable, el tipo CREDITO_RECHAZADO está en setDoNotRetry: una sola
+        // llamada. Como no vino marcada no reintentable, la saga libera por si acaso (liberarCredito es idempotente).
+        finanzas.respuesta = e -> {
+            throw ApplicationFailure.newFailure("Línea suspendida", "CREDITO_RECHAZADO");
+        };
+        var r = resultado(iniciar(UUID.randomUUID()));
+        assertEquals("CANCELADO", r.resultado());
+        assertEquals("CREDITO_RECHAZADO", r.motivo());
+        assertEquals(
+                List.of(
+                        "Viajes.crearViaje",
+                        "Finanzas.validarYReservarCredito",
+                        "Finanzas.liberarCredito:CREDITO_RECHAZADO",
+                        "Viajes.cancelarViaje:CREDITO_RECHAZADO"),
+                llamadas);
+    }
+
+    @Test
     void sinUnidadCompatibleLiberaElCreditoAntesDeCancelarElViaje() {
         flota.respuesta = e -> {
             throw negocio("SIN_UNIDAD_COMPATIBLE");
