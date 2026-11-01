@@ -804,4 +804,24 @@ describe('gestión de Flota desde el Centro de Control (D104)', () => {
       '/flota/api/v1/mantenimientos?unidadId=u1&limite=50',
     );
   });
+
+  it('F2-2: un despuesDe inválido llega como VALIDACION de Flota, con su campo, y no como una página vacía', async () => {
+    const invalido = () => ({
+      status: 400,
+      json: { codigo: 'VALIDACION', detail: 'cursor: no es válido', errores: [{ campo: 'cursor', mensaje: 'no es válido' }] },
+    });
+    rutas.set('GET /flota/api/v1/choferes', invalido);
+    rutas.set('GET /flota/api/v1/mantenimientos', invalido);
+    for (const q of ['{ choferes(despuesDe: "x") { siguienteCursor } }', '{ mantenimientos(despuesDe: "x") { siguienteCursor } }']) {
+      const r = await gql(['jefe_flota'], q);
+      expect(r.body.data).toEqual({ [q.includes('choferes') ? 'choferes' : 'mantenimientos']: null });
+      expect(r.body.errors[0].extensions).toMatchObject({
+        codigo: 'VALIDACION',
+        status: 400,
+        servicio: 'flota',
+        errores: [{ campo: 'cursor', mensaje: 'no es válido' }],
+      });
+    }
+    expect(pedidos.filter((p) => p.ruta.includes('cursor=x'))).toHaveLength(2);
+  });
 });
