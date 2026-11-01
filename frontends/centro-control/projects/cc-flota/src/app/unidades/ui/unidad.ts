@@ -91,7 +91,7 @@ import { UnidadFachada } from '../unidades.fachada';
     @if (cargando()) {
       <cc-esqueleto />
     }
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!unidad()" [reintentar]="recargar" />
+    <cc-aviso-servicios buscado="esta unidad" [error]="error()" [campos]="campos" [sinDatos]="!unidad()" [reintentar]="recargar" />
     @if (unidad(); as u) {
       @if (documentosEnAviso(u.documentos); as n) {
         <p class="aviso-documentos" role="status">

@@ -14,7 +14,7 @@ import { RutasFachada } from '../rutas.fachada';
     @if (cargando()) {
       <cc-esqueleto />
     }
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!ruta()" />
+    <cc-aviso-servicios buscado="esta ruta" [error]="error()" [campos]="campos" [sinDatos]="!ruta()" />
     @if (ruta(); as r) {
       <dl class="datos">
         <div>

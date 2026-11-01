@@ -52,7 +52,7 @@ import { nombreRuta } from '../domain/cliente';
     @if (cargando()) {
       <cc-esqueleto />
     }
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!cliente()" />
+    <cc-aviso-servicios buscado="este cliente" [error]="error()" [campos]="campos" [sinDatos]="!cliente()" />
     @if (cliente(); as c) {
       <dl class="datos">
         <div>

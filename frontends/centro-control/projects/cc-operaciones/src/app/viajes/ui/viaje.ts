@@ -68,7 +68,7 @@ import { ViajeFachada } from '../viajes.fachada';
       <cc-esqueleto [filas]="6" />
     }
     <!-- El Gateway ya convierte el 404 de la predicción en null (W3): un error en riesgo lo dice su sección (B-1, V1-10). -->
-    <cc-aviso-servicios [error]="r?.error" [campos]="campos" [sinDatos]="!r?.data?.viaje" [reintentar]="recargar" />
+    <cc-aviso-servicios buscado="este viaje" [error]="r?.error" [campos]="campos" [sinDatos]="!r?.data?.viaje" [reintentar]="recargar" />
     @if (r?.data?.viaje; as v) {
       <!-- Lo que pide una decisión va primero (PRODUCT.md, principio 1). -->
       @if (sesion.tiene('despachador') && v.estado === 'ENTREGA_OBSERVADA') {

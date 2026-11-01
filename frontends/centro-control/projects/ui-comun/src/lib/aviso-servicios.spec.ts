@@ -1,3 +1,4 @@
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Apollo } from 'apollo-angular';
@@ -117,6 +118,33 @@ describe('Reintentar con un padre real (V6-1, V4-3, V4-4)', () => {
     const { el, vivo } = await reintentar('Finanzas no disponible');
     expect(vivo).toBe('Sigue sin responder: Finanzas no disponible');
     expect(document.activeElement).toBe(el.querySelector('button.reintentar'));
+  });
+});
+
+describe('no encontrado (FB-2)', () => {
+  const noEncontrado = new CombinedGraphQLErrors({
+    data: { unidad: null },
+    errors: [{ message: 'x', path: ['unidad'], extensions: { codigo: 'NO_ENCONTRADO' } }],
+  });
+
+  it('un detalle sin datos con NO_ENCONTRADO dice qué no se encontró, con search_off y sin «Reintentar»', () => {
+    const f = TestBed.createComponent(AvisoServicios);
+    f.componentRef.setInput('error', noEncontrado);
+    f.componentRef.setInput('sinDatos', true);
+    f.componentRef.setInput('buscado', 'esta unidad');
+    f.detectChanges();
+    const el: HTMLElement = f.nativeElement;
+    expect(el.querySelector('[role="alert"]')?.textContent).toContain('No encontramos esta unidad.');
+    expect(el.querySelector('mat-icon')?.textContent).toBe('search_off');
+    expect(el.textContent).not.toContain('cloud_off');
+    expect(el.querySelector('button')).toBeNull();
+  });
+
+  it('con datos en pantalla, un NO_ENCONTRADO de otro campo no reemplaza la página', () => {
+    const f = TestBed.createComponent(AvisoServicios);
+    f.componentRef.setInput('error', noEncontrado);
+    f.detectChanges();
+    expect((f.nativeElement as HTMLElement).textContent).not.toContain('No encontramos');
   });
 });
 

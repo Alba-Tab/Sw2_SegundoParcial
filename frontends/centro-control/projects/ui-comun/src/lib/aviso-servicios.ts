@@ -36,6 +36,12 @@ export function avisosServicio(error: unknown, campos: CamposPorServicio, sinDat
   selector: 'cc-aviso-servicios',
   imports: [MatButtonModule, MatIconModule],
   template: `
+    @if (noEncontrado()) {
+      <!-- No encontrado no es un servicio caído: otro ícono y sin «Reintentar»; la salida es el «volver» del encabezado (FB-2). -->
+      <p class="aviso-servicio no-encontrado" role="alert">
+        <mat-icon>search_off</mat-icon> No encontramos {{ buscado() }}. Puede que el enlace esté mal o que ya no exista.
+      </p>
+    }
     @for (a of avisos(); track a) {
       <p class="aviso-servicio" role="alert"><mat-icon>cloud_off</mat-icon> {{ a }}</p>
     }
@@ -62,6 +68,10 @@ export function avisosServicio(error: unknown, campos: CamposPorServicio, sinDat
       background: var(--mat-sys-error-container);
       color: var(--mat-sys-on-error-container);
     }
+    .no-encontrado {
+      background: var(--mat-sys-surface-container-highest);
+      color: var(--mat-sys-on-surface);
+    }
   `,
 })
 export class AvisoServicios {
@@ -71,7 +81,14 @@ export class AvisoServicios {
   readonly sinDatos = input(false);
   /** Un aviso que la página arma sola (p. ej. «la lista está incompleta») y que también se arregla con «Reintentar» (V3-7). */
   readonly extra = input<string | null>(null);
+  /** Qué no se encontró, para el aviso de un detalle: «esta unidad», «este viaje». */
+  readonly buscado = input('lo que buscas');
+  /** Un detalle sin datos porque el servicio respondió NO_ENCONTRADO: se dice eso, no que el servicio falló (FB-2). */
+  readonly noEncontrado = computed(
+    () => this.sinDatos() && erroresGraphql(this.error()).some((e) => e.extensions?.['codigo'] === 'NO_ENCONTRADO'),
+  );
   readonly avisos = computed(() => {
+    if (this.noEncontrado()) return [];
     const extra = this.extra();
     return [...avisosServicio(this.error(), this.campos(), this.sinDatos()), ...(extra ? [extra] : [])];
   });

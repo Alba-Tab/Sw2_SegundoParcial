@@ -86,7 +86,7 @@ import { FacturaFachada } from '../facturas.fachada';
     @if (cargando()) {
       <cc-esqueleto />
     }
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!factura()" [reintentar]="recargar" />
+    <cc-aviso-servicios buscado="esta factura" [error]="error()" [campos]="campos" [sinDatos]="!factura()" [reintentar]="recargar" />
     @if (factura(); as f) {
       <dl class="datos">
         <div>

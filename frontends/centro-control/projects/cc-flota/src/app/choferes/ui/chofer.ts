@@ -20,7 +20,7 @@ import { estadoChofer, vigenciaLicencia } from '../domain/chofer';
     @if (cargando()) {
       <cc-esqueleto />
     }
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!chofer()" />
+    <cc-aviso-servicios buscado="este chofer" [error]="error()" [campos]="campos" [sinDatos]="!chofer()" />
     @if (chofer(); as c) {
       <dl class="datos">
         <div>
