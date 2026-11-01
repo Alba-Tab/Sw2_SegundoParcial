@@ -1,7 +1,7 @@
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { avisosServicio } from './aviso-servicios';
 import { esperaReconexion } from './conexion';
-import { APPS_POR_ROL, DESTINO_POR_ROL } from './configuracion';
+import { APPS_POR_ROL, DESTINO_POR_ROL, urlEnApp } from './configuracion';
 import { codigoDe, mensajeDe, servicioCaido, sinPermiso } from './errores';
 import { aCentavos, fechaLaPaz, pct, puedeVer, sumarMontos } from 'ui-comun/dominio';
 import { BobPipe, FechaPipe, NumeroPipe } from './formato';
@@ -30,6 +30,12 @@ describe('ui-comun', () => {
     });
     expect(APPS_POR_ROL['despachador']).not.toContain('cc-finanzas');
     expect(APPS_POR_ROL['cliente']).toBeUndefined();
+  });
+
+  it('FL-1: enlaza la ficha de otra app con ?desde= solo si el rol abre esa app', () => {
+    const config = { app: 'cc-operaciones', urls: { 'cc-flota': 'http://f' } } as never;
+    expect(urlEnApp(config, ['gerente'], 'cc-flota', '/unidades/u1')).toBe('http://f/unidades/u1?desde=cc-operaciones');
+    expect(urlEnApp(config, ['despachador'], 'cc-flota', '/unidades/u1')).toBeNull();
   });
 
   it('respuesta parcial: detecta el campo del servicio caído y el código de un error', () => {

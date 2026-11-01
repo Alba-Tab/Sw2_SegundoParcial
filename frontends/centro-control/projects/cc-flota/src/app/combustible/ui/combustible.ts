@@ -1,6 +1,7 @@
 import { Component, computed, inject, input } from '@angular/core';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
+import { RouterLink } from '@angular/router';
 import { aCentavos, AvisoServicios, BobPipe, controlLista, Encabezado, FechaPipe, FiltrosLista, PieLista, NumeroPipe } from 'ui-comun';
 import { CombustibleFachada } from '../combustible.fachada';
 import type { Anomalia, Carga } from '../domain/combustible';
@@ -9,7 +10,7 @@ import type { Anomalia, Carga } from '../domain/combustible';
 @Component({
   selector: 'app-combustible',
   providers: [CombustibleFachada],
-  imports: [Encabezado, MatTableModule, MatSortModule, NumeroPipe, BobPipe, FechaPipe, AvisoServicios, FiltrosLista, PieLista],
+  imports: [Encabezado, RouterLink, MatTableModule, MatSortModule, NumeroPipe, BobPipe, FechaPipe, AvisoServicios, FiltrosLista, PieLista],
   template: `
     <cc-encabezado
       [titulo]="id() ? 'Carga marcada' : 'Combustible'"
@@ -76,7 +77,10 @@ import type { Anomalia, Carga } from '../domain/combustible';
       >
         <ng-container matColumnDef="placa"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Placa</th>
-          <td mat-cell *matCellDef="let a">{{ a.placa }}</td></ng-container
+          <td mat-cell *matCellDef="let a">
+            <!-- FL-1: la placa lleva a la unidad (la consulta trae la placa, no el id). -->
+            <a routerLink="/unidades" [queryParams]="{ q: a.placa }">{{ a.placa }}</a>
+          </td></ng-container
         >
         <ng-container matColumnDef="litros"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Litros</th>
@@ -118,7 +122,10 @@ import type { Anomalia, Carga } from '../domain/combustible';
       >
         <ng-container matColumnDef="placa"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Placa</th>
-          <td mat-cell *matCellDef="let c">{{ c.placa }}</td></ng-container
+          <td mat-cell *matCellDef="let c">
+            <!-- FL-1: la placa lleva a la unidad (la consulta trae la placa, no el id). -->
+            <a routerLink="/unidades" [queryParams]="{ q: c.placa }">{{ c.placa }}</a>
+          </td></ng-container
         >
         <ng-container matColumnDef="litros"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Litros</th>

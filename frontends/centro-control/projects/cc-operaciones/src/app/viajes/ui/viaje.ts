@@ -9,6 +9,7 @@ import {
   AvisoServicios,
   BobPipe,
   Campo,
+  CONFIG_CENTRO,
   cargandoDe,
   erroresGraphql,
   Confirmacion,
@@ -22,9 +23,11 @@ import {
   exigirTexto,
   largoEntre,
   mensajeDe,
+  NumeroPipe,
   pct,
   Sesion,
   textoError,
+  urlEnApp,
 } from 'ui-comun';
 import { RouterLink } from '@angular/router';
 import type { OpcionIntervencion } from '../../graphql/generado';
@@ -48,6 +51,7 @@ import { ViajeFachada } from '../viajes.fachada';
     RouterLink,
     BobPipe,
     FechaPipe,
+    NumeroPipe,
     EtiquetaPipe,
     Estado,
     AvisoServicios,
@@ -151,11 +155,26 @@ import { ViajeFachada } from '../viajes.fachada';
       <dl class="datos">
         <div>
           <dt>Cliente</dt>
-          <dd>{{ v.cliente?.razonSocial ?? 'Sin dato' }}</dd>
+          <dd>
+            @if (v.cliente; as c) {
+              <a [routerLink]="['/clientes', c.clienteId]">{{ c.razonSocial }}</a>
+            } @else {
+              Sin dato
+            }
+          </dd>
         </div>
         <div>
           <dt>Ruta</dt>
-          <dd>{{ v.ruta?.nombre }}{{ v.ruta?.distanciaKm ? ' (' + v.ruta.distanciaKm + ' km)' : '' }}</dd>
+          <dd>
+            @if (v.ruta; as r) {
+              <a [routerLink]="['/rutas', r.rutaId]">{{ r.nombre }}</a>
+              @if (r.distanciaKm) {
+                ({{ r.distanciaKm | numero }} km)
+              }
+            } @else {
+              Sin dato
+            }
+          </dd>
         </div>
         <div>
           <dt>Carga</dt>
@@ -172,7 +191,12 @@ import { ViajeFachada } from '../viajes.fachada';
         <div>
           <dt>Unidad</dt>
           <dd>
-            {{ v.unidad?.placa ?? v.placa ?? 'Sin unidad' }}
+            <!-- FL-1: a la ficha de la unidad en Flota, si el rol abre Flota. -->
+            @if (v.unidad && urlUnidad(v.unidad.unidadId); as url) {
+              <a [href]="url">{{ v.unidad.placa }}</a>
+            } @else {
+              {{ v.unidad?.placa ?? v.placa ?? 'Sin unidad' }}
+            }
             @if (v.unidad?.estado; as estadoUnidad) {
               <cc-estado grupo="EstadoUnidad" [valor]="estadoUnidad" />
             }
@@ -282,6 +306,11 @@ export class ViajePagina {
   private readonly fachada = inject(ViajeFachada);
   private readonly avisos = inject(MatSnackBar);
   readonly sesion = inject(Sesion);
+  private readonly config = inject(CONFIG_CENTRO);
+  urlUnidad(unidadId: string | null | undefined): string | null {
+    if (!unidadId) return null;
+    return urlEnApp(this.config, this.sesion.roles(), 'cc-flota', `/unidades/${encodeURIComponent(unidadId)}`);
+  }
   readonly id = input.required<string>();
   /** La cola desde la que se abrió (`?de=`), validada contra una lista cerrada: miga y "volver" llevan ahí (V1-5). */
   readonly de = input<string>();

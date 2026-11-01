@@ -1,4 +1,5 @@
 import { InjectionToken } from '@angular/core';
+import { conDesde } from 'ui-comun/dominio';
 
 export type App = 'cc-tablero' | 'cc-operaciones' | 'cc-flota' | 'cc-finanzas';
 
@@ -53,4 +54,13 @@ export async function cargarConfiguracion(): Promise<ConfigCentro> {
 /** La app de la que se llegó (`?desde=`), si es una del Centro de Control distinta de la actual; lo demás se ignora. */
 export function appOrigen(desde: string | null | undefined, actual: App): App | undefined {
   return desde && desde !== actual && Object.hasOwn(NOMBRES_APPS, desde) ? (desde as App) : undefined;
+}
+
+/**
+ * FL-1: la URL de una ficha en otra app con `?desde=` (ofrece volver), o null si el rol no abre esa app: el enlace no
+ * promete lo que el guarda de la otra app rechaza.
+ */
+export function urlEnApp(config: Pick<ConfigCentro, 'app' | 'urls'>, roles: readonly string[], app: App, ruta: string): string | null {
+  if (!roles.some((r) => APPS_POR_ROL[r]?.includes(app))) return null;
+  return conDesde(`${config.urls[app]}${ruta}`, config.app);
 }
