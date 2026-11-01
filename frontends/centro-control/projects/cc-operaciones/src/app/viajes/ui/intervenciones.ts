@@ -36,7 +36,7 @@ import { Vistas, VISTAS } from '../../vistas';
     <cc-filtros-lista
       [control]="lista"
       [cargando]="cargando()"
-      busqueda="Buscar por placa, cliente, ruta o motivo"
+      busqueda="Buscar por placa, cliente o ruta"
       nombre="intervenciones"
       singular="intervención"
     />
@@ -55,19 +55,15 @@ import { Vistas, VISTAS } from '../../vistas';
         >
         <ng-container matColumnDef="cliente"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Cliente</th>
-          <td mat-cell *matCellDef="let v">{{ v.cliente?.razonSocial }}</td></ng-container
+          <td mat-cell *matCellDef="let v">{{ v.cliente?.razonSocial ?? 'Sin dato' }}</td></ng-container
         >
         <ng-container matColumnDef="ruta"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Ruta</th>
-          <td mat-cell *matCellDef="let v">{{ v.ruta?.nombre }}</td></ng-container
+          <td mat-cell *matCellDef="let v">{{ v.ruta?.nombre ?? 'Sin dato' }}</td></ng-container
         >
         <ng-container matColumnDef="fecha"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha</th>
           <td mat-cell *matCellDef="let v">{{ v.fechaViaje | fecha }}</td></ng-container
-        >
-        <ng-container matColumnDef="motivo"
-          ><th mat-header-cell *matHeaderCellDef>Motivo</th>
-          <td mat-cell *matCellDef="let v">{{ v.motivo }}</td></ng-container
         >
         <ng-container matColumnDef="accion"
           ><th mat-header-cell *matHeaderCellDef><span class="cdk-visually-hidden">Acción</span></th>
@@ -103,10 +99,10 @@ export class IntervencionesPagina {
   readonly cargando = this.fachada.cargando;
   readonly decide = inject(Sesion).tiene('despachador');
   readonly campos = { intervenciones: 'Viajes' };
-  readonly columnas = ['placa', 'cliente', 'ruta', 'fecha', 'motivo', 'accion'];
+  readonly columnas = ['placa', 'cliente', 'ruta', 'fecha', 'accion'];
   readonly lista = controlLista({
     filas: computed(() => this.fachada.datos()?.data?.intervenciones ?? []),
-    texto: (v) => `${textoViaje(v)} ${v.motivo ?? ''}`,
+    texto: textoViaje,
     orden: {
       placa: (v) => v.placa,
       cliente: (v) => v.cliente?.razonSocial,

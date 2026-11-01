@@ -121,9 +121,8 @@ import { ViajeFachada } from '../viajes.fachada';
       @if (sesion.tiene('despachador') && v.estado === 'REQUIERE_INTERVENCION') {
         <section class="decision" aria-labelledby="titulo-intervencion">
           <h2 id="titulo-intervencion">Resolver la intervención</h2>
-          @if (v.motivo) {
-            <p>{{ v.motivo }}</p>
-          }
+          <!-- R2F-5: v.motivo es el código de cancelación (viajes.yaml), no la causa; la causa es esta. -->
+          <p>La cancelación automática no terminó: quedó una reserva o el crédito sin liberar.</p>
           <div class="fila-acciones" #zonaIntervencion>
             <mat-form-field class="ancho">
               <mat-label>Nota</mat-label>

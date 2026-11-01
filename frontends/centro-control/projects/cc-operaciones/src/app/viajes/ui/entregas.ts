@@ -50,15 +50,15 @@ import { Vistas, VISTAS } from '../../vistas';
       >
         <ng-container matColumnDef="placa"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Placa</th>
-          <td mat-cell *matCellDef="let v">{{ v.placa }}</td></ng-container
+          <td mat-cell *matCellDef="let v">{{ v.placa ?? 'Sin unidad' }}</td></ng-container
         >
         <ng-container matColumnDef="cliente"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Cliente</th>
-          <td mat-cell *matCellDef="let v">{{ v.cliente?.razonSocial }}</td></ng-container
+          <td mat-cell *matCellDef="let v">{{ v.cliente?.razonSocial ?? 'Sin dato' }}</td></ng-container
         >
         <ng-container matColumnDef="ruta"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Ruta</th>
-          <td mat-cell *matCellDef="let v">{{ v.ruta?.nombre }}</td></ng-container
+          <td mat-cell *matCellDef="let v">{{ v.ruta?.nombre ?? 'Sin dato' }}</td></ng-container
         >
         <ng-container matColumnDef="registrada"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Registrada</th>

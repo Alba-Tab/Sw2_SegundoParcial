@@ -57,15 +57,15 @@ import { Vistas, VISTAS } from '../../vistas';
         >
         <ng-container matColumnDef="cliente"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Cliente</th>
-          <td mat-cell *matCellDef="let v">{{ v.cliente?.razonSocial }}</td></ng-container
+          <td mat-cell *matCellDef="let v">{{ v.cliente?.razonSocial ?? 'Sin dato' }}</td></ng-container
         >
         <ng-container matColumnDef="ruta"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Ruta</th>
-          <td mat-cell *matCellDef="let v">{{ v.ruta?.nombre }}</td></ng-container
+          <td mat-cell *matCellDef="let v">{{ v.ruta?.nombre ?? 'Sin dato' }}</td></ng-container
         >
         <ng-container matColumnDef="chofer"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Chofer</th>
-          <td mat-cell *matCellDef="let v">{{ v.choferNombre }}</td></ng-container
+          <td mat-cell *matCellDef="let v">{{ v.choferNombre ?? 'Sin dato' }}</td></ng-container
         >
         <ng-container matColumnDef="fecha"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha</th>
