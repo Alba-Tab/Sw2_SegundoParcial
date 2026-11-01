@@ -1,9 +1,9 @@
-import { inject, type Provider, type EnvironmentProviders } from '@angular/core';
+import { DestroyRef, inject, provideEnvironmentInitializer, type Provider, type EnvironmentProviders } from '@angular/core';
 import { ApolloLink, InMemoryCache } from '@apollo/client/core';
 import { ErrorLink } from '@apollo/client/link/error';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { getMainDefinition } from '@apollo/client/utilities';
-import { provideApollo } from 'apollo-angular';
+import { Apollo, provideApollo } from 'apollo-angular';
 import { HttpLink } from 'apollo-angular/http';
 import { createClient } from 'graphql-ws';
 import { Observable, type Subscription } from 'rxjs';
@@ -66,8 +66,16 @@ export function reintentarCon401(renovar: () => Promise<string | undefined>): Er
  * antes `{ loading: true, error: undefined }`. Eso borraba el aviso y su «Reintentar» (el foco caía en <body>) y el
  * banner `role="alert"` se volvía a anunciar en cada sondeo.
  */
+/** R1F-9: con la pestaña oculta los sondeos no piden nada; antes seguían (unas 1.200 peticiones en 10 min). */
+export const pestanaOculta = (): boolean => typeof document !== 'undefined' && document.visibilityState === 'hidden';
+
 export const opcionesApollo = {
-  watchQuery: { fetchPolicy: 'cache-and-network', errorPolicy: 'all', notifyOnNetworkStatusChange: false },
+  watchQuery: {
+    fetchPolicy: 'cache-and-network',
+    errorPolicy: 'all',
+    notifyOnNetworkStatusChange: false,
+    skipPollAttempt: pestanaOculta,
+  },
   query: { fetchPolicy: 'network-only', errorPolicy: 'all' },
 } as const;
 
@@ -122,6 +130,16 @@ export function proveerApollo(): (Provider | EnvironmentProviders)[] {
         cache: new InMemoryCache(),
         defaultOptions: opcionesApollo,
       };
+    }),
+    // Al volver a la pestaña, los sondeos se ponen al día enseguida, sin esperar su próximo turno.
+    provideEnvironmentInitializer(() => {
+      const client = inject(Apollo).client;
+      const alVolver = () => {
+        if (pestanaOculta()) return;
+        for (const q of client.getObservableQueries()) if (q.options.pollInterval) q.refetch().catch(() => undefined);
+      };
+      document.addEventListener('visibilitychange', alVolver);
+      inject(DestroyRef).onDestroy(() => document.removeEventListener('visibilitychange', alVolver));
     }),
   ];
 }

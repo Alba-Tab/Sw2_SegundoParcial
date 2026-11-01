@@ -8,6 +8,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink, RouterOutlet } from '@angular/router';
 import { Alertas } from './alertas';
+import { pestanaOculta } from './apollo';
 import { appsDeRoles, CONFIG_CENTRO, NOMBRES_APPS, type App } from './configuracion';
 import { etiqueta, urlAdminKeycloak } from 'ui-comun/dominio';
 import { EtiquetaPipe } from './estado';
@@ -358,6 +359,7 @@ export class Marco implements OnInit {
   }
 
   private async revisarSalud(): Promise<void> {
+    if (pestanaOculta()) return; // R1F-9: con la pestaña oculta no se revisa nada.
     const caidas = new Set<App>();
     await Promise.all(
       this.apps()

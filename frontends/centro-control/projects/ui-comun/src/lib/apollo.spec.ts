@@ -1,5 +1,5 @@
 import { Observable, of, Subject } from 'rxjs';
-import { opcionesApollo, reintentarCon401 } from './apollo';
+import { opcionesApollo, pestanaOculta, reintentarCon401 } from './apollo';
 
 type Contexto = Record<string, unknown>;
 
@@ -24,6 +24,17 @@ function manejar(
   const r = reintentarCon401(renovar)({ error, operation: op, forward } as never);
   return { r: r as Observable<unknown> | undefined, op, forward };
 }
+
+describe('Apollo: sondeos con la pestaña oculta (R1F-9)', () => {
+  it('los sondeos se saltan mientras la pestaña está oculta', () => {
+    expect(opcionesApollo.watchQuery.skipPollAttempt).toBe(pestanaOculta);
+    const visibilidad = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    expect(pestanaOculta()).toBe(true);
+    visibilidad.mockReturnValue('visible');
+    expect(pestanaOculta()).toBe(false);
+    visibilidad.mockRestore();
+  });
+});
 
 describe('Apollo: reintento con 401 (spec 016)', () => {
   it('solo actúa con 401 y una sola vez por operación', () => {
