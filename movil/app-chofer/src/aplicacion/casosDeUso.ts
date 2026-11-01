@@ -12,6 +12,7 @@ import type {
   Dispositivo,
   EnTransaccion,
   Evidencias,
+  FatigasSinPosicion,
   Ids,
   PosicionGuardada,
   PuntosGps,
@@ -38,6 +39,7 @@ export class CasosDeUso {
     private readonly archivos: Archivos,
     private readonly posicionGuardada: PosicionGuardada | null = null,
     private readonly enTransaccion: EnTransaccion = (fn) => fn(),
+    private readonly fatigasSinPosicion: FatigasSinPosicion | null = null,
   ) {}
 
   /** Paso 1 (con señal): `GET /viajes/mios` a SQLite para operar sin red. */
@@ -62,6 +64,7 @@ export class CasosDeUso {
   registrarLectura(viajeId: string, l: Lectura): boolean {
     this.ultima = l;
     this.posicionGuardada?.guardar({ lat: l.lat, lng: l.lng });
+    this.encolarFatigasSinPosicion({ lat: l.lat, lng: l.lng });
     const muestreo = this.muestreos.get(viajeId) ?? new MuestreoGps();
     this.muestreos.set(viajeId, muestreo);
     if (!muestreo.aceptar(l)) return false;
@@ -114,16 +117,32 @@ export class CasosDeUso {
 
   /**
    * D60 (FO6): ojos cerrados o bostezos; la alarma ya sonó en el celular, esto solo deja el evento en la cola. Sin
-   * ninguna posición conocida (ni guardada) no se puede encolar: el contrato exige `posicion`.
+   * ninguna posición conocida (ni guardada), la alerta se guarda con su hora y sale con la primera lectura del GPS
+   * (decisión del 01-11-2026); entonces devuelve null.
    */
   registrarFatiga(viajeId: string): string | null {
+    const eventoId = this.ids.nuevo();
+    const registradoEn = this.reloj.ahora().toISOString();
     const posicion = this.posicionParaEvento();
-    if (!posicion) return null;
-    return this.encolar(viajeId, 'EVENTO_CONDUCCION', {
-      eventoId: this.ids.nuevo(),
-      tipo: 'ALERTA_FATIGA',
-      posicion,
-      registradoEn: this.reloj.ahora().toISOString(),
+    if (posicion) return this.encolar(viajeId, 'EVENTO_CONDUCCION', { eventoId, tipo: 'ALERTA_FATIGA', posicion, registradoEn });
+    this.fatigasSinPosicion?.guardar([...this.fatigasSinPosicion.leer(), { viajeId, eventoId, registradoEn }]);
+    return null;
+  }
+
+  /** Las alertas que esperaban una posición salen con esta; `registradoEn` sigue siendo la hora de la alerta. */
+  private encolarFatigasSinPosicion(posicion: { lat: number; lng: number }): void {
+    const guardadas = this.fatigasSinPosicion?.leer() ?? [];
+    if (guardadas.length === 0) return;
+    this.enTransaccion(() => {
+      for (const f of guardadas) {
+        this.encolar(f.viajeId, 'EVENTO_CONDUCCION', {
+          eventoId: f.eventoId,
+          tipo: 'ALERTA_FATIGA',
+          posicion,
+          registradoEn: f.registradoEn,
+        });
+      }
+      this.fatigasSinPosicion?.guardar([]);
     });
   }
 

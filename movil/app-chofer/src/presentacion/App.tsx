@@ -109,7 +109,7 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
       setAviso(
         enCola
           ? 'Alerta de fatiga registrada; detente a descansar'
-          : 'Detente a descansar. Sin ubicación todavía: la alerta no quedó registrada',
+          : 'Detente a descansar. La alerta quedó guardada y se envía con la ubicación',
       ),
     [],
   );

@@ -1,5 +1,14 @@
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
-import type { Cola, DatosDelChofer, Evidencias, PosicionGuardada, PuntosGps, Viajes } from '../aplicacion/puertos';
+import type {
+  Cola,
+  DatosDelChofer,
+  Evidencias,
+  FatigaSinPosicion,
+  FatigasSinPosicion,
+  PosicionGuardada,
+  PuntosGps,
+  Viajes,
+} from '../aplicacion/puertos';
 import type { EvidenciaLocal } from '../dominio/evidencia';
 import type { PuntoGps } from '../dominio/gps';
 import type { EstadoOperacion, Operacion, TipoOperacion } from '../dominio/operacion';
@@ -235,8 +244,28 @@ export class PosicionSqlite implements PosicionGuardada {
   }
 }
 
+const CLAVE_FATIGAS = 'fatigasSinPosicion';
+
+/** Las alertas de fatiga sin posición, en la tabla `ajuste` (JSON con la lista). */
+export class FatigasSqlite implements FatigasSinPosicion {
+  leer(): FatigaSinPosicion[] {
+    const f = bd.select().from(ajuste).where(eq(ajuste.clave, CLAVE_FATIGAS)).get();
+    return f ? (JSON.parse(f.valor) as FatigaSinPosicion[]) : [];
+  }
+
+  guardar(fatigas: FatigaSinPosicion[]): void {
+    if (fatigas.length === 0) {
+      bd.delete(ajuste).where(eq(ajuste.clave, CLAVE_FATIGAS)).run();
+      return;
+    }
+    const valor = JSON.stringify(fatigas);
+    bd.insert(ajuste).values({ clave: CLAVE_FATIGAS, valor }).onConflictDoUpdate({ target: ajuste.clave, set: { valor } }).run();
+  }
+}
+
 /**
- * Al cerrar sesión: viajes, cola, evidencias (filas y archivos), puntos GPS y la última posición. Quedan el
+ * Al cerrar sesión: viajes, cola, evidencias (filas y archivos), puntos GPS, la última posición y las alertas de fatiga
+ * que esperaban una posición. Quedan el
  * `dispositivoId` y el `seq` de cada viaje, que son del celular (D55) y no del chofer.
  */
 export class DatosDelChoferSqlite implements DatosDelChofer {
@@ -246,7 +275,9 @@ export class DatosDelChoferSqlite implements DatosDelChofer {
       tx.delete(evidenciaLocal).run();
       tx.delete(puntoGps).run();
       tx.delete(viaje).run();
-      tx.delete(ajuste).where(eq(ajuste.clave, CLAVE_POSICION)).run();
+      tx.delete(ajuste)
+        .where(inArray(ajuste.clave, [CLAVE_POSICION, CLAVE_FATIGAS]))
+        .run();
     });
     borrarEvidencias();
   }

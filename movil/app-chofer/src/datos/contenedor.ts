@@ -6,7 +6,7 @@ import { ApiViajes } from './apiViajes';
 import { archivos } from './archivos';
 import { bd } from './bd';
 import { dispositivo, ids, red, reloj } from './plataforma';
-import { ColaSqlite, EvidenciasSqlite, PosicionSqlite, PuntosSqlite, ViajesSqlite } from './repositorios';
+import { ColaSqlite, EvidenciasSqlite, FatigasSqlite, PosicionSqlite, PuntosSqlite, ViajesSqlite } from './repositorios';
 import { SesionKeycloak } from './sesion';
 
 /** Raíz de composición: los adaptadores concretos detrás de los puertos (Clean). */
@@ -32,4 +32,5 @@ export const casos = new CasosDeUso(
   archivos,
   new PosicionSqlite(),
   (fn) => bd.transaction(() => fn()),
+  new FatigasSqlite(),
 );

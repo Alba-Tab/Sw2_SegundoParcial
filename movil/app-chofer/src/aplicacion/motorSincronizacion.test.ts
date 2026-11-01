@@ -11,6 +11,7 @@ import {
   type ApiEvidencias,
   type Cola,
   type Evidencias,
+  type FatigaSinPosicion,
   type PosicionGuardada,
   type PuntosGps,
   SesionVencida,
@@ -102,6 +103,12 @@ class PosicionEnMemoria implements PosicionGuardada {
   borrar = () => void (this.p = null);
 }
 
+class FatigasEnMemoria {
+  f: FatigaSinPosicion[] = [];
+  leer = () => this.f;
+  guardar = (f: FatigaSinPosicion[]) => void (this.f = f);
+}
+
 class EvidenciasEnMemoria implements Evidencias {
   e = new Map<string, EvidenciaLocal>();
   agregar = (x: EvidenciaLocal) => void this.e.set(x.evidenciaId, x);
@@ -159,7 +166,7 @@ const viaje = (viajeId: string): ViajeLocal => ({
 describe('motor de sincronización (spec 005, CU-08)', () => {
   let cola: ColaEnMemoria, puntos: PuntosEnMemoria, viajes: ViajesEnMemoria, api: ApiFalsa;
   let ahora: Date, conRed: boolean, sesionVencida: boolean, n: number;
-  let evidencias: EvidenciasEnMemoria, apiEvidencias: ApiEvidenciasFalsa, posicion: PosicionEnMemoria;
+  let evidencias: EvidenciasEnMemoria, apiEvidencias: ApiEvidenciasFalsa, posicion: PosicionEnMemoria, fatigas: FatigasEnMemoria;
   let motor: MotorSincronizacion, casos: CasosDeUso;
   let borrados: string[];
 
@@ -197,7 +204,23 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     const subida = new SubidaEvidencias(evidencias, apiEvidencias, archivos);
     motor = new MotorSincronizacion(cola, puntos, viajes, api, sesion, red, reloj, ids, dispositivo, subida, () => 0.5);
     posicion = new PosicionEnMemoria();
-    casos = new CasosDeUso(cola, puntos, viajes, api, sesion, reloj, ids, dispositivo, evidencias, archivos, posicion);
+    fatigas = new FatigasEnMemoria();
+    const enTransaccion = <T>(fn: () => T) => fn();
+    casos = new CasosDeUso(
+      cola,
+      puntos,
+      viajes,
+      api,
+      sesion,
+      reloj,
+      ids,
+      dispositivo,
+      evidencias,
+      archivos,
+      posicion,
+      enTransaccion,
+      fatigas,
+    );
     viajes.guardarDelServidor([viaje('v1')]);
   });
 
@@ -323,7 +346,6 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
   });
 
   it('T7.7: la alerta de fatiga va a la cola como evento de conducción, sin magnitud', () => {
-    expect(casos.registrarFatiga('v1')).toBeNull();
     casos.registrarLectura('v1', { lat: -17.7, lng: -63.18, velocidadMs: 20, precisionMetros: 5, en: ahora.getTime() });
     const op = casos.registrarFatiga('v1')!;
     const fatiga = cola.ops.find((o) => o.opId === op)!;
@@ -458,6 +480,28 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     expect(cola.ops.find((o) => o.opId === op)?.cuerpo).toMatchObject({ tipo: 'ALERTA_FATIGA', posicion: { lat: -17.75, lng: -63.17 } });
     const frenada = casos.registrarFrenada('v1', 0.6)!;
     expect(cola.ops.find((o) => o.opId === frenada)?.cuerpo).toMatchObject({ posicion: { lat: -17.75, lng: -63.17 } });
+  });
+
+  it('sin ninguna posición conocida, la alerta de fatiga se guarda con su hora y sale con la primera lectura del GPS', () => {
+    const alerta = ahora.toISOString();
+    expect(casos.registrarFatiga('v1')).toBeNull();
+    expect(cola.ops).toHaveLength(0);
+    expect(fatigas.f).toEqual([{ viajeId: 'v1', eventoId: 'id-1', registradoEn: alerta }]);
+
+    ahora = new Date(ahora.getTime() + 60_000);
+    casos.registrarLectura('v1', { lat: -17.7, lng: -63.18, velocidadMs: 20, precisionMetros: 5, en: ahora.getTime() });
+    expect(fatigas.f).toEqual([]);
+    expect(cola.ops).toHaveLength(1);
+    expect(cola.ops[0]).toMatchObject({ viajeId: 'v1', tipo: 'EVENTO_CONDUCCION' });
+    expect(cola.ops[0].cuerpo).toEqual({
+      eventoId: 'id-1',
+      tipo: 'ALERTA_FATIGA',
+      posicion: { lat: -17.7, lng: -63.18 },
+      registradoEn: alerta,
+    });
+
+    casos.registrarLectura('v1', { lat: -17.71, lng: -63.18, velocidadMs: 20, precisionMetros: 5, en: ahora.getTime() + 30_000 });
+    expect(cola.ops).toHaveLength(1);
   });
 
   it('cada lectura del GPS queda guardada como última posición; olvidar limpia la memoria', () => {
