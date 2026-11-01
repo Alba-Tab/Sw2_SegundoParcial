@@ -1,7 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
-import { AvisoServicios, BobPipe, CONFIG_CENTRO, conDesde, DatosAl, Encabezado, Esqueleto, Estado, FechaPipe, pct, Sesion } from 'ui-comun';
+import { AvisoServicios, BobPipe, CONFIG_CENTRO, DatosAl, Encabezado, Esqueleto, Estado, FechaPipe, pct, Sesion, urlEnApp } from 'ui-comun';
 import { conPendientes, pendientes, type EstadoTarjeta, type Pendiente } from '../domain/tablero';
 import { TableroFachada } from '../tablero.fachada';
 
@@ -41,13 +41,17 @@ import { TableroFachada } from '../tablero.fachada';
               <li [attr.data-tono]="p.tono">
                 <mat-icon>{{ p.icono }}</mat-icon>
                 <span class="texto">
-                  @if (p.app) {
-                    <a [href]="enlace(p)">{{ p.texto }}</a>
+                  @let url = enlace(p);
+                  @if (url) {
+                    <a [href]="url">{{ p.texto }}</a>
                   } @else {
                     <span class="titulo">{{ p.texto }}</span>
                   }
                   @if (p.detalle) {
                     <span class="detalle">{{ p.detalle }}</span>
+                  }
+                  @if (!url && p.app && p.quien) {
+                    <span class="detalle">{{ p.quien }}</span>
                   }
                 </span>
               </li>
@@ -151,7 +155,11 @@ import { TableroFachada } from '../tablero.fachada';
         <ul class="lineas">
           @for (v of t.viajesEnCurso; track v.viajeId) {
             <li>
-              <a [href]="enlaceViaje(v.viajeId)">{{ v.placa ?? 'Sin unidad' }}</a>
+              @if (enlaceViaje(v.viajeId); as url) {
+                <a [href]="url">{{ v.placa ?? 'Sin unidad' }}</a>
+              } @else {
+                {{ v.placa ?? 'Sin unidad' }}
+              }
               · {{ v.cliente?.razonSocial }} · {{ v.ruta?.nombre }}
               @if (v.riesgo?.enRiesgo) {
                 <cc-estado grupo="Riesgo" valor="EN_RIESGO" /> {{ pct(v.riesgo.probabilidad) }}
@@ -165,8 +173,12 @@ import { TableroFachada } from '../tablero.fachada';
         <ul class="lineas">
           @for (f of t.cuentasPorCobrar.proximas; track f.facturaId) {
             <li>
-              <a class="sin-corte" [href]="enlaceFactura(f.facturaId)">{{ f.numero }}</a> · {{ f.razonSocial }} · {{ f.saldo | bob }} ·
-              vence
+              @if (enlaceFactura(f.facturaId); as url) {
+                <a class="sin-corte" [href]="url">{{ f.numero }}</a>
+              } @else {
+                <span class="sin-corte">{{ f.numero }}</span>
+              }
+              · {{ f.razonSocial }} · {{ f.saldo | bob }} · vence
               {{ f.venceEl | fecha }}
             </li>
           }
@@ -272,23 +284,24 @@ export class TableroPagina {
   readonly cargando = this.fachada.cargando;
   readonly bloques = this.fachada.bloques;
   readonly conPendientes = conPendientes;
-  private readonly puedeAtender = inject(Sesion).tiene('despachador', 'jefe_flota', 'administracion');
+  private readonly sesion = inject(Sesion);
+  private readonly puedeAtender = this.sesion.tiene('despachador', 'jefe_flota', 'administracion');
   readonly lista = computed(() => pendientes(this.datos()?.data?.tablero, this.bloques, (c) => this.fachada.estado(c), this.puedeAtender));
 
   estado(campo: string): EstadoTarjeta {
     return this.fachada.estado(campo);
   }
 
-  /** Hacia otra app con `?desde=cc-tablero`, para que ofrezca volver aquí (N3). */
-  enlace(p: Pendiente): string {
-    return conDesde(this.config.urls[p.app!] + p.ruta, this.config.app);
+  /** Hacia otra app con `?desde=cc-tablero` (N3), solo si el rol la abre; si no, null y la línea va en texto (R2F-1). */
+  enlace(p: Pendiente): string | null {
+    return p.app ? urlEnApp(this.config, this.sesion.roles(), p.app, p.ruta ?? '') : null;
   }
 
-  enlaceViaje(id: string | undefined): string {
-    return conDesde(`${this.config.urls['cc-operaciones']}/viajes/${id}`, this.config.app);
+  enlaceViaje(id: string | undefined): string | null {
+    return urlEnApp(this.config, this.sesion.roles(), 'cc-operaciones', `/viajes/${id}`);
   }
 
-  enlaceFactura(id: string | undefined): string {
-    return conDesde(`${this.config.urls['cc-finanzas']}/facturas/${id}`, this.config.app);
+  enlaceFactura(id: string | undefined): string | null {
+    return urlEnApp(this.config, this.sesion.roles(), 'cc-finanzas', `/facturas/${id}`);
   }
 }

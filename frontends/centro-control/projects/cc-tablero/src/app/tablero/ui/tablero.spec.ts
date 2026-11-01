@@ -110,6 +110,43 @@ describe('Tablero por rol (spec 016, paso 10)', () => {
     ]);
   });
 
+  it('R2F-1: el despachador no recibe un enlace a Flota; la línea dice quién programa el mantenimiento', () => {
+    const { el, texto } = montar(['despachador'], {
+      data: {
+        tablero: {
+          periodo: 'ESTA_SEMANA',
+          viajesEnCurso: [{ viajeId: 'v1', placa: 'AAA-1', riesgo: { enRiesgo: true, probabilidad: 0.7 } }],
+          unidadesPorEstado: [{ estado: 'MANTENIMIENTO_PENDIENTE', cantidad: 2 }],
+          alertasAbiertas: 0,
+          datosAl: null,
+        },
+      },
+    });
+    const enlaces = [...el.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    expect(enlaces).toContain('http://o/viajes/v1?desde=cc-tablero');
+    expect(enlaces.some((h) => h?.startsWith('http://f'))).toBe(false);
+    expect(texto).toContain('2 unidades con mantenimiento pendiente');
+    expect(texto).toContain('Lo programa el jefe de flota.');
+  });
+
+  it('R2F-1: el jefe de flota ve las placas de los viajes en curso sin enlace a Operaciones', () => {
+    const { el, texto } = montar(['jefe_flota'], {
+      data: {
+        tablero: {
+          periodo: 'ESTA_SEMANA',
+          viajesEnCurso: [{ viajeId: 'v1', placa: 'AAA-1' }],
+          unidadesPorEstado: [{ estado: 'MANTENIMIENTO_PENDIENTE', cantidad: 1 }],
+          alertasAbiertas: 0,
+          datosAl: null,
+        },
+      },
+    });
+    const enlaces = [...el.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    expect(enlaces).toEqual(['http://f/unidades?estado=MANTENIMIENTO_PENDIENTE&desde=cc-tablero']);
+    expect(texto).toContain('AAA-1');
+    expect(texto).not.toContain('Lo programa el jefe de flota.');
+  });
+
   it('sin pendientes lo dice, en vez de dejar la sección vacía', () => {
     const { texto } = montar(['administracion'], {
       data: {

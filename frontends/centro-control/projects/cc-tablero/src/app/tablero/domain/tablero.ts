@@ -65,6 +65,8 @@ export interface Pendiente {
   detalle?: string;
   app?: 'cc-operaciones' | 'cc-flota' | 'cc-finanzas';
   ruta?: string;
+  /** Quién lo resuelve, para el rol que no abre `app` (R2F-1): la línea va sin enlace y lo dice. */
+  quien?: string;
 }
 
 const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
@@ -139,6 +141,7 @@ export function pendientes(
         detalle: 'No sale de viaje hasta programar el mantenimiento.',
         app: 'cc-flota',
         ruta: '/unidades?estado=MANTENIMIENTO_PENDIENTE',
+        quien: 'Lo programa el jefe de flota.',
       });
   }
   if (b.verAlertas && !caido('alertasAbiertas', 'Analítica', 'alertas abiertas')) {
