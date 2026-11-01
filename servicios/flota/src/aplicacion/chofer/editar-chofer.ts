@@ -1,8 +1,9 @@
-import type { Chofer } from '../../dominio/unidad/chofer';
+import { editarChofer, type Chofer } from '../../dominio/unidad/chofer';
 import { conIdempotencia, type Peticion, soloJefeFlota } from '../comun/idempotencia';
 import type { ChoferRepositorio } from '../puertos/chofer-repositorio';
 import type { OperacionesIdempotentes } from '../puertos/operaciones-idempotentes';
 import type { RegistroDeEventos } from '../puertos/registro-de-eventos';
+import type { Reloj } from '../puertos/reloj';
 import type { UnidadDeTrabajo } from '../puertos/unidad-de-trabajo';
 import { choferConVersion, guardarConEvento, type ChoferVersionado } from './actualizar-chofer';
 
@@ -15,6 +16,7 @@ export class EditarChofer {
     private readonly operaciones: OperacionesIdempotentes,
     private readonly choferes: ChoferRepositorio,
     private readonly eventos: RegistroDeEventos,
+    private readonly reloj: Reloj,
   ) {}
 
   async ejecutar(choferId: string, p: Peticion<EdicionChofer>): Promise<ChoferVersionado> {
@@ -22,9 +24,9 @@ export class EditarChofer {
     const op = { clave: p.clave, operacion: `editarChofer:${choferId}`, hashCuerpo: p.hashCuerpo };
     return this.tx.ejecutar(() =>
       conIdempotencia(this.operaciones, op, async () => {
-        const { nombre, licenciaCategoria, licenciaVenceEl } = p.cuerpo;
         const actual = await choferConVersion(this.choferes, choferId);
-        return guardarConEvento(this.choferes, this.eventos, { ...actual, nombre: nombre.trim(), licenciaCategoria, licenciaVenceEl });
+        const editado = editarChofer(actual, p.cuerpo, this.reloj.hoy());
+        return guardarConEvento(this.choferes, this.eventos, { ...editado, versionAgregado: actual.versionAgregado });
       }),
     );
   }

@@ -1,5 +1,14 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 import { ErrorDeDominio } from '../../dominio/comun/error-de-dominio';
+
+// Mensajes de validación en español ("Demasiado pequeño…", "Opción inválida…"), como el portal.
+z.config(z.locales.es());
+
+/**
+ * Texto con los espacios de los bordes recortados antes de contar el largo: el esquema generado del contrato no recorta,
+ * y "  ab " pasaría un mínimo de 3 para llegar como "ab" al dominio y al Outbox.
+ */
+export const textoRecortado = (min: number, max: number) => z.string().trim().min(min).max(max);
 
 /**
  * Valida contra el esquema zod generado del contrato; el primer error va como `campo` (000 §5).

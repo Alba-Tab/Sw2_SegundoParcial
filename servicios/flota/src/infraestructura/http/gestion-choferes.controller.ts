@@ -10,7 +10,10 @@ import {
   type EditarChoferResponse,
 } from './contrato/flota.zod';
 import { hashPeticion, type PeticionHttp } from './hash-cuerpo';
-import { claveObligatoria, validar } from './validar';
+import { claveObligatoria, textoRecortado, validar } from './validar';
+
+const EdicionChofer = EditarChoferBody.extend({ nombre: textoRecortado(3, 120) });
+const Habilitacion = CambiarHabilitacionChoferBody.extend({ motivo: textoRecortado(3, 200).optional() });
 
 /** `versionAgregado` es interno (ChoferActualizado, 000 §6): no está en el contrato del chofer. */
 const sinVersion = ({ versionAgregado: _v, ...c }: ChoferVersionado) => c;
@@ -30,7 +33,7 @@ export class GestionChoferesController {
     @Headers('idempotency-key') clave: string | undefined,
     @Body() cuerpo: unknown,
   ): Promise<z.infer<typeof EditarChoferResponse>> {
-    const e = validar(EditarChoferBody, cuerpo);
+    const e = validar(EdicionChofer, cuerpo);
     const c = await this.editar.ejecutar(choferId, {
       usuario: req.usuario,
       clave: claveObligatoria(clave),
@@ -48,7 +51,7 @@ export class GestionChoferesController {
     @Headers('idempotency-key') clave: string | undefined,
     @Body() cuerpo: unknown,
   ): Promise<z.infer<typeof CambiarHabilitacionChoferResponse>> {
-    const e = validar(CambiarHabilitacionChoferBody, cuerpo);
+    const e = validar(Habilitacion, cuerpo);
     const c = await this.habilitacion.ejecutar(choferId, {
       usuario: req.usuario,
       clave: claveObligatoria(clave),

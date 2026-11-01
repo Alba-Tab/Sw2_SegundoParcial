@@ -516,6 +516,20 @@ describe('Flota (Mongo rs0 + RabbitMQ)', () => {
       }).expect(200);
       expect(habilitado.body.activo).toBe(true);
       expect(habilitado.body).not.toHaveProperty('inhabilitacion');
+      // Ya habilitado: 409 sin versión nueva ni evento (la lista de abajo sigue en 3, 4 y 5).
+      const otraVez = await pedir('post', `${libre}/habilitacion`, jefe, '0193a000-0000-7000-8000-0000000d0409', { activo: true });
+      expect([otraVez.status, otraVez.body.codigo]).toEqual([409, 'CONFLICTO_ESTADO']);
+      // Los bordes no cuentan para el largo (antes "  ab " pasaba y el Outbox respondía 500); el mensaje, en español.
+      const corto = await pedir('put', libre, jefe, '0193a000-0000-7000-8000-0000000d0410', { ...edicion, nombre: '  ab ' });
+      expect(corto.status).toBe(400);
+      expect(corto.body.errores[0].campo).toBe('nombre');
+      expect(corto.body.errores[0].mensaje).toMatch(/Demasiado pequeño/);
+      // Con una reserva activa la licencia no deja de ser C vigente.
+      const conViaje = await pedir('put', ocupado, jefe, '0193a000-0000-7000-8000-0000000d0411', {
+        ...edicion,
+        licenciaCategoria: 'B',
+      }).expect(409);
+      expect(conViaje.body.codigo).toBe('CONFLICTO_ESTADO');
 
       const eventos = await conexion
         .collection('outboxEventos')

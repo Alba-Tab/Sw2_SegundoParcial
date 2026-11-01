@@ -312,7 +312,11 @@ export const darDeBajaUnidadBodyMotivoMin = 3;
 export const darDeBajaUnidadBodyMotivoMax = 200;
 
 export const DarDeBajaUnidadBody = zod.object({
-  motivo: zod.string().min(darDeBajaUnidadBodyMotivoMin).max(darDeBajaUnidadBodyMotivoMax),
+  motivo: zod
+    .string()
+    .min(darDeBajaUnidadBodyMotivoMin)
+    .max(darDeBajaUnidadBodyMotivoMax)
+    .describe('Se recortan los espacios de los bordes antes de contar el largo.'),
 });
 
 export const darDeBajaUnidadResponsePlacaRegExp = new RegExp('^[0-9]{3,4}[A-Z]{3}$');
@@ -629,6 +633,8 @@ export const ObtenerChoferResponse = zod.object({
 /**
  * Los choferes no tienen alta por API: el usuario se crea en la consola de Keycloak y el chofer llega de la
  * semilla (D102, D103). Sube `versionAgregado` y publica `ChoferActualizado` por Outbox en la misma transacción.
+ * Con una reserva activa (`disponible = false`) la licencia tiene que seguir siendo C y vigente hoy: si no, 409
+ * `CONFLICTO_ESTADO`.
  * @summary Edición del nombre y la licencia de un chofer (jefe_flota). D104.
  */
 export const EditarChoferParams = zod.object({
@@ -643,7 +649,11 @@ export const editarChoferBodyNombreMin = 3;
 export const editarChoferBodyNombreMax = 120;
 
 export const EditarChoferBody = zod.object({
-  nombre: zod.string().min(editarChoferBodyNombreMin).max(editarChoferBodyNombreMax),
+  nombre: zod
+    .string()
+    .min(editarChoferBodyNombreMin)
+    .max(editarChoferBodyNombreMax)
+    .describe('Se recortan los espacios de los bordes antes de contar el largo.'),
   licenciaCategoria: zod.enum(['A', 'B', 'C']),
   licenciaVenceEl: zod.iso.date().describe('Fecha sin hora, en America/La_Paz.'),
 });
@@ -669,8 +679,10 @@ export const EditarChoferResponse = zod.object({
 
 /**
  * Al inhabilitar (`activo = false`) el `motivo` es obligatorio (400 VALIDACION). No se inhabilita a un chofer con
- * una reserva activa (`disponible = false`): 409 `CONFLICTO_ESTADO`. Sube `versionAgregado` y publica
- * `ChoferActualizado` por Outbox en la misma transacción.
+ * una reserva activa (`disponible = false`): 409 `CONFLICTO_ESTADO`. Pedir el estado que ya tiene (habilitar a
+ * uno activo o inhabilitar a uno inactivo) también es 409 `CONFLICTO_ESTADO`, sin versión nueva ni evento.
+ * Habilitar borra `inhabilitacion`. Sube `versionAgregado` y publica `ChoferActualizado` por Outbox en la misma
+ * transacción.
  * @summary Habilita o inhabilita a un chofer (jefe_flota). D104.
  */
 export const CambiarHabilitacionChoferParams = zod.object({
@@ -691,7 +703,7 @@ export const CambiarHabilitacionChoferBody = zod.object({
     .min(cambiarHabilitacionChoferBodyMotivoMin)
     .max(cambiarHabilitacionChoferBodyMotivoMax)
     .optional()
-    .describe('Obligatorio al inhabilitar.'),
+    .describe('Obligatorio al inhabilitar. Se recortan los espacios de los bordes antes de contar el largo.'),
 });
 
 export const cambiarHabilitacionChoferResponseUsuarioSubMax = 64;

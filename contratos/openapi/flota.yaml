@@ -386,6 +386,8 @@ paths:
       description: |
         Los choferes no tienen alta por API: el usuario se crea en la consola de Keycloak y el chofer llega de la
         semilla (D102, D103). Sube `versionAgregado` y publica `ChoferActualizado` por Outbox en la misma transacción.
+        Con una reserva activa (`disponible = false`) la licencia tiene que seguir siendo C y vigente hoy: si no, 409
+        `CONFLICTO_ESTADO`.
       parameters:
         - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
       requestBody:
@@ -428,8 +430,10 @@ paths:
       summary: Habilita o inhabilita a un chofer (jefe_flota). D104.
       description: |
         Al inhabilitar (`activo = false`) el `motivo` es obligatorio (400 VALIDACION). No se inhabilita a un chofer con
-        una reserva activa (`disponible = false`): 409 `CONFLICTO_ESTADO`. Sube `versionAgregado` y publica
-        `ChoferActualizado` por Outbox en la misma transacción.
+        una reserva activa (`disponible = false`): 409 `CONFLICTO_ESTADO`. Pedir el estado que ya tiene (habilitar a
+        uno activo o inhabilitar a uno inactivo) también es 409 `CONFLICTO_ESTADO`, sin versión nueva ni evento.
+        Habilitar borra `inhabilitacion`. Sube `versionAgregado` y publica `ChoferActualizado` por Outbox en la misma
+        transacción.
       parameters:
         - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
       requestBody:
@@ -709,6 +713,7 @@ components:
           type: string
           minLength: 3
           maxLength: 200
+          description: Se recortan los espacios de los bordes antes de contar el largo.
     TipoMantenimiento:
       type: string
       enum: [PREVENTIVO, CORRECTIVO, DOCUMENTOS]
@@ -881,6 +886,7 @@ components:
           type: string
           minLength: 3
           maxLength: 120
+          description: Se recortan los espacios de los bordes antes de contar el largo.
         licenciaCategoria:
           type: string
           enum: [A, B, C]
@@ -896,7 +902,7 @@ components:
           type: string
           minLength: 3
           maxLength: 200
-          description: Obligatorio al inhabilitar.
+          description: Obligatorio al inhabilitar. Se recortan los espacios de los bordes antes de contar el largo.
     PaginaChoferes:
       type: object
       required: [items, siguienteCursor]

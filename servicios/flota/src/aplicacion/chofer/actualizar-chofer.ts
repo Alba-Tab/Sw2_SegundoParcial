@@ -1,5 +1,5 @@
 import { ErrorDeDominio } from '../../dominio/comun/error-de-dominio';
-import type { Chofer } from '../../dominio/unidad/chofer';
+import { aplicarCambio, type Chofer } from '../../dominio/unidad/chofer';
 import type { ChoferRepositorio } from '../puertos/chofer-repositorio';
 import type { RegistroDeEventos } from '../puertos/registro-de-eventos';
 import type { UnidadDeTrabajo } from '../puertos/unidad-de-trabajo';
@@ -57,7 +57,7 @@ export class ActualizarChofer {
   ejecutar(choferId: string, cambio: CambioChofer): Promise<number> {
     return this.tx.ejecutar(async () => {
       const actual = await choferConVersion(this.choferes, choferId);
-      return (await guardarConEvento(this.choferes, this.eventos, { ...actual, ...cambio })).versionAgregado;
+      return (await guardarConEvento(this.choferes, this.eventos, aplicarCambio(actual, cambio))).versionAgregado;
     });
   }
 }

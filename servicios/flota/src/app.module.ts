@@ -111,9 +111,9 @@ import { UnidadesController } from './infraestructura/http/unidades.controller';
     },
     {
       provide: EditarChofer,
-      inject: [UNIDAD_DE_TRABAJO, OPERACIONES_IDEMPOTENTES, CHOFER_REPOSITORIO, REGISTRO_DE_EVENTOS],
-      useFactory: (tx: UnidadDeTrabajo, o: OperacionesIdempotentes, c: ChoferRepositorio, e: RegistroDeEventos) =>
-        new EditarChofer(tx, o, c, e),
+      inject: [UNIDAD_DE_TRABAJO, OPERACIONES_IDEMPOTENTES, CHOFER_REPOSITORIO, REGISTRO_DE_EVENTOS, RELOJ],
+      useFactory: (tx: UnidadDeTrabajo, o: OperacionesIdempotentes, c: ChoferRepositorio, e: RegistroDeEventos, reloj: Reloj) =>
+        new EditarChofer(tx, o, c, e, reloj),
     },
     {
       provide: CambiarHabilitacionChofer,

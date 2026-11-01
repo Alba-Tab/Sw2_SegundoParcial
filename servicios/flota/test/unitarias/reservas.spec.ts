@@ -1,4 +1,4 @@
-import { cambiarHabilitacion, choferHabilitado, type Chofer } from '../../src/dominio/unidad/chofer';
+import { aplicarCambio, cambiarHabilitacion, choferHabilitado, editarChofer, type Chofer } from '../../src/dominio/unidad/chofer';
 import { documentosVigentes, porPrioridad, remolqueCompatible, reservable, type Unidad } from '../../src/dominio/unidad/unidad';
 import { aLiberar, confirmar } from '../../src/dominio/reserva/reserva-unidad';
 
@@ -113,5 +113,32 @@ describe('Habilitación del chofer (D104)', () => {
     const activo = cambiarHabilitacion(inactivo, true, undefined, ahora);
     expect(activo.activo).toBe(true);
     expect(activo).not.toHaveProperty('inhabilitacion');
+  });
+
+  it('pedir el estado que ya tiene es CONFLICTO_ESTADO', () => {
+    expect(codigo(() => cambiarHabilitacion(c, true, undefined, ahora))).toBe('CONFLICTO_ESTADO');
+    expect(codigo(() => cambiarHabilitacion({ ...c, activo: false }, false, 'Otra vez', ahora))).toBe('CONFLICTO_ESTADO');
+  });
+
+  it('con una reserva activa la licencia sigue siendo C y vigente hoy', () => {
+    const ocupado = { ...c, disponible: false };
+    const hoy = '2026-11-01';
+    expect(codigo(() => editarChofer(ocupado, { nombre: 'Juan', licenciaCategoria: 'B', licenciaVenceEl: '2028-01-01' }, hoy))).toBe(
+      'CONFLICTO_ESTADO',
+    );
+    expect(codigo(() => editarChofer(ocupado, { nombre: 'Juan', licenciaCategoria: 'C', licenciaVenceEl: '2026-10-31' }, hoy))).toBe(
+      'CONFLICTO_ESTADO',
+    );
+    expect(editarChofer(ocupado, { nombre: ' Juan M ', licenciaCategoria: 'C', licenciaVenceEl: hoy }, hoy)).toMatchObject({
+      nombre: 'Juan M',
+      licenciaVenceEl: hoy,
+    });
+    expect(editarChofer(c, { nombre: 'Juan', licenciaCategoria: 'A', licenciaVenceEl: '2020-01-01' }, hoy).licenciaCategoria).toBe('A');
+  });
+
+  it('la CLI con activo=true borra el motivo de la inhabilitación', () => {
+    const inactivo = { ...c, activo: false, inhabilitacion: { motivo: 'Vacaciones', desde: 'x' } };
+    expect(aplicarCambio(inactivo, { activo: true })).not.toHaveProperty('inhabilitacion');
+    expect(aplicarCambio(inactivo, { licenciaVenceEl: '2030-01-01' }).inhabilitacion?.motivo).toBe('Vacaciones');
   });
 });
