@@ -111,6 +111,8 @@ Material Symbols Outlined, fijado como fuente por defecto de `<mat-icon>` en `co
 | `account_circle`, `manage_accounts` | Menú del usuario, administrar usuarios |
 | `search`, `search_off`, `filter_alt_off` | Buscar, sin resultados, limpiar filtros |
 | `arrow_back`, `logout` | Volver, cerrar sesión |
+| `apps` | Menú «Apps» de la barra común bajo 900 px |
+| `remove_road`, `pause_circle`, `where_to_vote`, `car_repair`, `more_horiz` | Hito de la bitácora: bloqueo, parada, punto de control, falla mecánica, otro (chip de `TipoHito`) |
 
 **Secciones y menú.** Cada pestaña lleva su ícono y el portal usa el mismo para la misma idea:
 
