@@ -37,6 +37,7 @@ import {
   checklistValido,
   cierreInicial,
   documentosEnAviso,
+  motivoBloqueo,
   puedeProgramar,
   type ItemCierre,
   type Mantenimiento,
@@ -93,6 +94,13 @@ import { UnidadFachada } from '../unidades.fachada';
     }
     <cc-aviso-servicios buscado="esta unidad" [error]="error()" [campos]="campos" [sinDatos]="!unidad()" [reintentar]="recargar" />
     @if (unidad(); as u) {
+      @if (motivoBloqueo(u, sesion.tiene('jefe_flota')); as motivo) {
+        <!-- NG-4: lo detenido dice por qué y quién lo resuelve. -->
+        <p class="aviso-documentos" role="status">
+          <mat-icon>{{ etiquetaEstado(u.estado).icono }}</mat-icon
+          >{{ motivo }}
+        </p>
+      }
       @if (documentosEnAviso(u.documentos); as n) {
         <p class="aviso-documentos" role="status">
           <mat-icon>warning</mat-icon>{{ n === 1 ? 'Un documento vencido o por vencer' : n + ' documentos vencidos o por vencer' }}.
@@ -112,7 +120,15 @@ import { UnidadFachada } from '../unidades.fachada';
         </div>
         <div>
           <dt>Desde el último mantenimiento</dt>
-          <dd [class.no-disponible]="u.kmDesdeUltimoMantenimiento >= avisoKm">{{ u.kmDesdeUltimoMantenimiento | numero }} km</dd>
+          <dd [class.no-disponible]="u.kmDesdeUltimoMantenimiento >= avisoKm">
+            @if (u.kmDesdeUltimoMantenimiento >= avisoKm) {
+              <mat-icon class="km-aviso">warning</mat-icon>
+            }
+            {{ u.kmDesdeUltimoMantenimiento | numero }} km
+            @if (u.kmDesdeUltimoMantenimiento >= avisoKm) {
+              <span class="cdk-visually-hidden">, cerca del mantenimiento</span>
+            }
+          </dd>
         </div>
         @for (d of u.documentos; track d.tipo) {
           <div>
@@ -235,6 +251,13 @@ import { UnidadFachada } from '../unidades.fachada';
     }
   `,
   styles: `
+    .km-aviso {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      vertical-align: text-bottom;
+      margin-right: 4px;
+    }
     .aviso-documentos {
       display: flex;
       align-items: center;
@@ -267,6 +290,8 @@ export class UnidadPagina {
   readonly cargando = this.fachada.cargando;
   readonly campos = { unidad: 'Flota', mantenimientos: { servicio: 'Flota', que: 'los mantenimientos de esta unidad' } };
   readonly puedeProgramar = puedeProgramar;
+  readonly motivoBloqueo = (u: Parameters<typeof motivoBloqueo>[0], jefe: boolean) => motivoBloqueo(u, jefe);
+  readonly etiquetaEstado = (estado: string) => etiqueta('EstadoUnidad', estado);
   readonly vigencia = (venceEl: string) => vigencia(venceEl);
   readonly documentosEnAviso = documentosEnAviso;
   readonly avisoKm = AVISO_KM;

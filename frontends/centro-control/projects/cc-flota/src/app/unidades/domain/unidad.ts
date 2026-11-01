@@ -1,4 +1,4 @@
-import { etiqueta, vigencia } from 'ui-comun/dominio';
+import { etiqueta, numero, vigencia } from 'ui-comun/dominio';
 import type { TipoMantenimiento, UnidadesQuery, UnidadQuery } from '../../graphql/generado';
 
 /** Tipos y reglas de presentación de unidades y mantenimientos (spec 010). Sin Angular ni Apollo. */
@@ -52,3 +52,41 @@ export const textoUnidad = (u: Unidad): string =>
 /** Cuántos documentos de la unidad están vencidos o por vencer (G2): la ficha avisa y la lista los marca. */
 export const documentosEnAviso = (documentos: readonly { venceEl: string }[], hoy?: string): number =>
   documentos.filter((d) => vigencia(d.venceEl, hoy) !== 'VIGENTE').length;
+
+/**
+ * JV-1: el orden con que abre la lista, lo que no puede salir primero: mantenimiento pendiente o un documento vencido,
+ * en el taller, cerca del mantenimiento o con un documento por vencer, el resto y al final las inactivas. Dentro de cada
+ * grupo, por placa.
+ */
+export function urgenciaUnidad(u: Pick<Unidad, 'estado' | 'placa' | 'kmDesdeUltimoMantenimiento' | 'documentos'>, hoy?: string): string {
+  const vigencias = u.documentos.map((d) => vigencia(d.venceEl, hoy));
+  let grupo = 3;
+  if (u.estado === 'MANTENIMIENTO_PENDIENTE' || vigencias.includes('VENCIDO')) grupo = 0;
+  else if (u.estado === 'EN_MANTENIMIENTO') grupo = 1;
+  else if (u.estado === 'INACTIVA') grupo = 4;
+  else if (u.kmDesdeUltimoMantenimiento >= AVISO_KM || vigencias.includes('POR_VENCER')) grupo = 2;
+  return `${grupo}-${u.placa}`;
+}
+
+/**
+ * NG-4: por qué la unidad no puede salir y quién lo resuelve, solo con lo que trae Flota (km frente a AVISO_KM y
+ * documentos vencidos); sin ese dato, una frase genérica. null si la unidad no está detenida por mantenimiento.
+ */
+export function motivoBloqueo(
+  u: Pick<DetalleUnidad, 'estado' | 'kmDesdeUltimoMantenimiento' | 'documentos'>,
+  esJefeFlota: boolean,
+  hoy?: string,
+): string | null {
+  if (u.estado === 'EN_MANTENIMIENTO') {
+    return `Está en el taller: vuelve a estar disponible cuando ${esJefeFlota ? 'cierres' : 'el jefe de flota cierre'} el mantenimiento.`;
+  }
+  if (u.estado !== 'MANTENIMIENTO_PENDIENTE') return null;
+  const razones: string[] = [];
+  if (u.kmDesdeUltimoMantenimiento >= AVISO_KM)
+    razones.push(`lleva ${numero(u.kmDesdeUltimoMantenimiento)} km desde el último mantenimiento`);
+  const vencidos = u.documentos.filter((d) => vigencia(d.venceEl, hoy) === 'VENCIDO').map((d) => etiqueta('TipoDocumento', d.tipo).texto);
+  if (vencidos.length) razones.push(`${vencidos.length === 1 ? 'documento vencido' : 'documentos vencidos'}: ${vencidos.join(', ')}`);
+  const porque = razones.length ? razones.join('; ') : 'tiene un mantenimiento pendiente';
+  const quien = esJefeFlota ? 'Prográmalo con «Programar mantenimiento».' : 'Lo programa el jefe de flota.';
+  return `No puede salir: ${porque}. ${quien}`;
+}

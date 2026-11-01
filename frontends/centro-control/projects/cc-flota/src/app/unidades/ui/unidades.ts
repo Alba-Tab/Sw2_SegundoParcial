@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import { MatIconModule } from '@angular/material/icon';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
@@ -17,13 +18,14 @@ import {
   vigencia,
   NumeroPipe,
 } from 'ui-comun';
-import { AVISO_KM, textoUnidad, type Unidad } from '../domain/unidad';
+import { AVISO_KM, textoUnidad, urgenciaUnidad, type Unidad } from '../domain/unidad';
 import { UnidadesFachada } from '../unidades.fachada';
 
 @Component({
   selector: 'app-unidades',
   providers: [UnidadesFachada],
   imports: [
+    MatIconModule,
     Encabezado,
     MatTableModule,
     MatSortModule,
@@ -76,7 +78,14 @@ import { UnidadesFachada } from '../unidades.fachada';
         <ng-container matColumnDef="km"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Km desde el mantenimiento</th>
           <td mat-cell *matCellDef="let u" [class.no-disponible]="u.kmDesdeUltimoMantenimiento >= avisoKm">
+            <!-- Cerca del mantenimiento: ícono y texto además del color (JV-1). -->
+            @if (u.kmDesdeUltimoMantenimiento >= avisoKm) {
+              <mat-icon class="km-aviso">warning</mat-icon>
+            }
             {{ u.kmDesdeUltimoMantenimiento | numero }}
+            @if (u.kmDesdeUltimoMantenimiento >= avisoKm) {
+              <span class="cdk-visually-hidden">, cerca del mantenimiento</span>
+            }
           </td></ng-container
         >
         <ng-container matColumnDef="documentos"
@@ -94,6 +103,15 @@ import { UnidadesFachada } from '../unidades.fachada';
       </table>
     </div>
     <cc-pie-lista [control]="lista" nombre="unidades" vacio="No hay unidades registradas." [error]="error()" [cargando]="cargando()" />
+  `,
+  styles: `
+    .km-aviso {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+      vertical-align: text-bottom;
+      margin-right: 4px;
+    }
   `,
 })
 export class UnidadesPagina {
@@ -115,9 +133,11 @@ export class UnidadesPagina {
       tipo: (u) => etiqueta('TipoUnidad', u.tipoUnidad).texto,
       estado: (u) => posicionEstado('EstadoUnidad', u.estado),
       km: (u) => u.kmDesdeUltimoMantenimiento,
+      urgencia: (u) => urgenciaUnidad(u),
       // El documento que vence primero.
       documentos: (u) => u.documentos.map((d) => d.venceEl).sort()[0],
     },
-    ordenInicial: { orden: 'placa', dir: 'asc' },
+    // Lo que no puede salir primero (JV-1); los encabezados siguen ordenando por su columna.
+    ordenInicial: { orden: 'urgencia', dir: 'asc' },
   });
 }
