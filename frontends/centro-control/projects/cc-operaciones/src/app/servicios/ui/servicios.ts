@@ -68,6 +68,7 @@ import { ServiciosFachada } from '../servicios.fachada';
     />
     <cc-filtros-lista
       [control]="lista"
+      [cargando]="cargando()"
       busqueda="Buscar por cliente, placa o chofer"
       grupo="EstadoServicio"
       nombre="servicios"

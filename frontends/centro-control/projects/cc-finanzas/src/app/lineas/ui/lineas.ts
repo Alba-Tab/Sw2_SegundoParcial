@@ -37,6 +37,7 @@ import { LineasFachada } from '../lineas.fachada';
     }
     <cc-filtros-lista
       [control]="lista"
+      [cargando]="cargando()"
       busqueda="Buscar por razón social o NIT"
       grupo="EstadoLineaCredito"
       nombre="líneas"

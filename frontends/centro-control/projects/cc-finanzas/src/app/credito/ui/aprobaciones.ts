@@ -60,7 +60,14 @@ import { CreditoFachada } from '../credito.fachada';
       [sinDatos]="!solicitudes().length"
       [reintentar]="recargar"
     />
-    <cc-filtros-lista [control]="lista" busqueda="Buscar por cliente" grupo="EstadoAprobacion" nombre="solicitudes" singular="solicitud" />
+    <cc-filtros-lista
+      [control]="lista"
+      [cargando]="cargando()"
+      busqueda="Buscar por cliente"
+      grupo="EstadoAprobacion"
+      nombre="solicitudes"
+      singular="solicitud"
+    />
     <div class="tarjetas">
       @for (s of lista.visibles(); track s.servicioId) {
         <mat-card>

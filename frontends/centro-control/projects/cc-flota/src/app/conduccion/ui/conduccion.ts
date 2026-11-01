@@ -21,7 +21,7 @@ import { PUNTAJE_BAJO, type PuntajeChofer } from '../domain/conduccion';
           · datos al {{ p.datosAl | fecha: true }}
         }
       </p>
-      <cc-filtros-lista [control]="lista" busqueda="Buscar por chofer" nombre="choferes" singular="chofer" />
+      <cc-filtros-lista [control]="lista" [cargando]="cargando()" busqueda="Buscar por chofer" nombre="choferes" singular="chofer" />
       <div class="tabla-ancha" role="region" tabindex="0" aria-label="Conducción por chofer">
         <table
           mat-table

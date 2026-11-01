@@ -32,6 +32,7 @@ import { IntervencionesFachada } from '../viajes.fachada';
     <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!lista.filas().length" />
     <cc-filtros-lista
       [control]="lista"
+      [cargando]="cargando()"
       busqueda="Buscar por placa, cliente, ruta o motivo"
       nombre="intervenciones"
       singular="intervención"

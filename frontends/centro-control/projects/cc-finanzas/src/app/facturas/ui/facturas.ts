@@ -39,6 +39,7 @@ import { cambioDeSaldo, ESTADOS_CON_SALDO, textoVencida } from '../domain/filtro
     <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!facturas().length" />
     <cc-filtros-lista
       [control]="lista"
+      [cargando]="cargando()"
       busqueda="Buscar por número o cliente"
       grupo="EstadoFactura"
       [valores]="saldo() === 'todas' ? undefined : estadosConSaldo"

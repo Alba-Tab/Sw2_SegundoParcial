@@ -1,8 +1,8 @@
 import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
-import { aCentavos, aParametros, filtrar, leerFiltro, normalizar, opcionesEstado, ordenar, paginar } from 'ui-comun/dominio';
-import { controlLista, MemoriaListas, textoTope } from './lista';
+import { aCentavos, aParametros, estadoSegunda, filtrar, leerFiltro, normalizar, opcionesEstado, ordenar, paginar } from 'ui-comun/dominio';
+import { controlLista, FiltrosLista, MemoriaListas, textoTope } from './lista';
 
 const filas = [
   { placa: 'ABC-123', chofer: 'José Peña', estado: 'EN_RUTA', monto: '2800.00', km: 900 },
@@ -111,5 +111,24 @@ describe('ControlLista', () => {
     expect(lista.dir()).toBe('asc');
     TestBed.tick();
     expect(TestBed.inject(MemoriaListas).de('/')).toMatchObject({ q: 'abc', orden: 'placa', dir: 'asc' });
+  });
+});
+
+describe('FiltrosLista', () => {
+  it('FB-4: mientras no llega la primera respuesta dice «Cargando…», no «0 viajes»', async () => {
+    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+    const datos = signal<typeof filas>([]);
+    const lista = TestBed.runInInjectionContext(() => controlLista({ filas: datos, texto }));
+    const f = TestBed.createComponent(FiltrosLista);
+    f.componentRef.setInput('control', lista);
+    f.componentRef.setInput('nombre', 'viajes');
+    f.componentRef.setInput('singular', 'viaje');
+    f.componentRef.setInput('cargando', true);
+    expect(f.componentInstance.conteo()).toBe('Cargando…');
+    datos.set(filas);
+    expect(f.componentInstance.conteo()).toBe('3 viajes');
+    datos.set([]);
+    f.componentRef.setInput('cargando', false);
+    expect(f.componentInstance.conteo()).toBe('0 viajes');
   });
 });

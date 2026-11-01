@@ -44,6 +44,7 @@ import { MantenimientosFachada } from '../mantenimientos.fachada';
     <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!mantenimientos().length" />
     <cc-filtros-lista
       [control]="lista"
+      [cargando]="cargando()"
       busqueda="Buscar por placa, tipo o taller"
       grupo="EstadoMantenimiento"
       nombre="mantenimientos"

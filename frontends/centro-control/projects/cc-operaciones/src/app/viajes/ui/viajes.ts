@@ -17,6 +17,7 @@ import { ViajesFachada } from '../viajes.fachada';
     <cc-aviso-servicios [error]="r?.error" [datosAl]="r?.datosAl" [campos]="campos" [sinDatos]="!r?.data?.viajes?.length" />
     <cc-filtros-lista
       [control]="lista"
+      [cargando]="cargandoDe(r)"
       busqueda="Buscar por placa, cliente, ruta o chofer"
       grupo="EstadoViaje"
       [valores]="estados"

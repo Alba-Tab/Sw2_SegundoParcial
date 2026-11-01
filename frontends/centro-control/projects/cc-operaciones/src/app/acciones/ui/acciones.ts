@@ -60,7 +60,14 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
       [migas]="id() ? [{ texto: 'Acciones del agente', ruta: '/acciones' }, { texto: 'Acción propuesta' }] : []"
     />
     <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!visibles().length" [reintentar]="recargar" />
-    <cc-filtros-lista [control]="lista" busqueda="Buscar por cliente o placa" grupo="EstadoAccion" nombre="acciones" singular="acción" />
+    <cc-filtros-lista
+      [control]="lista"
+      [cargando]="cargando()"
+      busqueda="Buscar por cliente o placa"
+      grupo="EstadoAccion"
+      nombre="acciones"
+      singular="acción"
+    />
     <div class="lista">
       @for (a of lista.visibles(); track a.accionId) {
         <mat-card [class.elegida]="a.accionId === id()">

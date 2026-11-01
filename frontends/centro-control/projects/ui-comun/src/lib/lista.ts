@@ -231,12 +231,15 @@ export class FiltrosLista {
   readonly corte = input<CorteServidor>(null);
   /** El filtro de estado ya lo aplicó el servidor: el "de N" solo se muestra si filtra la búsqueda (C-14). */
   readonly estadoEnServidor = input(false);
+  /** Todavía no llega la primera respuesta: el conteo dice «Cargando…», no «0 viajes» (FB-4). */
+  readonly cargando = input(false);
   readonly opciones = computed(() => (this.grupo() ? opcionesEstado(this.grupo()!, this.valores()) : []));
   readonly texto = signal('');
   private espera?: ReturnType<typeof setTimeout>;
 
   readonly conteo = computed(() => {
     const c = this.control();
+    if (this.cargando() && !c.filas().length) return 'Cargando…';
     const n = c.total();
     const cuantos = `${n} ${n === 1 ? this.singular() : this.nombre()}`;
     const f = c.filtro();

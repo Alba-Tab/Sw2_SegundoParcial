@@ -27,6 +27,7 @@ import { estadoCotizacion } from '../domain/cotizacion';
     <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!cotizaciones().length" />
     <cc-filtros-lista
       [control]="lista"
+      [cargando]="cargando()"
       busqueda="Buscar por cliente, ruta o carga"
       grupo="EstadoCotizacion"
       nombre="cotizaciones"

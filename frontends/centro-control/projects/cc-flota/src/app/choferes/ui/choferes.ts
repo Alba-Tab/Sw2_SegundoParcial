@@ -26,6 +26,7 @@ import { estadoChofer, textoChofer, vigenciaLicencia, type Chofer } from '../dom
     <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!choferes().length" />
     <cc-filtros-lista
       [control]="lista"
+      [cargando]="cargando()"
       busqueda="Buscar por nombre o licencia"
       grupo="EstadoChofer"
       nombre="choferes"

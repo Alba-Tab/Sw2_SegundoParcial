@@ -44,6 +44,7 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
     @if (verCredito) {
       <cc-filtros-lista
         [control]="lista"
+        [cargando]="cargando()"
         busqueda="Buscar por razón social, NIT o correo"
         grupo="EstadoLineaCredito"
         nombre="clientes"
@@ -53,6 +54,7 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
     } @else {
       <cc-filtros-lista
         [control]="lista"
+        [cargando]="cargando()"
         busqueda="Buscar por razón social, NIT o correo"
         nombre="clientes"
         singular="cliente"
