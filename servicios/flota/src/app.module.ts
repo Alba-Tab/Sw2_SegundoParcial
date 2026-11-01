@@ -1,5 +1,7 @@
 import { MiddlewareConsumer, Module, NestModule } from '@nestjs/common';
 import { APP_FILTER } from '@nestjs/core';
+import { CambiarHabilitacionChofer } from './aplicacion/chofer/cambiar-habilitacion-chofer';
+import { EditarChofer } from './aplicacion/chofer/editar-chofer';
 import { ConsultarCombustible } from './aplicacion/combustible/consultar-combustible';
 import { RegistrarCarga } from './aplicacion/combustible/registrar-carga';
 import { ConsultarChoferes } from './aplicacion/consulta/consultar-choferes';
@@ -24,6 +26,7 @@ import { ComunModule } from './infraestructura/comun.module';
 import { AutenticacionMiddleware } from './infraestructura/http/autenticacion.middleware';
 import { CorrelacionMiddleware } from './infraestructura/http/correlacion.middleware';
 import { FiltroProblemas } from './infraestructura/http/filtro-problemas';
+import { GestionChoferesController } from './infraestructura/http/gestion-choferes.controller';
 import { GestionUnidadesController } from './infraestructura/http/gestion-unidades.controller';
 import { MantenimientosController } from './infraestructura/http/mantenimientos.controller';
 import { SaludController } from './infraestructura/http/salud.controller';
@@ -32,7 +35,14 @@ import { UnidadesController } from './infraestructura/http/unidades.controller';
 /** API HTTP de Flota (Cloud Run service). */
 @Module({
   imports: [ComunModule],
-  controllers: [SaludController, UnidadesController, GestionUnidadesController, MantenimientosController, CombustibleController],
+  controllers: [
+    SaludController,
+    UnidadesController,
+    GestionUnidadesController,
+    GestionChoferesController,
+    MantenimientosController,
+    CombustibleController,
+  ],
   providers: [
     { provide: APP_FILTER, useClass: FiltroProblemas },
     { provide: ConsultarUnidades, inject: [UNIDAD_REPOSITORIO], useFactory: (u: UnidadRepositorio) => new ConsultarUnidades(u) },
@@ -98,6 +108,18 @@ import { UnidadesController } from './infraestructura/http/unidades.controller';
         e: RegistroDeEventos,
         reloj: Reloj,
       ) => new CerrarMantenimiento(tx, o, u, m, e, reloj),
+    },
+    {
+      provide: EditarChofer,
+      inject: [UNIDAD_DE_TRABAJO, OPERACIONES_IDEMPOTENTES, CHOFER_REPOSITORIO, REGISTRO_DE_EVENTOS],
+      useFactory: (tx: UnidadDeTrabajo, o: OperacionesIdempotentes, c: ChoferRepositorio, e: RegistroDeEventos) =>
+        new EditarChofer(tx, o, c, e),
+    },
+    {
+      provide: CambiarHabilitacionChofer,
+      inject: [UNIDAD_DE_TRABAJO, OPERACIONES_IDEMPOTENTES, CHOFER_REPOSITORIO, REGISTRO_DE_EVENTOS, RELOJ],
+      useFactory: (tx: UnidadDeTrabajo, o: OperacionesIdempotentes, c: ChoferRepositorio, e: RegistroDeEventos, reloj: Reloj) =>
+        new CambiarHabilitacionChofer(tx, o, c, e, reloj),
     },
     {
       provide: ConsultarMantenimientos,

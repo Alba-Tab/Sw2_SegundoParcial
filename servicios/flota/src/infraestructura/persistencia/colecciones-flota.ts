@@ -115,7 +115,7 @@ export class ChoferRepositorioMongo implements ChoferRepositorio {
   }
 
   async tomar(choferId: string): Promise<boolean> {
-    const r = await this.col.updateOne({ _id: choferId, disponible: true }, { $set: { disponible: false } }, opciones());
+    const r = await this.col.updateOne({ _id: choferId, disponible: true, activo: true }, { $set: { disponible: false } }, opciones());
     return r.modifiedCount === 1;
   }
 

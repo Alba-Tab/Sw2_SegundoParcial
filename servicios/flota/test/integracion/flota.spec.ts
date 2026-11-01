@@ -465,5 +465,69 @@ describe('Flota (Mongo rs0 + RabbitMQ)', () => {
         .findOne({ tipo: 'MantenimientoRequerido', 'sobre.datos.placa': '8003TRA' });
       expect(evento?.sobre).toMatchObject({ correlationId, traceparent });
     });
+
+    it('D104: edita la licencia y habilita o inhabilita con ChoferActualizado; con reserva activa es 409', async () => {
+      const conexion = worker.get<Connection>(getConnectionToken());
+      const [libre, ocupado] = ['0193a000-0000-7000-8000-0000000d0401', '0193a000-0000-7000-8000-0000000d0402'];
+      const chofer = (id: string, disponible: boolean) => ({
+        _id: id as never,
+        nombre: 'Chofer de prueba',
+        usuarioSub: `sub-${id.slice(-2)}`,
+        licenciaCategoria: 'B',
+        licenciaVenceEl: '2027-01-01',
+        activo: true,
+        disponible,
+        versionAgregado: 2,
+      });
+      await conexion.collection('choferes').insertMany([chofer(libre, true), chofer(ocupado, false)]);
+      const [jefe, despachador] = [await firmar('jefe-1', ['jefe_flota']), await firmar('desp-1', ['despachador'])];
+      const pedir = (metodo: 'put' | 'post', ruta: string, token: string, clave: string, cuerpo: object) =>
+        request(apiConToken.getHttpServer())
+          [metodo](`/api/v1/choferes/${ruta}`)
+          .set('Authorization', `Bearer ${token}`)
+          .set('Idempotency-Key', clave)
+          .send(cuerpo);
+      const edicion = { nombre: 'Juan Mamani', licenciaCategoria: 'C', licenciaVenceEl: '2029-03-15' };
+
+      await pedir('put', libre, despachador, '0193a000-0000-7000-8000-0000000d0403', edicion).expect(403);
+      const editado = await pedir('put', libre, jefe, '0193a000-0000-7000-8000-0000000d0404', edicion).expect(200);
+      expect(editado.body).toMatchObject({ choferId: libre, ...edicion, activo: true });
+      expect(editado.body).not.toHaveProperty('versionAgregado');
+      // Reenvío con la misma clave: la misma respuesta, sin otro evento.
+      expect((await pedir('put', libre, jefe, '0193a000-0000-7000-8000-0000000d0404', edicion).expect(200)).body).toEqual(editado.body);
+
+      const sinMotivo = await pedir('post', `${libre}/habilitacion`, jefe, '0193a000-0000-7000-8000-0000000d0405', { activo: false });
+      expect(sinMotivo.status).toBe(400);
+      expect(sinMotivo.body.errores).toEqual([{ campo: 'motivo', mensaje: expect.any(String) }]);
+      const conReserva = await pedir('post', `${ocupado}/habilitacion`, jefe, '0193a000-0000-7000-8000-0000000d0406', {
+        activo: false,
+        motivo: 'Licencia retenida',
+      }).expect(409);
+      expect(conReserva.body.codigo).toBe('CONFLICTO_ESTADO');
+      expect((await conexion.collection('choferes').findOne({ _id: ocupado as never }))?.activo).toBe(true);
+
+      const inhabilitado = await pedir('post', `${libre}/habilitacion`, jefe, '0193a000-0000-7000-8000-0000000d0407', {
+        activo: false,
+        motivo: 'Licencia retenida',
+      }).expect(200);
+      expect(inhabilitado.body).toMatchObject({ activo: false, inhabilitacion: { motivo: 'Licencia retenida' } });
+      const habilitado = await pedir('post', `${libre}/habilitacion`, jefe, '0193a000-0000-7000-8000-0000000d0408', {
+        activo: true,
+      }).expect(200);
+      expect(habilitado.body.activo).toBe(true);
+      expect(habilitado.body).not.toHaveProperty('inhabilitacion');
+
+      const eventos = await conexion
+        .collection('outboxEventos')
+        .find({ tipo: 'ChoferActualizado', 'sobre.datos.choferId': libre })
+        .sort({ 'sobre.datos.versionAgregado': 1 })
+        .toArray();
+      expect(eventos.map((e) => [e['sobre'].datos.versionAgregado, e['sobre'].datos.activo])).toEqual([
+        [3, true],
+        [4, false],
+        [5, true],
+      ]);
+      expect(eventos[0]['sobre'].datos).toMatchObject({ nombre: 'Juan Mamani', licenciaCategoria: 'C', licenciaVenceEl: '2029-03-15' });
+    });
   });
 });

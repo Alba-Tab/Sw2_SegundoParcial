@@ -379,6 +379,86 @@ paths:
           $ref: './comun.yaml#/components/responses/SinPermiso'
         '404':
           $ref: './comun.yaml#/components/responses/NoEncontrado'
+    put:
+      tags: [choferes]
+      operationId: editarChofer
+      summary: Edición del nombre y la licencia de un chofer (jefe_flota). D104.
+      description: |
+        Los choferes no tienen alta por API: el usuario se crea en la consola de Keycloak y el chofer llega de la
+        semilla (D102, D103). Sube `versionAgregado` y publica `ChoferActualizado` por Outbox en la misma transacción.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChoferEdicion'
+      responses:
+        '200':
+          description: Chofer actualizado (también en el reenvío con la misma clave).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chofer'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/choferes/{choferId}/habilitacion:
+    parameters:
+      - name: choferId
+        in: path
+        required: true
+        schema:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    post:
+      tags: [choferes]
+      operationId: cambiarHabilitacionChofer
+      summary: Habilita o inhabilita a un chofer (jefe_flota). D104.
+      description: |
+        Al inhabilitar (`activo = false`) el `motivo` es obligatorio (400 VALIDACION). No se inhabilita a un chofer con
+        una reserva activa (`disponible = false`): 409 `CONFLICTO_ESTADO`. Sube `versionAgregado` y publica
+        `ChoferActualizado` por Outbox en la misma transacción.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HabilitacionChofer'
+      responses:
+        '200':
+          description: Chofer con su habilitación nueva (también en el reenvío con la misma clave).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Chofer'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
 
   /api/v1/cargas-combustible:
     get:
@@ -784,6 +864,39 @@ components:
         disponible:
           type: boolean
           description: false si tiene una reserva activa (D11).
+        inhabilitacion:
+          type: object
+          required: [motivo, desde]
+          description: Solo en choferes inhabilitados desde la API (`activo = false`).
+          properties:
+            motivo:
+              type: string
+            desde:
+              $ref: './comun.yaml#/components/schemas/Instante'
+    ChoferEdicion:
+      type: object
+      required: [nombre, licenciaCategoria, licenciaVenceEl]
+      properties:
+        nombre:
+          type: string
+          minLength: 3
+          maxLength: 120
+        licenciaCategoria:
+          type: string
+          enum: [A, B, C]
+        licenciaVenceEl:
+          $ref: './comun.yaml#/components/schemas/Fecha'
+    HabilitacionChofer:
+      type: object
+      required: [activo]
+      properties:
+        activo:
+          type: boolean
+        motivo:
+          type: string
+          minLength: 3
+          maxLength: 200
+          description: Obligatorio al inhabilitar.
     PaginaChoferes:
       type: object
       required: [items, siguienteCursor]
