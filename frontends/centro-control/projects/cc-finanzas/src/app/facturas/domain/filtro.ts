@@ -6,3 +6,7 @@ export function cambioDeSaldo(valor: string, estado: string | null | undefined):
   if (valor === 'todas') return { saldo: 'todas' };
   return estado && !ESTADOS_CON_SALDO.includes(estado) ? { saldo: null, estado: null } : { saldo: null };
 }
+
+/** El chip de una factura vencida (JV-2): dice desde cuándo, con el ícono y el tono de `Vigencia.VENCIDO`. */
+export const textoVencida = (dias: number | null | undefined): string =>
+  !dias || dias < 1 ? 'Vencida' : `Vencida hace ${dias} ${dias === 1 ? 'día' : 'días'}`;

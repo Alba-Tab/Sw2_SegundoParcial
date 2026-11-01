@@ -37,6 +37,7 @@ import {
 import { completarConRecibo } from '../domain/recibo';
 import { MEDIOS_PAGO, medioEnFrase, pagoRepetido, saldoDelError, saldoDespuesDe, type PagoEnEdicion } from '../domain/pago';
 import { FacturaFachada } from '../facturas.fachada';
+import { textoVencida } from '../domain/filtro';
 
 /**
  * Spec 008: administración registra un pago (baja el saldo y libera crédito). El OCR del recibo (Tesseract.js en el
@@ -69,7 +70,12 @@ import { FacturaFachada } from '../facturas.fachada';
     @let titulo = factura()?.numero ?? 'Factura';
     <cc-encabezado [titulo]="titulo" [migas]="[{ texto: 'Facturas', ruta: '/facturas' }, { texto: titulo }]">
       @if (factura(); as f) {
-        <cc-estado grupo="EstadoFactura" [valor]="f.estado" />
+        @if (f.vencida) {
+          <cc-estado grupo="Vigencia" valor="VENCIDO" [texto]="textoVencida(f.diasVencida)" />
+        }
+        @if (!f.vencida || f.estado !== 'EMITIDA') {
+          <cc-estado grupo="EstadoFactura" [valor]="f.estado" />
+        }
       }
       @if (puedeRegistrar()) {
         <button
@@ -255,6 +261,7 @@ export class FacturaPagina {
   readonly factura = this.fachada.factura;
   readonly error = this.fachada.error;
   readonly cargando = this.fachada.cargando;
+  readonly textoVencida = textoVencida;
   readonly campos = { factura: 'Finanzas' };
   readonly medios = MEDIOS_PAGO;
   readonly enviando = signal(false);

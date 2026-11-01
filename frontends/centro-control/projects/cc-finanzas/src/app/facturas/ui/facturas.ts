@@ -17,7 +17,7 @@ import {
 } from 'ui-comun';
 import { FacturasFachada } from '../facturas.fachada';
 
-import { cambioDeSaldo, ESTADOS_CON_SALDO } from '../domain/filtro';
+import { cambioDeSaldo, ESTADOS_CON_SALDO, textoVencida } from '../domain/filtro';
 @Component({
   selector: 'app-facturas',
   providers: [FacturasFachada],
@@ -83,14 +83,18 @@ import { cambioDeSaldo, ESTADOS_CON_SALDO } from '../domain/filtro';
         >
         <ng-container matColumnDef="vence"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Vence</th>
-          <td mat-cell *matCellDef="let f" [class.no-disponible]="f.vencida">
-            {{ f.venceEl | fecha }}{{ f.vencida ? ' (' + f.diasVencida + ' días)' : '' }}
-          </td></ng-container
+          <td mat-cell *matCellDef="let f">{{ f.venceEl | fecha }}</td></ng-container
         >
         <ng-container matColumnDef="estado"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
           <td mat-cell *matCellDef="let f">
-            <cc-estado grupo="EstadoFactura" [valor]="f.estado" /></td
+            <!-- Vencida: chip propio en tono error (no «Por cobrar» en info); un pago parcial lo sigue diciendo. -->
+            @if (f.vencida) {
+              <cc-estado grupo="Vigencia" valor="VENCIDO" [texto]="textoVencida(f.diasVencida)" />
+            }
+            @if (!f.vencida || f.estado !== 'EMITIDA') {
+              <cc-estado grupo="EstadoFactura" [valor]="f.estado" />
+            }</td
         ></ng-container>
         <tr mat-header-row *matHeaderRowDef="columnas"></tr>
         <tr mat-row *matRowDef="let f; columns: columnas"></tr>
@@ -131,6 +135,7 @@ export class FacturasPagina {
   readonly saldo = this.lista.parametro('saldo');
   readonly estadosConSaldo = ESTADOS_CON_SALDO;
   readonly cambioDeSaldo = cambioDeSaldo;
+  readonly textoVencida = textoVencida;
 
   constructor() {
     effect(() => this.fachada.conSaldo.set(this.saldo() === 'todas' ? null : true));
