@@ -6,8 +6,15 @@ import { erroresGraphql, mensajeDe, servicioCaido } from './errores';
 import { enfocarTitulo } from './formulario';
 import { FechaPipe } from './formato';
 
-/** Qué servicio está detrás de cada campo de la consulta de una página, para decir cuál no está disponible ('' si lo dice la página). */
-export type CamposPorServicio = Record<string, string>;
+/**
+ * Qué servicio está detrás de cada campo de la consulta de una página, para decir cuál no está disponible ('' si lo dice
+ * la página). En una ficha, `{ servicio, que }` dice además qué se buscaba: «No se pudieron cargar los servicios de este
+ * cliente: Viajes no responde.» (FB-6).
+ */
+export type CamposPorServicio = Record<string, string | { servicio: string; que: string }>;
+
+const textoCaido = (c: CamposPorServicio[string]) =>
+  typeof c === 'string' ? `${c} no disponible` : `No se pudieron cargar ${c.que}: ${c.servicio} no responde.`;
 
 /**
  * Respuesta parcial (FR1, FR2): un aviso "<Servicio> no disponible" por cada campo que el Gateway dejó en null con
@@ -23,7 +30,7 @@ export function avisosServicio(error: unknown, campos: CamposPorServicio, sinDat
     const campo = [...(e.path ?? [])].reverse().find((p): p is string => typeof p === 'string' && servicioCaido(error, p) && p in campos);
     // Un campo con nombre vacío lo explica su propia sección: sin banner repetido (V1-10).
     if (campo && !campos[campo]) continue;
-    caidos.add(campo ? `${campos[campo]} no disponible` : 'Un servicio no está disponible');
+    caidos.add(campo ? textoCaido(campos[campo]) : 'Un servicio no está disponible');
   }
   if (caidos.size) return [...caidos];
   return sinDatos ? [mensajeDe(error)] : [];

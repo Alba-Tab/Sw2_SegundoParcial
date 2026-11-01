@@ -92,7 +92,7 @@ export class ChoferPagina {
   readonly limite = LIMITE_GATEWAY;
   readonly error = this.fachada.error;
   readonly cargando = this.fachada.cargando;
-  readonly campos = { choferes: 'Flota', puntajesConduccion: 'Analítica' };
+  readonly campos = { choferes: 'Flota', puntajesConduccion: { servicio: 'Analítica', que: 'el puntaje de conducción' } };
   readonly puntajeBajo = PUNTAJE_BAJO;
   readonly estado = estadoChofer;
   readonly vigencia = computed(() => {

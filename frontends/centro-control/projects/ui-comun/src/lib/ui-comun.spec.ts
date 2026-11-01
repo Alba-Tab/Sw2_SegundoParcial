@@ -108,6 +108,10 @@ describe('ui-comun', () => {
       errors: [{ message: 'Analítica no disponible', path: ['viaje', 'riesgo'], extensions: { codigo: 'DEPENDENCIA_NO_DISPONIBLE' } }],
     });
     expect(avisosServicio(riesgo, { ...campos, riesgo: '' })).toEqual([]);
+    // FB-6: en una ficha se dice qué se buscaba, y qué servicio no responde.
+    expect(avisosServicio(parcial, { ...campos, unidad: { servicio: 'Flota', que: 'la unidad del viaje' } })).toEqual([
+      'No se pudieron cargar la unidad del viaje: Flota no responde.',
+    ]);
   });
 
   it('NG-1: los números van con miles en punto y decimales en coma (es-BO), nunca "1,300"', () => {

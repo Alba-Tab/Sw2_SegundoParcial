@@ -170,7 +170,12 @@ export class ClientePagina {
   readonly error = this.fachada.error;
   readonly cargando = this.fachada.cargando;
   readonly verCredito = this.fachada.verCredito;
-  readonly campos = { clientes: 'Viajes', servicios: 'Viajes', rutas: 'Viajes', lineaCredito: 'Finanzas' };
+  readonly campos = {
+    clientes: { servicio: 'Viajes', que: 'los datos del cliente' },
+    servicios: { servicio: 'Viajes', que: 'los viajes de este cliente' },
+    rutas: { servicio: 'Viajes', que: 'los nombres de las rutas' },
+    lineaCredito: { servicio: 'Finanzas', que: 'la línea de crédito de este cliente' },
+  };
   readonly columnas = ['fecha', 'estado', 'carga', 'placa', ...(this.fachada.verMonto ? ['monto'] : [])];
   readonly estadoLinea = estadoLineaCredito;
 

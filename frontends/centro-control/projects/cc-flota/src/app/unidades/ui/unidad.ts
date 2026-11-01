@@ -265,7 +265,7 @@ export class UnidadPagina {
   readonly unidad = this.fachada.unidad;
   readonly error = this.fachada.error;
   readonly cargando = this.fachada.cargando;
-  readonly campos = { unidad: 'Flota', mantenimientos: 'Flota' };
+  readonly campos = { unidad: 'Flota', mantenimientos: { servicio: 'Flota', que: 'los mantenimientos de esta unidad' } };
   readonly puedeProgramar = puedeProgramar;
   readonly vigencia = (venceEl: string) => vigencia(venceEl);
   readonly documentosEnAviso = documentosEnAviso;

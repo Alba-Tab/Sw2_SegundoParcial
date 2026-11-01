@@ -293,7 +293,7 @@ export class ViajePagina {
   readonly errorRiesgo = computed(() => erroresGraphql(this.datos()?.error).some((e) => e.path?.includes('riesgo')));
   readonly enviando = signal(false);
   readonly pct = pct;
-  readonly campos = { viaje: 'Viajes', unidad: 'Flota', riesgo: '' };
+  readonly campos = { viaje: 'Viajes', unidad: { servicio: 'Flota', que: 'los datos de la unidad' }, riesgo: '' };
   readonly cargandoDe = cargandoDe;
   readonly textoError = textoError;
   /** Rechazar la entrega no se deshace: se confirma con un resumen. */
