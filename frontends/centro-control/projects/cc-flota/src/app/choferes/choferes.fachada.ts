@@ -1,9 +1,8 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { filter, switchMap } from 'rxjs';
-import { cargandoDe, completo, esUuid, Intentos } from 'ui-comun';
+import { filter, firstValueFrom, switchMap } from 'rxjs';
+import { cargandoDe, completo, esUuid, Intentos, PaginasCursor } from 'ui-comun';
 import type { ChoferesQuery, ChoferQuery } from '../graphql/generado';
-import { PaginasPorCursor } from '../paginas';
 import { ChoferesRepositorio } from './data/choferes.repositorio';
 import type { EdicionChofer } from './domain/chofer';
 
@@ -12,15 +11,15 @@ import type { EdicionChofer } from './domain/chofer';
 export class ChoferesFachada {
   private readonly repo = inject(ChoferesRepositorio);
   private readonly datos = toSignal(this.repo.observarChoferes(60_000));
-  private readonly paginas = new PaginasPorCursor(
-    computed(() => completo<ChoferesQuery>(this.datos())?.choferes),
-    (despuesDe) => this.repo.pagina(despuesDe),
+  readonly paginas = new PaginasCursor(
+    () => completo<ChoferesQuery>(this.datos())?.choferes,
+    async (despuesDe) => {
+      const r = await firstValueFrom(this.repo.pagina(despuesDe));
+      return { pagina: completo<ChoferesQuery>(r)?.choferes, error: r.error };
+    },
     (c) => c.choferId,
   );
   readonly choferes = this.paginas.items;
-  readonly siguienteCursor = this.paginas.siguienteCursor;
-  readonly cargandoMas = this.paginas.cargandoMas;
-  readonly cargarMas = () => this.paginas.cargarMas();
   readonly error = computed(() => this.datos()?.error);
   readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
