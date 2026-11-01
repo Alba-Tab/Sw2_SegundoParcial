@@ -129,8 +129,17 @@ import { CreditoFachada } from '../credito.fachada';
                   </div>
                 }
               </div>
-            } @else if (s.decididaPor) {
-              <p class="secundario">Decidida por {{ s.decididaPor }} {{ s.motivoDecision ?? '' }}</p>
+            } @else if (s.estado === 'PENDIENTE') {
+              <!-- R2F-3: solo administración decide (spec 012). -->
+              <p class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>La decide administración.</p>
+            } @else {
+              <!-- R2F-4: decididaPor es el sub (o «sistema» si venció); no se muestra. Solo administración decide. -->
+              @if (s.decididaPor && s.decididaPor !== 'sistema') {
+                <p class="secundario">Decidida por administración</p>
+              }
+              @if (s.motivoDecision) {
+                <p class="secundario">Motivo: {{ s.motivoDecision }}</p>
+              }
             }
           </mat-card-content>
         </mat-card>

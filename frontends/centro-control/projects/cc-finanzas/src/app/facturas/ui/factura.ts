@@ -116,6 +116,10 @@ import { textoVencida } from '../domain/filtro';
           <dd>{{ f.venceEl | fecha }}</dd>
         </div>
       </dl>
+      @if (!sesion.tiene('administracion') && f.saldo !== '0.00') {
+        <!-- R2F-3: el gerente ve el saldo, pero el pago lo registra administración (spec 008). -->
+        <p class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>El pago lo registra administración.</p>
+      }
 
       @if (registrando() && puedeRegistrar()) {
         <mat-card class="pago" id="registrar-pago">
