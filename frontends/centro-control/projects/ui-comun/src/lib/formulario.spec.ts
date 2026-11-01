@@ -4,7 +4,17 @@ import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angula
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { errorPeriodo, ETIQUETAS, ICONOS, MENSAJES_ERROR, mensajeCampo, montoConDecimales } from 'ui-comun/dominio';
 import { cargandoDe, mensajeDe } from './errores';
-import { Campo, exigirTexto, fechaEntre, largoEntre, listoParaEnviar, montoMaximo, textoError, validarMonto } from './formulario';
+import {
+  Campo,
+  exigirTexto,
+  fechaEntre,
+  largoEntre,
+  listoParaEnviar,
+  montoMaximo,
+  montoMinimo,
+  textoError,
+  validarMonto,
+} from './formulario';
 
 /** Un formulario real: tres campos con formControlName y un motivo suelto con [formControl], como en las páginas. */
 @Component({
@@ -62,6 +72,20 @@ describe('formularios (U8, W4)', () => {
     expect(c.valid).toBe(true);
     saldo.valor = null;
     c.setValue('999999');
+    expect(c.valid).toBe(true);
+  });
+
+  it('el límite no baja de lo usado y lo dice con ese monto (spec 012)', () => {
+    const usado = { valor: '10400.00' as string | null };
+    const c = new FormControl(
+      '10399.99',
+      montoMinimo(() => usado.valor),
+    );
+    expect(textoError(c)).toBe('No puede ser menor que 10.400,00\u00a0BOB.');
+    c.setValue('10400');
+    expect(c.valid).toBe(true);
+    usado.valor = null;
+    c.setValue('1');
     expect(c.valid).toBe(true);
   });
 

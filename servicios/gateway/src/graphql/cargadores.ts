@@ -2,6 +2,7 @@ import DataLoader from 'dataloader';
 import { GraphQLError } from 'graphql';
 import type { Contexto } from '../autenticacion';
 import { rutaRest, type ClienteServicios } from '../servicios';
+import { LOTE_LINEAS, lineasPorLote } from './gestion-finanzas';
 import * as m from './mapeos';
 
 /** D97: sin filtro por ids en el servicio, las claves de un tipo se piden en paralelo, como máximo 10 a la vez. */
@@ -49,9 +50,7 @@ export function crearCargadores(servicios: ClienteServicios, ctx: Contexto) {
         .get<Json>(ctx, 'flota', rutaRest`/api/v1/unidades`, { query: { placa, limite: 1 } })
         .then((r) => m.items(r).map(m.unidad)[0] ?? null),
     ),
-    lineaCredito: cargador((id) =>
-      nuloSi404(servicios.get<Json>(ctx, 'finanzas', rutaRest`/api/v1/lineas-credito/${id}`).then(m.lineaCredito)),
-    ),
+    lineaCredito: new DataLoader<string, Json | null>((ids) => lineasPorLote(servicios, ctx, ids), { maxBatchSize: LOTE_LINEAS }),
     /** Clave `JSON.stringify([viajeId, texto])`: la bitácora de un viaje, filtrada o no (listarHitos no pagina). */
     hitos: cargador((clave) => {
       const [viajeId, texto] = JSON.parse(clave) as [string, string | null];

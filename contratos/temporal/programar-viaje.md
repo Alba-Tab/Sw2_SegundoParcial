@@ -38,7 +38,7 @@ Nombres **explícitos**, iguales en los tres SDK:
 | Actividad | Cola | Entrada | Resultado | StartToClose | ScheduleToClose | Reintentos | No reintentables |
 |---|---|---|---|---|---|---|---|
 | `Viajes.crearViaje` | viajes | `CrearViajeEntrada` | — | 10 s | 5 min | inicial 1 s, ×2, máx. 30 s | `VALIDACION` |
-| `Finanzas.validarYReservarCredito` | finanzas | `ValidarYReservarCreditoEntrada` | `ValidarYReservarCreditoResultado` | 15 s | 30 min | igual | `COTIZACION_VENCIDA`, `COTIZACION_AJENA`, `CREDITO_INSUFICIENTE` |
+| `Finanzas.validarYReservarCredito` | finanzas | `ValidarYReservarCreditoEntrada` | `ValidarYReservarCreditoResultado` | 15 s | 30 min | igual | `COTIZACION_VENCIDA`, `COTIZACION_AJENA`, `CREDITO_INSUFICIENTE`, `CREDITO_RECHAZADO` (línea suspendida, spec 012) |
 | `Finanzas.registrarDecisionCredito` | finanzas | `RegistrarDecisionCreditoEntrada` | — | 15 s | 30 min | igual | — |
 | `Flota.reservarUnidad` | flota | `ReservarUnidadEntrada` | `ReservarUnidadResultado` | 15 s | 30 min | igual | `SIN_UNIDAD_COMPATIBLE` |
 | `Viajes.confirmarViaje` | viajes | `ConfirmarViajeEntrada` | — | 10 s | sin límite | sin límite | — |
@@ -57,7 +57,7 @@ Nombres **explícitos**, iguales en los tres SDK:
 - `CLIENTE_NO_REPLICADO` y `DEPENDENCIA_NO_DISPONIBLE` son **reintentables** (`nonRetryable = false`).
 - Cualquier otra excepción es técnica y se reintenta según la tabla.
 - `REQUIERE_APROBACION` **no** es un error: es `resultado` de `validarYReservarCredito`.
-- Errores que lanza el propio workflow (no una actividad): `CREDITO_RECHAZADO` (señal con `aprobado = false`) y `APROBACION_VENCIDA` (vence `esperaAprobacion`).
+- Errores que lanza el propio workflow (no una actividad): `CREDITO_RECHAZADO` (señal con `aprobado = false`) y `APROBACION_VENCIDA` (vence `esperaAprobacion`). `CREDITO_RECHAZADO` también sale de `Finanzas.validarYReservarCredito` si la línea del cliente está suspendida; Finanzas lo marca no reintentable y el motivo del viaje es el mismo.
 
 ## Orden y compensaciones
 

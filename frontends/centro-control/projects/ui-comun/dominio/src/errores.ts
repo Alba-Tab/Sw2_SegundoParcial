@@ -35,6 +35,7 @@ export const MENSAJES_ERROR: Record<string, string> = {
   LIMITE_PETICIONES: 'Se hicieron demasiadas consultas seguidas. Espera un minuto.',
   EXPORTACION_VENCIDA: 'El enlace de descarga venció. Vuelve a exportar.',
   CONSULTA_DEMASIADO_COMPLEJA: 'La consulta pide demasiados datos a la vez. Filtra la lista e intenta de nuevo.',
+  LIMITE_MENOR_QUE_USADO: 'El límite no puede quedar por debajo de lo reservado y utilizado.',
 };
 
 export const ERROR_GENERICO = 'No se pudo completar la operación. Intenta de nuevo.';

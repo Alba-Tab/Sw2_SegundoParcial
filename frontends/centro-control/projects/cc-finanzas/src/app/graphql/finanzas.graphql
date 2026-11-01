@@ -115,6 +115,7 @@ query LineasCredito {
       utilizado
       disponible
       enMora
+      suspendida
     }
   }
 }
@@ -151,5 +152,25 @@ mutation AprobarCredito($servicioId: ID!, $aprobado: Boolean!, $motivo: String, 
     servicio {
       estado
     }
+  }
+}
+
+fragment LineaGestionada on LineaCredito {
+  clienteId
+  limite
+  disponible
+  suspendida
+}
+
+# G6 (spec 012): administración y gerente. La lista se relee después (la línea no tiene id para la caché de Apollo).
+mutation AjustarLineaCredito($clienteId: ID!, $limite: Dinero!, $motivo: String!, $clave: ID!) {
+  ajustarLineaCredito(clienteId: $clienteId, limite: $limite, motivo: $motivo, claveIdempotencia: $clave) {
+    ...LineaGestionada
+  }
+}
+
+mutation CambiarEstadoLineaCredito($clienteId: ID!, $suspendida: Boolean!, $motivo: String!, $clave: ID!) {
+  cambiarEstadoLineaCredito(clienteId: $clienteId, suspendida: $suspendida, motivo: $motivo, claveIdempotencia: $clave) {
+    ...LineaGestionada
   }
 }

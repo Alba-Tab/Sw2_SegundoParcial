@@ -25,6 +25,17 @@ export const montoMaximo =
     return monto !== null && max !== null && monto > max ? { montoMaximo: { saldo: new BobPipe().transform(tope) } } : null;
   };
 
+/** Monto que no baja de `minimo` (spec 012: el límite no baja de lo reservado y utilizado). Sin mínimo conocido, no se limita. */
+export const montoMinimo =
+  (minimo: () => string | null | undefined): ValidatorFn =>
+  (c) => {
+    // El mínimo se lee solo con un monto escrito: al crear el control todavía puede no haber datos (input requerido).
+    const monto = aCentavos(String(c.value ?? ''));
+    const piso = monto === null ? null : minimo();
+    const min = piso ? aCentavos(piso) : null;
+    return monto !== null && min !== null && monto < min ? { montoMinimo: { minimo: new BobPipe().transform(piso) } } : null;
+  };
+
 /** Fecha ISO (`YYYY-MM-DD`) entre `desde` y `hasta`, si se dan; se leen al validar porque dependen de los datos. */
 export const fechaEntre =
   (desde: () => string | null | undefined, hasta: () => string | null | undefined = () => null): ValidatorFn =>

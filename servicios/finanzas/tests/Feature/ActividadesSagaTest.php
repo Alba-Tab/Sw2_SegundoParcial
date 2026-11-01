@@ -116,6 +116,20 @@ it('crédito insuficiente no reintenta, trae el detalle y no deja nada a medias'
         ->and(linea()->reservado)->toBe('0.00');
 });
 
+it('línea suspendida: CREDITO_RECHAZADO no reintentable, sin reserva; reactivada vuelve a reservar (spec 012)', function () {
+    DB::table('linea_credito')->where('cliente_id', CLIENTE)->update(['suspendida' => true]);
+    $cot = cotizacion($this, AULA, 28);
+    $f = falla(fn () => reservar((string) Str::uuid7(), $cot));
+    expect($f->getType())->toBe('CREDITO_RECHAZADO')->and($f->isNonRetryable())->toBeTrue()
+        ->and($f->getMessage())->toContain('suspendida')
+        ->and(DB::table('cotizacion')->where('cotizacion_id', $cot)->value('estado'))->toBe('VIGENTE')
+        ->and(DB::table('reserva_credito')->count())->toBe(0)
+        ->and(linea()->reservado)->toBe('0.00');
+
+    DB::table('linea_credito')->where('cliente_id', CLIENTE)->update(['suspendida' => false]);
+    expect(reservar((string) Str::uuid7(), $cot)['resultado'])->toBe('RESERVADO');
+});
+
 it('cotización ajena, inexistente, vencida o ya usada', function () {
     consumidor()->aplicar(clienteActualizado(OTRO_CLIENTE, 1, 'Agro Moroso'));
     $ajena = cotizacion($this, AULA, 10, OTRO_CLIENTE);

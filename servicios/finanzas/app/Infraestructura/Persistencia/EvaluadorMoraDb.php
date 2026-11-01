@@ -13,10 +13,15 @@ final class EvaluadorMoraDb implements EvaluadorMora
 
     public function enMora(string $clienteId, \DateTimeImmutable $ahora): bool
     {
+        return $this->clientesEnMora([$clienteId], $ahora) !== [];
+    }
+
+    public function clientesEnMora(array $clienteIds, \DateTimeImmutable $ahora): array
+    {
         $limite = self::hoy($ahora)->modify('-'.self::DIAS_DE_GRACIA.' days')->format('Y-m-d');
 
-        return DB::table('factura')->where('cliente_id', $clienteId)->where('saldo', '>', 0)
-            ->where('vence_el', '<', $limite)->exists();
+        return DB::table('factura')->whereIn('cliente_id', $clienteIds)->where('saldo', '>', 0)
+            ->where('vence_el', '<', $limite)->distinct()->pluck('cliente_id')->map(fn ($id) => (string) $id)->values()->all();
     }
 
     public function facturasVencidas(string $clienteId, \DateTimeImmutable $ahora): array

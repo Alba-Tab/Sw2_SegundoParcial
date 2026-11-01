@@ -64,6 +64,7 @@ final class Formato
             'utilizado' => $l->utilizado->aContrato(),
             'disponible' => $l->disponible()->aContrato(),
             'enMora' => $enMora,
+            'suspendida' => $l->suspendida,
         ];
     }
 

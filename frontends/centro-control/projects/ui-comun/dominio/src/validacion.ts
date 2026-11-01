@@ -37,6 +37,7 @@ export function mensajeCampo(errores: ErroresCampo): string {
   if (errores['min']) return `Debe ser ${numero(arg('min', 'min'))} o más.`;
   if (errores['max']) return `Debe ser ${numero(arg('max', 'max'))} o menos.`;
   if (errores['montoMaximo']) return `El monto supera el saldo (${arg('montoMaximo', 'saldo')}).`;
+  if (errores['montoMinimo']) return `No puede ser menor que ${arg('montoMinimo', 'minimo')}.`;
   if (errores['fechaMinima']) return `La fecha no puede ser anterior al ${fechaCorta(arg('fechaMinima', 'min'))}.`;
   if (errores['fechaMaxima']) return `La fecha no puede ser posterior al ${fechaCorta(arg('fechaMaxima', 'max'))}.`;
   if (errores['lineas']) return 'Escribe de 1 a 30 ítems, uno por línea, de hasta 120 caracteres cada uno.';
