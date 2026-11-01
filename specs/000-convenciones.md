@@ -74,7 +74,7 @@ GET /api/v1/viajes?limite=50&cursor=<opaco>
 → { "items": [...], "siguienteCursor": "<opaco>" | null }
 ```
 
-`limite` por defecto 20, máximo 100.
+`limite` por defecto 20, máximo 100. Un `cursor` que no salió de una respuesta del servicio (mal formado) da `400 VALIDACION` con `campo: cursor`.
 
 **Códigos de estado**
 

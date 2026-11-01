@@ -2,62 +2,55 @@
 
 Lo que quedó abierto al cerrar las iteraciones de UX del 31-10 y 01-11-2026 (app del chofer, Centro de Control y portal). Las decisiones que salieron de ellas están en `decisiones.md` (D60, D103, D104); los planes y las revisiones de esas iteraciones se borraron al fusionarlas.
 
-## 1. Backend para la gestión de datos maestros (D104)
+## 1. Para publicar lo de las vueltas del 01-11-2026
 
-El front ya tiene en modo lectura todo lo que el Gateway permite: Mantenimientos y Choferes (con ficha) en `cc-flota`, avisos de documentos vencidos en Unidades, Clientes y Rutas (con ficha) en `cc-operaciones` y Líneas de crédito en `cc-finanzas`. Las escrituras de abajo **no tienen botón** hasta que exista su mutación. Cada una va "contratos primero": OpenAPI y `contratos/graphql/centro-control.graphql` en el mismo commit que el resolvedor y la pantalla.
+Las seis ramas son locales y están probadas juntas: verificación completa, `probar-realm.sh` y flujos de punta a punta sobre `chore/repo/integracion-vuelta-3`, que no se publica. Orden de merge a `develop`:
+1. `docs/specs/decision-d60-fatiga-y-entrega`
+2. `fix/plataforma/gerente-consola-y-portal`
+3. `fix/app-chofer/decisiones-fatiga-entrega`
+4. `feat/finanzas/ajuste-linea-credito`
+5. `feat/flota/gestion-flota`
+6. `feat/viajes/gestion-rutas-clientes`
 
-Convención propuesta: la mutación recibe `claveIdempotencia: ID!`, el Gateway la reenvía como `Idempotency-Key` (igual que `cancelarServicio` o `programarMantenimiento`) y responde el objeto actualizado para que Apollo refresque su caché.
+Después, una rama aparte con los 4 commits de arreglo que solo aplican con todo junto (están en la rama de integración): `78e2527` (cc-flota usa `PaginasCursor`), `f0166ab` y `c19239d` (filas de «Cargar más» en líneas de crédito) y `eb91e14` (prueba de complejidad). En los merges, `specs/pendientes.md` y la línea 11 de la spec 016 los gana la rama docs.
 
-| Acción | Mutación GraphQL propuesta | Input | Respuesta | Roles | REST en el servicio |
-|---|---|---|---|---|---|
-| Alta de unidad (G1) | `crearUnidad(input: UnidadNuevaInput!)` | `tipoUnidad`, `placa`, `tipoRemolque`, `capacidadToneladas`, `kilometraje` (odómetro del tracto; `UnidadNueva` en `flota.yaml` ya lo acepta), `kmDesdeUltimoMantenimiento`, `documentos: [DocumentoInput!]!`, `atributos: JSON`, `claveIdempotencia` | `Unidad!` | jefe_flota | **Existe:** `POST /api/v1/unidades` (Flota, con `Idempotency-Key`) |
-| Edición de unidad y de sus documentos (G1, G2) | `editarUnidad(input: UnidadEdicionInput!)` | `unidadId`, `capacidadToneladas`, `documentos`, `atributos`, `claveIdempotencia` | `Unidad!` | jefe_flota | **Existe:** `PUT /api/v1/unidades/{unidadId}` (con `Idempotency-Key`) |
-| Baja de unidad (G1) | `darDeBajaUnidad(unidadId: ID!, motivo: String!, claveIdempotencia: ID!)` | motivo de 3 o más caracteres | `Unidad!` (queda `INACTIVA`, final) | jefe_flota | **Existe:** `POST /api/v1/unidades/{unidadId}/baja` |
-| Alta de chofer (G3) | `crearChofer(input: ChoferNuevoInput!)` | `nombre`, `usuarioSub` (usuario de Keycloak con rol `chofer`), `licenciaCategoria` (A, B, C), `licenciaVenceEl`, `claveIdempotencia` | `Chofer!` | jefe_flota | **Falta:** `POST /api/v1/choferes` en Flota (hoy solo `GET`). Falta decidir cómo se obtiene `usuarioSub` (el usuario se crea en la consola de Keycloak, D103) |
-| Edición de chofer y renovación de licencia (G3) | `editarChofer(input: ChoferEdicionInput!)` | `choferId`, `nombre`, `licenciaCategoria`, `licenciaVenceEl`, `claveIdempotencia` | `Chofer!` | jefe_flota | **Falta:** `PUT /api/v1/choferes/{choferId}` |
-| Habilitar o inhabilitar chofer (G3) | `cambiarHabilitacionChofer(choferId: ID!, activo: Boolean!, motivo: String, claveIdempotencia: ID!)` | motivo obligatorio al inhabilitar | `Chofer!` | jefe_flota | **Falta:** `POST /api/v1/choferes/{choferId}/habilitacion`. Regla a definir: no inhabilitar con una reserva activa (`disponible = false`) |
-| Alta y edición de ruta (G4) | `crearRuta(input: RutaInput!)`, `editarRuta(rutaId: ID!, input: RutaInput!)` | `nombre`, `origen: LugarInput!`, `destino: DestinoInput!`, `distanciaKm`, `activa`, `claveIdempotencia`; `LugarInput { nombre, coordenadas: CoordenadasInput! }` y `DestinoInput` igual más `radioMetros: Int!` (50 a 5000), como `Lugar` en `viajes.yaml` | `Ruta!` | gerente, despachador | **Falta:** `POST /api/v1/rutas` y `PUT /api/v1/rutas/{rutaId}` en Viajes (hoy solo `GET`). Publica `RutaActualizada` por Outbox. `Ruta` en GraphQL debería exponer `activa` y `destino.radioMetros` |
-| Ajuste de línea de crédito (G6) | `ajustarLineaCredito(clienteId: ID!, limite: Dinero!, motivo: String!, claveIdempotencia: ID!)` | límite en texto decimal (sin float). Sin `version`: la línea se cambia con `FOR UPDATE` (000 §9, PR #99) | `LineaCredito!` | administracion, gerente | **Falta:** `PUT /api/v1/lineas-credito/{clienteId}` en Finanzas. Invariante: el límite no baja de `reservado + utilizado` |
-| Suspender o reactivar línea (G6) | `cambiarEstadoLineaCredito(clienteId: ID!, suspendida: Boolean!, motivo: String!, claveIdempotencia: ID!)` | | `LineaCredito!` | administracion, gerente | **Falta:** endpoint y campo de estado en `LineaCredito` (hoy solo `enMora`) |
-| Edición de cliente desde el Centro de Control (G7) | `editarCliente(clienteId: ID!, input: ClienteEdicionInput!)` | `razonSocial`, `nit`, `correo`, `claveIdempotencia` | `Cliente!` | comercial, gerente | Alta: **existe** `POST /api/v1/clientes` en Viajes. Edición: **falta** `PUT /api/v1/clientes/{clienteId}` |
-| Tarifas (G5) | `tarifas(rutaId: ID)` (query) y `guardarTarifa(input: TarifaInput!)` | `rutaId`, `tipoCarga`, `precioPorTonelada: Dinero!`, `vigenteDesde: Fecha!`, `claveIdempotencia` | `Tarifa!` | administracion, gerente | **Falta todo:** no hay endpoint ni agregado en Finanzas. Necesita spec y una decisión frente a D10/D102 (tarifas de semilla). La pestaña va en `cc-finanzas` (TODO en `seccion.ts`) |
+Después del merge, en local y en cada nube: `aplicar-realm.sh` y reconstruir las imágenes de viajes, flota, finanzas, gateway y analítica.
 
-**Lecturas por id que faltan en el esquema:** `chofer(id)`, `cliente(id)` y `ruta(id)`. Hoy cada ficha pide la lista y busca el id en el navegador; los `GET /{id}` ya existen en Flota y Viajes.
+## 2. Abiertos (todos P3)
 
-## 2. Backend y plataforma
-
-| Qué | Efecto hoy | Arreglo |
+| Qué | Dónde | Arreglo |
 |---|---|---|
-| **Tope de 100 sin cursor.** `clientes`, `choferes` y `mantenimientos` se resuelven con `limite: LIMITE_MAXIMO` = 100 (`servicios/gateway/src/graphql/limites.ts`) y el Gateway no sigue el cursor | Desde el registro 101 las listas quedan truncadas y la ficha de un registro más allá del 100 no se encuentra. El front lo dice («Se muestran los primeros 100…») | Paginación por cursor en esas tres consultas (`pagina { items, siguienteCursor }`) y las lecturas por id de la sección 1 |
-| **Viajes devuelve los 80 más antiguos.** `ViajeRepositorioJdbc.listar` ordena por `viaje_id` ascendente (UUIDv7, o sea por fecha de alta) | Con más de 80 viajes sin filtro de estado, los nuevos no llegan. El front lo dice | `ORDER BY v.viaje_id DESC` (como `ServicioRepositorioJdbc`) o el cursor `despuesDe` en GraphQL. Con el primero, el aviso de `viajes.ts` pasa a `corte="recientes"` |
-| **El Gateway no reenvía todas las extensiones del error.** `ClienteServicio` (`servicios/gateway/src/servicios.ts`) solo pasa `codigo`, `status`, `servicio` y `errores` | Se pierden `pagoId` de `PAGO_DUPLICADO` y `saldo` de `PAGO_EXCEDE_SALDO` (spec 008); el front los suple con la factura recargada | Reenviar el resto del Problem Details (sin `type`, `title`, `detail` ni `instance`) |
-| **Líneas de crédito de todos los clientes.** El DataLoader hace una llamada a Finanzas por cliente | Con el tope de 100 son 101 llamadas, dentro del presupuesto de 200. Con cursor se agotaría y las líneas saldrían en `null` | `GET /api/v1/lineas-credito?clienteIds=…` en Finanzas o una query `lineasCredito` paginada |
-| **Gerente en la consola (D103): permiso por usuario.** El gerente administra a `personal-interno` con FGAP v2, pero `viajes-map-roles-usuarios` (todos los usuarios) anula los permisos de grupo, así que lleva un permiso por usuario con la foto de los miembros al aplicar | Un interno que entra a `personal-interno` después aparece en la lista del gerente, pero no se abre hasta volver a correr `configurar-api.sh`. El gerente tampoco crea usuarios ni cambia grupos. Puede editar el `clienteId` de un interno (el perfil no distingue al gerente de Viajes), sin efecto porque no puede asignar `cliente` | Dar a `viajes` `map-roles` sin un permiso sobre todos los usuarios (si Keycloak lo permite por grupo) para que el gerente use solo el permiso de grupo; o, si basta, que `configurar-api.sh` corra cada vez que el administrador agrega un interno |
-| **Viajes corta en los 3 s del Gateway (D98).** A veces la lista llega con `DEPENDENCIA_NO_DISPONIBLE` aunque la consulta tiene índice | La pantalla conserva las últimas filas buenas con «Datos al …» y «Reintentar» | Medir con las trazas OTel (perfil `trazas` del compose) Gateway → Viajes → PostgreSQL antes de proponer un arreglo. El límite no cambia |
+| Velocidad estimada con mala precisión: con `speed = -1` y una precisión de 65 a 100 m, un camión a menos de ~50 km/h da 0 conocido y SIN_ROSTRO no vigila (contra D60) | app-chofer, `velocidadEstimada()` | Si el desplazamiento es menor que la precisión, alargar la ventana hasta 20 s y, si no alcanza, devolver `null` |
+| Las filas de «Cargar más» no se sondean, y en cc-finanzas `gestionadas` tapa datos más nuevos | ui-comun, cc-finanzas | Vaciar `gestionadas` cuando llega una página con ese cliente; decidir si las páginas extra se resondean |
+| El texto de D108 en pantalla dice «Sin tarifa de semilla…» también al reactivar rutas de semilla | cc-operaciones, `CONFIRMAR_ACTIVAR` | «Si no tiene tarifa de semilla, el portal no podrá cotizarla» |
+| Sin `ruta(id)` de una inactiva, el comercial y el portal no ven el nombre de la ruta en los servicios viejos | viajes, gateway y portal | Llevar el nombre de la ruta en la respuesta del servicio |
+| Los mensajes de dominio de Flota van en minúscula y los de zod y Viajes en mayúscula | flota | Poner en mayúscula los `ErrorDeDominio('VALIDACION', …)` |
+| `POST /rutas` con un rol ajeno y un cuerpo mal formado da 400, no 403 | viajes, `RutasController` | Revisar el permiso antes de validar el cuerpo |
+| `probar-realm.sh` no prueba que el gerente no se agregue a grupos ni cree usuarios (hoy da 403, sin prueba) | plataforma | Agregar los dos casos |
+| El selector de clientes de Reportes trae solo los primeros 100 (los más viejos) | cc-tablero | Búsqueda por nombre |
+| La CLI `choferes:actualizar` no aplica la regla de licencia con reserva | flota | Pasar por `editarChofer()` |
+| Las fotos de una entrega FALLIDA quedan en el celular hasta cerrar sesión; los celulares con un FALLIDA de antes de D106 conservan la marca | app-chofer | Borrarlas al registrar de nuevo; migración de una sola vez |
+| Viajes a veces pasa de los 3 s del Gateway (D98) | viajes | Medir con las trazas OTel antes de proponer un arreglo |
+| Las `VITE_*` del portal no tienen build de nube | despliegue | Definirlas en el workflow de Firebase (T3b.4, T11.9) |
+| «Volver a la app» desde una alerta lleva a la raíz de la app | ui-comun | `?desde=<app>&ruta=<path>` si se quiere la página |
 
-## 3. Centro de Control y portal
+**Riesgos aceptados (D103):**
+- El gerente, con `manage` sobre el personal interno, puede restablecer contraseñas, escribir atributos de un interno, cerrar sesiones y deshabilitar usuarios.
+- El permiso por usuario se arma al correr `configurar-api.sh`: hay que volver a correrlo después de cambiar `personal-interno`.
 
-- **Enlace a la ficha del chofer desde el viaje.** `Viaje.choferId` ya está en el contrato y el Gateway. Falta en `cc-operaciones`: `npm run generar` y `urlEnApp(..., 'cc-flota', '/choferes/' + id)`, como la unidad.
-- **«Volver a la app» desde una alerta** lleva a la raíz de la app de origen, no a la página. Si se quiere la página: `?desde=<app>&ruta=<path relativo>`.
-- **Sin probar en el navegador:** sesiones de despachador, jefe de flota, administración, comercial, cliente y recién registrado (cubiertas por pruebas); auditoría con axe; el banner sin parpadeo al sondear con un servicio caído y el foco tras «Reintentar» en una página real.
-- **Nube:** el portal no tiene build de despliegue (`_deploy-firebase.yml` es T3b.4/T11.9 y no existe). Las cuatro `VITE_*` (`VITE_OIDC_ISSUER`, `VITE_VIAJES_URL`, `VITE_FINANZAS_URL`, `VITE_CENTRO_URL`) solo están en `.env.example`; ese workflow tiene que pasarlas al `npm run build`, o el portal en la nube apunta a localhost.
-- **Para revisar:** «Aprobar entrega» no pide confirmación, igual que las demás aprobaciones.
+**Para revisar:** «Aprobar entrega» no pide confirmación, igual que las demás aprobaciones.
 
-## 4. App del chofer
+## 3. Sin probar
 
-**A decidir (tocan D60 o el contrato):**
-
-- **Alerta de fatiga sin GPS.** Sin ninguna posición conocida, `registrarFatiga` devuelve `null` y la alerta se pierde (el contrato exige `posicion`). Propuesta: guardarla con su `registradoEn` y encolarla con la primera posición que llegue.
-- **SIN_ROSTRO con el camión detenido.** A los 3 s también salta al cargar, en un control o al mirar los espejos. Propuesta: contarlo solo con velocidad > 5 km/h (el umbral de D58).
-- **Reintentar una entrega o un rechazo que terminó FALLIDA.** Hoy solo se avisa y se lleva a Pendientes; permitir registrarla de nuevo hay que confirmarlo en las specs 006 y 007.
-
-**A verificar en un iPhone o un Android real** (el simulador no tiene cámara frontal ni entrega foto):
-
-- Detector de fatiga: rendimiento por cuadro (tres modelos en CPU y el muestreo en JS), rostros chicos con el celular a unos 90 cm (BlazeFace de rango corto pierde el rostro por debajo del 12 % del alto), el umbral `OJO_CERRADO = 0,5` de noche y con lentes, la gorra que tapa los ojos, y que la alarma se repita sin silencios (`didJustFinish`).
-- La foto de evidencia y la firma (también la ruta de `captureRef` en Android).
-- La tecla «Listo» del teclado numérico en iOS (no hay `InputAccessoryView`).
-
-**Técnicos:** `react-native-worklets` está en 0.13 y Expo 57 espera 0.10.1 (lo pide VisionCamera 5); sin gesto de borde para volver en iOS, por decisión (D105).
+- **UI en el navegador:** el login se sirve en `MacBook-Air-de-Brayan.local` (emisor fijo), así que las pruebas automáticas no pueden iniciar sesión en localhost. Faltan las sesiones por rol, axe, «Cargar más» con «Reintentar», la confirmación de D108 y el foco tras «Reintentar».
+- **App del chofer en un iPhone o un Android real:**
+  - Detector de fatiga: rendimiento, rostros chicos, umbral de ojos de noche y con lentes, y la gorra.
+  - Alarma en bucle.
+  - Velocidad estimada con `speed = -1`.
+  - Inicio con 409 por otro viaje en ruta.
+  - Barra «Siguiente / Listo» en iOS.
+  - Build nativo con `react-native-worklets` 0.10.1.
+  - Foto, firma y `captureRef` en Android.
 
 ## 5. Para ICONIX
 
@@ -74,7 +67,7 @@ No se editan los `.docx` ni los `.eap`: esta lista es la entrada para actualizar
 | Consultar líneas de crédito | administracion, gerente | `cc-finanzas` › Líneas de crédito | Límite, reservado, utilizado, disponible y estado |
 | Administrar usuarios internos | gerente | Menú de usuario › consola de Keycloak | Sin pantalla propia (D103); actor externo: Keycloak |
 
-**Casos de uso propuestos, pendientes de backend:** los de la sección 1.
+**Casos de uso nuevos de gestión** (vuelta 1): registrar, editar y dar de baja una unidad; editar e inhabilitar o habilitar un chofer; registrar y editar una ruta; editar un cliente; ajustar, suspender y reactivar una línea de crédito.
 
 **Cambios en casos de uso existentes:**
 
