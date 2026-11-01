@@ -4,6 +4,7 @@ import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import { aCentavos, conDesde, type Direccion, numero, ordenar, pct, SIN_DATO, sumarMontos } from 'ui-comun/dominio';
 import { CONFIG_CENTRO } from './configuracion';
+import { DatosAl } from './datos-al';
 import { Estado } from './estado';
 import { BobPipe, FechaPipe } from './formato';
 
@@ -40,12 +41,10 @@ export function ordenarFilas(filas: readonly Record<string, unknown>[], columna:
  */
 @Component({
   selector: 'cc-tabla-reporte',
-  imports: [MatTableModule, MatSortModule, RouterLink, FechaPipe, Estado],
+  imports: [MatTableModule, MatSortModule, RouterLink, Estado, DatosAl],
   template: `
     @let r = resultado();
-    @if (r.datosAl) {
-      <p class="datos-al">Datos al {{ r.datosAl | fecha: true }}</p>
-    }
+    <cc-datos-al [al]="r.datosAl" />
     @if (barras().length) {
       <svg class="grafico" [attr.viewBox]="'0 0 ' + ancho + ' ' + (barras().length * 28 + 8)" role="img" [attr.aria-label]="r.titulo">
         @for (b of barras(); track b.etiqueta; let i = $index) {
@@ -103,11 +102,6 @@ export function ordenarFilas(filas: readonly Record<string, unknown>[], columna:
     </div>
   `,
   styles: `
-    .datos-al {
-      color: var(--mat-sys-on-surface-variant);
-      font: var(--mat-sys-body-medium);
-      margin: 0 0 8px;
-    }
     .grafico {
       width: 100%;
       max-height: 360px;

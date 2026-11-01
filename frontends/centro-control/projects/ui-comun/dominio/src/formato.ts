@@ -41,3 +41,16 @@ export function vigencia(venceEl: string, hoy: string = fechaLaPaz(), dias = DIA
   const limite = new Date(Date.parse(hoy) + dias * 86_400_000).toISOString().slice(0, 10);
   return venceEl <= limite ? 'POR_VENCER' : 'VIGENTE';
 }
+
+/**
+ * Minutos sin datos nuevos desde los que «Datos al …» pasa a tono aviso (FB-7). `datosAl` es el último evento que
+ * procesó Analítica; con viajes en ruta llegan posiciones e hitos cada pocos minutos, así que media hora sin nada nuevo
+ * ya dice que las cifras pueden no estar al día (también cuando no hay operación: no afirma una falla).
+ */
+export const MINUTOS_DATOS_VIEJOS = 30;
+
+/** ¿El instante `al` tiene más de `minutos` frente a `ahora`? Sin instante, no hay nada que marcar. */
+export function datosViejos(al: string | null | undefined, ahora: Date = new Date(), minutos = MINUTOS_DATOS_VIEJOS): boolean {
+  const t = al ? Date.parse(al) : NaN;
+  return Number.isFinite(t) && ahora.getTime() - t > minutos * 60_000;
+}

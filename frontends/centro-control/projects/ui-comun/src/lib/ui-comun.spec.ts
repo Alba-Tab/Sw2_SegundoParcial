@@ -3,7 +3,7 @@ import { avisosServicio } from './aviso-servicios';
 import { esperaReconexion } from './conexion';
 import { APPS_POR_ROL, DESTINO_POR_ROL, urlEnApp } from './configuracion';
 import { codigoDe, mensajeDe, servicioCaido, sinPermiso } from './errores';
-import { aCentavos, fechaLaPaz, pct, puedeVer, sumarMontos } from 'ui-comun/dominio';
+import { aCentavos, datosViejos, fechaLaPaz, pct, puedeVer, sumarMontos } from 'ui-comun/dominio';
 import { BobPipe, FechaPipe, NumeroPipe } from './formato';
 import { reclamos } from './sesion';
 
@@ -118,6 +118,16 @@ describe('ui-comun', () => {
     expect(avisosServicio(parcial, { ...campos, unidad: { servicio: 'Flota', que: 'la unidad del viaje' } })).toEqual([
       'No se pudieron cargar la unidad del viaje: Flota no responde.',
     ]);
+  });
+
+  it('FB-7: «Datos al …» se marca con más de 30 minutos sin datos nuevos', () => {
+    const ahora = new Date('2026-11-01T14:30:00Z');
+    expect(datosViejos('2026-11-01T14:00:00Z', ahora)).toBe(false);
+    expect(datosViejos('2026-11-01T13:59:00Z', ahora)).toBe(true);
+    expect(datosViejos('2026-10-31T22:01:00Z', ahora)).toBe(true);
+    expect(datosViejos('2026-11-01T14:20:00Z', ahora, 5)).toBe(true);
+    expect(datosViejos(null, ahora)).toBe(false);
+    expect(datosViejos('no es fecha', ahora)).toBe(false);
   });
 
   it('NG-1: los números van con miles en punto y decimales en coma (es-BO), nunca "1,300"', () => {

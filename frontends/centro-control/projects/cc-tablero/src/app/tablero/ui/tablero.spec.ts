@@ -48,6 +48,21 @@ describe('Tablero por rol (spec 016, paso 10)', () => {
     expect(texto).toContain('Cuentas por cobrar');
   });
 
+  it('FB-7: «Datos al …» viejo dice que las cifras pueden no estar al día; reciente, solo la hora', () => {
+    const viejo = montar(['gerente'], {
+      data: { tablero: { periodo: 'ESTA_SEMANA', alertasAbiertas: 0, datosAl: '2026-10-31T22:01:00Z' } },
+    });
+    expect(viejo.texto).toContain('Datos al 31/10 18:01');
+    expect(viejo.texto).toContain('las cifras pueden no estar al día');
+    expect(viejo.el.querySelector('.datos-al.viejo mat-icon')?.textContent).toBe('warning');
+    TestBed.resetTestingModule();
+    const reciente = montar(['gerente'], {
+      data: { tablero: { periodo: 'ESTA_SEMANA', alertasAbiertas: 0, datosAl: new Date().toISOString() } },
+    });
+    expect(reciente.texto).toContain('Datos al');
+    expect(reciente.texto).not.toContain('no estar al día');
+  });
+
   it('comercial no ve alertas ni la fecha de los datos', () => {
     const { texto } = montar(['comercial'], { data: { tablero: { periodo: 'ESTA_SEMANA', viajesEnCurso: [] } } });
     expect(texto).not.toContain('Alertas abiertas');

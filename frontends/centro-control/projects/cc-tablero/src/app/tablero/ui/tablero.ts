@@ -1,7 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
-import { AvisoServicios, BobPipe, CONFIG_CENTRO, conDesde, Encabezado, Esqueleto, Estado, FechaPipe, pct, Sesion } from 'ui-comun';
+import { AvisoServicios, BobPipe, CONFIG_CENTRO, conDesde, DatosAl, Encabezado, Esqueleto, Estado, FechaPipe, pct, Sesion } from 'ui-comun';
 import { conPendientes, pendientes, type EstadoTarjeta, type Pendiente } from '../domain/tablero';
 import { TableroFachada } from '../tablero.fachada';
 
@@ -13,9 +13,9 @@ import { TableroFachada } from '../tablero.fachada';
 @Component({
   selector: 'app-tablero',
   providers: [TableroFachada],
-  imports: [MatButtonToggleModule, MatIconModule, Encabezado, Esqueleto, BobPipe, FechaPipe, Estado, AvisoServicios],
+  imports: [MatButtonToggleModule, MatIconModule, Encabezado, Esqueleto, BobPipe, FechaPipe, Estado, AvisoServicios, DatosAl],
   template: `
-    <cc-encabezado titulo="Tablero" [subtitulo]="bloques.verAlertas && datosAl() ? 'Datos al ' + datosAl() : undefined">
+    <cc-encabezado titulo="Tablero">
       <mat-button-toggle-group [value]="periodo()" (change)="periodo.set($event.value)" aria-label="Periodo de las cifras">
         <mat-button-toggle value="HOY">Hoy</mat-button-toggle>
         <mat-button-toggle value="ESTA_SEMANA">Esta semana</mat-button-toggle>
@@ -23,6 +23,9 @@ import { TableroFachada } from '../tablero.fachada';
       </mat-button-toggle-group>
     </cc-encabezado>
     @let t = datos()?.data?.tablero;
+    @if (bloques.verAlertas) {
+      <cc-datos-al [al]="t?.datosAl" />
+    }
     @if (cargando() && !t) {
       <cc-esqueleto [filas]="6" />
     }
@@ -262,7 +265,6 @@ import { TableroFachada } from '../tablero.fachada';
 export class TableroPagina {
   private readonly fachada = inject(TableroFachada);
   readonly config = inject(CONFIG_CENTRO);
-  private readonly fecha = new FechaPipe();
   readonly periodo = this.fachada.periodo;
   readonly pct = pct;
   readonly datos = this.fachada.datos;
@@ -271,10 +273,6 @@ export class TableroPagina {
   readonly conPendientes = conPendientes;
   private readonly puedeAtender = inject(Sesion).tiene('despachador', 'jefe_flota', 'administracion');
   readonly lista = computed(() => pendientes(this.datos()?.data?.tablero, this.bloques, (c) => this.fachada.estado(c), this.puedeAtender));
-  readonly datosAl = computed(() => {
-    const al = this.datos()?.data?.tablero?.datosAl;
-    return al ? this.fecha.transform(al, true) : undefined;
-  });
 
   estado(campo: string): EstadoTarjeta {
     return this.fachada.estado(campo);

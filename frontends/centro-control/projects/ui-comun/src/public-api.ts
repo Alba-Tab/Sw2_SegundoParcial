@@ -9,6 +9,7 @@ export * from './lib/confirmacion';
 export * from './lib/conexion';
 export * from './lib/encabezado';
 export * from './lib/configuracion';
+export * from './lib/datos-al';
 export * from './lib/errores';
 export * from './lib/esqueleto';
 export * from './lib/formulario';

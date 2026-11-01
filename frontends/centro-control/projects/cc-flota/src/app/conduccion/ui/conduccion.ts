@@ -3,7 +3,7 @@ import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
-import { AvisoServicios, controlLista, Encabezado, FechaPipe, FiltrosLista, PieLista, NumeroPipe } from 'ui-comun';
+import { AvisoServicios, controlLista, DatosAl, Encabezado, FechaPipe, FiltrosLista, PieLista, NumeroPipe } from 'ui-comun';
 import { ConduccionFachada } from '../conduccion.fachada';
 import { PUNTAJE_BAJO, type PuntajeChofer } from '../domain/conduccion';
 
@@ -22,6 +22,7 @@ import { PUNTAJE_BAJO, type PuntajeChofer } from '../domain/conduccion';
     AvisoServicios,
     FiltrosLista,
     PieLista,
+    DatosAl,
   ],
   template: `
     <!-- FL-4: el mismo nombre que la pestaña. NG-5: la escala se dice, no se supone. -->
@@ -31,12 +32,8 @@ import { PUNTAJE_BAJO, type PuntajeChofer } from '../domain/conduccion';
     />
     <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!puntajes()" />
     @if (puntajes(); as p) {
-      <p class="secundario">
-        Semana del {{ p.desde | fecha }} al {{ p.hasta | fecha }}
-        @if (p.datosAl) {
-          · datos al {{ p.datosAl | fecha: true }}
-        }
-      </p>
+      <p class="secundario">Semana del {{ p.desde | fecha }} al {{ p.hasta | fecha }}</p>
+      <cc-datos-al [al]="p.datosAl" />
       <cc-filtros-lista [control]="lista" [cargando]="cargando()" busqueda="Buscar por chofer" nombre="choferes" singular="chofer" />
       <div class="tabla-ancha" role="region" tabindex="0" aria-label="Conducción por chofer">
         <table
