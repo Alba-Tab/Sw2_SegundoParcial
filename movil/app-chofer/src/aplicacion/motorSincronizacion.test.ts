@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { PuntoGps } from '../dominio/gps';
 import type { Operacion } from '../dominio/operacion';
 import type { Respuesta } from '../dominio/reintento';
-import type { ViajeLocal } from '../dominio/viaje';
+import { estadoVisible, type ViajeLocal } from '../dominio/viaje';
 import type { EvidenciaLocal, Parte } from '../dominio/evidencia';
 import { CasosDeUso } from './casosDeUso';
 import { MotorSincronizacion } from './motorSincronizacion';
@@ -52,7 +52,22 @@ class ViajesEnMemoria implements Viajes {
   v = new Map<string, ViajeLocal>();
   todos = () => [...this.v.values()];
   porId = (id: string) => this.v.get(id) ?? null;
-  guardarDelServidor = (vs: ViajeLocal[]) => vs.forEach((x) => this.v.set(x.viajeId, x));
+  // Como SQLite: el servidor manda en el estado y se conservan las marcas locales.
+  guardarDelServidor = (vs: ViajeLocal[]) =>
+    vs.forEach((x) => {
+      const local = this.v.get(x.viajeId);
+      this.v.set(
+        x.viajeId,
+        local
+          ? {
+              ...x,
+              iniciadoLocal: local.iniciadoLocal,
+              canceladoAlSincronizar: local.canceladoAlSincronizar,
+              entregaLocal: local.entregaLocal,
+            }
+          : x,
+      );
+    });
   marcarIniciado = (id: string) => void (this.v.get(id)!.iniciadoLocal = true);
   marcarCanceladoAlSincronizar = (id: string) => void (this.v.get(id)!.canceladoAlSincronizar = true);
   marcarEntregaLocal = (id: string, t: 'ENTREGA' | 'RECHAZO') => void (this.v.get(id)!.entregaLocal = t);
@@ -92,7 +107,9 @@ class ApiFalsa implements Api {
     return this.siguiente('GPS');
   };
   estadoDelViaje = async (): Promise<Respuesta> => this.respuestasEstado.shift() ?? { estado: 200, cuerpo: { estado: this.estado } };
-  misViajes = async () => [];
+  /** Lo que devuelve `GET /viajes/mios`. */
+  viajesServidor: ViajeLocal[] = [];
+  misViajes = async () => this.viajesServidor;
   cursor = async (_d: string, viajeId: string) => {
     if (this.cursorQueLanza.has(viajeId)) throw new TypeError('Network request failed');
     return this.cursorServidor;
@@ -480,6 +497,17 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     const otro = casos.iniciarViaje('v1', null);
     expect(otro).not.toBe(inicio);
     expect(viajes.porId('v1')?.iniciadoLocal).toBe(true);
+  });
+
+  it('D106: un inicio con 409 CONFLICTO_ESTADO no libera la marca; se baja el estado del servidor y el viaje sigue en ruta', async () => {
+    const inicio = casos.iniciarViaje('v1', null);
+    api.responder(`INICIO:${inicio}`, { estado: 409, codigo: 'CONFLICTO_ESTADO' });
+    api.estado = 'EN_RUTA';
+    api.viajesServidor = [{ ...viaje('v1'), estado: 'EN_RUTA' }];
+    await motor.sincronizar();
+    expect(cola.ops[0]).toMatchObject({ estado: 'FALLIDA', codigoError: 'CONFLICTO_ESTADO' });
+    expect(viajes.porId('v1')).toMatchObject({ estado: 'EN_RUTA', iniciadoLocal: true });
+    expect(estadoVisible(viajes.porId('v1')!)).toBe('EN_RUTA');
   });
 
   it('un envío que lanza no rompe la tanda: esa operación se reintenta y los otros viajes siguen', async () => {

@@ -121,6 +121,20 @@ export class MotorSincronizacion {
         return;
       }
       this.cerrar(op, 'FALLIDA', 'CONFLICTO_ESTADO');
+      await this.descargarViajes(token);
+    }
+  }
+
+  /**
+   * Tras un 409 que no es una cancelación, el estado del servidor manda: se bajan los viajes como al abrir. Un inicio
+   * rechazado porque el viaje ya está en ruta deja de verse como pendiente y el GPS sigue. Sin red queda como está: lo
+   * trae la próxima descarga.
+   */
+  private async descargarViajes(token: string): Promise<void> {
+    try {
+      this.viajes.guardarDelServidor(await this.api.misViajes(token));
+    } catch {
+      // se reintenta con la próxima descarga
     }
   }
 
@@ -167,15 +181,17 @@ export class MotorSincronizacion {
   }
 
   /**
-   * Un inicio, entrega o rechazo FALLIDA libera su marca local (decisión del 01-11-2026): vuelve el botón y el chofer lo
-   * registra de nuevo con otra clave. Si el viaje ya no está en ruta, Viajes responde 409 otra vez y se muestra.
+   * Un inicio, entrega o rechazo FALLIDA libera su marca local (D106): vuelve el botón y el chofer lo registra de nuevo
+   * con otra clave. Si el viaje ya no está en ruta, Viajes responde 409 otra vez y se muestra. Un inicio con 409
+   * CONFLICTO_ESTADO no la libera: el viaje ya salió de CONFIRMADO y manda el estado que se baja del servidor.
    */
   private cerrar(op: Operacion, estado: 'CONFIRMADA' | 'FALLIDA', codigo: string | null) {
     op.estado = estado;
     op.codigoError = codigo;
     op.cerradaEn = this.reloj.ahora().toISOString();
     this.cola.actualizar(op);
-    if (estado === 'FALLIDA' && (op.tipo === 'INICIO' || op.tipo === 'ENTREGA' || op.tipo === 'RECHAZO')) {
+    const conflictoDelInicio = op.tipo === 'INICIO' && codigo === 'CONFLICTO_ESTADO';
+    if (estado === 'FALLIDA' && !conflictoDelInicio && (op.tipo === 'INICIO' || op.tipo === 'ENTREGA' || op.tipo === 'RECHAZO')) {
       this.viajes.liberarMarca(op.viajeId, op.tipo);
     }
   }
