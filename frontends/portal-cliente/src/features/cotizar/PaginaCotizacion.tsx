@@ -8,7 +8,7 @@ import { useParams } from '@tanstack/react-router';
 import { type ReactNode, useState } from 'react';
 import { useObtenerCotizacion } from '../../api/generado/finanzas';
 import { useListarRutas } from '../../api/generado/viajes';
-import { dinero, fecha, TIPOS_CARGA } from '../../compartido/formato/formato';
+import { dinero, fecha, numero, TIPOS_CARGA } from '../../compartido/formato/formato';
 import { BotonEnlace } from '../../compartido/ui/BotonEnlace';
 import { CuentaRegresiva } from '../../compartido/ui/CuentaRegresiva';
 import { Problema } from '../../compartido/ui/Problema';
@@ -35,7 +35,7 @@ export function PaginaCotizacion() {
           Tu cotización
         </Typography>
         <Typography color="text.secondary">
-          {ruta?.nombre ?? 'Ruta: Sin dato'} · {TIPOS_CARGA[c.tipoCarga]} · {c.toneladas} t · {fecha(c.fechaViaje)}
+          {ruta?.nombre ?? 'Ruta: Sin dato'} · {TIPOS_CARGA[c.tipoCarga]} · {numero(c.toneladas)} t · {fecha(c.fechaViaje)}
         </Typography>
         <Divider />
         <Typography variant="h3" component="p">

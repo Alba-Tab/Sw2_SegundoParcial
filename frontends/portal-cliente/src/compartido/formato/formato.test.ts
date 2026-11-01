@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aCentavos, compararMontos, dinero, porcentaje } from './formato';
+import { aCentavos, compararMontos, dinero, numero, porcentaje } from './formato';
 
 describe('dinero sin float (000 §3)', () => {
   it('convierte el texto decimal a centavos exactos', () => {
@@ -28,5 +28,15 @@ describe('dinero sin float (000 §3)', () => {
 
   it('formatea el texto decimal tal cual', () => {
     expect(dinero({ monto: '999999999999.99', moneda: 'BOB' })).toContain('999.999.999.999,99');
+  });
+});
+
+describe('números como en Bolivia (DESIGN.md, «Números»)', () => {
+  it('miles con punto y decimales con coma, nunca «1300» ni «25.5»', () => {
+    expect(numero(1300, 0)).toBe('1.300');
+    expect(numero(25.5)).toBe('25,5');
+    expect(numero(-17.78331, 4, 4)).toBe('-17,7833');
+    expect(numero(null)).toBe('Sin dato');
+    expect(numero(undefined)).toBe('Sin dato');
   });
 });

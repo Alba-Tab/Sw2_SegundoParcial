@@ -11,7 +11,7 @@ import Typography from '@mui/material/Typography';
 import { useParams } from '@tanstack/react-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { type Servicio, useListarRutas, useObtenerServicio } from '../../api/generado/viajes';
-import { dinero, fecha, instante, TIPOS_CARGA } from '../../compartido/formato/formato';
+import { dinero, fecha, instante, numero, TIPOS_CARGA } from '../../compartido/formato/formato';
 import { BotonEnlace } from '../../compartido/ui/BotonEnlace';
 import { Enlace } from '../../compartido/ui/Enlace';
 import { EstadoServicio } from '../../compartido/ui/EstadoServicio';
@@ -61,7 +61,7 @@ export function PaginaServicio() {
         <Typography color="text.secondary">
           {[
             s.tipoCarga && TIPOS_CARGA[s.tipoCarga],
-            s.toneladas && `${s.toneladas} t`,
+            s.toneladas && `${numero(s.toneladas)} t`,
             s.fechaViaje && fecha(s.fechaViaje),
             s.monto && dinero(s.monto),
           ]
@@ -110,7 +110,8 @@ export function PaginaServicio() {
               target="_blank"
               rel="noreferrer"
             >
-              {s.ultimaPosicion.lat.toFixed(4)}, {s.ultimaPosicion.lng.toFixed(4)}
+              {/* Decimales con coma: latitud y longitud van separadas por punto y coma. */}
+              {numero(s.ultimaPosicion.lat, 4, 4)}; {numero(s.ultimaPosicion.lng, 4, 4)}
               <OpenInNew fontSize="inherit" sx={{ ml: 0.5, verticalAlign: 'middle' }} />
               {/* Como «Ver como cliente» del Centro de Control: avisa que se abre en otra pestaña (V5-6). */}
               <Box component="span" sx={OCULTO}>

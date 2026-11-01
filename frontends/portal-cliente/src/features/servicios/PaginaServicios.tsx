@@ -12,7 +12,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { useMemo } from 'react';
 import { getListarServiciosQueryKey, listarServicios, type Servicio, useListarRutas } from '../../api/generado/viajes';
-import { dinero, fecha, TIPOS_CARGA } from '../../compartido/formato/formato';
+import { dinero, fecha, numero, TIPOS_CARGA } from '../../compartido/formato/formato';
 import { Antiguedad } from '../../compartido/offline/Antiguedad';
 import { useClienteActivo } from '../../compartido/sesion/ClienteActivo';
 import { BotonEnlace } from '../../compartido/ui/BotonEnlace';
@@ -50,7 +50,7 @@ export function PaginaServicios() {
       }),
       col.accessor('rutaId', { header: 'Ruta', cell: (c) => nombreRuta.get(c.getValue() ?? '') ?? 'Sin dato' }),
       col.accessor('tipoCarga', { header: 'Carga', cell: (c) => (c.getValue() ? TIPOS_CARGA[c.getValue()!] : 'Sin dato') }),
-      col.accessor('toneladas', { header: 'Toneladas', cell: (c) => c.getValue() ?? 'Sin dato' }),
+      col.accessor('toneladas', { header: 'Toneladas', cell: (c) => numero(c.getValue()) }),
       col.accessor('monto', { header: 'Monto', cell: (c) => (c.getValue() ? dinero(c.getValue()!) : 'Sin dato') }),
       col.accessor('estado', { header: 'Estado', cell: (c) => <EstadoServicio estado={c.getValue()} etapa={c.row.original.etapa} /> }),
     ],

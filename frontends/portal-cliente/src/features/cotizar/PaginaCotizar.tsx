@@ -13,7 +13,7 @@ import { crearCotizacion, getObtenerCotizacionQueryKey } from '../../api/generad
 import { CrearCotizacionBody } from '../../api/generado/finanzas.zod';
 import { useListarRutas } from '../../api/generado/viajes';
 import { marcarCampos } from '../../compartido/formato/errores';
-import { diaDesdeHoy, TIPOS_CARGA } from '../../compartido/formato/formato';
+import { diaDesdeHoy, numero, TIPOS_CARGA } from '../../compartido/formato/formato';
 import { useClienteActivo } from '../../compartido/sesion/ClienteActivo';
 import { CampoTexto } from '../../compartido/ui/CampoTexto';
 import { Problema } from '../../compartido/ui/Problema';
@@ -67,7 +67,7 @@ export function PaginaCotizar() {
           <CampoTexto control={control} nombre="rutaId" label="Ruta" select required disabled={!rutas.data}>
             {(rutas.data ?? []).map((r) => (
               <MenuItem key={r.rutaId} value={r.rutaId}>
-                {r.nombre} · {r.distanciaKm} km
+                {r.nombre} · {numero(r.distanciaKm, 0)} km
               </MenuItem>
             ))}
           </CampoTexto>
