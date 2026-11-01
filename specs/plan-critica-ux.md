@@ -166,3 +166,37 @@ Revisado y aprobado con cambios por un agente revisor el 01-11-2026. **Ningún c
 - Verificación en el navegador a 375/800/1280 px y en oscuro: no se pudo abrir una pestaña nueva (tope de pestañas del panel). Falta medir el ancho real a 375 px y ver el menú «Apps».
 - Guardián de NG-1: no hay eslint en `centro-control`, así que no hay `no-restricted-imports` de `DecimalPipe`.
 - Visto al probar: `FechaPipe` con hora sale como «1/11, 10:20 a. m.» en Node 26, donde corren las pruebas (no «01/11 10:20» como dice el comentario del pipe); falta ver si Chrome hace lo mismo. Afecta a todos los «Datos al …»; queda para la vuelta B.
+
+**Vuelta B (01-11-2026), hecha en `feat/ui-comun/arreglos-ux-web`, sin push.** Cada corrección con su prueba (salvo marcado y CSS); `generar:verificar`, formato, capas, complejidad, pruebas de las 5 piezas (ui-comun 127, operaciones 26, finanzas 20, tablero 34, flota 14) y build de las 4 apps en verde y sin advertencias nuevas; el portal pasa `npm run verificar` (53).
+
+| Id | Qué quedó | Prueba |
+|---|---|---|
+| Fecha | `FechaPipe` arma «dd/mm HH:mm» (24 h, La Paz) con `formatToParts`; antes «1/11, 10:20 a. m.». En el tablero: «Datos al 31/10 18:01» | `ui-comun.spec.ts` |
+| CA-2 | `color-scheme: light dark` en `:root` (y su par por `data-tema`); portal con `CssBaseline enableColorScheme` | Medido: `dark` en el portal y `light dark` en el Centro |
+| CA-3 | «Saltar al contenido», primera parada; enfoca `<main id="contenido">` sin pasar por el router | `marco.spec.ts` |
+| CA-4 | Detalle de la alerta a 14 px (`body-medium`); el pie sigue en 12 px | Medido: 14 / 12 px |
+| CA-5 | En `pointer: coarse`, 44 px para encabezados que ordenan, toggles de periodo, botones de ícono y vistas de Operaciones | Medido a 375 px: 44 px |
+| CA-6 | Bajo el mapa, «Viajes en ruta (N)» con placa (enlace), cliente, ruta, posición o «Aún no reporta posición» y riesgo; `aria-describedby` desde el mapa | Visto en el navegador |
+| CA-7 | Portal: `<main id="contenido">`, la marca deja de ser `h1`, cada página tiene su `h1` y las secciones bajan a `h2` | `NoEncontrada.test.tsx` (nivel 1) |
+| JV-1 | Unidades abre por urgencia (`urgenciaUnidad`: pendiente o documento vencido, taller, cerca del mantenimiento o por vencer, resto, inactivas); km cerca del mantenimiento con ícono `warning` y texto para el lector, en lista y ficha | `unidad.spec.ts` |
+| JV-3 | Agente: pasos en frases (`pasoLegible`), «No respondió» si falló, conclusión solo si es útil (`conclusionLegible`, sin «FIN»); JSON, nombres y traza en «Ver detalle técnico» | `mision.spec.ts` |
+| FB-3 | «Abriendo <app>…» dentro de `<app-root>` en los 4 `index.html` | Servido por el dev server |
+| FB-4 | `cc-filtros-lista [cargando]` dice «Cargando…» hasta la primera respuesta (17 listas) | `lista.spec.ts` |
+| FB-5 | «Ningún viaje en ruta reporta posición ahora.» (`mapaSinPosiciones`) | `viaje.spec.ts` |
+| FB-6 | `CamposPorServicio` acepta `{ servicio, que }`: «No se pudieron cargar los viajes de este cliente: Viajes no responde.» en las fichas de cliente, viaje, unidad y chofer | `ui-comun.spec.ts` |
+| FB-1 anidado | `conservarUltimoBueno(ahora, anidados)` repone `clientes[i].lineaCredito` por `clienteId`, solo en filas con error, con «Datos al»; Clientes y Líneas de crédito no cuentan las repuestas como «sin leer» | `sondeo.spec.ts` |
+| FB-2 + lista | El Gateway da `NO_ENCONTRADO` en `viaje`, `unidad` y `factura`; chofer, cliente y ruta buscan en una lista (no hay consulta por id) y llegaban sin error: `cc-aviso-servicios [sinResultado]` muestra el mismo «No encontramos …»; queda el texto de la lista cortada en el tope | `aviso-servicios.spec.ts`; visto con un chofer inexistente |
+| RS-2 | Espacio duro antes de «BOB» en `BobPipe`; `.sin-corte` en el número de factura (Facturas, tablero, reporte); bajo 600 px el estado pasa a segunda columna (`columnasConEstado` / `estadoSegunda`) en 8 listas | `lista.spec.ts`; medido: filas de 52 px a 800 px, estado visible a 375 px |
+| NG-3 | Al gerente, «las marca atendidas quien las resuelve»; a despachador, jefe de flota y administración, el texto de antes | `tablero.spec.ts` |
+| NG-4 | Ficha de unidad: «No puede salir: lleva 10.380 km desde el último mantenimiento. Lo programa el jefe de flota.» (`motivoBloqueo`, solo con km y documentos vencidos; si no, frase genérica); en el taller, quién lo cierra | `unidad.spec.ts`; visto con 7341CST |
+| FL-1 | `urlEnApp` (otra app con `?desde=`, solo si el rol la abre). Viaje: cliente, ruta y unidad (Flota) enlazados; distancia con `numero`. Combustible: la placa lleva a Unidades filtradas | `ui-comun.spec.ts`; visto en el viaje 4521KTR |
+| FL-2 | Ficha de cliente: estado y disponible de la línea y «Ver la línea en Finanzas» (por NIT); Clientes enlaza a Líneas de crédito. Cuentas por cobrar sigue en Reportes; Cobranza ya decía «Datos al» (`tabla-reporte`) | Visto en Agroexport |
+| FL-3 | Seis pestañas: Viajes (vistas Lista y Mapa en vivo, `/viajes/mapa`), Decisiones (`/decisiones/entregas-observadas`, `/decisiones/intervenciones`), Servicios, Clientes, Rutas, Acciones del agente. `/mapa`, `/entregas-observadas` e `/intervenciones` redirigen con sus parámetros; `/viajes/{id}` y `/acciones/{id}` no cambian. Íconos `view_list` y `pending_actions` (92 glifos, DESIGN.md) | `seccion.spec.ts` y `viaje.spec.ts` |
+
+**Medidas en el navegador (gerente1):** `scrollWidth` igual al ancho a 375 px (Facturas, Mapa, portal) y a 800 px (Facturas, Unidades); a 375 px las 6 pestañas de Operaciones caben con las flechas de Material. Oscuro: enlaces 10,91:1, vista activa 7,26:1, texto de estado 10,88:1 sobre `surface`.
+
+**Pendiente o fuera de la vuelta B:**
+- FL-1: el chofer del viaje sigue en texto: `Viaje` no trae `choferId` (cambiaría el contrato GraphQL). Las anomalías de combustible enlazan a Unidades filtradas por placa porque la consulta no trae `unidadId`.
+- No se vio con sesión de despachador, jefe de flota, administración ni cliente; FB-3 no se pudo ver en pantalla (el panel del navegador estaba oculto), solo que el HTML servido lo trae.
+- JV-4 (pestañas estiradas) sigue para la vuelta C: a 1280 px las 6 pestañas de Operaciones se ven anchas.
+- ICONIX (anotar): pestañas de Operaciones reagrupadas (Viajes con su vista de mapa y Decisiones).
