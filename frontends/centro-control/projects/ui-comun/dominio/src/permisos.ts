@@ -35,7 +35,7 @@ export const puedeVer = (roles: readonly string[], campo: CampoConRoles): boolea
 const ROL_EN_FRASE: Record<string, string> = {
   gerente: 'gerencia',
   despachador: 'despacho',
-  jefe_flota: 'flota',
+  jefe_flota: 'jefatura de flota',
   administracion: 'administración',
   comercial: 'comercial',
 };

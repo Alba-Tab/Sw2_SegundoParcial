@@ -46,7 +46,7 @@ describe('ui-comun', () => {
 
   it('5a: quién ve un campo sale de ROLES_CAMPO, con nombres para personas', () => {
     expect(quienesVen('cuentasPorCobrar')).toBe('gerencia y administración');
-    expect(quienesVen('unidadesPorEstado')).toBe('gerencia, despacho y flota');
+    expect(quienesVen('unidadesPorEstado')).toBe('gerencia, despacho y jefatura de flota');
   });
 
   it('respuesta parcial: detecta el campo del servicio caído y el código de un error', () => {

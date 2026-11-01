@@ -154,7 +154,7 @@ export function pendientes(
         texto: plural(n, 'alerta abierta', 'alertas abiertas'),
         detalle: puedeAtender
           ? 'Se revisan y se marcan atendidas desde la campana de la barra.'
-          : 'Se revisan desde la campana de la barra; las marca atendidas quien las resuelve (despacho, flota o administración).',
+          : 'Se revisan desde la campana de la barra; las marca atendidas quien las resuelve (despacho, jefatura de flota o administración).',
       });
   }
   return lista;
