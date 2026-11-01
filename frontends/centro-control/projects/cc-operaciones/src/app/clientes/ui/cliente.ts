@@ -16,6 +16,7 @@ import {
   LIMITE_GATEWAY,
   Sesion,
   urlEnApp,
+  NumeroPipe,
 } from 'ui-comun';
 import { ClienteFachada } from '../clientes.fachada';
 import { nombreRuta } from '../domain/cliente';
@@ -25,6 +26,7 @@ import { nombreRuta } from '../domain/cliente';
   selector: 'app-cliente',
   providers: [ClienteFachada],
   imports: [
+    NumeroPipe,
     Esqueleto,
     Encabezado,
     MatTableModule,
@@ -123,7 +125,8 @@ import { nombreRuta } from '../domain/cliente';
             <ng-container matColumnDef="carga"
               ><th mat-header-cell *matHeaderCellDef>Ruta y carga</th>
               <td mat-cell *matCellDef="let s">
-                {{ ruta(s.rutaId) }} <span class="secundario">{{ s.tipoCarga | etiqueta: 'TipoCarga' }} · {{ s.toneladas }} t</span>
+                {{ ruta(s.rutaId) }}
+                <span class="secundario">{{ s.tipoCarga | etiqueta: 'TipoCarga' }} · {{ s.toneladas | numero }} t</span>
               </td></ng-container
             >
             <ng-container matColumnDef="placa"

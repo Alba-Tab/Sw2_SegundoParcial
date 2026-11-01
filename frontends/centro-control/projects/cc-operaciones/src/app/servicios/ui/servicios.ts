@@ -28,6 +28,7 @@ import {
   posicionEstado,
   Sesion,
   textoError,
+  NumeroPipe,
 } from 'ui-comun';
 import { estadoServicio, puedeCancelarServicio, type Servicio } from '../domain/servicio';
 import { ServiciosFachada } from '../servicios.fachada';
@@ -40,6 +41,7 @@ import { ServiciosFachada } from '../servicios.fachada';
   selector: 'app-servicios',
   providers: [ServiciosFachada],
   imports: [
+    NumeroPipe,
     Encabezado,
     ReactiveFormsModule,
     Campo,
@@ -96,7 +98,7 @@ import { ServiciosFachada } from '../servicios.fachada';
         ></ng-container>
         <ng-container matColumnDef="carga"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Carga</th>
-          <td mat-cell *matCellDef="let s">{{ s.tipoCarga | etiqueta: 'TipoCarga' }} · {{ s.toneladas }} t</td></ng-container
+          <td mat-cell *matCellDef="let s">{{ s.tipoCarga | etiqueta: 'TipoCarga' }} · {{ s.toneladas | numero }} t</td></ng-container
         >
         <ng-container matColumnDef="fecha"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha</th>

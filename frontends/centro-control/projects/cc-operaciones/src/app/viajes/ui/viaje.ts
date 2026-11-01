@@ -178,7 +178,7 @@ import { ViajeFachada } from '../viajes.fachada';
         </div>
         <div>
           <dt>Carga</dt>
-          <dd>{{ v.tipoCarga | etiqueta: 'TipoCarga' }} · {{ v.toneladas }} t</dd>
+          <dd>{{ v.tipoCarga | etiqueta: 'TipoCarga' }} · {{ v.toneladas | numero }} t</dd>
         </div>
         <div>
           <dt>Fecha del viaje</dt>
@@ -247,7 +247,7 @@ import { ViajeFachada } from '../viajes.fachada';
           </div>
           <div>
             <dt>Geocerca</dt>
-            <dd>{{ e.dentroGeocerca ? 'Dentro' : 'Fuera' }} ({{ e.distanciaMetros }} m del destino)</dd>
+            <dd>{{ e.dentroGeocerca ? 'Dentro' : 'Fuera' }} ({{ e.distanciaMetros | numero: 0 }} m del destino)</dd>
           </div>
           <div>
             <dt>Firma</dt>

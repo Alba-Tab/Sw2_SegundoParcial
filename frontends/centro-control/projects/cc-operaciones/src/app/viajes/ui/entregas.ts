@@ -4,7 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, controlLista, Encabezado, EtiquetaPipe, FechaPipe, FiltrosLista, PieLista, Sesion } from 'ui-comun';
+import { AvisoServicios, controlLista, Encabezado, EtiquetaPipe, FechaPipe, FiltrosLista, PieLista, Sesion, NumeroPipe } from 'ui-comun';
 import { textoViaje } from '../domain/viaje';
 import { EntregasFachada } from '../viajes.fachada';
 import { Vistas, VISTAS } from '../../vistas';
@@ -14,6 +14,7 @@ import { Vistas, VISTAS } from '../../vistas';
   selector: 'app-entregas',
   providers: [EntregasFachada],
   imports: [
+    NumeroPipe,
     Vistas,
     Encabezado,
     MatTableModule,
@@ -65,7 +66,9 @@ import { Vistas, VISTAS } from '../../vistas';
         >
         <ng-container matColumnDef="distancia"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Distancia al destino</th>
-          <td mat-cell *matCellDef="let v">{{ v.entrega?.distanciaMetros }} m</td></ng-container
+          <td mat-cell *matCellDef="let v">
+            {{ v.entrega?.distanciaMetros == null ? 'Sin dato' : (v.entrega.distanciaMetros | numero: 0) + ' m' }}
+          </td></ng-container
         >
         <ng-container matColumnDef="observacion"
           ><th mat-header-cell *matHeaderCellDef>Observación</th>
