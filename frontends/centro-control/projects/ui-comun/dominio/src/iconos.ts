@@ -8,6 +8,7 @@ export const ICONOS = [
   'account_balance_wallet',
   'account_circle',
   'alt_route',
+  'apps',
   'archive',
   'arrow_back',
   'assignment',

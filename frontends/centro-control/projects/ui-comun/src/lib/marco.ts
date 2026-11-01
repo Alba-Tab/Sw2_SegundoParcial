@@ -71,6 +71,21 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
           }
         }
       </nav>
+      <!-- Bajo 900 px las apps van en este menú: la barra no desborda a 375 px (RS-1). -->
+      <button mat-icon-button class="boton-apps" [matMenuTriggerFor]="menuApps" aria-label="Apps del Centro de Control">
+        <mat-icon>apps</mat-icon>
+      </button>
+      <mat-menu #menuApps="matMenu">
+        @for (app of apps(); track app) {
+          @if (app === config.app) {
+            <a mat-menu-item class="app-actual" routerLink="/" aria-current="page">{{ nombres[app] }}</a>
+          } @else if (caidas().has(app)) {
+            <button mat-menu-item disabled><mat-icon>cloud_off</mat-icon>{{ nombres[app] }} (no disponible)</button>
+          } @else {
+            <a mat-menu-item [href]="config.urls[app]">{{ nombres[app] }}</a>
+          }
+        }
+      </mat-menu>
       <span class="espacio"></span>
       @if (recibeAlertas()) {
         <button
@@ -118,7 +133,9 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
           }
         </mat-menu>
       }
-      <button mat-button [matMenuTriggerFor]="menuUsuario"><mat-icon>account_circle</mat-icon> {{ sesion.nombre() }}</button>
+      <button mat-button class="usuario" [matMenuTriggerFor]="menuUsuario">
+        <mat-icon>account_circle</mat-icon> <span class="nombre-usuario">{{ sesion.nombre() }}</span>
+      </button>
       <mat-menu #menuUsuario="matMenu">
         <span class="aviso">{{ roles() }}</span>
         <mat-divider />
@@ -178,6 +195,52 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
     }
     .espacio {
       flex: 1;
+    }
+    .boton-apps {
+      display: none;
+    }
+    .app-actual {
+      font-weight: 700;
+      background: var(--mat-sys-secondary-container);
+    }
+    /* Bajo 900 px: las apps en el menú «Apps» y el usuario solo con su ícono; el nombre lo sigue leyendo el lector. */
+    @media (max-width: 899px) {
+      .barra {
+        gap: 4px;
+        padding-inline: 8px;
+      }
+      .marca {
+        margin-right: 0;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        display: block;
+        line-height: 44px;
+      }
+      .enlaces {
+        display: none;
+      }
+      .boton-apps {
+        display: inline-flex;
+        flex: none;
+      }
+      .usuario {
+        min-width: 48px;
+        padding-inline: 12px;
+        flex: none;
+      }
+      .usuario mat-icon {
+        margin: 0;
+      }
+      .nombre-usuario {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+      }
     }
     .contenido {
       padding: 24px;

@@ -86,5 +86,29 @@ describe('Marco: disponibilidad de las apps (FR3, spec 016 paso 16)', () => {
       await vi.advanceTimersByTimeAsync(3 * INTERVALO_SALUD_MS);
       expect(pedir).toHaveBeenCalledTimes(6);
     });
+
+    it('RS-1: el menú «Apps» (bajo 900 px) lista las apps del rol, marca la actual y conserva «no disponible»', async () => {
+      const f = TestBed.createComponent(Marco);
+      f.detectChanges();
+      await vi.advanceTimersByTimeAsync(0);
+      f.detectChanges();
+      const el: HTMLElement = f.nativeElement;
+      const boton = el.querySelector<HTMLButtonElement>('button[aria-label="Apps del Centro de Control"]')!;
+      expect(boton.querySelector('mat-icon')?.textContent).toBe('apps');
+      boton.click();
+      f.detectChanges();
+      const items = [...document.querySelectorAll<HTMLElement>('.mat-mdc-menu-panel [mat-menu-item]')];
+      expect(items.map((i) => i.textContent?.replace('cloud_off', '').trim())).toEqual([
+        'Tablero',
+        'Operaciones',
+        'Flota (no disponible)',
+        'Finanzas',
+      ]);
+      expect(items[0].getAttribute('aria-current')).toBe('page');
+      expect(items[2].hasAttribute('disabled')).toBe(true);
+      expect(items[3].getAttribute('href')).toBe('http://fi');
+      // El usuario queda solo con su ícono en angosto, pero el botón sigue teniendo su nombre.
+      expect(el.querySelector('.usuario')?.textContent).toContain('Gerente');
+    });
   });
 });
