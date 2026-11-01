@@ -22,7 +22,8 @@ export function resolversGestionFlota(s: ClienteServicios) {
       chofer: (_: unknown, { id }: Args, ctx: Contexto) => s.get<Json>(ctx, 'flota', rutaRest`/api/v1/choferes/${id}`),
     },
     Chofer: {
-      motivoInhabilitacion: (c: Json) => c['inhabilitacion']?.['motivo'] ?? null,
+      // Solo de un chofer inhabilitado (E7-1): un dato viejo de antes de habilitarlo no se muestra.
+      motivoInhabilitacion: (c: Json) => (c['activo'] ? null : (c['inhabilitacion']?.['motivo'] ?? null)),
     },
     Mutation: {
       crearUnidad: async (_: unknown, { input }: Args, ctx: Contexto) => {
