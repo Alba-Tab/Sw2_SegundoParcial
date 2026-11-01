@@ -69,6 +69,14 @@ export function reintentarCon401(renovar: () => Promise<string | undefined>): Er
 /** R1F-9: con la pestaña oculta los sondeos no piden nada; antes seguían (unas 1.200 peticiones en 10 min). */
 export const pestanaOculta = (): boolean => typeof document !== 'undefined' && document.visibilityState === 'hidden';
 
+/** Al volver a la pestaña, cada consulta con sondeo se pide de nuevo, sin esperar su próximo turno (R1F-9). */
+export function ponerAlDia(client: {
+  getObservableQueries(): Iterable<{ options: { pollInterval?: number }; refetch(): Promise<unknown> }>;
+}): void {
+  if (pestanaOculta()) return;
+  for (const q of client.getObservableQueries()) if (q.options.pollInterval) q.refetch().catch(() => undefined);
+}
+
 export const opcionesApollo = {
   watchQuery: {
     fetchPolicy: 'cache-and-network',
@@ -134,10 +142,7 @@ export function proveerApollo(): (Provider | EnvironmentProviders)[] {
     // Al volver a la pestaña, los sondeos se ponen al día enseguida, sin esperar su próximo turno.
     provideEnvironmentInitializer(() => {
       const client = inject(Apollo).client;
-      const alVolver = () => {
-        if (pestanaOculta()) return;
-        for (const q of client.getObservableQueries()) if (q.options.pollInterval) q.refetch().catch(() => undefined);
-      };
+      const alVolver = () => ponerAlDia(client);
       document.addEventListener('visibilitychange', alVolver);
       inject(DestroyRef).onDestroy(() => document.removeEventListener('visibilitychange', alVolver));
     }),

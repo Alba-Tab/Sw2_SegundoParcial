@@ -1,5 +1,5 @@
 import { Observable, of, Subject } from 'rxjs';
-import { opcionesApollo, pestanaOculta, reintentarCon401 } from './apollo';
+import { opcionesApollo, pestanaOculta, ponerAlDia, reintentarCon401 } from './apollo';
 
 type Contexto = Record<string, unknown>;
 
@@ -32,6 +32,20 @@ describe('Apollo: sondeos con la pestaña oculta (R1F-9)', () => {
     expect(pestanaOculta()).toBe(true);
     visibilidad.mockReturnValue('visible');
     expect(pestanaOculta()).toBe(false);
+    visibilidad.mockRestore();
+  });
+
+  it('R2F-8: al volver a la pestaña pide de nuevo solo las consultas con sondeo; oculta, ninguna', () => {
+    const conSondeo = { options: { pollInterval: 15_000 }, refetch: vi.fn(async () => undefined) };
+    const sinSondeo = { options: {}, refetch: vi.fn(async () => undefined) };
+    const client = { getObservableQueries: () => new Set([conSondeo, sinSondeo]) };
+    const visibilidad = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+    ponerAlDia(client);
+    expect(conSondeo.refetch).not.toHaveBeenCalled();
+    visibilidad.mockReturnValue('visible');
+    ponerAlDia(client);
+    expect(conSondeo.refetch).toHaveBeenCalledTimes(1);
+    expect(sinSondeo.refetch).not.toHaveBeenCalled();
     visibilidad.mockRestore();
   });
 });

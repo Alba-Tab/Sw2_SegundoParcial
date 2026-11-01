@@ -87,6 +87,26 @@ describe('Marco: disponibilidad de las apps (FR3, spec 016 paso 16)', () => {
       expect(pedir).toHaveBeenCalledTimes(6);
     });
 
+    it('R2F-8: al volver a la pestaña revisa la salud enseguida; oculta, no', async () => {
+      const f = TestBed.createComponent(Marco);
+      f.detectChanges();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(pedir).toHaveBeenCalledTimes(3);
+      const visibilidad = vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(pedir).toHaveBeenCalledTimes(3);
+      visibilidad.mockReturnValue('visible');
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(pedir).toHaveBeenCalledTimes(6);
+      visibilidad.mockRestore();
+      f.destroy();
+      document.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(pedir).toHaveBeenCalledTimes(6);
+    });
+
     it('RS-1: el menú «Apps» (bajo 900 px) lista las apps del rol, marca la actual y conserva «no disponible»', async () => {
       const f = TestBed.createComponent(Marco);
       f.detectChanges();

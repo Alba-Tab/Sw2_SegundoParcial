@@ -355,7 +355,13 @@ export class Marco implements OnInit {
     if (this.recibeAlertas()) void this.alertas.iniciar();
     void this.revisarSalud();
     const intervalo = setInterval(() => void this.revisarSalud(), INTERVALO_SALUD_MS);
-    this.destruir.onDestroy(() => clearInterval(intervalo));
+    // R2F-8: al volver a la pestaña, la salud de las apps se pone al día sin esperar el próximo turno.
+    const alVolver = () => void this.revisarSalud();
+    document.addEventListener('visibilitychange', alVolver);
+    this.destruir.onDestroy(() => {
+      clearInterval(intervalo);
+      document.removeEventListener('visibilitychange', alVolver);
+    });
   }
 
   private async revisarSalud(): Promise<void> {
