@@ -1,4 +1,4 @@
-import { Component, computed, inject, input, signal } from '@angular/core';
+import { afterNextRender, Component, computed, inject, Injector, input, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { Apollo } from 'apollo-angular';
@@ -81,6 +81,7 @@ export class AvisoServicios {
    */
   readonly reintentar = input<() => unknown>();
   private readonly apollo = inject(Apollo, { optional: true });
+  private readonly injector = inject(Injector);
 
   /** Mientras dura el reintento, el botón se deshabilita y se anuncia "Reintentando…" (V2-9). */
   readonly reintentando = signal(false);
@@ -100,10 +101,13 @@ export class AvisoServicios {
       // El error de un reintento lo vuelve a mostrar el mismo aviso.
     } finally {
       this.reintentando.set(false);
-      const sigue = this.avisos()[0];
-      this.anuncio.set(sigue ? `Sigue sin responder: ${sigue}` : '');
-      // Funcionó: el aviso y su botón se van; el foco no se queda en <body>, va al título de la página (V4-3).
-      if (!sigue && (document.activeElement === foco || document.activeElement === document.body)) enfocarTitulo();
     }
+    // Las entradas `error` y `extra` las cambia el padre en su próxima detección de cambios, no al resolver: se leen
+    // después de ese render (V6-1). Leerlas aquí mismo daba el resultado del intento anterior.
+    await new Promise<void>((listo) => afterNextRender(() => listo(), { injector: this.injector }));
+    const sigue = this.avisos()[0];
+    this.anuncio.set(sigue ? `Sigue sin responder: ${sigue}` : '');
+    // Funcionó: el aviso y su botón se van; el foco no se queda en <body>, va al título de la página (V4-3).
+    if (!sigue && (document.activeElement === foco || document.activeElement === document.body)) enfocarTitulo();
   }
 }

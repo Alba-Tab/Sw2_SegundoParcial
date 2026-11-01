@@ -1,5 +1,5 @@
 import { Observable, of, Subject } from 'rxjs';
-import { reintentarCon401 } from './apollo';
+import { opcionesApollo, reintentarCon401 } from './apollo';
 
 type Contexto = Record<string, unknown>;
 
@@ -86,13 +86,17 @@ describe('Apollo: reintento con 401 (spec 016)', () => {
  * PAGO_EXCEDE_SALDO decía el saldo viejo. Por eso se mira justo después del `await`, sin esperar otra tarea.
  */
 describe('Apollo: recargar con refetch del mismo watch (V4-1)', () => {
-  async function montar(respuesta: () => Observable<{ data: Record<string, unknown> }>) {
+  async function montar(
+    respuesta: () => Observable<{
+      data: Record<string, unknown> | null;
+      errors?: { message: string; path?: string[]; extensions?: Record<string, unknown> }[];
+    }>,
+  ) {
     const { ApolloClient, ApolloLink: Link, InMemoryCache, gql } = await import('@apollo/client/core');
     const client = new ApolloClient({
       link: new Link(respuesta),
       cache: new InMemoryCache(),
-      // Las mismas que `proveerApollo`.
-      defaultOptions: { watchQuery: { fetchPolicy: 'cache-and-network', errorPolicy: 'all' }, query: { errorPolicy: 'all' } },
+      defaultOptions: opcionesApollo,
     });
     const consulta = client.watchQuery({
       // Como `Factura` del Gateway: sin `id`, así la caché no la normaliza (V4-1).
@@ -105,8 +109,8 @@ describe('Apollo: recargar con refetch del mismo watch (V4-1)', () => {
         }
       `,
     });
-    const vistos: { data: unknown; error: unknown }[] = [];
-    const sub = consulta.subscribe((r) => vistos.push({ data: r.data, error: r.error }));
+    const vistos: { data: unknown; error: unknown; loading?: boolean }[] = [];
+    const sub = consulta.subscribe((r) => vistos.push({ data: r.data, error: r.error, loading: r.loading }));
     await new Promise((ok) => setTimeout(ok));
     return { consulta, vistos, sub };
   }
@@ -130,7 +134,42 @@ describe('Apollo: recargar con refetch del mismo watch (V4-1)', () => {
     expect(vistos.at(-1)?.error).toBeTruthy();
     falla = false;
     await consulta.refetch();
-    expect(vistos.at(-1)).toEqual({ data: factura('10.00').data, error: undefined });
+    expect(vistos.at(-1)).toMatchObject({ data: factura('10.00').data, error: undefined });
+    sub.unsubscribe();
+  });
+
+  // V6-2: el aviso sale de `error`; si el refetch o el sondeo emitieran `{ loading: true, error: undefined }`, el banner
+  // y su «Reintentar» desaparecerían (foco a <body>) y el `role="alert"` se volvería a anunciar en cada sondeo.
+  // Asíncrona, como la red: con una respuesta síncrona Apollo no llega a emitir el estado de carga.
+  const parcial = () =>
+    new Observable<{ data: Record<string, unknown>; errors: { message: string; path: string[]; extensions: Record<string, unknown> }[] }>(
+      (o) => {
+        setTimeout(() => {
+          o.next({
+            data: { factura: null },
+            errors: [{ message: 'Finanzas no disponible', path: ['factura'], extensions: { codigo: 'DEPENDENCIA_NO_DISPONIBLE' } }],
+          });
+          o.complete();
+        });
+      },
+    );
+
+  it('con datos parciales, el refetch no borra el error mientras dura', async () => {
+    const { consulta, vistos, sub } = await montar(parcial);
+    expect(vistos.at(-1)?.error).toBeTruthy();
+    const desde = vistos.length;
+    await consulta.refetch();
+    expect(vistos.slice(desde).every((v) => v.error && !v.loading)).toBe(true);
+    sub.unsubscribe();
+  });
+
+  it('con datos parciales, el sondeo no vuelve a emitir el estado de carga', async () => {
+    const { consulta, vistos, sub } = await montar(parcial);
+    const desde = vistos.length;
+    consulta.startPolling(5);
+    await new Promise((ok) => setTimeout(ok, 40));
+    consulta.stopPolling();
+    expect(vistos.slice(desde).every((v) => v.error && !v.loading)).toBe(true);
     sub.unsubscribe();
   });
 });

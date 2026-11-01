@@ -307,7 +307,8 @@ export class ViajePagina {
   }
 
   aprobar(viajeId: string, zona: HTMLElement) {
-    if (!this.valida(false, zona)) return;
+    // Mientras se envía, un segundo clic no vuelve a validar ni mueve el foco (V6-4).
+    if (this.enviando() || !this.valida(false, zona)) return;
     const nota = this.texto.value.trim() || undefined;
     return this.enviar(() => this.fachada.aprobarEntrega(viajeId, nota), 'Entrega aprobada: se factura');
   }
@@ -331,6 +332,7 @@ export class ViajePagina {
     return this.enviar(() => this.fachada.rechazarEntrega(viajeId, motivo), 'Entrega rechazada');
   }
   resolver(viajeId: string, opcion: OpcionIntervencion, zona: HTMLElement) {
+    if (this.enviando()) return;
     if (!this.valida(opcion === 'MARCAR_RESUELTO', zona, opcion === 'MARCAR_RESUELTO' ? 500 : 300)) return;
     const nota = this.texto.value.trim() || undefined;
     return this.enviar(() => this.fachada.resolverIntervencion(viajeId, opcion, nota), 'Intervención enviada');

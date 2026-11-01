@@ -1,3 +1,4 @@
+import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Apollo } from 'apollo-angular';
 import { AvisoServicios } from './aviso-servicios';
@@ -41,7 +42,7 @@ describe('Reintentar (revisión E-2)', () => {
     expect(f.componentInstance.reintentando()).toBe(false);
   });
 
-  it('si vuelve a fallar, lo anuncia; el botón sigue enfocable mientras reintenta (V4-4, foco)', async () => {
+  it('el botón sigue enfocable mientras reintenta y un segundo clic no hace nada (foco)', async () => {
     const f = TestBed.createComponent(AvisoServicios);
     const recargar = vi.fn(() => Promise.resolve());
     f.componentRef.setInput('reintentar', recargar);
@@ -56,29 +57,66 @@ describe('Reintentar (revisión E-2)', () => {
     expect(boton.getAttribute('aria-disabled')).toBe('true');
     await f.componentInstance.reintentarAhora();
     expect(recargar).toHaveBeenCalledTimes(1);
-    await promesa;
     f.detectChanges();
-    expect(vivo.textContent).toContain('Sigue sin responder: Finanzas no disponible');
+    await promesa;
+  });
+});
+
+/**
+ * V6-1: con un padre de verdad, `error`/`extra` cambian en la próxima detección de cambios del padre, no al resolver
+ * `recargar`. Antes se probaba con `setInput` dentro del callback, que cambia la entrada al momento.
+ */
+@Component({
+  imports: [AvisoServicios],
+  template: `<cc-aviso-servicios [extra]="aviso()" [reintentar]="recargar" />`,
+})
+class PaginaAnfitriona {
+  readonly aviso = signal<string | null>('Finanzas no disponible');
+  /** Lo que deja el reintento: null si funcionó. */
+  resultado: string | null = null;
+  readonly recargar = async () => {
+    // Como `refetch`: la señal cambia justo antes de resolver; la entrada del hijo, en el próximo render del padre.
+    await new Promise((ok) => setTimeout(ok));
+    this.aviso.set(this.resultado);
+  };
+}
+
+describe('Reintentar con un padre real (V6-1, V4-3, V4-4)', () => {
+  let h1: HTMLElement;
+  let encabezado: HTMLElement;
+  beforeEach(() => {
+    encabezado = document.body.appendChild(document.createElement('cc-encabezado'));
+    h1 = encabezado.appendChild(Object.assign(document.createElement('h1'), { tabIndex: -1 }));
+  });
+  afterEach(() => encabezado.remove());
+
+  async function reintentar(resultado: string | null) {
+    const f = TestBed.createComponent(PaginaAnfitriona);
+    f.componentInstance.resultado = resultado;
+    await f.whenStable();
+    const el: HTMLElement = f.nativeElement;
+    const boton = el.querySelector<HTMLButtonElement>('button.reintentar')!;
+    boton.focus();
+    boton.click();
+    // Hasta que termine el reintento, se renderice el padre y corra el `setTimeout` de `enfocarTitulo`.
+    for (let i = 0; i < 5; i++) {
+      await f.whenStable();
+      await new Promise((ok) => setTimeout(ok));
+    }
+    return { el, boton, vivo: el.querySelector('[aria-live]')!.textContent!.trim() };
+  }
+
+  it('si funciona, no dice «Sigue sin responder» y el foco va al título', async () => {
+    const { el, vivo } = await reintentar(null);
+    expect(el.querySelector('button.reintentar')).toBeNull();
+    expect(vivo).toBe('');
+    expect(document.activeElement).toBe(h1);
   });
 
-  it('si funciona, la región queda vacía y el foco va al título, no a <body> (V4-3)', async () => {
-    vi.useFakeTimers();
-    const h1 = Object.assign(document.createElement('h1'), { tabIndex: -1 });
-    const encabezado = document.body.appendChild(document.createElement('cc-encabezado'));
-    encabezado.appendChild(h1);
-    const f = TestBed.createComponent(AvisoServicios);
-    f.componentRef.setInput('reintentar', () => {
-      f.componentRef.setInput('extra', null);
-      return Promise.resolve();
-    });
-    f.componentRef.setInput('extra', 'Finanzas no disponible');
-    f.detectChanges();
-    await f.componentInstance.reintentarAhora();
-    vi.runAllTimers();
-    expect(f.componentInstance.anuncio()).toBe('');
-    expect(document.activeElement).toBe(h1);
-    encabezado.remove();
-    vi.useRealTimers();
+  it('si vuelve a fallar, lo anuncia y el foco se queda en «Reintentar»', async () => {
+    const { el, vivo } = await reintentar('Finanzas no disponible');
+    expect(vivo).toBe('Sigue sin responder: Finanzas no disponible');
+    expect(document.activeElement).toBe(el.querySelector('button.reintentar'));
   });
 });
 

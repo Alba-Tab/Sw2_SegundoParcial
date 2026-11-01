@@ -1,4 +1,4 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
+import { computed, inject, Injectable, linkedSignal, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { filter, switchMap } from 'rxjs';
 import { cargandoDe, completo, Intentos } from 'ui-comun';
@@ -35,7 +35,15 @@ export class FacturaFachada {
       switchMap((id) => (this.consulta = this.repo.observarFactura(id)).valueChanges),
     ),
   );
-  readonly factura = computed(() => completo<FacturaQuery>(this.datos())?.factura);
+  /**
+   * Si la relectura de la misma factura falla por red, el `watch` emite sin datos: se conservan los que había, para no
+   * perder el detalle ni lo escrito en el formulario (V6-3). El detalle no se sondea, así que solo pasa al recargar.
+   */
+  readonly factura = linkedSignal({
+    source: () => ({ id: this.id(), datos: this.datos() }),
+    computation: ({ id, datos }, previo): FacturaQuery['factura'] | undefined =>
+      completo<FacturaQuery>(datos)?.factura ?? (datos?.error && previo && previo.source.id === id ? previo.value : undefined),
+  });
   readonly error = computed(() => this.datos()?.error);
   readonly cargando = computed(() => cargandoDe(this.datos()));
 
@@ -54,7 +62,10 @@ export class FacturaFachada {
    * `refetch` del mismo `watch` (V4-1): al resolver, `factura()` ya trae el saldo y los pagos nuevos. Un `fetch` aparte
    * resolvía antes de que el `watch` emitiera, y el aviso de PAGO_EXCEDE_SALDO decía el saldo viejo.
    */
-  recargar(): Promise<unknown> {
-    return this.consulta?.refetch() ?? Promise.resolve();
+  async recargar(): Promise<void> {
+    if (!this.consulta) return;
+    // Con `errorPolicy: 'all'`, `refetch` no rechaza si falla la red: resuelve sin datos (V6-3).
+    const r = await this.consulta.refetch();
+    if (!r.data?.factura && r.error) throw r.error;
   }
 }

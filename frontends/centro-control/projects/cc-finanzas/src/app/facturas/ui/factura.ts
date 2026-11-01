@@ -364,7 +364,8 @@ export class FacturaPagina {
       this.repetido.set(undefined);
       this.form.reset({ fecha: p.fecha, medio: p.medio });
       this.cerrar();
-      await this.fachada.recargar();
+      // El pago ya quedó: si la relectura falla, se sigue con lo que se tenía (V6-3).
+      await this.fachada.recargar().catch(() => undefined);
       // Con saldo 0 el botón "Registrar pago" ya no está: el foco va al título de la factura.
       if (!this.puedeRegistrar()) enfocarTitulo();
     } catch (e) {
@@ -386,20 +387,23 @@ export class FacturaPagina {
     // Otro pago cambió la factura: se relee antes de explicarlo. `recargar` es un `refetch` del mismo `watch`, así que
     // al volver `factura()` ya trae el saldo y los pagos nuevos (V2-5, V4-1).
     this.releyendo.set(true);
+    let releida = true;
     try {
       await this.fachada.recargar();
     } catch {
-      // Sin la relectura, se explica con lo que ya se tenía.
+      // La fachada conserva la factura que había: se explica con eso y se dice que puede no estar al día (V6-3).
+      releida = false;
     } finally {
       this.releyendo.set(false);
     }
+    const sinReleer = releida ? '' : ' No se pudo releer la factura: el saldo y los pagos que ves pueden no estar al día.';
     // Si otro pago la dejó en 0, el formulario y su botón desaparecen: el foco va al título.
     if (!this.puedeRegistrar()) enfocarTitulo();
     if (codigo === 'PAGO_EXCEDE_SALDO') {
       const saldo = saldoDelError(ext['saldo'], this.factura()?.saldo);
       this.form.controls.monto.updateValueAndValidity();
       this.form.controls.monto.markAsTouched();
-      this.avisos.open(mensajeDe(e) + (saldo ? ` El saldo es ${this.bob.transform(saldo)}.` : ''), 'Cerrar');
+      this.avisos.open(mensajeDe(e) + (saldo ? ` El saldo es ${this.bob.transform(saldo)}.` : '') + sinReleer, 'Cerrar');
       return;
     }
     const p = this.form.getRawValue();
@@ -408,7 +412,7 @@ export class FacturaPagina {
     const texto = existente
       ? `Ese pago ya está registrado: ${this.bob.transform(existente.monto)} del ${this.fecha.transform(existente.fecha)} ` +
         `${medioEnFrase(existente.medio)}, referencia ${existente.referencia}. Está marcado en Pagos.`
-      : `${mensajeDe(e)} Revisa la lista de pagos de esta factura.`;
+      : `${mensajeDe(e)} Revisa la lista de pagos de esta factura.${sinReleer}`;
     this.avisos
       .open(texto, 'Ver pagos')
       .onAction()

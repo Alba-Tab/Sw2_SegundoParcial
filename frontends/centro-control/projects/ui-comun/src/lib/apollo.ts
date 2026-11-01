@@ -61,6 +61,16 @@ export function reintentarCon401(renovar: () => Promise<string | undefined>): Er
  * en la URL. Con 401 renueva el token y repite una vez. Los cortes de red los reintenta graphql-ws con espera creciente;
  * los cierres fatales (4401 al vencer el token o a los 3.600 s de Cloud Run) los reintenta `Alertas` con un token nuevo.
  */
+/**
+ * `notifyOnNetworkStatusChange: false` (V6-2): en Apollo 4 viene en `true`, y cada `refetch` y cada sondeo emitían
+ * antes `{ loading: true, error: undefined }`. Eso borraba el aviso y su «Reintentar» (el foco caía en <body>) y el
+ * banner `role="alert"` se volvía a anunciar en cada sondeo.
+ */
+export const opcionesApollo = {
+  watchQuery: { fetchPolicy: 'cache-and-network', errorPolicy: 'all', notifyOnNetworkStatusChange: false },
+  query: { fetchPolicy: 'network-only', errorPolicy: 'all' },
+} as const;
+
 export function proveerApollo(): (Provider | EnvironmentProviders)[] {
   return [
     provideApollo(() => {
@@ -110,10 +120,7 @@ export function proveerApollo(): (Provider | EnvironmentProviders)[] {
       return {
         link: ApolloLink.split(esSuscripcion, ws, ApolloLink.from([conToken, reintento401, http])),
         cache: new InMemoryCache(),
-        defaultOptions: {
-          watchQuery: { fetchPolicy: 'cache-and-network', errorPolicy: 'all' },
-          query: { fetchPolicy: 'network-only', errorPolicy: 'all' },
-        },
+        defaultOptions: opcionesApollo,
       };
     }),
   ];
