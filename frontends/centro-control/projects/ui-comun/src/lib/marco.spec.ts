@@ -110,5 +110,19 @@ describe('Marco: disponibilidad de las apps (FR3, spec 016 paso 16)', () => {
       // El usuario queda solo con su ícono en angosto, pero el botón sigue teniendo su nombre.
       expect(el.querySelector('.usuario')?.textContent).toContain('Gerente');
     });
+
+    it('CA-3: «Saltar al contenido» es la primera parada y enfoca el <main> sin navegar', () => {
+      const f = TestBed.createComponent(Marco);
+      f.detectChanges();
+      const el: HTMLElement = f.nativeElement;
+      document.body.appendChild(el);
+      const saltar = el.querySelector<HTMLAnchorElement>('a, button')!;
+      expect(saltar.textContent?.trim()).toBe('Saltar al contenido');
+      const evento = new MouseEvent('click', { cancelable: true });
+      saltar.dispatchEvent(evento);
+      expect(evento.defaultPrevented).toBe(true);
+      expect(document.activeElement).toBe(el.querySelector('main#contenido'));
+      el.remove();
+    });
   });
 });

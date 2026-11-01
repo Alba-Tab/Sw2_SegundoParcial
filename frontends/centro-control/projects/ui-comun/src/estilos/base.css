@@ -9,6 +9,17 @@ html,
 body {
   height: 100%;
 }
+
+/* Fechas, selects y barras de scroll nativos con el tema activo (CA-2): el sistema decide salvo que data-tema lo fije. */
+:root {
+  color-scheme: light dark;
+}
+[data-tema='light'] {
+  color-scheme: light;
+}
+[data-tema='dark'] {
+  color-scheme: dark;
+}
 body {
   margin: 0;
   font: var(--mat-sys-body-medium);
@@ -106,6 +117,22 @@ tr.marcada {
   text-underline-offset: 2px;
 }
 
+/* «Saltar al contenido» (CA-3): primera parada del teclado, oculto hasta que recibe el foco. */
+.saltar {
+  position: absolute;
+  left: 8px;
+  top: -100px;
+  z-index: 20;
+  padding: 12px 16px;
+  border-radius: var(--mat-sys-corner-small, 8px);
+  background: var(--mat-sys-primary-container);
+  color: var(--mat-sys-on-primary-container);
+  font: var(--mat-sys-label-large);
+}
+.saltar:focus {
+  top: 8px;
+}
+
 /* Foco visible con el teclado en todo lo que se puede enfocar (DESIGN.md, accesible por defecto). */
 :focus-visible {
   outline: 2px solid var(--mat-sys-primary);
@@ -122,14 +149,28 @@ tr.marcada {
 .tabla-ancha th {
   white-space: nowrap;
 }
+/* Un número de factura («FAC-000001») no se parte en el guion (RS-2); los montos ya llevan espacio duro antes de «BOB». */
+.sin-corte {
+  white-space: nowrap;
+}
 
-/* En pantallas táctiles, los enlaces de las tablas y los datos tienen 44 px de alto para el dedo. */
+/*
+ * En pantallas táctiles, 44 px de alto para el dedo (CA-5): enlaces de tablas y datos, encabezados que ordenan,
+ * selectores de periodo y botones de ícono (campana, menús).
+ */
 @media (pointer: coarse) {
   td a,
   .datos a {
     display: inline-flex;
     align-items: center;
     min-height: 44px;
+  }
+  .mat-sort-header-container {
+    min-height: 44px;
+  }
+  :root {
+    --mat-button-toggle-height: 44px;
+    --mat-icon-button-state-layer-size: 44px;
   }
 }
 

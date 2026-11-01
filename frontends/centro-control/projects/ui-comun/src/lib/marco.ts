@@ -55,6 +55,7 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
     EtiquetaPipe,
   ],
   template: `
+    <a class="saltar" href="#contenido" (click)="saltar($event)">Saltar al contenido</a>
     <mat-toolbar class="barra">
       <a class="marca" routerLink="/">Transporte · {{ nombres[config.app] }}</a>
       <nav class="enlaces" aria-label="Apps del Centro de Control">
@@ -148,7 +149,7 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
         <button mat-menu-item (click)="sesion.cerrar()"><mat-icon>logout</mat-icon> Cerrar sesión</button>
       </mat-menu>
     </mat-toolbar>
-    <main class="contenido"><router-outlet /></main>
+    <main id="contenido" class="contenido" tabindex="-1"><router-outlet /></main>
   `,
   styles: `
     .barra {
@@ -307,7 +308,11 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
     .severidad {
       font: var(--mat-sys-label-large);
     }
-    .detalle,
+    /* El detalle se lee para decidir: 14 px (CA-4); solo el pie (fecha y estado) baja a 12 px. */
+    .detalle {
+      font: var(--mat-sys-body-medium);
+      color: var(--mat-sys-on-surface-variant);
+    }
     .pie {
       font: var(--mat-sys-body-small);
       color: var(--mat-sys-on-surface-variant);
@@ -341,6 +346,12 @@ export class Marco implements OnInit {
     const n = this.alertas.abiertas();
     return n === 1 ? '1 alerta abierta' : `${n} alertas abiertas`;
   });
+
+  /** El ancla iría por el router (base href "/"): se enfoca el contenido sin navegar. */
+  saltar(evento: Event): void {
+    evento.preventDefault();
+    document.getElementById('contenido')?.focus();
+  }
 
   ngOnInit(): void {
     if (this.recibeAlertas()) void this.alertas.iniciar();
