@@ -17,6 +17,13 @@ export const textoRuta = (r: Ruta): string => [r.nombre, r.origen, r.destino].jo
 export const AVISO_ALTA_INACTIVA = 'La ruta queda inactiva hasta tener su tarifa.';
 export const AVISO_ACTIVAR_SIN_TARIFA = 'Actívala solo si Finanzas ya tiene su tarifa: sin tarifa, el portal no puede cotizarla.';
 
+/** D108: activar una ruta pide confirmación, porque las tarifas son de semilla (D10). */
+export const CONFIRMAR_ACTIVAR = 'Sin tarifa de semilla, el portal no podrá cotizarla. ¿Activarla igual?';
+
+/** La edición pasa una ruta inactiva a activa (D108). */
+export const activaLaRuta = (antes: { activa?: boolean | null } | null | undefined, v: Pick<ValoresRuta, 'activa'>): boolean =>
+  antes?.activa === false && v.activa;
+
 /** «Inactiva» solo si Viajes lo dice: una ruta sin el dato se muestra como activa, igual que en el catálogo. */
 export const textoActiva = (r: { activa?: boolean | null }): string => (r.activa === false ? 'Inactiva' : 'Activa');
 

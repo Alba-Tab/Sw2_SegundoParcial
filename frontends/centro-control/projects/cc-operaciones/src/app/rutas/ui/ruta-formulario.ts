@@ -1,13 +1,15 @@
-import { afterNextRender, Component, computed, type ElementRef, input, type OnInit, output, viewChild } from '@angular/core';
+import { afterNextRender, Component, computed, type ElementRef, input, type OnInit, output, signal, viewChild } from '@angular/core';
 import { type AbstractControl, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { Campo, largoEntre, listoParaEnviar, textoError } from 'ui-comun';
+import { Campo, Confirmacion, enfocar, largoEntre, listoParaEnviar, textoError } from 'ui-comun';
 import {
+  activaLaRuta,
   AVISO_ACTIVAR_SIN_TARIFA,
+  CONFIRMAR_ACTIVAR,
   AVISO_ALTA_INACTIVA,
   type FichaRuta,
   LIMITES_RUTA,
@@ -24,7 +26,16 @@ const entero = (c: AbstractControl) => (c.value === null || Number.isInteger(c.v
  */
 @Component({
   selector: 'app-ruta-formulario',
-  imports: [ReactiveFormsModule, Campo, MatCardModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatCheckboxModule],
+  imports: [
+    ReactiveFormsModule,
+    Campo,
+    Confirmacion,
+    MatCardModule,
+    MatButtonModule,
+    MatFormFieldModule,
+    MatInputModule,
+    MatCheckboxModule,
+  ],
   template: `
     <mat-card class="formulario">
       <mat-card-header
@@ -94,10 +105,21 @@ const entero = (c: AbstractControl) => (c.value === null || Number.isInteger(c.v
             }
           </div>
           <p class="secundario">{{ alta() ? avisoAlta : avisoActivar }}</p>
-          <div class="fila-acciones">
-            <button mat-flat-button type="submit" [disabled]="enviando()" disabledInteractive>{{ accion() }}</button>
-            <button mat-button type="button" (click)="cancelar.emit()" [disabled]="enviando()">Cancelar</button>
-          </div>
+          @if (confirmando()) {
+            <cc-confirmacion
+              [resumen]="confirmarActivar"
+              accion="Sí, activarla"
+              icono="check_circle"
+              [enviando]="enviando()"
+              (confirmar)="confirmarActivacion()"
+              (volver)="volver()"
+            />
+          } @else {
+            <div class="fila-acciones">
+              <button mat-flat-button type="submit" id="guardar-ruta" [disabled]="enviando()" disabledInteractive>{{ accion() }}</button>
+              <button mat-button type="button" (click)="cancelar.emit()" [disabled]="enviando()">Cancelar</button>
+            </div>
+          }
         </form>
       </mat-card-content>
     </mat-card>
@@ -131,6 +153,8 @@ export class RutaFormulario implements OnInit {
   readonly limites = LIMITES_RUTA;
   readonly avisoAlta = AVISO_ALTA_INACTIVA;
   readonly avisoActivar = AVISO_ACTIVAR_SIN_TARIFA;
+  readonly confirmarActivar = CONFIRMAR_ACTIVAR;
+  readonly confirmando = signal(false);
   /** Sin ruta que editar es un alta: no se elige si está activa (F1-2). */
   readonly alta = computed(() => !this.inicial());
   private readonly primerCampo = viewChild<ElementRef<HTMLInputElement>>('primerCampo');
@@ -162,6 +186,25 @@ export class RutaFormulario implements OnInit {
 
   enviar(raiz: HTMLElement): void {
     if (this.enviando() || !listoParaEnviar(this.form, raiz)) return;
+    if (activaLaRuta(this.inicial(), this.form.getRawValue())) {
+      // D108: el formulario queda bloqueado mientras se confirma.
+      this.form.disable();
+      this.confirmando.set(true);
+      return;
+    }
     this.guardar.emit(this.form.getRawValue());
+  }
+
+  confirmarActivacion(): void {
+    const valores = this.form.getRawValue();
+    this.volver(false);
+    this.guardar.emit(valores);
+  }
+
+  /** «No, volver»: desbloquea y el foco vuelve a «Guardar cambios». */
+  volver(enfocarGuardar = true): void {
+    this.form.enable();
+    this.confirmando.set(false);
+    if (enfocarGuardar) enfocar('guardar-ruta');
   }
 }
