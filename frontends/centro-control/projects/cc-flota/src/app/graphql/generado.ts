@@ -90,6 +90,56 @@ export type UnidadQuery = {
   }> | null;
 };
 
+export type MantenimientosQueryVariables = Exact<{ [key: string]: never }>;
+
+export type MantenimientosQuery = {
+  mantenimientos: Array<{
+    mantenimientoId: string;
+    unidadId: string;
+    placa: string;
+    tipo: TipoMantenimiento;
+    estado: string;
+    fechaProgramada: string;
+    taller: string;
+    descripcion: string;
+    cerradoEn: string | null;
+  }> | null;
+};
+
+export type ChoferesQueryVariables = Exact<{ [key: string]: never }>;
+
+export type ChoferesQuery = {
+  choferes: Array<{
+    choferId: string;
+    nombre: string;
+    licenciaCategoria: string;
+    licenciaVenceEl: string;
+    activo: boolean;
+    disponible: boolean;
+  }> | null;
+};
+
+export type ChoferQueryVariables = Exact<{
+  choferId: string | number;
+}>;
+
+export type ChoferQuery = {
+  choferes: Array<{
+    choferId: string;
+    nombre: string;
+    licenciaCategoria: string;
+    licenciaVenceEl: string;
+    activo: boolean;
+    disponible: boolean;
+  }> | null;
+  puntajesConduccion: {
+    desde: string;
+    hasta: string;
+    choferes: Array<{ choferId: string; frenadas: number; fatigas: number; km: number; puntaje: number }>;
+    viajes: Array<{ viajeId: string | null; frenadas: number; fatigas: number; km: number; puntaje: number }>;
+  } | null;
+};
+
 export type CombustibleQueryVariables = Exact<{
   desde: string;
 }>;
@@ -218,6 +268,96 @@ export const UnidadDocument = gql`
 })
 export class UnidadGQL extends Apollo.Query<UnidadQuery, UnidadQueryVariables> {
   override document = UnidadDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const MantenimientosDocument = gql`
+  query Mantenimientos {
+    mantenimientos {
+      mantenimientoId
+      unidadId
+      placa
+      tipo
+      estado
+      fechaProgramada
+      taller
+      descripcion
+      cerradoEn
+    }
+  }
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class MantenimientosGQL extends Apollo.Query<MantenimientosQuery, MantenimientosQueryVariables> {
+  override document = MantenimientosDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const ChoferesDocument = gql`
+  query Choferes {
+    choferes {
+      choferId
+      nombre
+      licenciaCategoria
+      licenciaVenceEl
+      activo
+      disponible
+    }
+  }
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class ChoferesGQL extends Apollo.Query<ChoferesQuery, ChoferesQueryVariables> {
+  override document = ChoferesDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const ChoferDocument = gql`
+  query Chofer($choferId: ID!) {
+    choferes {
+      choferId
+      nombre
+      licenciaCategoria
+      licenciaVenceEl
+      activo
+      disponible
+    }
+    puntajesConduccion(choferId: $choferId) {
+      desde
+      hasta
+      choferes {
+        choferId
+        frenadas
+        fatigas
+        km
+        puntaje
+      }
+      viajes {
+        viajeId
+        frenadas
+        fatigas
+        km
+        puntaje
+      }
+    }
+  }
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class ChoferGQL extends Apollo.Query<ChoferQuery, ChoferQueryVariables> {
+  override document = ChoferDocument;
 
   constructor(apollo: Apollo.Apollo) {
     super(apollo);

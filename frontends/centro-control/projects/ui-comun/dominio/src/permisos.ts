@@ -19,6 +19,8 @@ export const ROLES_CAMPO = {
   unidadesPorEstado: ['gerente', 'despachador', 'jefe_flota'],
   /** `Tablero.alertasAbiertas` y `Tablero.datosAl`. */
   alertasAbiertas: ['gerente', 'despachador', 'jefe_flota', 'administracion'],
+  /** `lineaCredito` y `Cliente.lineaCredito`. */
+  lineaCredito: ['gerente', 'administracion', 'comercial'],
   /** `clientes`. */
   clientes: ['gerente', 'despachador', 'administracion', 'comercial'],
 } as const satisfies Record<string, readonly string[]>;

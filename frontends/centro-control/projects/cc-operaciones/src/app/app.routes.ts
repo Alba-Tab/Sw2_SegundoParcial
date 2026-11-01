@@ -17,6 +17,10 @@ export const rutas: Routes = [
       { path: 'mapa', ...p(() => import('./viajes/ui/mapa').then((m) => m.MapaPagina), 'Mapa en vivo') },
       { path: 'entregas-observadas', ...p(() => import('./viajes/ui/entregas').then((m) => m.EntregasPagina), 'Entregas observadas') },
       { path: 'intervenciones', ...p(() => import('./viajes/ui/intervenciones').then((m) => m.IntervencionesPagina), 'Intervenciones') },
+      { path: 'clientes', ...p(() => import('./clientes/ui/clientes').then((m) => m.ClientesPagina), 'Clientes') },
+      { path: 'clientes/:id', ...p(() => import('./clientes/ui/cliente').then((m) => m.ClientePagina), 'Cliente') },
+      { path: 'rutas', ...p(() => import('./rutas/ui/rutas').then((m) => m.RutasPagina), 'Rutas') },
+      { path: 'rutas/:id', ...p(() => import('./rutas/ui/ruta').then((m) => m.RutaPagina), 'Ruta') },
       { path: 'servicios', ...p(() => import('./servicios/ui/servicios').then((m) => m.ServiciosPagina), 'Servicios') },
       {
         path: 'acciones',

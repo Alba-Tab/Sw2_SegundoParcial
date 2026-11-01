@@ -13,6 +13,13 @@ export const rutas: Routes = [
       { path: 'unidades', loadComponent: () => import('./unidades/ui/unidades').then((m) => m.UnidadesPagina), title: 'Unidades' },
       { path: 'unidades/:id', loadComponent: () => import('./unidades/ui/unidad').then((m) => m.UnidadPagina), title: 'Unidad' },
       {
+        path: 'mantenimientos',
+        loadComponent: () => import('./mantenimientos/ui/mantenimientos').then((m) => m.MantenimientosPagina),
+        title: 'Mantenimientos',
+      },
+      { path: 'choferes', loadComponent: () => import('./choferes/ui/choferes').then((m) => m.ChoferesPagina), title: 'Choferes' },
+      { path: 'choferes/:id', loadComponent: () => import('./choferes/ui/chofer').then((m) => m.ChoferPagina), title: 'Chofer' },
+      {
         path: 'combustible',
         loadComponent: () => import('./combustible/ui/combustible').then((m) => m.CombustiblePagina),
         title: 'Combustible',

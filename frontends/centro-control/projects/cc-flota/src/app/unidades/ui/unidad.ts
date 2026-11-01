@@ -9,8 +9,16 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Encabezado, AvisoServicios, Estado, EtiquetaPipe, fechaLaPaz, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
-import { AVISO_KM, CHECKLIST_POR_DEFECTO, cierreInicial, puedeProgramar, type ItemCierre, type NuevoMantenimiento } from '../domain/unidad';
+import { Encabezado, AvisoServicios, Estado, EtiquetaPipe, fechaLaPaz, FechaPipe, mensajeDe, Sesion, vigencia } from 'ui-comun';
+import {
+  AVISO_KM,
+  CHECKLIST_POR_DEFECTO,
+  cierreInicial,
+  documentosEnAviso,
+  puedeProgramar,
+  type ItemCierre,
+  type NuevoMantenimiento,
+} from '../domain/unidad';
 import { UnidadFachada } from '../unidades.fachada';
 
 /** Spec 010: programar un mantenimiento (la unidad pasa a EN_MANTENIMIENTO) y cerrarlo con su checklist. */
@@ -50,6 +58,12 @@ import { UnidadFachada } from '../unidades.fachada';
     </cc-encabezado>
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!unidad()" />
     @if (unidad(); as u) {
+      @if (documentosEnAviso(u.documentos); as n) {
+        <p class="aviso-documentos" role="status">
+          <mat-icon>warning</mat-icon>{{ n === 1 ? 'Un documento vencido o por vencer' : n + ' documentos vencidos o por vencer' }}. Para
+          renovarlo, programa un mantenimiento de tipo «Documentos».
+        </p>
+      }
       <dl class="datos">
         <div>
           <dt>Tipo</dt>
@@ -66,7 +80,7 @@ import { UnidadFachada } from '../unidades.fachada';
         @for (d of u.documentos; track d.tipo) {
           <div>
             <dt>{{ d.tipo | etiqueta: 'TipoDocumento' }} vence</dt>
-            <dd>{{ d.venceEl | fecha }}</dd>
+            <dd>{{ d.venceEl | fecha }} <cc-estado grupo="Vigencia" [valor]="vigencia(d.venceEl)" /></dd>
           </div>
         }
       </dl>
@@ -145,6 +159,16 @@ import { UnidadFachada } from '../unidades.fachada';
     }
   `,
   styles: `
+    .aviso-documentos {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 12px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: var(--mat-sys-advertencia-container);
+      color: var(--mat-sys-on-advertencia-container);
+    }
     .formulario,
     .mantenimiento {
       margin: 16px 0;
@@ -166,6 +190,8 @@ export class UnidadPagina {
   readonly error = this.fachada.error;
   readonly campos = { unidad: 'Flota', mantenimientos: 'Flota' };
   readonly puedeProgramar = puedeProgramar;
+  readonly vigencia = (venceEl: string) => vigencia(venceEl);
+  readonly documentosEnAviso = documentosEnAviso;
   readonly avisoKm = AVISO_KM;
   /** El formulario de programar se abre desde la acción del encabezado. */
   readonly programando = signal(false);

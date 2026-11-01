@@ -21,3 +21,9 @@ export function desdeCentavos(centavos: bigint): string {
 export function sumarMontos(montos: unknown[]): string {
   return desdeCentavos(montos.reduce<bigint>((total, m) => total + (aCentavos(String(m ?? '0')) ?? 0n), 0n));
 }
+
+/** Estado de una línea de crédito (grupo EstadoLineaCredito): la mora manda; sin disponible, aviso; si no, al día. */
+export function estadoLineaCredito(l: { enMora: boolean; disponible: string }): 'AL_DIA' | 'SIN_DISPONIBLE' | 'EN_MORA' {
+  if (l.enMora) return 'EN_MORA';
+  return (aCentavos(l.disponible) ?? 0n) <= 0n ? 'SIN_DISPONIBLE' : 'AL_DIA';
+}

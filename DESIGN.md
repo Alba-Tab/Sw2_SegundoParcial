@@ -68,6 +68,8 @@ Material Symbols Outlined (paquete `material-symbols`), cargado en `base.css` y 
 | `cancel` | Cancelado |
 | `lock` | Cerrado |
 | `event_busy` | Vencido |
+| `person_off` | Chofer inhabilitado |
+| `money_off` | En mora |
 | `build` | Mantenimiento |
 | `schedule` | Riesgo de retraso |
 | `help` | Valor desconocido |
@@ -94,8 +96,11 @@ Material Symbols Outlined (paquete `material-symbols`), cargado en `base.css` y 
 | `warning`, `error` | Entregas observadas, Intervenciones (los mismos íconos de su estado) |
 | `assignment` | Servicios (portal: «Mis servicios») |
 | `local_shipping`, `local_gas_station`, `speed` | Unidades, Combustible, Conducción |
+| `build`, `id_card` | Mantenimientos (el mismo ícono de «Mantenimiento»), Choferes |
+| `groups`, `alt_route` | Clientes, Rutas |
 | `receipt_long` | Facturas |
 | `account_balance_wallet`, `credit_score`, `request_quote` | Cuentas por cobrar, Aprobación de crédito, Cotizaciones (portal: «Cotizar») |
+| `credit_card` | Líneas de crédito |
 | `business`, `groups` | Portal: Mi empresa, Clientes |
 
 En el portal la página actual se marca con fondo y peso en el botón del menú, no con subrayado.

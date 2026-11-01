@@ -18,6 +18,11 @@ export const rutas: Routes = [
         title: 'Aprobación de crédito',
       },
       {
+        path: 'lineas-credito',
+        loadComponent: () => import('./lineas/ui/lineas').then((m) => m.LineasPagina),
+        title: 'Líneas de crédito',
+      },
+      {
         path: 'cotizaciones',
         loadComponent: () => import('./cotizaciones/ui/cotizaciones').then((m) => m.CotizacionesPagina),
         title: 'Cotizaciones',

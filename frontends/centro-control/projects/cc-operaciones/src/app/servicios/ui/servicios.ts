@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -14,6 +14,7 @@ import {
   CONFIG_CENTRO,
   controlLista,
   Encabezado,
+  Estado,
   etiqueta,
   EtiquetaPipe,
   FechaPipe,
@@ -22,11 +23,11 @@ import {
   PieLista,
   Sesion,
 } from 'ui-comun';
-import { motivoCancelacionValido } from '../domain/servicio';
+import { estadoServicio, motivoCancelacionValido, puedeCancelarServicio } from '../domain/servicio';
 import { ServiciosFachada } from '../servicios.fachada';
 
 /**
- * Servicios confirmados (spec 004): el despachador y atención comercial cancelan; comercial abre el portal "como el
+ * Servicios (spec 004), filtrables por estado: el despachador y atención comercial cancelan; comercial abre el portal "como el
  * cliente" por SSO (propuesta 7.7).
  */
 @Component({
@@ -44,14 +45,21 @@ import { ServiciosFachada } from '../servicios.fachada';
     BobPipe,
     FechaPipe,
     EtiquetaPipe,
+    Estado,
     AvisoServicios,
     FiltrosLista,
     PieLista,
   ],
   template: `
-    <cc-encabezado titulo="Servicios confirmados" />
+    <cc-encabezado titulo="Servicios" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!servicios().length" />
-    <cc-filtros-lista [control]="lista" busqueda="Buscar por cliente, placa o chofer" nombre="servicios" singular="servicio" />
+    <cc-filtros-lista
+      [control]="lista"
+      busqueda="Buscar por cliente, placa o chofer"
+      grupo="EstadoServicio"
+      nombre="servicios"
+      singular="servicio"
+    />
     <div class="tabla-ancha">
       <table
         mat-table
@@ -65,6 +73,10 @@ import { ServiciosFachada } from '../servicios.fachada';
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Cliente</th>
           <td mat-cell *matCellDef="let s">{{ nombre(s.clienteId) }}</td></ng-container
         >
+        <ng-container matColumnDef="estado"
+          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
+          <td mat-cell *matCellDef="let s"><cc-estado grupo="EstadoServicio" [valor]="s.estado" /></td
+        ></ng-container>
         <ng-container matColumnDef="carga"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Carga</th>
           <td mat-cell *matCellDef="let s">{{ s.tipoCarga | etiqueta: 'TipoCarga' }} · {{ s.toneladas }} t</td></ng-container
@@ -84,7 +96,7 @@ import { ServiciosFachada } from '../servicios.fachada';
         <ng-container matColumnDef="acciones">
           <th mat-header-cell *matHeaderCellDef><span class="cdk-visually-hidden">Acciones</span></th>
           <td mat-cell *matCellDef="let s">
-            @if (puedeCancelar() && s.confirmacionCompleta) {
+            @if (puedeCancelar() && puedeCancelarServicio(s)) {
               @if (confirmando() === s.servicioId) {
                 <!-- Cancelar devuelve el crédito y la unidad: se pide el motivo de esta fila y una confirmación. -->
                 <div class="confirmacion">
@@ -114,7 +126,7 @@ import { ServiciosFachada } from '../servicios.fachada';
         <tr mat-row *matRowDef="let s; columns: columnas()"></tr>
       </table>
     </div>
-    <cc-pie-lista [control]="lista" nombre="servicios" vacio="No hay servicios confirmados." [error]="error()" />
+    <cc-pie-lista [control]="lista" nombre="servicios" vacio="No hay servicios." [error]="error()" />
   `,
   styles: `
     .confirmacion {
@@ -141,14 +153,16 @@ export class ServiciosPagina {
   /** La columna del monto, solo si el rol lo ve (no se le pide al despachador). */
   readonly columnas = computed(() =>
     this.fachada.verMonto
-      ? ['cliente', 'carga', 'fecha', 'unidad', 'monto', 'acciones']
-      : ['cliente', 'carga', 'fecha', 'unidad', 'acciones'],
+      ? ['cliente', 'estado', 'carga', 'fecha', 'unidad', 'monto', 'acciones']
+      : ['cliente', 'estado', 'carga', 'fecha', 'unidad', 'acciones'],
   );
   readonly lista = controlLista({
     filas: this.servicios,
     texto: (s) => [this.nombre(s.clienteId ?? ''), s.placa, s.choferNombre, etiqueta('TipoCarga', s.tipoCarga).texto].join(' '),
+    estado: (s) => s.estado,
     orden: {
       cliente: (s) => this.nombre(s.clienteId ?? ''),
+      estado: (s) => etiqueta('EstadoServicio', s.estado).texto,
       carga: (s) => etiqueta('TipoCarga', s.tipoCarga).texto,
       fecha: (s) => s.fechaViaje,
       unidad: (s) => s.placa,
@@ -160,6 +174,12 @@ export class ServiciosPagina {
   /** La fila que está pidiendo confirmación; cada fila tiene su propio motivo. */
   readonly confirmando = signal<string | null>(null);
   motivos: Record<string, string> = {};
+  readonly puedeCancelarServicio = puedeCancelarServicio;
+
+  constructor() {
+    // El filtro de estado de la URL también se pide a Viajes: el límite de 80 filas se aplica ya filtrado.
+    effect(() => this.fachada.estado.set(estadoServicio(this.lista.filtro().estado)));
+  }
 
   nombre(clienteId: string): string {
     return this.fachada.nombreCliente(clienteId);

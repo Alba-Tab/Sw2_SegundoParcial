@@ -97,6 +97,8 @@ Orden por valor y por lo que ya existe en el backend. Cada paso sigue "contratos
 6. `feat/cc-operaciones/clientes`: lista y ficha de clientes internas con lo que ya da la query `clientes` (G7).
 7. Usuarios internos (G8): según la decisión de la sección 3.
 
+**Estado al 31-10-2026 (sin tocar backend, decisión 1 de la sección 3).** Hecho en el front: G9 pestaña Mantenimientos en `cc-flota` (lista con búsqueda, filtro y orden; enlace a la unidad, donde se programa y se cierra); G3 pestaña Choferes con ficha `choferes/:id` (licencia con aviso de vencimiento, estado, conducción de la semana), armada desde la lista porque no hay `chofer(id)`; G1 y G2 lista y ficha de unidades con aviso de documentos vencidos o por vencer; G7 pestaña Clientes con ficha `clientes/:id` (línea de crédito, últimos 50 servicios con enlace al viaje, "Ver como cliente" para comercial); G4 pestaña Rutas con ficha `rutas/:id` (origen, destino, distancia; `radioMetros` no está en el esquema); G6 pestaña Líneas de crédito en `cc-finanzas` (límite, reservado, utilizado, disponible y estado, con `clientes { lineaCredito }`); filtro por estado en Servicios (se pide a Viajes). Pendiente de backend, con el contrato propuesto en `specs/pendientes-frontend-web.md` sección 5: pasos 1, 3, 4 y 5 (alta, edición y baja de unidades; alta, edición y habilitación de choferes; alta y edición de rutas; tarifas; ajuste de línea de crédito), la edición de clientes y el permiso `realm-management` del gerente para G8.
+
 ### Fase E. Pulido y verificación
 
 1. Formularios del Centro de Control a `ReactiveForms` con errores por campo (U8).

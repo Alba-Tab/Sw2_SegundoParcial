@@ -101,6 +101,23 @@ query LineaCredito($clienteId: ID!) {
   }
 }
 
+# G6: la línea de cada cliente va anidada en `clientes` (una sola petición del navegador). El Gateway la resuelve con
+# una llamada a Finanzas por cliente: con más de ~199 clientes se agota su presupuesto (200) y las demás salen en null.
+query LineasCredito {
+  clientes {
+    clienteId
+    razonSocial
+    nit
+    lineaCredito {
+      limite
+      reservado
+      utilizado
+      disponible
+      enMora
+    }
+  }
+}
+
 query Cobranza($params: ReporteParams) {
   reporte(id: CUENTAS_POR_COBRAR, params: $params) {
     reporteId

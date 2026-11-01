@@ -26,10 +26,12 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
   `,
 })
 export class Seccion {
+  // TODO(G5): pestaña "Tarifas" cuando Finanzas y el Gateway la expongan; ver specs/pendientes-frontend-web.md, sección 5.
   readonly enlaces = [
     { ruta: 'facturas', titulo: 'Facturas y pagos', icono: 'receipt_long' },
     { ruta: 'cobranza', titulo: 'Cuentas por cobrar', icono: 'account_balance_wallet' },
     { ruta: 'aprobaciones', titulo: 'Aprobación de crédito', icono: 'credit_score' },
+    { ruta: 'lineas-credito', titulo: 'Líneas de crédito', icono: 'credit_card' },
     { ruta: 'cotizaciones', titulo: 'Cotizaciones', icono: 'request_quote' },
   ];
 }

@@ -3,7 +3,18 @@ import { Component, inject } from '@angular/core';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, controlLista, Encabezado, Estado, etiqueta, EtiquetaPipe, FechaPipe, FiltrosLista, PieLista } from 'ui-comun';
+import {
+  AvisoServicios,
+  controlLista,
+  Encabezado,
+  Estado,
+  etiqueta,
+  EtiquetaPipe,
+  FechaPipe,
+  FiltrosLista,
+  PieLista,
+  vigencia,
+} from 'ui-comun';
 import { AVISO_KM, textoUnidad, type Unidad } from '../domain/unidad';
 import { UnidadesFachada } from '../unidades.fachada';
 
@@ -64,9 +75,11 @@ import { UnidadesFachada } from '../unidades.fachada';
           <td mat-cell *matCellDef="let u">
             @for (d of u.documentos; track d.tipo) {
               <span class="secundario">{{ d.tipo | etiqueta: 'TipoDocumento' }} {{ d.venceEl | fecha }} </span>
-            }
-          </td></ng-container
-        >
+              @if (vigencia(d.venceEl) !== 'VIGENTE') {
+                <cc-estado grupo="Vigencia" [valor]="vigencia(d.venceEl)" />
+              }
+            }</td
+        ></ng-container>
         <tr mat-header-row *matHeaderRowDef="columnas"></tr>
         <tr mat-row *matRowDef="let u; columns: columnas"></tr>
       </table>
@@ -81,6 +94,7 @@ export class UnidadesPagina {
   readonly campos = { unidades: 'Flota' };
   readonly columnas = ['placa', 'tipo', 'estado', 'km', 'documentos'];
   readonly avisoKm = AVISO_KM;
+  readonly vigencia = (venceEl: string) => vigencia(venceEl);
   readonly lista = controlLista<Unidad>({
     filas: this.unidades,
     texto: textoUnidad,

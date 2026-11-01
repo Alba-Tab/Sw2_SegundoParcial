@@ -29,7 +29,8 @@ describe('campos con @roles: no se piden al rol que no los ve (sin un SIN_PERMIS
   it('al despachador no se le pide el monto de servicios ni del viaje', () => {
     const { viajes, servicios } = preparar(['despachador']);
     expect(TestBed.inject(ServiciosFachada).verMonto).toBe(false);
-    expect(servicios.observar).toHaveBeenCalledWith('CONFIRMADO', false, 20_000);
+    TestBed.tick();
+    expect(servicios.observar).toHaveBeenCalledWith(null, false, 20_000);
     const viaje = TestBed.inject(ViajeFachada);
     viaje.id.set('v1');
     TestBed.tick();

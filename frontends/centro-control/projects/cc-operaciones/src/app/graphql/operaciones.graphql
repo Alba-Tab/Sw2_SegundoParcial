@@ -130,11 +130,12 @@ query Intervenciones {
   }
 }
 
-# 80 × 10 + 1 más los clientes = 805. `monto` no se pide al despachador (Servicio.monto: gerente, administracion, comercial).
+# 80 × 11 + 1 más los clientes = 885. `monto` no se pide al despachador (Servicio.monto: gerente, administracion, comercial).
 query Servicios($estado: EstadoServicio, $verMonto: Boolean!) {
   servicios(estado: $estado, limite: 80) {
     servicioId
     clienteId
+    estado
     tipoCarga
     toneladas
     fechaViaje
@@ -146,6 +147,68 @@ query Servicios($estado: EstadoServicio, $verMonto: Boolean!) {
   clientes {
     clienteId
     razonSocial
+  }
+}
+
+# G7. `lineaCredito` solo a quien la puede ver (gerente, administracion, comercial): el despachador no la pide.
+# Cada línea es una llamada a Finanzas por cliente (presupuesto del Gateway: 200 por petición).
+query Clientes($verCredito: Boolean!) {
+  clientes {
+    clienteId
+    razonSocial
+    nit
+    correo
+    canal
+    lineaCredito @include(if: $verCredito) {
+      limite
+      disponible
+      enMora
+    }
+  }
+}
+
+# No hay `cliente(id)` en el esquema: la ficha sale de `clientes`. 50 × 12 + 1 más clientes, rutas y línea = 569.
+query Cliente($clienteId: ID!, $verCredito: Boolean!, $verMonto: Boolean!) {
+  clientes {
+    clienteId
+    razonSocial
+    nit
+    correo
+    canal
+  }
+  lineaCredito(clienteId: $clienteId) @include(if: $verCredito) {
+    limite
+    reservado
+    utilizado
+    disponible
+    enMora
+  }
+  servicios(clienteId: $clienteId, limite: 50) {
+    servicioId
+    viajeId
+    estado
+    rutaId
+    tipoCarga
+    toneladas
+    fechaViaje
+    monto @include(if: $verMonto)
+    placa
+    creadoEn
+  }
+  rutas {
+    rutaId
+    nombre
+  }
+}
+
+# G4. Lo que el esquema trae de cada ruta; `radioMetros` aún no está en el Gateway.
+query Rutas {
+  rutas {
+    rutaId
+    nombre
+    origen
+    destino
+    distanciaKm
   }
 }
 

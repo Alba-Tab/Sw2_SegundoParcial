@@ -28,6 +28,8 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 export class Seccion {
   readonly enlaces = [
     { ruta: 'unidades', titulo: 'Unidades', icono: 'local_shipping' },
+    { ruta: 'mantenimientos', titulo: 'Mantenimientos', icono: 'build' },
+    { ruta: 'choferes', titulo: 'Choferes', icono: 'id_card' },
     { ruta: 'combustible', titulo: 'Combustible', icono: 'local_gas_station' },
     { ruta: 'conduccion', titulo: 'Conducción', icono: 'speed' },
   ];

@@ -2,6 +2,7 @@ import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
+import { RouterLink } from '@angular/router';
 import { AvisoServicios, controlLista, Encabezado, FechaPipe, FiltrosLista, PieLista } from 'ui-comun';
 import { ConduccionFachada } from '../conduccion.fachada';
 import { PUNTAJE_BAJO, type PuntajeChofer } from '../domain/conduccion';
@@ -10,7 +11,7 @@ import { PUNTAJE_BAJO, type PuntajeChofer } from '../domain/conduccion';
 @Component({
   selector: 'app-conduccion',
   providers: [ConduccionFachada],
-  imports: [Encabezado, MatTableModule, MatSortModule, DecimalPipe, FechaPipe, AvisoServicios, FiltrosLista, PieLista],
+  imports: [Encabezado, MatTableModule, MatSortModule, RouterLink, DecimalPipe, FechaPipe, AvisoServicios, FiltrosLista, PieLista],
   template: `
     <cc-encabezado titulo="Puntaje de conducción" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!puntajes()" />
@@ -28,7 +29,9 @@ import { PUNTAJE_BAJO, type PuntajeChofer } from '../domain/conduccion';
         >
           <ng-container matColumnDef="nombre"
             ><th mat-header-cell *matHeaderCellDef mat-sort-header>Chofer</th>
-            <td mat-cell *matCellDef="let c">{{ c.nombre ?? c.choferId }}</td></ng-container
+            <td mat-cell *matCellDef="let c">
+              <a [routerLink]="['/choferes', c.choferId]">{{ c.nombre ?? c.choferId }}</a>
+            </td></ng-container
           >
           <ng-container matColumnDef="frenadas"
             ><th mat-header-cell *matHeaderCellDef mat-sort-header>Frenadas</th>

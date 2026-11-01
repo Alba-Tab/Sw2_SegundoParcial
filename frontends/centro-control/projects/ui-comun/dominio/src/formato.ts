@@ -8,3 +8,14 @@ export function fechaLaPaz(dias = 0, ahora: Date = new Date()): string {
 
 /** 0.857 → "86 %". */
 export const pct = (p: number | null | undefined) => (p === null || p === undefined ? '—' : `${Math.round(p * 100)} %`);
+
+/** Días antes del vencimiento desde los que un documento o una licencia se marca "Por vencer". */
+export const DIAS_AVISO_VENCIMIENTO = 30;
+
+/** "YYYY-MM-DD" frente a hoy en La Paz: VENCIDO si ya pasó, POR_VENCER dentro del aviso, si no VIGENTE (grupo Vigencia). */
+export function vigencia(venceEl: string, hoy: string = fechaLaPaz(), dias = DIAS_AVISO_VENCIMIENTO): 'VIGENTE' | 'POR_VENCER' | 'VENCIDO' {
+  if (venceEl < hoy) return 'VENCIDO';
+  // "YYYY-MM-DD" se lee en UTC: sumar días enteros no cruza husos.
+  const limite = new Date(Date.parse(hoy) + dias * 86_400_000).toISOString().slice(0, 10);
+  return venceEl <= limite ? 'POR_VENCER' : 'VIGENTE';
+}

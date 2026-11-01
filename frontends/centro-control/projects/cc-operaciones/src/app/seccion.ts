@@ -13,6 +13,8 @@ const ENLACES: { ruta: string; titulo: string; icono: string; roles?: string[] }
   { ruta: 'entregas-observadas', titulo: 'Entregas observadas', icono: 'warning' },
   { ruta: 'intervenciones', titulo: 'Intervenciones', icono: 'error' },
   { ruta: 'servicios', titulo: 'Servicios', icono: 'assignment' },
+  { ruta: 'clientes', titulo: 'Clientes', icono: 'groups' },
+  { ruta: 'rutas', titulo: 'Rutas', icono: 'alt_route' },
   { ruta: 'acciones', titulo: 'Acciones del agente', icono: 'smart_toy', roles: ROLES_ACCIONES },
 ];
 

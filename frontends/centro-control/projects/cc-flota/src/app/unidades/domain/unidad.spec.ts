@@ -1,5 +1,5 @@
 import { filtrar } from 'ui-comun/dominio';
-import { cierreInicial, lineasChecklist, puedeProgramar, textoUnidad, type Mantenimiento, type Unidad } from './unidad';
+import { cierreInicial, documentosEnAviso, lineasChecklist, puedeProgramar, textoUnidad, type Mantenimiento, type Unidad } from './unidad';
 
 describe('unidades (dominio)', () => {
   it('el checklist es una línea por ítem, sin líneas vacías', () => {
@@ -24,5 +24,11 @@ describe('unidades (dominio)', () => {
     ] as unknown as Unidad[];
     expect(filtrar(u, 'furgon', textoUnidad).map((x) => x.placa)).toEqual(['R-77']);
     expect(filtrar(u, 'tracto', textoUnidad).map((x) => x.placa)).toEqual(['ABC-123']);
+  });
+
+  it('G2: cuenta los documentos vencidos o por vencer', () => {
+    const docs = [{ venceEl: '2026-10-01' }, { venceEl: '2026-11-15' }, { venceEl: '2027-06-01' }];
+    expect(documentosEnAviso(docs, '2026-10-31')).toBe(2);
+    expect(documentosEnAviso([], '2026-10-31')).toBe(0);
   });
 });

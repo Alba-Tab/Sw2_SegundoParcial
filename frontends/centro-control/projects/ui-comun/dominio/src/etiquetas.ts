@@ -162,6 +162,22 @@ export const ETIQUETAS = {
   Riesgo: {
     EN_RIESGO: e('Riesgo', 'schedule', 'error'),
   },
+  // Calculados en el front (no vienen del esquema): ver `vigencia`, `estadoLineaCredito` y `estadoChofer`.
+  Vigencia: {
+    VIGENTE: e('Vigente', 'check_circle', 'exito'),
+    POR_VENCER: e('Por vencer', 'warning', 'aviso'),
+    VENCIDO: e('Vencido', 'event_busy', 'error'),
+  },
+  EstadoLineaCredito: {
+    AL_DIA: e('Al día', 'check_circle', 'exito'),
+    SIN_DISPONIBLE: e('Sin disponible', 'warning', 'aviso'),
+    EN_MORA: e('En mora', 'money_off', 'error'),
+  },
+  EstadoChofer: {
+    DISPONIBLE: e('Disponible', 'check_circle', 'exito'),
+    OCUPADO: e('En viaje o reservado', 'route', 'info'),
+    INACTIVO: e('Inhabilitado', 'person_off', 'neutro'),
+  },
 } satisfies Record<string, Record<string, Etiqueta>>;
 
 export type GrupoEtiqueta = keyof typeof ETIQUETAS;
