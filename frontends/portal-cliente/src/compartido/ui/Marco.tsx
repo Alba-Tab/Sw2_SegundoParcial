@@ -23,6 +23,7 @@ import { useClienteActivo } from '../sesion/ClienteActivo';
 import { useSesion } from '../sesion/useSesion';
 import { AvisoComercial } from './AvisoComercial';
 import { Bienvenida } from './Bienvenida';
+import { CuentaInterna } from './CuentaInterna';
 import { BotonEnlace } from './BotonEnlace';
 import { tituloDe } from './titulo';
 
@@ -64,10 +65,11 @@ export function Marco() {
   if (soloCache) contenido = <Outlet />;
   else if (s.cargando || !cacheLista) contenido = <CircularProgress sx={{ display: 'block', mx: 'auto', mt: 8 }} aria-label="Cargando" />;
   else if (!s.autenticado) contenido = <Bienvenida sinConexion={!enLinea} />;
+  else if (s.esInterno) contenido = <CuentaInterna />;
   else if (s.necesitaEmpresa && ruta !== '/empresa') contenido = <Navigate to="/empresa" />;
   else if (activo.modoComercial && !activo.clienteId && ruta !== '/clientes') contenido = <Navigate to="/clientes" />;
 
-  const menu = !s.autenticado || s.necesitaEmpresa ? [] : activo.modoComercial ? MENU_COMERCIAL : MENU_CLIENTE;
+  const menu = !s.autenticado || s.necesitaEmpresa || s.esInterno ? [] : activo.modoComercial ? MENU_COMERCIAL : MENU_CLIENTE;
   return (
     <>
       {/* Desde md, la barra y la banda del modo comercial quedan fijas juntas (N7). En un celular la barra se va con el

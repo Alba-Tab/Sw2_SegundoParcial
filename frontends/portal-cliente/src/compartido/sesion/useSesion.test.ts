@@ -1,6 +1,6 @@
 import { ErrorResponse } from 'oidc-client-ts';
 import { afterEach, describe, expect, it } from 'vitest';
-import { destinoActual, destinoSeguro, reclamosDe, sesionPerdida } from './useSesion';
+import { destinoActual, destinoSeguro, esCuentaInterna, reclamosDe, sesionPerdida } from './useSesion';
 
 const token = (payload: object) => `e30.${btoa(JSON.stringify(payload)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')}.firma`;
 
@@ -47,5 +47,15 @@ describe('sesionPerdida', () => {
     expect(sesionPerdida(new ErrorResponse({ error: 'invalid_grant', error_description: 'Session not active' }))).toBe(true);
     expect(sesionPerdida(new ErrorResponse({ error: 'temporarily_unavailable' }))).toBe(false);
     expect(sesionPerdida(new TypeError('Failed to fetch'))).toBe(false);
+  });
+});
+
+describe('esCuentaInterna', () => {
+  it('gerente, despachador o chofer no tienen empresa en el portal; cliente, comercial y el recién registrado sí entran', () => {
+    expect(esCuentaInterna(['gerente'])).toBe(true);
+    expect(esCuentaInterna(['chofer'])).toBe(true);
+    expect(esCuentaInterna(['comercial'])).toBe(false);
+    expect(esCuentaInterna(['cliente'])).toBe(false);
+    expect(esCuentaInterna([])).toBe(false);
   });
 });

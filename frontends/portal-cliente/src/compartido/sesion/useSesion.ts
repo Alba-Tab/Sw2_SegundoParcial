@@ -13,6 +13,8 @@ export interface Sesion {
   clienteId?: string;
   esCliente: boolean;
   esComercial: boolean;
+  /** Cuenta del Centro de Control (gerente, despachador, chofer…): el portal no es para ella. */
+  esInterno: boolean;
   /** Usuario recién registrado: todavía no completó los datos de su empresa o no está vinculado. */
   necesitaEmpresa: boolean;
   iniciar: () => Promise<void>;
@@ -20,6 +22,13 @@ export interface Sesion {
   cerrar: () => Promise<void>;
   /** Pide un token nuevo con el refresh token (después de vincular, el token trae clienteId y el rol). */
   renovar: () => Promise<void>;
+}
+
+/** Roles del Centro de Control y de la app del chofer, que no tienen empresa en el portal. */
+const ROLES_INTERNOS = ['gerente', 'despachador', 'jefe_flota', 'administracion', 'chofer'];
+
+export function esCuentaInterna(roles: string[]): boolean {
+  return !roles.includes('cliente') && !roles.includes('comercial') && roles.some((rol) => ROLES_INTERNOS.includes(rol));
 }
 
 interface Reclamos {
@@ -66,6 +75,7 @@ export function useSesion(): Sesion {
   const roles = r.realm_access?.roles ?? [];
   const esCliente = roles.includes('cliente');
   const esComercial = roles.includes('comercial');
+  const esInterno = esCuentaInterna(roles);
   return {
     autenticado: auth.isAuthenticated,
     cargando: auth.isLoading && !auth.error,
@@ -76,7 +86,8 @@ export function useSesion(): Sesion {
     clienteId: r.clienteId,
     esCliente,
     esComercial,
-    necesitaEmpresa: auth.isAuthenticated && !esComercial && !(esCliente && r.clienteId),
+    esInterno,
+    necesitaEmpresa: auth.isAuthenticated && !esComercial && !esInterno && !(esCliente && r.clienteId),
     iniciar: () => auth.signinRedirect({ state: destinoActual() }),
     // Keycloak abre su formulario de registro con prompt=create (spec 001, paso 1).
     crearCuenta: () => auth.signinRedirect({ prompt: 'create', state: destinoActual() }),
