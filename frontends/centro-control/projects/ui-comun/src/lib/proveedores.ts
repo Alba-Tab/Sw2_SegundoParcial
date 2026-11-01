@@ -4,6 +4,7 @@ import { provideRouter, type Routes, withComponentInputBinding } from '@angular/
 import { MAT_DATE_LOCALE } from '@angular/material/core';
 import { MAT_ICON_DEFAULT_OPTIONS } from '@angular/material/icon';
 import { MatPaginatorIntl } from '@angular/material/paginator';
+import { MAT_TABS_CONFIG } from '@angular/material/tabs';
 import { proveerApollo } from './apollo';
 import { CONFIG_CENTRO, type ConfigCentro } from './configuracion';
 import { PaginadorEs } from './lista';
@@ -19,6 +20,8 @@ export function configurarApp(config: ConfigCentro, rutas: Routes): ApplicationC
       // Los <mat-icon> usan Material Symbols (base.css), no la fuente clásica material-icons.
       { provide: MAT_ICON_DEFAULT_OPTIONS, useValue: { fontSet: 'material-symbols-outlined' } },
       { provide: MatPaginatorIntl, useClass: PaginadorEs },
+      // Pestañas de sección con su ancho y alineadas a la izquierda, no estiradas a todo el ancho (JV-4).
+      { provide: MAT_TABS_CONFIG, useValue: { stretchTabs: false } },
       provideHttpClient(),
       provideAppInitializer(() => inject(Sesion).iniciar()),
       ...proveerApollo(),
