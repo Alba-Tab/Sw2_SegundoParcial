@@ -87,7 +87,8 @@ class ViajesController implements ViajesApi {
                         v.fechaViaje(),
                         v.placa(),
                         v.choferNombre())
-                .motivo(v.motivo());
+                .motivo(v.motivo())
+                .choferId(v.choferId());
         if (v.iniciadoEn() != null) d.iniciadoEn(v.iniciadoEn().atOffset(ZoneOffset.UTC));
         var u = v.ultimaPosicion();
         if (u != null) {

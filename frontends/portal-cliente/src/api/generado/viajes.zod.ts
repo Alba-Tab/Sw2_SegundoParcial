@@ -817,6 +817,10 @@ export const ListarViajesResponse = zod.object({
         fechaViaje: zod.iso.date().describe('Fecha sin hora, en America/La_Paz.'),
         placa: zod.string().regex(listarViajesResponseItemsItemPlacaRegExp),
         choferNombre: zod.string(),
+        choferId: zod
+          .uuid()
+          .nullish()
+          .describe('El chofer asignado al viaje (Flota); sirve para enlazar su ficha. Null solo en viajes anteriores a este campo.'),
         iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
         ultimaPosicion: zod
           .object({
@@ -947,6 +951,10 @@ export const ListarMisViajesResponse = zod.object({
         fechaViaje: zod.iso.date().describe('Fecha sin hora, en America/La_Paz.'),
         placa: zod.string().regex(listarMisViajesResponseItemsItemPlacaRegExp),
         choferNombre: zod.string(),
+        choferId: zod
+          .uuid()
+          .nullish()
+          .describe('El chofer asignado al viaje (Flota); sirve para enlazar su ficha. Null solo en viajes anteriores a este campo.'),
         iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
         ultimaPosicion: zod
           .object({
@@ -1070,6 +1078,10 @@ export const ObtenerViajeResponse = zod
     fechaViaje: zod.iso.date().describe('Fecha sin hora, en America/La_Paz.'),
     placa: zod.string().regex(obtenerViajeResponsePlacaRegExp),
     choferNombre: zod.string(),
+    choferId: zod
+      .uuid()
+      .nullish()
+      .describe('El chofer asignado al viaje (Flota); sirve para enlazar su ficha. Null solo en viajes anteriores a este campo.'),
     iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
     ultimaPosicion: zod
       .object({
@@ -1210,6 +1222,10 @@ export const IniciarViajeResponse = zod
     fechaViaje: zod.iso.date().describe('Fecha sin hora, en America/La_Paz.'),
     placa: zod.string().regex(iniciarViajeResponsePlacaRegExp),
     choferNombre: zod.string(),
+    choferId: zod
+      .uuid()
+      .nullish()
+      .describe('El chofer asignado al viaje (Flota); sirve para enlazar su ficha. Null solo en viajes anteriores a este campo.'),
     iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
     ultimaPosicion: zod
       .object({
@@ -1900,6 +1916,10 @@ export const AprobarEntregaObservadaResponse = zod
     fechaViaje: zod.iso.date().describe('Fecha sin hora, en America/La_Paz.'),
     placa: zod.string().regex(aprobarEntregaObservadaResponsePlacaRegExp),
     choferNombre: zod.string(),
+    choferId: zod
+      .uuid()
+      .nullish()
+      .describe('El chofer asignado al viaje (Flota); sirve para enlazar su ficha. Null solo en viajes anteriores a este campo.'),
     iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
     ultimaPosicion: zod
       .object({
@@ -2038,6 +2058,10 @@ export const RechazarEntregaObservadaResponse = zod
     fechaViaje: zod.iso.date().describe('Fecha sin hora, en America/La_Paz.'),
     placa: zod.string().regex(rechazarEntregaObservadaResponsePlacaRegExp),
     choferNombre: zod.string(),
+    choferId: zod
+      .uuid()
+      .nullish()
+      .describe('El chofer asignado al viaje (Flota); sirve para enlazar su ficha. Null solo en viajes anteriores a este campo.'),
     iniciadoEn: zod.iso.datetime({ offset: true }).optional().describe('ISO-8601 en UTC con `Z`.'),
     ultimaPosicion: zod
       .object({

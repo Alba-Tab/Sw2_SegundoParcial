@@ -27,6 +27,7 @@ public record ViajeVista(
         LocalDate fechaViaje,
         String placa,
         String choferNombre,
+        UUID choferId,
         Instant iniciadoEn,
         UltimaPosicion ultimaPosicion) {
 
@@ -45,6 +46,7 @@ public record ViajeVista(
                 a.fechaViaje(),
                 a.placa(),
                 a.choferNombre(),
+                a.choferId(),
                 v.iniciadoEn(),
                 ultimaPosicion);
     }

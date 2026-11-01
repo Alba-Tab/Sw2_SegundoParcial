@@ -1179,6 +1179,11 @@ components:
           $ref: './comun.yaml#/components/schemas/Placa'
         choferNombre:
           type: string
+        choferId:
+          type: string
+          format: uuid
+          nullable: true
+          description: El chofer asignado al viaje (Flota); sirve para enlazar su ficha. Null solo en viajes anteriores a este campo.
         iniciadoEn:
           $ref: './comun.yaml#/components/schemas/Instante'
         ultimaPosicion:

@@ -30,6 +30,7 @@ export function viaje(v: Json): Json {
     fechaViaje: v['fechaViaje'],
     placa: v['placa'] ?? null,
     choferNombre: v['choferNombre'] ?? null,
+    choferId: v['choferId'] ?? null,
     iniciadoEn: v['iniciadoEn'] ?? null,
     ultimaPosicion: v['ultimaPosicion']?.['posicion'] ?? null,
     ultimaPosicionEn: v['ultimaPosicion']?.['registradaEn'] ?? null,
