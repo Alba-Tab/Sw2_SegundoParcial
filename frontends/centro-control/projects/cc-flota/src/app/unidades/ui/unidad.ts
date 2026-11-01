@@ -37,6 +37,7 @@ import {
   checklistValido,
   cierreInicial,
   documentosEnAviso,
+  KM_MANTENIMIENTO,
   motivoBloqueo,
   puedeProgramar,
   type ItemCierre,
@@ -126,7 +127,10 @@ import { UnidadFachada } from '../unidades.fachada';
             }
             {{ u.kmDesdeUltimoMantenimiento | numero }} km
             @if (u.kmDesdeUltimoMantenimiento >= avisoKm) {
-              <span class="cdk-visually-hidden">, cerca del mantenimiento</span>
+              <!-- R2F-11: desde KM_MANTENIMIENTO ya le toca; antes, solo está cerca. -->
+              <span class="cdk-visually-hidden">{{
+                u.kmDesdeUltimoMantenimiento >= kmMantenimiento ? ', ya le toca el mantenimiento' : ', cerca del mantenimiento'
+              }}</span>
             }
           </dd>
         </div>
@@ -288,6 +292,7 @@ export class UnidadPagina {
   readonly vigencia = (venceEl: string) => vigencia(venceEl);
   readonly documentosEnAviso = documentosEnAviso;
   readonly avisoKm = AVISO_KM;
+  readonly kmMantenimiento = KM_MANTENIMIENTO;
   /** El formulario de programar se abre desde la acción del encabezado. */
   readonly programando = signal(false);
   readonly mantenimientos = this.fachada.mantenimientos;
