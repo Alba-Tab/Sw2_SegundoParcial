@@ -149,8 +149,8 @@ query Servicios($estado: EstadoServicio, $verMonto: Boolean!) {
 }
 
 # G7. `lineaCredito` solo a quien la puede ver (gerente, administracion, comercial): el despachador no la pide.
-# Cada línea es una llamada a Finanzas por cliente (presupuesto del Gateway: 200 por petición). E5-1: de a 50, con
-# «Cargar más» por `despuesDe`.
+# Las líneas de la página van a Finanzas en un lote (B5, hasta 100 por llamada). E5-1: de a 50, con «Cargar más» por
+# `despuesDe`.
 query Clientes($verCredito: Boolean!, $despuesDe: Cursor) {
   clientes(limite: 50, despuesDe: $despuesDe) {
     items {

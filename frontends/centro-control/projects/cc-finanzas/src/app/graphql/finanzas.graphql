@@ -99,8 +99,8 @@ query LineaCredito($clienteId: ID!) {
 }
 
 # G6: la línea de cada cliente va anidada en `clientes` (una sola petición del navegador); el Gateway pide a Finanzas
-# una línea por cliente. E5-1: de a 50 clientes, con «Cargar más» por `despuesDe`; la pantalla dice cuántas líneas
-# vinieron con error (revisión D-1).
+# las líneas de la página en un lote (B5). E5-1: de a 50 clientes, con «Cargar más» por `despuesDe`; la pantalla dice
+# cuántas líneas vinieron con error (revisión D-1, E2-2).
 query LineasCredito($despuesDe: Cursor) {
   clientes(limite: 50, despuesDe: $despuesDe) {
     items {
