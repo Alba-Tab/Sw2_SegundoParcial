@@ -69,7 +69,7 @@ El chofer descarga su viaje con señal, registra el inicio y opera sin red: GPS,
 | Descripción | 3 a 500 caracteres |
 | En movimiento | Con velocidad > 5 km/h la app solo permite dictar, no escribir (6.5; umbral en D58) |
 | Frenada brusca | Desaceleración ≥ **0,4 g** (D08) sostenida 300 ms con velocidad > 20 km/h (D59); acelerómetro a 10 Hz; una por cada 10 s. Viajes rechaza `FRENADA_BRUSCA` con `magnitudG < 0,4` → `400 VALIDACION` |
-| Fatiga | Modelo TFLite con la cámara **en primer plano** (limitación de iOS): ojos cerrados ≥ 1,5 s, somnolencia (PERCLOS), cabeceo, rostro no visible 3 s con velocidad > 5 km/h o 3 bostezos en 2 min (D60) → alarma sonora y `ALERTA_FATIGA`. Sin ninguna posición conocida, la alerta se guarda con su `registradoEn` y se encola con la primera posición que llegue. Las imágenes se descartan en el celular; la pantalla dibuja cajas y etiquetas (FO6) |
+| Fatiga | MediaPipe Face Landmarker (detector, malla y gestos en TFLite) con la cámara **en primer plano** (limitación de iOS): ojos cerrados ≥ 1,5 s, somnolencia (PERCLOS), cabeceo, rostro no visible 3 s con velocidad > 5 km/h o 3 bostezos en 2 min (D60) → alarma sonora y `ALERTA_FATIGA`. Sin ninguna posición conocida, la alerta se guarda con su `registradoEn` y se encola con la primera posición que llegue. Las imágenes se descartan en el celular; la pantalla dibuja cajas y etiquetas (FO6) |
 | Estados válidos | Hitos y eventos: `EN_RUTA` y los estados posteriores a la entrega (llegan tarde); otro → `409 CONFLICTO_ESTADO` |
 
 **Motor de sincronización (CU-08, app con Clean, SQLite + Drizzle)**

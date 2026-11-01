@@ -52,7 +52,7 @@ Las 4 apps Angular (`cc-tablero`, `cc-operaciones`, `cc-flota`, `cc-finanzas`) s
 
 **C. Mutaciones**
 
-11. Toda mutación de negocio recibe el argumento **`claveIdempotencia: ID!`** (en `input` cuando la mutación usa uno). La app genera un UUID **por intento** (al abrir el diálogo o en cada clic de "Confirmar"); el Gateway no guarda nada y lo reenvía como `Idempotency-Key` al servicio dueño, que es la autoridad (000 §4.1). Mutaciones con clave: `cancelarServicio`, `aprobarCredito`, `resolverIntervencion`, `aprobarEntregaObservada`, `rechazarEntregaObservada`, `programarMantenimiento`, `cerrarMantenimiento`, `registrarPago`, `atenderAlerta`, `dispararMision`, `aprobarAccion`, `rechazarAccion` y `exportarReporte`. `preguntar` no lleva clave porque no cambia estado (spec 015).
+11. Toda mutación de negocio recibe el argumento **`claveIdempotencia: ID!`** (en `input` cuando la mutación usa uno). La app genera un UUID **por intento** (al abrir el diálogo o en cada clic de "Confirmar"); el Gateway no guarda nada y lo reenvía como `Idempotency-Key` al servicio dueño, que es la autoridad (000 §4.1). Mutaciones con clave: `cancelarServicio`, `aprobarCredito`, `resolverIntervencion`, `aprobarEntregaObservada`, `rechazarEntregaObservada`, `programarMantenimiento`, `cerrarMantenimiento`, `registrarPago`, `ajustarLineaCredito`, `cambiarEstadoLineaCredito`, `crearUnidad`, `editarUnidad`, `darDeBajaUnidad`, `editarChofer`, `cambiarHabilitacionChofer`, `crearRuta`, `editarRuta`, `editarCliente`, `atenderAlerta`, `dispararMision`, `aprobarAccion`, `rechazarAccion` y `exportarReporte`. Gestión de datos maestros (D104, D107): unidades y choferes, `jefe_flota`; rutas, `gerente` y `despachador`; clientes, `comercial` y `gerente`; línea de crédito, `administracion` y `gerente`. `preguntar` no lleva clave porque no cambia estado (spec 015).
 12. Los errores del servicio llegan en `errors[].extensions` con `codigo` y `status` de 000 §5; la app decide por `codigo`.
 
 **D. Suscripción de alertas**
@@ -81,15 +81,15 @@ Las 4 apps Angular (`cc-tablero`, `cc-operaciones`, `cc-flota`, `cc-finanzas`) s
 | Sin token | `401` (HTTP) en `POST /graphql`; las apps redirigen al login |
 | Cliente en el Centro de Control | La app muestra "Sin acceso"; el Gateway responde `403 SIN_PERMISO` a cualquier consulta con rol `cliente` o `chofer` |
 
-**Lectura por rol.** Son los roles que acepta hoy cada servicio; el esquema los repite con `@roles` para cortar antes en el Gateway. Un campo que no aparece es para cualquier rol interno (`yo`, `rutas`).
+**Lectura por rol.** Son los roles que acepta hoy cada servicio; el esquema los repite con `@roles` para cortar antes en el Gateway. Un campo que no aparece es para cualquier rol interno (`yo`, `rutas`, `ruta`). Las listas que crecen sin tope (`clientes`, `choferes`, `mantenimientos`) se paginan por cursor en el esquema (`limite`, `despuesDe` → `items`, `siguienteCursor`); el Gateway no recorre todas las páginas (D109).
 
 | Campos | Roles | Servicio |
 |---|---|---|
 | `viajes`, `viajesEnCurso`, `viaje`, `entregasObservadas`, `intervenciones`, `Tablero.viajesEnCurso` | gerente, despachador, jefe_flota, comercial | Viajes |
 | `Viaje.hitos`, `Viaje.entrega` | gerente, despachador, comercial | Viajes |
-| `servicios`, `clientes` | gerente, despachador, administracion, comercial | Viajes |
+| `servicios`, `clientes`, `cliente` | gerente, despachador, administracion, comercial | Viajes |
 | `Viaje.monto`, `Servicio.monto` | gerente, administracion, comercial | Viajes |
-| `Viaje.unidad`, `unidades`, `unidad`, `mantenimientos`, `choferes`, `cargasCombustible`, `Tablero.unidadesPorEstado` | gerente, despachador, jefe_flota | Flota |
+| `Viaje.unidad`, `unidades`, `unidad`, `mantenimientos`, `choferes`, `chofer`, `cargasCombustible`, `Tablero.unidadesPorEstado` | gerente, despachador, jefe_flota | Flota |
 | `anomaliasCombustible`, `puntajesConduccion` | gerente, jefe_flota | Analítica |
 | `facturas` (comercial con `clienteId`), `factura`, `lineaCredito`, `cotizaciones` | gerente, administracion, comercial | Finanzas |
 | `Tablero.cuentasPorCobrar`, `solicitudesAprobacion` | gerente, administracion | Finanzas (el resumen lo calcula `GET /facturas/resumen`; el Gateway no suma) |
