@@ -2,7 +2,7 @@ import { esPositivo, normalizarMonto } from '../dominio/dinero';
 import { ErrorDeUsuario } from '../dominio/errores';
 import type { TipoEvidencia } from '../dominio/evidencia';
 import { descripcionValida, type OrigenHito, type TipoHito } from '../dominio/hito';
-import { kmh, type Lectura, MuestreoGps, velocidadEstimada } from '../dominio/muestreo';
+import { agregarLectura, kmh, type Lectura, MuestreoGps, velocidadEstimada } from '../dominio/muestreo';
 import type { TipoOperacion } from '../dominio/operacion';
 import { estadoVisible, inicioRechazado, puedeIniciar, type ViajeLocal } from '../dominio/viaje';
 import type {
@@ -35,7 +35,8 @@ export function guardarViajesDelServidor(viajes: Viajes, cola: Cola, delServidor
 export class CasosDeUso {
   private readonly muestreos = new Map<string, MuestreoGps>();
   private ultima: Lectura | null = null;
-  private anterior: Lectura | null = null;
+  /** Las lecturas que sirven para estimar la velocidad cuando el GPS no la da. */
+  private recientes: Lectura[] = [];
 
   constructor(
     private readonly cola: Cola,
@@ -73,8 +74,8 @@ export class CasosDeUso {
 
   /** Spec 005, paso 4: cada lectura del GPS; se guarda solo si pasa el muestreo de D52. */
   registrarLectura(viajeId: string, l: Lectura): boolean {
-    this.anterior = this.ultima;
     this.ultima = l;
+    this.recientes = agregarLectura(this.recientes, l);
     this.posicionGuardada?.guardar({ lat: l.lat, lng: l.lng });
     this.encolarFatigasSinPosicion(viajeId, { lat: l.lat, lng: l.lng });
     const muestreo = this.muestreos.get(viajeId) ?? new MuestreoGps();
@@ -98,7 +99,7 @@ export class CasosDeUso {
 
   /** La velocidad del camión ahora, o `null` si no se sabe (ver `velocidadEstimada`). */
   velocidadKmh(): number | null {
-    return velocidadEstimada(this.ultima, this.anterior, this.reloj.ahora().getTime());
+    return velocidadEstimada(this.recientes, this.reloj.ahora().getTime());
   }
 
   /**
@@ -112,7 +113,7 @@ export class CasosDeUso {
   /** Al cerrar sesión: nada de la posición ni del muestreo del chofer anterior queda en memoria. */
   olvidar(): void {
     this.ultima = null;
-    this.anterior = null;
+    this.recientes = [];
     this.muestreos.clear();
   }
 

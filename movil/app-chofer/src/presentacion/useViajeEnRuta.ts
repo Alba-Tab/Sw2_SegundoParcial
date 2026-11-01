@@ -30,6 +30,7 @@ export function useViajeEnRuta(viajeId: string | null, alFrenar: () => void) {
       const a = m.acceleration;
       if (!a) return;
       const g = Math.sqrt(a.x ** 2 + a.y ** 2 + a.z ** 2) / GRAVEDAD;
+      // Velocidad desconocida = 0 para las frenadas (a propósito, distinto de SIN_ROSTRO): sin GPS no se inventan eventos.
       const magnitud = detector.muestra(Date.now(), g, casos.velocidadKmh() ?? 0);
       if (magnitud !== null && casos.registrarFrenada(viajeId, magnitud)) alFrenar();
     });

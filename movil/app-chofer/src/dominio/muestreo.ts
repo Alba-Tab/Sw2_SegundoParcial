@@ -40,13 +40,29 @@ export const kmh = (velocidadMs: number) => Math.max(0, Math.round(velocidadMs *
  */
 export const LECTURA_VIGENTE_MS = 2 * LECTURA_GPS_CADA_MS;
 
+/** La velocidad por distancia se calcula con lecturas separadas por 5 s o más: con menos, el ruido del GPS manda. */
+export const SEPARACION_VELOCIDAD_MS = 5000;
+
+/** Agrega la lectura y deja solo las de los últimos 5 s más la última anterior a eso (la que sirve para estimar). */
+export function agregarLectura(lecturas: Lectura[], l: Lectura): Lectura[] {
+  const r = [...lecturas, l];
+  while (r.length > 2 && r[1].en <= l.en - SEPARACION_VELOCIDAD_MS) r.shift();
+  return r;
+}
+
 /**
  * km/h de la última lectura: la que da el GPS o, si no la da (`-1`: iOS sin dato, Android sin `hasSpeed`), distancia
- * sobre tiempo desde la anterior. `null` si no se sabe: sin lecturas, con la última de más de 20 s o sin anterior.
+ * sobre tiempo desde una lectura de 5 s antes o más. Un desplazamiento menor que la precisión de las lecturas es ruido
+ * del GPS con el camión parado: 0. `null` si no se sabe: sin lecturas, con la última de más de 20 s o sin otra 5 s antes.
  */
-export function velocidadEstimada(ultima: Lectura | null, anterior: Lectura | null, ahora: number): number | null {
+export function velocidadEstimada(lecturas: Lectura[], ahora: number): number | null {
+  const ultima = lecturas.at(-1);
   if (!ultima || ahora - ultima.en > LECTURA_VIGENTE_MS) return null;
   if (ultima.velocidadMs >= 0) return kmh(ultima.velocidadMs);
-  if (!anterior || ultima.en <= anterior.en) return null;
-  return kmh(metros(anterior, ultima) / ((ultima.en - anterior.en) / 1000));
+  const anterior = [...lecturas].reverse().find((l) => ultima.en - l.en >= SEPARACION_VELOCIDAD_MS);
+  if (!anterior) return null;
+  const d = metros(anterior, ultima);
+  // El error de la peor de las dos lecturas: dentro de ese radio no se sabe si se movió.
+  if (d < Math.max(anterior.precisionMetros ?? 0, ultima.precisionMetros ?? 0)) return 0;
+  return kmh(d / ((ultima.en - anterior.en) / 1000));
 }
