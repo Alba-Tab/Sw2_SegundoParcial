@@ -2,7 +2,7 @@
 
 Estado: **revisado** · Casos de uso: CU-16 Consultar reporte generativo, CU-17 Exportar a Excel · Responsable: Brayan Albaro Garcia Taboada
 
-El gerente (u otro rol interno) pregunta por voz en cc-tablero; Whisper transcribe en el navegador; Analítica pide al LLM una **intención** en JSON, la valida en código contra el catálogo de 5 reportes, los permisos y las fechas, ejecuta el reporte **por el servidor MCP** y el LLM redacta la respuesta con números calculados en código. Se devuelven el texto, la tabla de respaldo, el gráfico y la opción de Excel, que se descarga por el Gateway con un enlace HMAC sin estado (D21). Requisitos 8, 10 y 18. Decisiones: D21, D36, D38, D46. Propuesta 4.6, 5.16, 6.3, 7.4 y 9; K1.
+El gerente (u otro rol interno) pregunta por voz en cc-tablero; Whisper transcribe en el navegador; Analítica pide al LLM una **intención** en JSON, la valida en código contra el catálogo de 5 reportes, los permisos y las fechas, corre el reporte **ella misma** (el reporte es suyo; no pasa por el MCP) y el LLM redacta la respuesta con números calculados en código. Se devuelven el texto, la tabla de respaldo, el gráfico y la opción de Excel, que se descarga por el Gateway con un enlace HMAC sin estado (D21). Requisitos 8, 10 y 18. Decisiones: D21, D36, D38, D46. Propuesta 4.6, 5.16, 6.3, 7.4 y 9.
 
 ## Actores y roles
 
@@ -12,8 +12,7 @@ El gerente (u otro rol interno) pregunta por voz en cc-tablero; Whisper transcri
 | Administración, despachador, jefe de flota | `administracion`, `despachador`, `jefe_flota` | Ven y exportan los reportes de su rol (tabla del catálogo) |
 | cc-tablero | — | Whisper `tiny` en un Web Worker (D38); tabla con Angular Material (D46) |
 | Gateway | cliente `gateway` | Mutaciones `preguntar` y `exportarReporte`; `GET /exportaciones/{token}` |
-| Analítica | cliente `analitica` | Intención, validación, cliente MCP, redacción, reportes y archivos |
-| Servidor MCP | `mcp-server` | `ejecutar_reporte`: permisos y auditoría uniformes (spec 014) |
+| Analítica | audiencia `analitica` (solo valida tokens) | Intención, validación, reporte, redacción y archivos |
 
 ## Precondiciones
 
@@ -32,7 +31,7 @@ El gerente (u otro rol interno) pregunta por voz en cc-tablero; Whisper transcri
 
 Todos responden con `datosAl` ("datos al hh:mm") y se pueden exportar. Máximo 500 filas en pantalla y 10.000 en Excel (D93); más → `400 VALIDACION` en el campo del rango.
 
-**Periodos que entiende la intención.** Las fechas **relativas** las calcula el código con la fecha de `America/La_Paz`; el LLM solo devuelve el nombre del periodo: `HOY`, `ESTA_SEMANA` (7 días con hoy incluido: hacia adelante en cuentas por cobrar, que mira vencimientos; hacia atrás en los demás), `ESTE_MES`, `MES_ANTERIOR`, `MES` (con `mes` 1–12 y `anio` opcional; sin año, el del año en curso, o el anterior si ese mes todavía no llegó: "octubre" dicho en noviembre de 2026 es octubre de 2026), `ULTIMOS_30_DIAS`, `ULTIMOS_3_MESES` y `RANGO`. En `RANGO` el LLM solo copia las fechas que el usuario **dijo explícitamente** (`desde`, `hasta` en `YYYY-MM-DD`) y el código valida formato, orden y límites. El vocabulario del MCP (`vocabulario://negocio`, spec 014) dice lo mismo.
+**Periodos que entiende la intención.** Las fechas **relativas** las calcula el código con la fecha de `America/La_Paz`; el LLM solo devuelve el nombre del periodo: `HOY`, `ESTA_SEMANA` (7 días con hoy incluido: hacia adelante en cuentas por cobrar, que mira vencimientos; hacia atrás en los demás), `ESTE_MES`, `MES_ANTERIOR`, `MES` (con `mes` 1–12 y `anio` opcional; sin año, el del año en curso, o el anterior si ese mes todavía no llegó: "octubre" dicho en noviembre de 2026 es octubre de 2026), `ULTIMOS_30_DIAS`, `ULTIMOS_3_MESES` y `RANGO`. En `RANGO` el LLM solo copia las fechas que el usuario **dijo explícitamente** (`desde`, `hasta` en `YYYY-MM-DD`) y el código valida formato, orden y límites. El vocabulario que Analítica pone en el prompt es el mismo texto que el recurso `vocabulario://negocio` del MCP (spec 014).
 
 ## Pasos (camino feliz)
 
@@ -40,16 +39,16 @@ Todos responden con `datosAl` ("datos al hh:mm") y se pueden exportar. Máximo 5
 
 1. El gerente mantiene pulsado el micrófono (máximo 15 s, D94). Whisper `tiny` transcribe en español en un Web Worker; el texto se ve y se puede corregir antes de enviar (D95).
 2. cc-tablero envía la mutación `preguntar(texto)` (3 a 300 caracteres). El Gateway intercambia el token (audiencia `analitica`) y llama a `POST /api/v1/voz/preguntas` con `{texto}`.
-3. Analítica pide al LLM la intención con salida JSON restringida por esquema (temperatura 0, 20 s): `{reporteId | null, periodo, mes?, anio?, desde?, hasta?, filtros: {clienteNombre?, placa?, rutaNombre?, agrupar?}, aclaracion?}`. El prompt lleva el catálogo y el vocabulario (los mismos recursos que publica el MCP, spec 014) y la fecha de hoy, **sin valores de ejemplo** (en la PoC-3 el modelo copió una placa del ejemplo) y con la regla "deja en null lo que el usuario no dijo". `format` siempre lleva el esquema completo: con `format = "json"` el modelo omitía `filtros`.
+3. Analítica pide al LLM la intención con salida JSON restringida por esquema (temperatura 0, 20 s): `{reporteId | null, periodo, mes?, anio?, desde?, hasta?, filtros: {clienteNombre?, placa?, rutaNombre?, agrupar?}, aclaracion?}`. El prompt lleva el catálogo y el vocabulario (el mismo texto que publica el MCP, spec 014) y la fecha de hoy, **sin valores de ejemplo** (en la PoC-3 el modelo copió una placa del ejemplo) y con la regla "deja en null lo que el usuario no dijo". `format` siempre lleva el esquema completo: con `format = "json"` el modelo omitía `filtros`.
 4. **Validación en código** (pydantic), en este orden:
    1. `reporteId` nulo o fuera del catálogo → `422 PREGUNTA_FUERA_DE_ALCANCE` (aunque venga `aclaracion`: el modelo también la llena en preguntas fuera de alcance);
    2. `aclaracion` llena con un `reporteId` válido → `ACLARACION` con ese texto; las opciones salen del paso 4 si hay nombres ambiguos o, si no, de los reportes del catálogo que permite el rol, empezando por el propuesto (en la PoC-3, ante "muéstrame lo de agro", el modelo eligió un reporte y además pidió aclaración);
    3. el rol del token no está en los roles del reporte → `403 SIN_PERMISO`;
    4. nombres a ids, con texto normalizado (minúsculas, sin tildes ni signos): `clienteNombre` contra las razones sociales de la copia `cliente` y `rutaNombre` contra `ruta`; primero coincidencia exacta y, si no hay, **por prefijo de palabra** (cada palabra dicha es el comienzo de una palabra del nombre: "agro" coincide con "Agro Moroso" y con "Agroexport SRL"); `placa` con su patrón. Ninguna coincidencia → `ACLARACION` ("No encontré ese cliente"); más de una → `ACLARACION` con hasta 3 opciones;
    5. periodo a fechas y límites del reporte; si falta o se pasa → `ACLARACION`.
-5. Analítica llama a `ejecutar_reporte` en el MCP con el token **intercambiado otra vez** (audiencia `mcp-server`); el MCP verifica el rol, audita e intercambia hacia `analitica` para llamar `GET /api/v1/reportes/{reporteId}`. Es la cadena de 3 intercambios: cc-tablero → gateway → analitica → mcp-server → analitica.
-6. Redacción: `prompts/get redactar_respuesta_reporte` y el LLM escribe hasta 3 oraciones en español. **Regla de números:** cada número del texto debe estar en `filas` o `totales` (con formato `2.800,00`); si no, o si el LLM no responde en 20 s, se usa una plantilla fija ("Hay 3 facturas por 8.400,00 BOB que vencen entre el 03/11 y el 09/11").
-7. Responde `200` con `RespuestaVoz {tipo: RESPUESTA, texto, reporteId, parametros, tabla: {columnas, filas}, grafico, totales, datosAl, exportable: true}`. cc-tablero muestra el texto, la tabla, el gráfico y "Exportar a Excel".
+5. Analítica corre el reporte con el mismo código que `GET /api/v1/reportes/{reporteId}` (`ejecutarReporte`) y los roles del token. El token se intercambia una sola vez: gateway → analitica.
+6. Redacción: con un prompt fijo que lleva la pregunta, las primeras 30 filas y los totales, el LLM escribe hasta 3 oraciones en español. **Regla de números:** cada número del texto debe estar en `filas` o `totales` (con formato `2.800,00`); si no, o si el LLM no responde en 20 s, se usa una plantilla fija ("Hay 3 facturas por 8.400,00 BOB que vencen entre el 03/11 y el 09/11").
+7. Responde `200` con `RespuestaVoz {tipo: RESPUESTA, texto, reporteId, parametros, resultado: {columnas, filas, totales, grafico, datosAl}, exportable: true}`. cc-tablero muestra el texto, la tabla, el gráfico y "Exportar a Excel".
 
 **B. Exportar a Excel (CU-17, D21)**
 
@@ -71,10 +70,10 @@ Todos responden con `datosAl` ("datos al hh:mm") y se pueden exportar. Máximo 5
 | Botones y tablero | `reporte(id, params)` va Gateway → Analítica `ejecutarReporte` directo, sin LLM ni MCP |
 | Exportación | Mismos roles que el reporte; Analítica guarda el archivo **10 min**; el enlace vence a los 10 min; máximo 5 MB (D96) |
 | HMAC | Secreto `EXPORTACION_HMAC_SECRETO` igual en todas las instancias del Gateway (gestor de secretos). Firma inválida → `403 SIN_PERMISO`; vencido → `404 EXPORTACION_VENCIDA`. Analítica además exige que `X-Solicitante-Sub` sea el `sub` guardado, y solo acepta el encabezado con el token de servicio del `gateway` |
-| Tiempos de espera en el Gateway (D98, spec 016) | `preguntar` 60 s; `exportarReporte` 30 s; en el plan B, 25 s por cada llamada (`/voz/interpretaciones`, `ejecutar_reporte`, `/voz/redacciones`). Los 3 s de la composición no aplican aquí |
-| Auditoría | Analítica registra pregunta, intención validada, reporte y exportación; el MCP registra `ejecutar_reporte` (spec 014) |
+| Tiempos de espera en el Gateway (D98, spec 016) | `preguntar` 60 s; `exportarReporte` 30 s. Los 3 s de la composición no aplican aquí |
+| Auditoría | Analítica registra pregunta, intención validada, reporte y exportación |
 
-**Plan B de K1 (2 saltos).** Si en PoC-1 el tercer intercambio falla (RHBK-3599), el Gateway orquesta con `VOZ_CADENA=DOS_SALTOS`: (a) `POST /api/v1/voz/interpretaciones` en Analítica (intención validada; 1 intercambio); (b) el Gateway llama al MCP `ejecutar_reporte` (gateway → mcp-server → analitica: 2 intercambios; `gateway` se registra como cliente del MCP); (c) `POST /api/v1/voz/redacciones` con el resultado (1 intercambio). La cadena más larga es de 2 saltos y el usuario ve lo mismo.
+**Por qué no pasa por el MCP.** Hasta el 31/10/2026 el reporte se pedía al MCP, que lo volvía a pedir a Analítica (3 intercambios de token, con un plan B de 2, K1). Se quitó porque el reporte es de Analítica: el salto no agregaba nada y sumaba un punto de falla. El MCP queda para el agente (spec 014), y Analítica ya no es cliente del MCP ni intercambia tokens.
 
 ## Estados que cambia
 
@@ -85,9 +84,9 @@ Todos responden con `datosAl` ("datos al hh:mm") y se pueden exportar. Máximo 5
 
 ## Contratos que toca
 
-- REST `contratos/openapi/analitica.yaml` (nuevas): `ejecutarReporte` (`GET /api/v1/reportes/{reporteId}`, parámetros por consulta), `listarReportes` (`GET /api/v1/reportes`: el catálogo), `preguntar` (`POST /api/v1/voz/preguntas`), `interpretarPregunta` y `redactarRespuesta` (`POST /api/v1/voz/interpretaciones`, `/voz/redacciones`; solo plan B), `crearExportacion` (`POST /api/v1/exportaciones`, `Idempotency-Key`, `201`), `obtenerArchivoExportacion` (`GET /api/v1/exportaciones/{exportacionId}/archivo`, solo el token de servicio del `gateway`). Respuestas `200`, `201`, `400`, `401`, `403`, `404`, `422`, `503`.
+- REST `contratos/openapi/analitica.yaml` (nuevas): `ejecutarReporte` (`GET /api/v1/reportes/{reporteId}`, parámetros por consulta), `listarReportes` (`GET /api/v1/reportes`: el catálogo), `preguntar` (`POST /api/v1/voz/preguntas`), `crearExportacion` (`POST /api/v1/exportaciones`, `Idempotency-Key`, `201`), `obtenerArchivoExportacion` (`GET /api/v1/exportaciones/{exportacionId}/archivo`, solo el token de servicio del `gateway`). Respuestas `200`, `201`, `400`, `401`, `403`, `404`, `422`, `503`.
 - REST `contratos/openapi/gateway.yaml` (archivo nuevo, D21): `descargarExportacion` (`GET /exportaciones/{token}`, sin `Authorization`; `200`, `403 SIN_PERMISO`, `404 EXPORTACION_VENCIDA`, `503 DEPENDENCIA_NO_DISPONIBLE` con `Retry-After`).
-- MCP: herramienta `ejecutar_reporte`, recurso `catalogo://reportes`, prompt `redactar_respuesta_reporte` (spec 014).
+- MCP: ninguno. La herramienta `ejecutar_reporte`, el recurso `catalogo://reportes` y el prompt `redactar_respuesta_reporte` siguen en el MCP para otros clientes (spec 014), pero la consulta por voz no los usa.
 - GraphQL (F9/F10, propuesta 6.3): `reporte(id: ReporteId!, params: ReporteParams): ReporteResultado!`, `preguntar(texto: String!): RespuestaVoz!`, `exportarReporte(id: ReporteId!, params: ReporteParams, claveIdempotencia: ID!): UrlDescarga!` (spec 016).
 
 ## Errores y caminos alternativos
@@ -110,8 +109,7 @@ Todos responden con `datosAl` ("datos al hh:mm") y se pueden exportar. Máximo 5
 - **FM4 (fuera de alcance). Dado** "¿Quién gana el clásico el domingo?", **entonces** `422 PREGUNTA_FUERA_DE_ALCANCE` y el catálogo con botones.
 - **FM4 (sin permiso). Dado** un `jefe_flota`, **cuando** pregunta por las cuentas por cobrar, **entonces** `403 SIN_PERMISO`.
 - **FR4. Dado** Ollama detenido, **cuando** el gerente pregunta, **entonces** `503 LLM_NO_DISPONIBLE` y el catálogo con botones sigue funcionando.
-- **Dado** la pregunta normal, **entonces** la auditoría del MCP tiene un `mcp.ejecutar_reporte` con el `sub` del gerente (la cadena de 3 intercambios conserva el usuario).
-- **Plan B. Dado** `VOZ_CADENA=DOS_SALTOS`, **cuando** se repite la pregunta normal, **entonces** la respuesta es la misma y ningún token pasó por más de 2 intercambios.
+- **Dado** la pregunta normal, **entonces** la auditoría de Analítica tiene un `voz.preguntar` con el `sub` del gerente y la tabla es la misma que da `ejecutarReporte` con esos parámetros.
 - **Excel. Dado** el resultado, **cuando** exporta, **entonces** descarga un `.xlsx` con las hojas "Datos" y "Parámetros" y los mismos totales que la pantalla; **y dado** el mismo enlace 11 min después, **entonces** `404 EXPORTACION_VENCIDA`; **y dado** el enlace con un carácter cambiado, **entonces** `403 SIN_PERMISO`.
 - **Dado** dos instancias del Gateway, **cuando** la exportación se crea en una y se descarga por la otra, **entonces** funciona (HMAC sin estado).
 - **Dado** `RENTABILIDAD` de la ruta Aula, **entonces** el margen de cada viaje es el monto facturado menos sus cargas de combustible (datos de Viajes, Finanzas y Flota).

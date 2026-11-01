@@ -169,7 +169,7 @@ Valores que las specs 005–010 y 013–016 necesitaban y que ni la propuesta ni
 | D95 | 015 | El texto transcrito se puede corregir antes de enviarlo | confirmada |
 | D96 | 015 | Archivo de Excel de hasta 5 MB | confirmada |
 | D97 | 016 | DataLoader sin filtro por ids: máximo 10 llamadas en paralelo | confirmada |
-| D98 | 016, 015 | Tiempo de espera del Gateway: 3 s por llamada al componer pantallas; `preguntar` 60 s, `exportarReporte` 30 s, cada llamada del plan B de voz 25 s, mutaciones simples 10 s; tiempo de espera de peticiones del Gateway en Cloud Run 3.600 s | confirmada |
+| D98 | 016, 015 | Tiempo de espera del Gateway: 3 s por llamada al componer pantallas; `preguntar` 60 s, `exportarReporte` 30 s, mutaciones simples 10 s; tiempo de espera de peticiones del Gateway en Cloud Run 3.600 s | confirmada |
 | D99 | 016 | Reconexión de la suscripción: 1, 2, 4… s, máximo 30 s | confirmada |
 | D100 | 016 | La barra revisa la disponibilidad de cada app cada 60 s con `/salud.json` | confirmada |
 | D101 | 016 | GraphQL: profundidad máxima 8 y complejidad máxima 1.000 | confirmada |

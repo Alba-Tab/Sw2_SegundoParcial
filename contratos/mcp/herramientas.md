@@ -34,7 +34,7 @@ Con el token del agente `tools/list` devuelve 6 herramientas; con el de un geren
 
 ## Seguridad (propuesta 8)
 
-- Token con audiencia `mcp-server` y `azp` registrado (`agente`, `analitica`; `gateway` solo con el plan B de la spec 015). Sin token → `401` con `WWW-Authenticate`; otro `azp` → `403 SIN_PERMISO`.
+- Token con audiencia `mcp-server` y `azp` registrado (`agente`). Sin token → `401` con `WWW-Authenticate`; otro `azp` → `403 SIN_PERMISO`.
 - Por cada llamada intercambia el token recibido por uno del servicio (`libs/intercambio-token`). Sin SQL ni GraphQL generado: cada herramienta llama a una operación REST fija.
 - 30 llamadas a herramientas (`tools/call`) por minuto por `sub` y `azp` → `429 LIMITE_PETICIONES` con `Retry-After`; `tools/list`, `ping` y la inicialización no cuentan.
 - Una línea JSON de auditoría por llamada (000 §9): `id`, `ocurridoEn`, `canal = SISTEMA`, `accion = mcp.<herramienta>`, `entidad`, `entidadId`, `actorSub`, `actorRol`, `correlationId` (el `X-Correlation-Id` del cliente si es un UUID), `datos` = argumentos sin texto libre, y `resultado` (`OK` o el `codigo`). Las llamadas rechazadas también: argumentos inválidos (`VALIDACION`, sin `datos`), herramienta desconocida u oculta (`-32602`; una desconocida como `mcp.desconocida`) y límite (`LIMITE_PETICIONES`).

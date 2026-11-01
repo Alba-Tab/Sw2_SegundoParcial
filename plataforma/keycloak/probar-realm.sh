@@ -44,17 +44,14 @@ ok "portal: chofer1 trae solo interno" "$(rolesPortal 0193a000-0000-7000-8000-00
 ok "portal: agroexport trae cliente" "$(rolesPortal 0193a000-0000-7000-8000-000000000021)" cliente
 ok "portal: comercial1 trae comercial" "$(rolesPortal 0193a000-0000-7000-8000-000000000005)" comercial
 
-echo "== K1: demo-cli → gateway → analitica → mcp-server → analitica"
+echo "== Intercambio: demo-cli → gateway → analitica (la voz no pasa por el MCP, spec 015)"
 SID=$(claims "$T" | jq -r .sid)
 T1=$(intercambio gateway "$KC_SECRETO_GATEWAY" "$T" analitica)
-T2=$(intercambio analitica "$KC_SECRETO_ANALITICA" "$T1" mcp-server)
-T3=$(intercambio mcp-server "$KC_SECRETO_MCP_SERVER" "$T2" analitica)
-ok "salto 1 aud" "$(aud "$T1")" analitica
-ok "salto 2 aud" "$(aud "$T2")" mcp-server
-ok "salto 3 aud" "$(aud "$T3")" analitica
-ok "salto 3 conserva sub y sid" "$(claims "$T3" | jq -r '.sub + " " + .sid')" "0193a000-0000-7000-8000-000000000001 $SID"
-ok "salto 3 conserva roles (fullScopeAllowed=false)" "$(roles "$T3")" gerente,interno
+ok "salto aud" "$(aud "$T1")" analitica
+ok "conserva sub y sid" "$(claims "$T1" | jq -r '.sub + " " + .sid')" "0193a000-0000-7000-8000-000000000001 $SID"
+ok "conserva roles (fullScopeAllowed=false)" "$(roles "$T1")" gerente,interno
 ok "gateway no intercambia hacia mcp-server" "$(intercambio gateway "$KC_SECRETO_GATEWAY" "$T" mcp-server)" ""
+ok "analitica no intercambia hacia mcp-server" "$(intercambio analitica "$KC_SECRETO_ANALITICA" "$T1" mcp-server)" ""
 
 echo "== Agente"
 TA=$(curl -s "$O/token" -d grant_type=client_credentials -d client_id=agente -d client_secret="$KC_SECRETO_AGENTE" | jq -r .access_token)

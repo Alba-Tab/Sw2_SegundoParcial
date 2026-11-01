@@ -59,10 +59,10 @@ La semilla de los servicios (D102, `plataforma/semilla/`) usa estos mismos ids: 
 | `portal-cliente` | Público, PKCE, registro | `viajes`, `finanzas`; claim `clienteId` | `cliente`, `comercial` o, para una cuenta interna, solo `interno` |
 | `app-chofer` | Público, PKCE, `offline_access` opcional; redirección `transporte-chofer://*` | `viajes`, `flota` | `chofer`, `interno` |
 | `demo-cli` | Público, *device grant* (y *direct grant* en local) | `gateway`, `viajes`, `finanzas`, `flota`, `analitica` | Todos menos `agente_lectura` |
-| `gateway`, `analitica`, `mcp-server` | Confidencial, intercambio estándar | La que piden con `audience` y `scope=aud-<cliente>` | Los del usuario |
+| `gateway`, `mcp-server` | Confidencial, intercambio estándar | La que piden con `audience` y `scope=aud-<cliente>` | Los del usuario |
 | `agente` | Confidencial, *client credentials* | `mcp-server` | `agente_lectura` |
 | `viajes` | Confidencial, cuenta de servicio con FGAP v2 y `query-users` | — | — |
-| `finanzas`, `flota` | Solo validan tokens | — | — |
+| `analitica`, `finanzas`, `flota` | Solo validan tokens | — | — |
 
 Notas:
 - `interno` no da permisos en ningún servicio. Es hijo compuesto de `gerente`, `despachador`, `jefe_flota`, `administracion` y `chofer`, y `portal-cliente` solo tiene en su *scope* `cliente`, `comercial` e `interno`. Así, una cuenta interna que entra al portal llega con `interno` y sin sus roles (dar `gerente` o `administracion` al portal abriría lectura total desde un cliente público), el portal puede reconocerla y Viajes rechaza su alta de cliente con `403 SIN_PERMISO` (spec 001). Como Keycloak expande los compuestos del *scope*, `interno` también aparece en los tokens de los clientes que ya tienen alguno de esos roles (`cc-*`, `app-chofer`, `demo-cli` y los intercambios); `comercial` no lo recibe.

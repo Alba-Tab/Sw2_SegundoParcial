@@ -1,4 +1,4 @@
-"""Consulta por voz (spec 015, A): intención del LLM validada en código → reporte por el MCP → redacción verificada."""
+"""Consulta por voz (spec 015, A): intención del LLM validada en código → reporte en Analítica → redacción verificada."""
 
 import asyncio
 import json
@@ -8,18 +8,24 @@ from typing import Any
 
 from sqlalchemy import select
 
+from app.aplicacion import reportes
 from app.aplicacion.consultas import hoy
 from app.dominio.errores import ErrorDeDominio
 from app.dominio.reportes import CATALOGO, PLACA, Parametros, ReporteId, validar
 from app.dominio.voz import PERIODOS, Intencion, coincidencias, fechas, numeros_validos, plantilla
 from app.infraestructura.bd import Cliente, Ruta, transaccion
 from app.infraestructura.llm import Llm, LlmNoDisponible
-from app.infraestructura.mcp import ERRORES_MCP, conectar, resultado
-from app.infraestructura.tokens import ErrorToken, Tokens
 
 ROLES_VOZ = {"gerente", "administracion", "despachador", "jefe_flota"}
 # Periodo de una opción cuando el que dijo el usuario no sirve: cabe en el max_dias de cualquier reporte.
 PERIODO_POR_DEFECTO = {ReporteId.CUENTAS_POR_COBRAR: "ESTA_SEMANA"}
+# Lo que el LLM necesita para entender las preguntas, sin ejemplos (el MCP publica el mismo texto para el agente).
+VOCABULARIO = """Vocabulario del negocio (transporte de carga, Santa Cruz, Bolivia)
+- Zona horaria: America/La_Paz. Moneda: BOB, con 2 decimales.
+- Estados del viaje: PROGRAMANDO, CONFIRMADO, EN_RUTA, ENTREGADO, CERRADO, CANCELADO, ENTREGA_OBSERVADA, ENTREGA_RECHAZADA, REQUIERE_INTERVENCION.
+- "En curso": CONFIRMADO, EN_RUTA o ENTREGA_OBSERVADA. "Retrasado": la duración real supera 1,25 veces la planificada (distancia / 55 km/h).
+- "Mora": el cliente tiene facturas vencidas con saldo. "Cuentas por cobrar": facturas con saldo, por fecha de vencimiento.
+- Periodos: "hoy"; "esta semana" = 7 días con hoy incluido, hacia adelante en cuentas por cobrar (mira vencimientos) y hacia atrás en los demás reportes; "este mes"; "mes anterior"; un mes nombrado = ese mes del año en curso, o del anterior si todavía no llegó; "últimos 30 días"; "últimos 3 meses"."""
 
 ESQUEMA = {
     "type": "object",
@@ -191,24 +197,33 @@ def validar_intencion(i: Intencion, roles: set[str], hoy_: date) -> dict[str, An
     return {"tipo": "INTENCION", "reporteId": reporte.value, "parametros": parametros}
 
 
-def _raiz(e: BaseException) -> BaseException:
-    """El cliente MCP corre en un TaskGroup de anyio: se desenvuelve para responder con el código correcto."""
-    while isinstance(e, BaseExceptionGroup) and len(e.exceptions) == 1:
-        e = e.exceptions[0]
-    return e
+def _parametros(p: dict[str, Any]) -> Parametros:
+    """Los parámetros que dejó `validar_intencion` (nombres del contrato) como Parametros del dominio."""
+    return Parametros(
+        desde=date.fromisoformat(p["desde"]) if p.get("desde") else None,
+        hasta=date.fromisoformat(p["hasta"]) if p.get("hasta") else None,
+        cliente_id=p.get("clienteId"),
+        ruta_id=p.get("rutaId"),
+        placa=p.get("placa"),
+        agrupar=p.get("agrupar", "VIAJE"),
+    )
+
+
+def _correr_reporte(reporte_id: str, parametros: dict[str, Any], roles: set[str]) -> dict[str, Any]:
+    with transaccion() as s:
+        return reportes.ejecutar(s, ReporteId(reporte_id), _parametros(parametros), roles)
 
 
 class Voz:
-    def __init__(self, llm: Llm | None = None, tokens: Tokens | None = None) -> None:
+    def __init__(self, llm: Llm | None = None) -> None:
         self.llm = llm or Llm()
-        self.tokens = tokens or Tokens()
 
-    async def interpretar(self, texto: str, roles: set[str], vocabulario: str = "") -> dict[str, Any]:
+    async def interpretar(self, texto: str, roles: set[str]) -> dict[str, Any]:
         if not roles & ROLES_VOZ:
             raise ErrorDeDominio("SIN_PERMISO", "Tu rol no usa la consulta por voz")
         try:
             r = await self.llm.chat(
-                [{"role": "system", "content": _sistema(vocabulario, hoy())}, {"role": "user", "content": texto}],
+                [{"role": "system", "content": _sistema(VOCABULARIO, hoy())}, {"role": "user", "content": texto}],
                 formato=ESQUEMA,
             )
             datos = json.loads(r.get("content") or "{}")
@@ -217,70 +232,35 @@ class Voz:
         # Lee las copias de clientes y rutas: fuera del bucle de eventos.
         return await asyncio.to_thread(validar_intencion, _intencion(datos), roles, hoy())
 
-    async def redactar(self, pregunta: str, resultado_reporte: dict[str, Any], prompt: str | None = None) -> str:
+    async def redactar(self, pregunta: str, resultado_reporte: dict[str, Any]) -> str:
         reporte = ReporteId(resultado_reporte["reporteId"])
         filas, totales = resultado_reporte.get("filas", []), resultado_reporte.get("totales", {})
-        texto_prompt = prompt or (
-            f'Responde en español, en hasta 3 oraciones, "{pregunta}" usando solo estos datos; cada número debe estar en filas o '
-            f"totales, con formato 2.800,00:\n{json.dumps({'filas': filas[:30], 'totales': totales}, ensure_ascii=False)}"
+        prompt = (
+            f'Responde en español, en hasta 3 oraciones, la pregunta "{pregunta}" usando SOLO los datos del reporte '
+            f"{reporte.value}.\nCada número que escribas debe aparecer en las filas o los totales, con formato boliviano "
+            f"(2.800,00). No agregues datos que no estén.\nResultado del reporte (JSON):\n"
+            f"{json.dumps({'filas': filas[:30], 'totales': totales}, ensure_ascii=False)}"
         )
         try:
-            r = await self.llm.chat([{"role": "user", "content": texto_prompt}])
+            r = await self.llm.chat([{"role": "user", "content": prompt}])
             texto = (r.get("content") or "").strip()
         except LlmNoDisponible:
             texto = ""
         # Regla de números: si el LLM inventa uno (o no responde), se usa la plantilla.
         return texto if texto and numeros_validos(texto, filas, totales) else plantilla(reporte, filas, totales)
 
-    async def preguntar(self, texto: str, roles: set[str], token_usuario: str) -> dict[str, Any]:
-        """Cadena de 3 intercambios: cc-tablero → gateway → analitica → mcp-server → analitica (spec 015, paso 5)."""
-        try:
-            return await self._preguntar(texto, roles, token_usuario)
-        except BaseException as envuelto:
-            e = _raiz(envuelto)
-            # Keycloak o el MCP caídos son una dependencia que no responde (503), no un error interno.
-            if isinstance(e, (ErrorToken, *ERRORES_MCP)):
-                raise ErrorDeDominio("DEPENDENCIA_NO_DISPONIBLE", "El servidor MCP o Keycloak no responden") from e
-            if e is envuelto:
-                raise
-            raise e from envuelto
-
-    async def _preguntar(self, texto: str, roles: set[str], token_usuario: str) -> dict[str, Any]:
-        token_mcp = await self.tokens.para_mcp(token_usuario)
-        async with conectar(token_mcp) as mcp:
-            vocabulario = "".join(
-                getattr(c, "text", "") for c in (await mcp.read_resource("vocabulario://negocio")).contents
-            )
-            interpretacion = await self.interpretar(texto, roles, vocabulario)
-            if interpretacion["tipo"] == "ACLARACION":
-                return {
-                    "tipo": "ACLARACION",
-                    "texto": interpretacion["texto"],
-                    "opciones": interpretacion.get("opciones", []),
-                }
-            es_error, datos = resultado(
-                await mcp.call_tool(
-                    "ejecutar_reporte",
-                    {"nombre": interpretacion["reporteId"], "parametros": interpretacion["parametros"]},
-                )
-            )
-            if es_error:
-                raise ErrorDeDominio(
-                    datos.get("codigo", "DEPENDENCIA_NO_DISPONIBLE"),
-                    datos.get("mensaje", "No se pudo correr el reporte"),
-                )
-            prompt = await mcp.get_prompt(
-                "redactar_respuesta_reporte",
-                {
-                    "pregunta": texto,
-                    "reporteId": datos["reporteId"],
-                    "resultado": json.dumps(
-                        {"filas": datos["filas"][:30], "totales": datos["totales"]}, ensure_ascii=False
-                    ),
-                },
-            )
-            texto_prompt = "".join(getattr(m.content, "text", "") for m in prompt.messages)
-        respuesta = await self.redactar(texto, datos, texto_prompt)
+    async def preguntar(self, texto: str, roles: set[str]) -> dict[str, Any]:
+        interpretacion = await self.interpretar(texto, roles)
+        if interpretacion["tipo"] == "ACLARACION":
+            return {
+                "tipo": "ACLARACION",
+                "texto": interpretacion["texto"],
+                "opciones": interpretacion.get("opciones", []),
+            }
+        datos = await asyncio.to_thread(
+            _correr_reporte, interpretacion["reporteId"], interpretacion["parametros"], roles
+        )
+        respuesta = await self.redactar(texto, datos)
         return {
             "tipo": "RESPUESTA",
             "texto": respuesta,
