@@ -164,6 +164,7 @@ export interface UnidadEdicion {
 
 export interface BajaUnidad {
   /**
+   * Se recortan los espacios de los bordes antes de contar el largo.
    * @minLength 3
    * @maxLength 200
    */
@@ -289,6 +290,14 @@ export const ChoferLicenciaCategoria = {
 } as const;
 
 /**
+ * Solo en choferes inhabilitados desde la API (`activo = false`).
+ */
+export type ChoferInhabilitacion = {
+  motivo: string;
+  desde: Instante;
+};
+
+/**
  * Claim `sub` de Keycloak.
  * @minLength 1
  * @maxLength 64
@@ -304,6 +313,37 @@ export interface Chofer {
   activo: boolean;
   /** false si tiene una reserva activa (D11). */
   disponible: boolean;
+  /** Solo en choferes inhabilitados desde la API (`activo = false`). */
+  inhabilitacion?: ChoferInhabilitacion;
+}
+
+export type ChoferEdicionLicenciaCategoria = (typeof ChoferEdicionLicenciaCategoria)[keyof typeof ChoferEdicionLicenciaCategoria];
+
+export const ChoferEdicionLicenciaCategoria = {
+  A: 'A',
+  B: 'B',
+  C: 'C',
+} as const;
+
+export interface ChoferEdicion {
+  /**
+   * Se recortan los espacios de los bordes antes de contar el largo.
+   * @minLength 3
+   * @maxLength 120
+   */
+  nombre: string;
+  licenciaCategoria: ChoferEdicionLicenciaCategoria;
+  licenciaVenceEl: Fecha;
+}
+
+export interface HabilitacionChofer {
+  activo: boolean;
+  /**
+   * Obligatorio al inhabilitar. Se recortan los espacios de los bordes antes de contar el largo.
+   * @minLength 3
+   * @maxLength 200
+   */
+  motivo?: string;
 }
 
 export interface PaginaChoferes {
@@ -1277,6 +1317,193 @@ export const obtenerChofer = async (choferId: Uuid, options?: Parameters<typeof 
   return pedirFlota<obtenerChoferResponse>(getObtenerChoferUrl(choferId), {
     ...options,
     method: 'GET',
+  });
+};
+
+export type editarChoferResponse200 = {
+  data: Chofer;
+  status: 200;
+};
+
+export type editarChoferResponse400 = {
+  data: Problema;
+  status: 400;
+};
+
+export type editarChoferResponse401 = {
+  data: Problema;
+  status: 401;
+};
+
+export type editarChoferResponse403 = {
+  data: Problema;
+  status: 403;
+};
+
+export type editarChoferResponse404 = {
+  data: Problema;
+  status: 404;
+};
+
+export type editarChoferResponse409 = {
+  data: Problema;
+  status: 409;
+};
+
+export type editarChoferResponse422 = {
+  data: Problema;
+  status: 422;
+};
+
+export type editarChoferResponse503 = {
+  data: Problema;
+  status: 503;
+};
+
+export type editarChoferResponseSuccess = editarChoferResponse200 & {
+  headers: Headers;
+};
+export type editarChoferResponseError = (
+  | editarChoferResponse400
+  | editarChoferResponse401
+  | editarChoferResponse403
+  | editarChoferResponse404
+  | editarChoferResponse409
+  | editarChoferResponse422
+  | editarChoferResponse503
+) & {
+  headers: Headers;
+};
+
+export type editarChoferResponse = editarChoferResponseSuccess | editarChoferResponseError;
+
+export const getEditarChoferUrl = (choferId: Uuid) => {
+  return `/api/v1/choferes/${choferId}`;
+};
+
+/**
+ * Los choferes no tienen alta por API: el usuario se crea en la consola de Keycloak y el chofer llega de la
+ * semilla (D102, D103). Sube `versionAgregado` y publica `ChoferActualizado` por Outbox en la misma transacción.
+ * Con una reserva activa (`disponible = false`) la licencia tiene que seguir siendo C y vigente hoy: si no, 409
+ * `CONFLICTO_ESTADO`.
+ * @summary Edición del nombre y la licencia de un chofer (jefe_flota). D104.
+ */
+export const editarChofer = async (
+  choferId: Uuid,
+  choferEdicion: ChoferEdicion,
+  options?: Parameters<typeof pedirFlota>[1],
+): Promise<editarChoferResponse> => {
+  const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]));
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return pedirFlota<editarChoferResponse>(getEditarChoferUrl(choferId), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(choferEdicion),
+  });
+};
+
+export type cambiarHabilitacionChoferResponse200 = {
+  data: Chofer;
+  status: 200;
+};
+
+export type cambiarHabilitacionChoferResponse400 = {
+  data: Problema;
+  status: 400;
+};
+
+export type cambiarHabilitacionChoferResponse401 = {
+  data: Problema;
+  status: 401;
+};
+
+export type cambiarHabilitacionChoferResponse403 = {
+  data: Problema;
+  status: 403;
+};
+
+export type cambiarHabilitacionChoferResponse404 = {
+  data: Problema;
+  status: 404;
+};
+
+export type cambiarHabilitacionChoferResponse409 = {
+  data: Problema;
+  status: 409;
+};
+
+export type cambiarHabilitacionChoferResponse422 = {
+  data: Problema;
+  status: 422;
+};
+
+export type cambiarHabilitacionChoferResponse503 = {
+  data: Problema;
+  status: 503;
+};
+
+export type cambiarHabilitacionChoferResponseSuccess = cambiarHabilitacionChoferResponse200 & {
+  headers: Headers;
+};
+export type cambiarHabilitacionChoferResponseError = (
+  | cambiarHabilitacionChoferResponse400
+  | cambiarHabilitacionChoferResponse401
+  | cambiarHabilitacionChoferResponse403
+  | cambiarHabilitacionChoferResponse404
+  | cambiarHabilitacionChoferResponse409
+  | cambiarHabilitacionChoferResponse422
+  | cambiarHabilitacionChoferResponse503
+) & {
+  headers: Headers;
+};
+
+export type cambiarHabilitacionChoferResponse = cambiarHabilitacionChoferResponseSuccess | cambiarHabilitacionChoferResponseError;
+
+export const getCambiarHabilitacionChoferUrl = (choferId: Uuid) => {
+  return `/api/v1/choferes/${choferId}/habilitacion`;
+};
+
+/**
+ * Al inhabilitar (`activo = false`) el `motivo` es obligatorio (400 VALIDACION). No se inhabilita a un chofer con
+ * una reserva activa (`disponible = false`): 409 `CONFLICTO_ESTADO`. Pedir el estado que ya tiene (habilitar a
+ * uno activo o inhabilitar a uno inactivo) también es 409 `CONFLICTO_ESTADO`, sin versión nueva ni evento.
+ * Habilitar borra `inhabilitacion`. Sube `versionAgregado` y publica `ChoferActualizado` por Outbox en la misma
+ * transacción.
+ * @summary Habilita o inhabilita a un chofer (jefe_flota). D104.
+ */
+export const cambiarHabilitacionChofer = async (
+  choferId: Uuid,
+  habilitacionChofer: HabilitacionChofer,
+  options?: Parameters<typeof pedirFlota>[1],
+): Promise<cambiarHabilitacionChoferResponse> => {
+  const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]));
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return pedirFlota<cambiarHabilitacionChoferResponse>(getCambiarHabilitacionChoferUrl(choferId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(habilitacionChofer),
   });
 };
 
