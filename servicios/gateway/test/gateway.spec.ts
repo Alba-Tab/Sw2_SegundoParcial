@@ -660,4 +660,12 @@ describe('revisión 2 del Gateway', () => {
     const u = await gql(['gerente'], '{ unidad(id: "u9") { unidadId } }');
     expect(u.body.errors[0].extensions).toMatchObject({ codigo: 'NO_ENCONTRADO', status: 404 });
   });
+
+  it('viaje.choferId pasa tal cual de Viajes y sale en null si Viajes no lo manda', async () => {
+    rutas.set('GET /viajes/api/v1/viajes/v1', () => ({ json: { ...VIAJE('v1'), choferId: 'ch1' } }));
+    rutas.set('GET /viajes/api/v1/viajes/v2', () => ({ json: VIAJE('v2') }));
+    const r = await gql(['despachador'], '{ a: viaje(id: "v1") { choferId } b: viaje(id: "v2") { choferId } }');
+    expect(r.body.errors).toBeUndefined();
+    expect(r.body.data).toEqual({ a: { choferId: 'ch1' }, b: { choferId: null } });
+  });
 });
