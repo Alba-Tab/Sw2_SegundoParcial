@@ -14,7 +14,6 @@ import {
   EtiquetaPipe,
   FechaPipe,
   FiltrosLista,
-  LIMITE_GATEWAY,
   PieLista,
   posicionEstado,
   Sesion,
@@ -50,8 +49,6 @@ import { MantenimientosFachada } from '../mantenimientos.fachada';
       grupo="EstadoMantenimiento"
       nombre="mantenimientos"
       singular="mantenimiento"
-      [limite]="limite"
-      corte="recientes"
     />
     <div class="tabla-ancha" role="region" tabindex="0" aria-label="Mantenimientos">
       <table
@@ -124,7 +121,6 @@ export class MantenimientosPagina {
   readonly campos = { mantenimientos: 'Flota' };
   readonly columnas = columnasConEstado(['placa', 'tipo', 'fecha', 'taller', 'estado', 'acciones']);
   readonly puedeCerrar = puedeCerrar;
-  readonly limite = LIMITE_GATEWAY;
   readonly lista = controlLista<FilaMantenimiento>({
     filas: this.mantenimientos,
     texto: textoMantenimiento,

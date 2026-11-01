@@ -10,14 +10,13 @@ import {
   Estado,
   FechaPipe,
   FiltrosLista,
-  LIMITE_GATEWAY,
   PieLista,
   posicionEstado,
 } from 'ui-comun';
 import { ChoferesFachada } from '../choferes.fachada';
 import { estadoChofer, textoChofer, vigenciaLicencia, type Chofer } from '../domain/chofer';
 
-/** G3: lista de choferes con su licencia y estado. Solo lectura hasta que el backend tenga alta y edición. */
+/** G3: lista de choferes con su licencia y estado; la edición y la habilitación están en la ficha (D104). */
 @Component({
   selector: 'app-choferes',
   providers: [ChoferesFachada],
@@ -32,7 +31,6 @@ import { estadoChofer, textoChofer, vigenciaLicencia, type Chofer } from '../dom
       grupo="EstadoChofer"
       nombre="choferes"
       singular="chofer"
-      [limite]="limite"
     />
     <div class="tabla-ancha" role="region" tabindex="0" aria-label="Choferes">
       <table
@@ -79,7 +77,6 @@ export class ChoferesPagina {
   readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly campos = { choferes: 'Flota' };
-  readonly limite = LIMITE_GATEWAY;
   readonly columnas = columnasConEstado(['nombre', 'licencia', 'vence', 'estado']);
   readonly estado = estadoChofer;
   readonly vigencia = (c: Chofer) => vigenciaLicencia(c);

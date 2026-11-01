@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
@@ -15,6 +16,7 @@ import {
   FiltrosLista,
   PieLista,
   posicionEstado,
+  Sesion,
   vigencia,
   NumeroPipe,
 } from 'ui-comun';
@@ -25,6 +27,7 @@ import { UnidadesFachada } from '../unidades.fachada';
   selector: 'app-unidades',
   providers: [UnidadesFachada],
   imports: [
+    MatButtonModule,
     MatIconModule,
     Encabezado,
     MatTableModule,
@@ -39,7 +42,11 @@ import { UnidadesFachada } from '../unidades.fachada';
     PieLista,
   ],
   template: `
-    <cc-encabezado titulo="Unidades" />
+    <cc-encabezado titulo="Unidades">
+      @if (sesion.tiene('jefe_flota')) {
+        <a mat-stroked-button routerLink="/unidades/nueva"><mat-icon>local_shipping</mat-icon>Nueva unidad</a>
+      }
+    </cc-encabezado>
     <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!unidades().length" />
     <cc-filtros-lista
       [control]="lista"
@@ -107,6 +114,7 @@ import { UnidadesFachada } from '../unidades.fachada';
 })
 export class UnidadesPagina {
   private readonly fachada = inject(UnidadesFachada);
+  readonly sesion = inject(Sesion);
   readonly unidades = this.fachada.unidades;
   readonly error = this.fachada.error;
   readonly datosAl = this.fachada.datosAl;

@@ -1,10 +1,12 @@
-import { etiqueta, numero, vigencia } from 'ui-comun/dominio';
-import type { TipoMantenimiento, UnidadesQuery, UnidadQuery } from '../../graphql/generado';
+import { etiqueta, mensajeCampo, numero, vigencia, type ErroresCampo } from 'ui-comun/dominio';
+import type { TipoMantenimiento, UnidadEdicionInput, UnidadesQuery, UnidadNuevaInput, UnidadQuery } from '../../graphql/generado';
 
 /** Tipos y reglas de presentación de unidades y mantenimientos (spec 010). Sin Angular ni Apollo. */
 export type Unidad = NonNullable<UnidadesQuery['unidades']>[number];
 export type DetalleUnidad = NonNullable<UnidadQuery['unidad']>;
 export type Mantenimiento = NonNullable<UnidadQuery['mantenimientos']>[number];
+export type NuevaUnidad = Omit<UnidadNuevaInput, 'claveIdempotencia'>;
+export type EdicionUnidad = Omit<UnidadEdicionInput, 'claveIdempotencia' | 'unidadId'>;
 export interface ItemCierre {
   item: string;
   ok: boolean;
@@ -50,7 +52,7 @@ export const checklistCompleto = (items: readonly ItemCierre[]): boolean => item
 /** Al cerrar, cada ítem empieza marcado como hecho. */
 export const cierreInicial = (m: Mantenimiento): ItemCierre[] => m.checklist.map((i) => ({ item: i.item, ok: true }));
 
-/** Se puede programar un mantenimiento solo con la unidad disponible o con el aviso pendiente. */
+/** Programar un mantenimiento, editar y dar de baja: solo con la unidad disponible o con el aviso pendiente (spec 010). */
 export const puedeProgramar = (estado: string): boolean => estado === 'DISPONIBLE' || estado === 'MANTENIMIENTO_PENDIENTE';
 
 /** Lo que encuentra la búsqueda de la lista: placa y tipo con su texto en pantalla ("tracto", "furgón"). */
@@ -102,4 +104,103 @@ export function motivoBloqueo(
   const porque = razones.length ? razones.join('; ') : 'tiene un mantenimiento pendiente';
   const quien = esJefeFlota ? 'Prográmalo con «Programar mantenimiento».' : 'Lo programa el jefe de flota.';
   return `No puede salir: ${porque}. ${quien}`;
+}
+
+/** Contrato de Flota (`Placa`): 3 o 4 números y 3 letras. */
+export const PLACA = /^[0-9]{3,4}[A-Z]{3}$/;
+
+/** Lo que define los atributos de una unidad (D76): el tracto o el tipo de remolque. */
+export type ClaseUnidad = 'TRACTO' | 'FURGON' | 'PLATAFORMA' | 'CISTERNA';
+export interface ReglaAtributo {
+  campo: string;
+  etiqueta: string;
+  min: number;
+  max?: number;
+  entero?: boolean;
+  opcional?: boolean;
+}
+
+/** D76: atributos de cada clase con sus rangos; Flota rechaza los de otra clase. */
+export const ATRIBUTOS: Record<ClaseUnidad, readonly ReglaAtributo[]> = {
+  TRACTO: [
+    { campo: 'capacidadTanqueLitros', etiqueta: 'Tanque (litros)', min: 100, max: 1500 },
+    { campo: 'potenciaHp', etiqueta: 'Potencia (HP)', min: 1, opcional: true },
+  ],
+  FURGON: [{ campo: 'volumenM3', etiqueta: 'Volumen (m³)', min: 10, max: 120 }],
+  PLATAFORMA: [{ campo: 'largoMetros', etiqueta: 'Largo (metros)', min: 6, max: 15 }],
+  CISTERNA: [
+    { campo: 'compartimentos', etiqueta: 'Compartimentos', min: 1, max: 6, entero: true },
+    { campo: 'capacidadLitros', etiqueta: 'Capacidad (litros)', min: 5000, max: 45000 },
+  ],
+};
+
+/** Todos los campos de atributos, sin repetir: el formulario tiene uno por campo y activa los de la clase. */
+export const CAMPOS_ATRIBUTO = Object.values(ATRIBUTOS).flatMap((reglas) => reglas.map((r) => r.campo));
+
+export const claseUnidad = (tipoUnidad: string, tipoRemolque?: string | null): ClaseUnidad | null =>
+  tipoUnidad === 'TRACTO' ? 'TRACTO' : ((tipoRemolque as ClaseUnidad | null | undefined) ?? null);
+
+/** Solo los atributos de la clase y con valor (un opcional vacío no viaja). */
+export function atributosDe(clase: ClaseUnidad, valores: Record<string, number | null | undefined>): Record<string, number> {
+  const atributos: Record<string, number> = {};
+  for (const { campo } of ATRIBUTOS[clase]) {
+    const v = valores[campo];
+    if (v !== null && v !== undefined) atributos[campo] = v;
+  }
+  return atributos;
+}
+
+/** El SOAT y la inspección técnica, como los pide Flota (un documento de cada tipo). */
+export const documentosDe = (soat: string, inspeccion: string) => [
+  { tipo: 'SOAT', venceEl: soat },
+  { tipo: 'INSPECCION_TECNICA', venceEl: inspeccion },
+];
+
+export const venceDocumento = (documentos: readonly { tipo: string; venceEl: string }[], tipo: string): string =>
+  documentos.find((d) => d.tipo === tipo)?.venceEl ?? '';
+
+/** El texto de error de los campos de unidad: la placa y los enteros tienen el suyo; lo demás, el de siempre. */
+export function mensajeUnidad(errores: ErroresCampo): string {
+  if (errores?.['placa']) return 'Escribe 3 o 4 números y 3 letras, por ejemplo 4521KTR.';
+  if (errores?.['entero']) return 'Escribe un número entero.';
+  return mensajeCampo(errores);
+}
+
+/** Lo que se escribe en los campos comunes del alta y la edición: capacidad, documentos y atributos. */
+export interface CamposEscritos {
+  capacidadToneladas: number | null;
+  soat: string;
+  inspeccion: string;
+  atributos: Record<string, number | null>;
+}
+
+/** La edición que va a Flota: la capacidad solo en remolques, un documento de cada tipo y los atributos de la clase. */
+export function edicionDesde(clase: ClaseUnidad, c: CamposEscritos): EdicionUnidad {
+  return {
+    ...(clase === 'TRACTO' ? {} : { capacidadToneladas: c.capacidadToneladas }),
+    documentos: documentosDe(c.soat, c.inspeccion),
+    atributos: atributosDe(clase, c.atributos),
+  };
+}
+
+/** El alta que va a Flota: el tracto con su odómetro; el remolque con su tipo y su capacidad. Placa en mayúsculas. */
+export function nuevaUnidadDesde(
+  v: {
+    tipoUnidad: 'TRACTO' | 'REMOLQUE';
+    tipoRemolque: string;
+    placa: string;
+    kilometraje: number | null;
+    kmDesdeUltimoMantenimiento: number | null;
+  },
+  c: CamposEscritos,
+): NuevaUnidad {
+  const tracto = v.tipoUnidad === 'TRACTO';
+  const clase = tracto ? 'TRACTO' : (v.tipoRemolque as ClaseUnidad);
+  return {
+    tipoUnidad: v.tipoUnidad,
+    placa: v.placa.trim().toUpperCase(),
+    ...(tracto ? { kilometraje: v.kilometraje ?? 0 } : { tipoRemolque: v.tipoRemolque }),
+    kmDesdeUltimoMantenimiento: v.kmDesdeUltimoMantenimiento ?? 0,
+    ...edicionDesde(clase, c),
+  };
 }

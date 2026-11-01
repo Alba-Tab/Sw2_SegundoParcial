@@ -74,15 +74,16 @@ query Choferes {
   }
 }
 
-# No hay `chofer(id)` en el esquema: la ficha sale de la lista, con su puntaje de conducción y sus viajes.
+# La ficha: el chofer por id, con su puntaje de conducción y sus viajes.
 query Chofer($choferId: ID!) {
-  choferes {
+  chofer(id: $choferId) {
     choferId
     nombre
     licenciaCategoria
     licenciaVenceEl
     activo
     disponible
+    motivoInhabilitacion
   }
   puntajesConduccion(choferId: $choferId) {
     desde
@@ -165,5 +166,57 @@ mutation CerrarMantenimiento($input: CierreMantenimientoInput!) {
   cerrarMantenimiento(input: $input) {
     mantenimientoId
     estado
+  }
+}
+
+# Gestión de unidades y choferes (D104): cada mutación devuelve el recurso y Apollo refresca su caché por id.
+fragment UnidadGestionada on Unidad {
+  unidadId
+  estado
+  capacidadToneladas
+  documentos {
+    tipo
+    venceEl
+  }
+  atributos
+}
+
+mutation CrearUnidad($input: UnidadNuevaInput!) {
+  crearUnidad(input: $input) {
+    ...UnidadGestionada
+  }
+}
+
+mutation EditarUnidad($input: UnidadEdicionInput!) {
+  editarUnidad(input: $input) {
+    ...UnidadGestionada
+  }
+}
+
+mutation DarDeBajaUnidad($unidadId: ID!, $motivo: String!, $claveIdempotencia: ID!) {
+  darDeBajaUnidad(unidadId: $unidadId, motivo: $motivo, claveIdempotencia: $claveIdempotencia) {
+    ...UnidadGestionada
+  }
+}
+
+fragment ChoferGestionado on Chofer {
+  choferId
+  nombre
+  licenciaCategoria
+  licenciaVenceEl
+  activo
+  disponible
+  motivoInhabilitacion
+}
+
+mutation EditarChofer($input: ChoferEdicionInput!) {
+  editarChofer(input: $input) {
+    ...ChoferGestionado
+  }
+}
+
+mutation CambiarHabilitacionChofer($choferId: ID!, $activo: Boolean!, $motivo: String, $claveIdempotencia: ID!) {
+  cambiarHabilitacionChofer(choferId: $choferId, activo: $activo, motivo: $motivo, claveIdempotencia: $claveIdempotencia) {
+    ...ChoferGestionado
   }
 }
