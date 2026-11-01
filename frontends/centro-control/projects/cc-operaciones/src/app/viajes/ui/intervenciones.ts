@@ -25,7 +25,10 @@ import { IntervencionesFachada } from '../viajes.fachada';
     PieLista,
   ],
   template: `
-    <cc-encabezado titulo="Intervenciones" subtitulo="Viajes cuya compensación se agotó: se reintenta o se marca resuelto en el viaje" />
+    <cc-encabezado
+      titulo="Intervenciones"
+      subtitulo="La cancelación automática no terminó (reserva o crédito sin liberar): reintenta o márcalo resuelto en el viaje"
+    />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!lista.filas().length" />
     <cc-filtros-lista
       [control]="lista"

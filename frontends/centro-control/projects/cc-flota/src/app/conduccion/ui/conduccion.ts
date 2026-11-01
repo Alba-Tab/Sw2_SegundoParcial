@@ -16,7 +16,12 @@ import { PUNTAJE_BAJO, type PuntajeChofer } from '../domain/conduccion';
     <cc-encabezado titulo="Puntaje de conducción" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!puntajes()" />
     @if (puntajes(); as p) {
-      <p class="secundario">Semana del {{ p.desde | fecha }} al {{ p.hasta | fecha }} · datos al {{ p.datosAl | fecha: true }}</p>
+      <p class="secundario">
+        Semana del {{ p.desde | fecha }} al {{ p.hasta | fecha }}
+        @if (p.datosAl) {
+          · datos al {{ p.datosAl | fecha: true }}
+        }
+      </p>
       <cc-filtros-lista [control]="lista" busqueda="Buscar por chofer" nombre="choferes" singular="chofer" />
       <div class="tabla-ancha" role="region" tabindex="0" aria-label="Conducción por chofer">
         <table

@@ -1,6 +1,13 @@
-import { pagoRepetido, saldoDelError, saldoDespuesDe } from './pago';
+import { medioEnFrase, pagoRepetido, saldoDelError, saldoDespuesDe } from './pago';
 
 describe('pago (dominio, spec 008)', () => {
+  it('el medio va con su preposición en la frase (V3-11)', () => {
+    expect(medioEnFrase('EFECTIVO')).toBe('en efectivo');
+    expect(medioEnFrase('TRANSFERENCIA')).toBe('por transferencia');
+    expect(medioEnFrase('DEPOSITO')).toBe('por depósito');
+    expect(medioEnFrase('CHEQUE')).toBe('con cheque');
+  });
+
   it('el saldo que queda se calcula en centavos, sin float (E-19)', () => {
     expect(saldoDespuesDe('2800.00', '1000.00')).toBe('1800.00');
     expect(saldoDespuesDe('0.30', '0.10')).toBe('0.20');

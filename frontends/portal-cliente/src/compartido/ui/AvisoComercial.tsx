@@ -1,4 +1,7 @@
 import Alert from '@mui/material/Alert';
+import Box from '@mui/material/Box';
+import type { Theme } from '@mui/material/styles';
+import useMediaQuery from '@mui/material/useMediaQuery';
 import Typography from '@mui/material/Typography';
 import { useObtenerCliente } from '../../api/generado/viajes';
 import { useClienteActivo } from '../sesion/ClienteActivo';
@@ -11,6 +14,7 @@ export function AvisoComercial() {
   const activo = useClienteActivo();
   // Con "Ver como cliente" llega solo el id: se completa la razón social.
   const cliente = useObtenerCliente(activo.clienteId ?? '', { query: { enabled: !!activo.clienteId && !activo.razonSocial } });
+  const esCelular = useMediaQuery((t: Theme) => t.breakpoints.down('sm'));
   if (!activo.modoComercial) return null;
   const nombre = activo.razonSocial ?? cliente.data?.razonSocial;
   return (
@@ -18,6 +22,9 @@ export function AvisoComercial() {
       severity="warning"
       variant="filled"
       square
+      // En un celular la banda queda en una línea (V1-14, V3-9): sin ícono y el nombre cortado con «…»; el completo, en title.
+      icon={esCelular ? false : undefined}
+      sx={{ '& .MuiAlert-message': { minWidth: 0 } }}
       action={
         <BotonEnlace to="/clientes" color="inherit" variant="outlined" sx={{ minHeight: 44 }}>
           {activo.clienteId ? 'Cambiar cliente' : 'Elegir cliente'}
@@ -25,13 +32,14 @@ export function AvisoComercial() {
       }
     >
       {activo.clienteId ? (
-        <>
+        // El lector de pantalla lee el texto entero: el corte es solo visual.
+        <Box title={`Atendiendo a: ${nombre ?? ''}`} sx={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
           Atendiendo a: <strong>{nombre ?? '…'}</strong>
-        </>
+        </Box>
       ) : (
         'Modo comercial: elige un cliente'
       )}
-      {/* En un celular la banda queda fija en una línea (V1-14): la nota de responsabilidad, desde sm. */}
+      {/* La nota de responsabilidad, desde sm. */}
       <Typography variant="body2" component="span" sx={{ display: { xs: 'none', sm: 'block' } }}>
         Lo que registres queda a nombre de {sesion.nombre}, por teléfono.
       </Typography>

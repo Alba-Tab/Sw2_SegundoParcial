@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import type { ComponentType, ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { conConsultas, problema, simularApi } from '../../pruebas/utilidades';
 import { PaginaFacturas } from './PaginaFacturas';
@@ -6,7 +7,13 @@ import { PaginaFacturas } from './PaginaFacturas';
 const clienteActivo = vi.hoisted(() => ({ actual: { modoComercial: false, clienteId: undefined as string | undefined } }));
 vi.mock('../../compartido/sesion/ClienteActivo', () => ({ useClienteActivo: () => ({ ...clienteActivo.actual, elegir: () => {} }) }));
 const ruta = vi.hoisted(() => ({ params: {} as { facturaId?: string } }));
-vi.mock('@tanstack/react-router', () => ({ useNavigate: () => vi.fn(), useParams: () => ruta.params }));
+vi.mock('@tanstack/react-router', () => ({
+  useNavigate: () => vi.fn(),
+  useParams: () => ruta.params,
+  createLink:
+    (C: ComponentType<{ href: string; children?: ReactNode }>) =>
+    ({ to, children }: { to: string; children?: ReactNode }) => <C href={to}>{children}</C>,
+}));
 
 const bob = (monto: string) => ({ monto, moneda: 'BOB' });
 const factura = (numero: string, monto: string, saldo: string, venceEl: string, extra: object = {}) => ({

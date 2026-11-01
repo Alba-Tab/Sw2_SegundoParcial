@@ -122,7 +122,7 @@ import { ViajeFachada } from '../viajes.fachada';
               <mat-error>{{ textoError(texto) }}</mat-error>
             </mat-form-field>
             <button mat-flat-button (click)="resolver(id(), 'REINTENTAR_COMPENSACION', zonaIntervencion)" [disabled]="enviando()">
-              <mat-icon>replay</mat-icon>Reintentar la compensación
+              <mat-icon>replay</mat-icon>Reintentar la liberación
             </button>
             <button mat-stroked-button (click)="resolver(id(), 'MARCAR_RESUELTO', zonaIntervencion)" [disabled]="enviando()">
               <mat-icon>task_alt</mat-icon>Marcar resuelto

@@ -1,5 +1,4 @@
-import { Component, inject } from '@angular/core';
-import { MatIconModule } from '@angular/material/icon';
+import { Component, computed, inject } from '@angular/core';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
@@ -22,15 +21,11 @@ import { LineasFachada } from '../lineas.fachada';
 @Component({
   selector: 'app-lineas',
   providers: [LineasFachada],
-  imports: [Encabezado, MatIconModule, MatTableModule, MatSortModule, RouterLink, BobPipe, Estado, AvisoServicios, FiltrosLista, PieLista],
+  imports: [Encabezado, MatTableModule, MatSortModule, RouterLink, BobPipe, Estado, AvisoServicios, FiltrosLista, PieLista],
   template: `
     <cc-encabezado titulo="Líneas de crédito" />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!lineas().length" />
-    @if (incompletas(); as n) {
-      <p class="aviso-lista" role="status">
-        <mat-icon>cloud_off</mat-icon>No se pudo leer la línea de {{ n }} {{ n === 1 ? 'cliente' : 'clientes' }}: la lista está incompleta.
-      </p>
-    }
+    <!-- Las líneas que faltan se dicen una vez, en el mismo aviso y con su «Reintentar» (V1-11, V3-7). -->
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!lineas().length" [extra]="avisoIncompletas()" />
     @if (clientesLeidos() >= limiteClientes) {
       <p class="secundario">Se revisan los primeros {{ limiteClientes }} clientes: si hay más, sus líneas no salen aquí.</p>
     }
@@ -96,7 +91,10 @@ export class LineasPagina {
   readonly lineas = this.fachada.lineas;
   readonly error = this.fachada.error;
   readonly cargando = this.fachada.cargando;
-  readonly incompletas = this.fachada.incompletas;
+  readonly avisoIncompletas = computed(() => {
+    const n = this.fachada.incompletas();
+    return n ? `No se pudo leer la línea de ${n} ${n === 1 ? 'cliente' : 'clientes'}: la lista está incompleta.` : null;
+  });
   readonly clientesLeidos = this.fachada.clientesLeidos;
   readonly limiteClientes = LIMITE_GATEWAY;
   /** Una línea caída la cuenta el aviso de la lista: sin banner repetido (V1-11). */

@@ -35,7 +35,7 @@ export function PaginaCotizacion() {
           Tu cotización
         </Typography>
         <Typography color="text.secondary">
-          {ruta?.nombre ?? 'Ruta'} · {TIPOS_CARGA[c.tipoCarga]} · {c.toneladas} t · {fecha(c.fechaViaje)}
+          {ruta?.nombre ?? 'Ruta: Sin dato'} · {TIPOS_CARGA[c.tipoCarga]} · {c.toneladas} t · {fecha(c.fechaViaje)}
         </Typography>
         <Divider />
         <Typography variant="h3" component="p">
@@ -45,7 +45,17 @@ export function PaginaCotizacion() {
           Tarifa: {dinero(c.tarifaPorTonelada)} por tonelada
         </Typography>
         {c.estado === 'ACEPTADA' ? (
-          <Alert severity="info">Ya confirmaste esta cotización.</Alert>
+          // Sin callejón: el servicio que salió de esta cotización está en la lista.
+          <Alert
+            severity="info"
+            action={
+              <BotonEnlace to="/servicios" color="inherit" size="small">
+                Ver servicios
+              </BotonEnlace>
+            }
+          >
+            Ya confirmaste esta cotización.
+          </Alert>
         ) : vencida ? (
           <Alert severity="warning">La cotización venció. Pide una nueva para ver el precio de hoy.</Alert>
         ) : (

@@ -112,7 +112,7 @@ import { TableroFachada } from '../tablero.fachada';
                       {{ c.saldoTotal | bob }}
                       <span class="secundario">· {{ c.facturasPorVencer }} por vencer · {{ c.facturasVencidas }} vencidas</span>
                     } @else {
-                      —
+                      Sin dato
                     }
                   }
                 }

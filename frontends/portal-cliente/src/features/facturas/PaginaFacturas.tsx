@@ -1,3 +1,4 @@
+import EventBusy from '@mui/icons-material/EventBusy';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -27,6 +28,7 @@ import { type Factura, getListarFacturasQueryKey, listarFacturas } from '../../a
 import { compararMontos, dinero, fecha } from '../../compartido/formato/formato';
 import { Antiguedad } from '../../compartido/offline/Antiguedad';
 import { useClienteActivo } from '../../compartido/sesion/ClienteActivo';
+import { desdeEnlace, Enlace } from '../../compartido/ui/Enlace';
 import { EstadoFactura } from '../../compartido/ui/EstadoServicio';
 import { Problema } from '../../compartido/ui/Problema';
 import { Credito } from './Credito';
@@ -64,7 +66,7 @@ export function PaginaFacturas() {
           <>
             {fecha(c.getValue())}
             {c.row.original.vencida && (
-              <Chip label={`${c.row.original.diasVencida} días vencida`} color="error" size="small" sx={{ ml: 1 }} />
+              <Chip icon={<EventBusy />} label={`${c.row.original.diasVencida} días vencida`} color="error" size="small" sx={{ ml: 1 }} />
             )}
           </>
         ),
@@ -82,6 +84,16 @@ export function PaginaFacturas() {
       col.accessor('estado', {
         header: 'Estado',
         cell: (c) => <EstadoFactura estado={c.getValue()} />,
+      }),
+      // La fila lleva al servicio: el enlace lo dice y sirve con teclado; su contexto es la fila de la factura (V3-1).
+      col.display({
+        id: 'servicio',
+        header: 'Servicio',
+        cell: (c) => (
+          <Enlace to="/servicios/$servicioId" params={{ servicioId: c.row.original.servicioId }}>
+            Ver servicio
+          </Enlace>
+        ),
       }),
     ],
     [],
@@ -135,13 +147,17 @@ export function PaginaFacturas() {
                 <TableRow key={g.id}>
                   {g.headers.map((h) => (
                     <TableCell key={h.id} sortDirection={h.column.getIsSorted() || false}>
-                      <TableSortLabel
-                        active={!!h.column.getIsSorted()}
-                        direction={h.column.getIsSorted() || 'asc'}
-                        onClick={h.column.getToggleSortingHandler()}
-                      >
-                        {flexRender(h.column.columnDef.header, h.getContext())}
-                      </TableSortLabel>
+                      {h.column.getCanSort() ? (
+                        <TableSortLabel
+                          active={!!h.column.getIsSorted()}
+                          direction={h.column.getIsSorted() || 'asc'}
+                          onClick={h.column.getToggleSortingHandler()}
+                        >
+                          {flexRender(h.column.columnDef.header, h.getContext())}
+                        </TableSortLabel>
+                      ) : (
+                        flexRender(h.column.columnDef.header, h.getContext())
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -168,7 +184,9 @@ export function PaginaFacturas() {
                         : undefined
                     }
                     sx={{ cursor: 'pointer' }}
-                    onClick={() => void navegar({ to: '/servicios/$servicioId', params: { servicioId: f.original.servicioId } })}
+                    onClick={(e) => {
+                      if (!desdeEnlace(e)) void navegar({ to: '/servicios/$servicioId', params: { servicioId: f.original.servicioId } });
+                    }}
                   >
                     {f.getVisibleCells().map((c) => (
                       <TableCell key={c.id}>{flexRender(c.column.columnDef.cell, c.getContext())}</TableCell>

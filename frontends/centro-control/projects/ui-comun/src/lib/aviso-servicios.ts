@@ -67,7 +67,12 @@ export class AvisoServicios {
   readonly campos = input<CamposPorServicio>({});
   /** La página no tiene nada que mostrar: también se avisa un error que no es de un servicio caído. */
   readonly sinDatos = input(false);
-  readonly avisos = computed(() => avisosServicio(this.error(), this.campos(), this.sinDatos()));
+  /** Un aviso que la página arma sola (p. ej. «la lista está incompleta») y que también se arregla con «Reintentar» (V3-7). */
+  readonly extra = input<string | null>(null);
+  readonly avisos = computed(() => {
+    const extra = this.extra();
+    return [...avisosServicio(this.error(), this.campos(), this.sinDatos()), ...(extra ? [extra] : [])];
+  });
   /**
    * Qué hacer al reintentar (el `recargar` de la fachada). Sin él, se vuelven a pedir las consultas activas de la
    * página. Nunca se recarga la página: se perdería lo escrito en un formulario y su clave de idempotencia (E-2).

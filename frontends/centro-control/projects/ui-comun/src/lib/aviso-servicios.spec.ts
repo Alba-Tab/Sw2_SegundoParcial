@@ -21,6 +21,15 @@ describe('Reintentar (revisión E-2)', () => {
     expect(recargar).toHaveBeenCalledTimes(1);
   });
 
+  it('un aviso [extra] de la página sale con su «Reintentar», aunque ningún servicio esté caído (V3-7)', () => {
+    const f = TestBed.createComponent(AvisoServicios);
+    f.componentRef.setInput('extra', 'No se pudo leer la línea de 2 clientes: la lista está incompleta.');
+    f.detectChanges();
+    const el: HTMLElement = f.nativeElement;
+    expect(el.textContent).toContain('No se pudo leer la línea de 2 clientes');
+    expect(el.querySelector('button')?.textContent).toContain('Reintentar');
+  });
+
   it('mientras reintenta lo dice y vuelve a habilitar aunque falle (V2-9)', async () => {
     let fallar!: (e: unknown) => void;
     const f = TestBed.createComponent(AvisoServicios);

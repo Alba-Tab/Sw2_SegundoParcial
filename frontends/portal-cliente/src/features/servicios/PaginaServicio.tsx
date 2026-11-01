@@ -11,6 +11,7 @@ import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { type Servicio, useListarRutas, useObtenerServicio } from '../../api/generado/viajes';
 import { dinero, fecha, instante, TIPOS_CARGA } from '../../compartido/formato/formato';
 import { BotonEnlace } from '../../compartido/ui/BotonEnlace';
+import { Enlace } from '../../compartido/ui/Enlace';
 import { EstadoServicio } from '../../compartido/ui/EstadoServicio';
 import { Problema } from '../../compartido/ui/Problema';
 import { CancelarServicio } from './CancelarServicio';
@@ -54,9 +55,16 @@ export function PaginaServicio() {
           </Typography>
           <EstadoServicio estado={s.estado} etapa={s.etapa} />
         </Stack>
+        {/* Solo lo que llegó: sin «undefined t» ni separadores sueltos. */}
         <Typography color="text.secondary">
-          {s.tipoCarga && TIPOS_CARGA[s.tipoCarga]} · {s.toneladas} t{s.fechaViaje && ` · ${fecha(s.fechaViaje)}`}
-          {s.monto && ` · ${dinero(s.monto)}`}
+          {[
+            s.tipoCarga && TIPOS_CARGA[s.tipoCarga],
+            s.toneladas && `${s.toneladas} t`,
+            s.fechaViaje && fecha(s.fechaViaje),
+            s.monto && dinero(s.monto),
+          ]
+            .filter(Boolean)
+            .join(' · ')}
         </Typography>
 
         {s.estado === 'PROGRAMANDO' && (
@@ -76,7 +84,10 @@ export function PaginaServicio() {
           </Alert>
         )}
         {s.estado === 'REQUIERE_INTERVENCION' && (
-          <Alert severity="warning">Hubo un problema al confirmar y la empresa lo está revisando. Te avisaremos.</Alert>
+          // El chip ya dice qué pasa; aquí, lo que agrega: en espera, sin nada que hacer (V3-8).
+          <Alert severity="info">
+            La empresa está resolviendo un imprevisto. Te avisaremos por correo cuando se resuelva; no tienes que hacer nada.
+          </Alert>
         )}
 
         {s.placa && (
@@ -102,7 +113,17 @@ export function PaginaServicio() {
           </Typography>
         )}
         {s.entregadoEn && <Typography color="text.secondary">Entregado el {instante(s.entregadoEn)}</Typography>}
-        {s.numeroFactura && <Typography>Factura {s.numeroFactura}</Typography>}
+        {s.numeroFactura && (
+          <Typography>
+            {s.facturaId ? (
+              <Enlace to="/facturas/$facturaId" params={{ facturaId: s.facturaId }}>
+                Factura {s.numeroFactura}
+              </Enlace>
+            ) : (
+              `Factura ${s.numeroFactura}`
+            )}
+          </Typography>
+        )}
 
         {(s.estado === 'PROGRAMANDO' || s.estado === 'CONFIRMADO') && (
           <CancelarServicio servicioId={s.servicioId} alCancelar={() => setRecienCancelado(true)} />

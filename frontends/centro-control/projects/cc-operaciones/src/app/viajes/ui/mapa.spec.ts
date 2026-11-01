@@ -18,6 +18,21 @@ describe('mapa en vivo', () => {
     expect(popup.querySelectorAll('b')).toHaveLength(1);
     expect(popup.textContent).toContain(malicioso);
     expect(popup.querySelector('a')?.getAttribute('href')).toBe('http://localhost:4202/viajes/v1');
-    expect(popup.textContent).toContain('Riesgo 80 %');
+    expect(popup.textContent).toContain('Riesgo de retraso 80 %');
+  });
+
+  it('sin riesgo (sin predicción o sin permiso) no muestra la línea de riesgo (V3-5)', () => {
+    const popup = popupViaje(
+      {
+        viajeId: 'v1',
+        placa: '4521KTR',
+        ultimaPosicion: { lat: -17.78, lng: -63.18 },
+        cliente: { razonSocial: 'Agroexport' },
+        ruta: { nombre: 'Santa Cruz → Cochabamba' },
+      },
+      'http://x/viajes/v1',
+    );
+    expect(popup.textContent).not.toContain('Riesgo');
+    expect(popup.textContent).not.toContain('Sin dato');
   });
 });

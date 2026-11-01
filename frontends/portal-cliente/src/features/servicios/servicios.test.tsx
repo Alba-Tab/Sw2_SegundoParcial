@@ -1,4 +1,5 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
+import type { ComponentType, ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { conConsultas, problema, simularApi } from '../../pruebas/utilidades';
 import { ConfirmarServicio } from './ConfirmarServicio';
@@ -12,7 +13,10 @@ vi.mock('../../compartido/sesion/ClienteActivo', () => ({ useClienteActivo: () =
 vi.mock('@tanstack/react-router', () => ({
   useNavigate: () => navegar,
   useParams: () => ({ servicioId: SERVICIO }),
-  createLink: (c: unknown) => c,
+  // Un <a href> con la ruta sin resolver: basta para ver que es un enlace y adónde va.
+  createLink:
+    (C: ComponentType<{ href: string; children?: ReactNode }>) =>
+    ({ to, children }: { to: string; children?: ReactNode }) => <C href={to}>{children}</C>,
 }));
 
 const base = {
@@ -148,7 +152,7 @@ describe('Confirmar y seguir (specs 003, 004 y 006)', () => {
       ...rutas,
       [`GET /api/v1/servicios/${SERVICIO}`]: {
         estado: 200,
-        cuerpo: { ...base, estado: 'CERRADO', numeroFactura: 'FAC-000123', entregadoEn: '2026-11-03T18:00:00Z' },
+        cuerpo: { ...base, estado: 'CERRADO', facturaId: 'fac-1', numeroFactura: 'FAC-000123', entregadoEn: '2026-11-03T18:00:00Z' },
       },
       [`GET /api/v1/viajes/${VIAJE}/entrega`]: {
         estado: 200,
@@ -192,7 +196,8 @@ describe('Confirmar y seguir (specs 003, 004 y 006)', () => {
       },
     });
     conConsultas(<PaginaServicio />);
-    expect(await screen.findByText('Factura FAC-000123')).toBeTruthy();
+    // V3-2: la factura es un enlace a su fila en Facturas.
+    expect((await screen.findByRole('link', { name: 'Factura FAC-000123' })).getAttribute('href')).toBe('/facturas/$facturaId');
     expect(await screen.findByText(/Recibió María Rojas/)).toBeTruthy();
     expect(((await screen.findByAltText('Firma del receptor')) as HTMLImageElement).src).toBe('https://s3/f2');
     expect(((await screen.findByAltText('Foto de la entrega 1')) as HTMLImageElement).src).toBe('https://s3/f1');

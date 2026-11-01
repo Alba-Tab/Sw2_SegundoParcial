@@ -22,8 +22,8 @@ export function popupViaje(v: ViajeMapa, urlViaje: string): HTMLElement {
     salto(),
     v.ruta?.nombre ?? '',
     salto(),
-    `Riesgo ${pct(v.riesgo?.probabilidad)}`,
-    salto(),
+    // Sin predicción, o sin permiso para verla (comercial), la línea no se muestra: nada de «Riesgo Sin dato» (V3-5).
+    ...(v.riesgo ? [`Riesgo de retraso ${pct(v.riesgo.probabilidad)}`, salto()] : []),
     enlace,
   );
   return caja;
@@ -36,11 +36,17 @@ export function popupViaje(v: ViajeMapa, urlViaje: string): HTMLElement {
   imports: [Encabezado, AvisoServicios],
   template: `<cc-encabezado titulo="Mapa en vivo" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!viajes().length" />
-    @if (sinPosicion()) {
-      <p class="secundario" role="status">Ese viaje aún no reporta posición.</p>
-    }
+    <!-- La región vive siempre en el DOM para que el lector anuncie el texto cuando aparece (V3-6). -->
+    <p class="secundario" role="status">
+      @if (sinPosicion()) {
+        Ese viaje aún no reporta posición.
+      }
+    </p>
     <div #mapa class="mapa" role="application" aria-label="Mapa de viajes en ruta"></div>`,
   styles: `
+    p:empty {
+      margin: 0;
+    }
     .mapa {
       height: calc(100vh - 220px);
       min-height: 420px;
@@ -97,7 +103,9 @@ export class MapaPagina implements OnDestroy {
           marcador.openPopup();
         }
       }
-      this.sinPosicion.set(!!mapa && !!this.viaje() && !this.centrado && !this.fachada.cargando());
+      // Si Viajes no respondió no se sabe nada del viaje: el aviso de servicios lo dice, no «aún no reporta» (V3-6).
+      const viajesCaido = !!this.fachada.error() && !viajes.length;
+      this.sinPosicion.set(!!mapa && !!this.viaje() && !this.centrado && !this.fachada.cargando() && !viajesCaido);
     });
   }
 

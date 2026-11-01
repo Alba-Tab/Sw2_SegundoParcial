@@ -47,6 +47,13 @@ export function PaginaClientes() {
         <TextField label="Buscar por razón social o NIT" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
         {clientes.isPending && <CircularProgress size={24} aria-label="Buscando" />}
         {clientes.isError && <Problema error={clientes.error} reintentar={clientes.refetch} />}
+        {clientes.data?.items.length === 0 && (
+          <Typography color="text.secondary">
+            {q
+              ? `Ningún cliente coincide con «${q}». Puedes registrarlo sin cuenta.`
+              : 'Todavía no hay clientes. Puedes registrar uno sin cuenta.'}
+          </Typography>
+        )}
         <List dense>
           {clientes.data?.items.map((c) => (
             <ListItemButton

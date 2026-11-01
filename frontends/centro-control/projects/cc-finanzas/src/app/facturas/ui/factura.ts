@@ -19,7 +19,6 @@ import {
   Encabezado,
   Esqueleto,
   Estado,
-  etiqueta,
   EtiquetaPipe,
   fechaEntre,
   fechaLaPaz,
@@ -36,7 +35,7 @@ import {
   validarMonto,
 } from 'ui-comun';
 import { completarConRecibo } from '../domain/recibo';
-import { MEDIOS_PAGO, pagoRepetido, saldoDelError, saldoDespuesDe, type PagoEnEdicion } from '../domain/pago';
+import { MEDIOS_PAGO, medioEnFrase, pagoRepetido, saldoDelError, saldoDespuesDe, type PagoEnEdicion } from '../domain/pago';
 import { FacturaFachada } from '../facturas.fachada';
 
 /**
@@ -200,7 +199,12 @@ import { FacturaFachada } from '../facturas.fachada';
             >
             <ng-container matColumnDef="referencia"
               ><th mat-header-cell *matHeaderCellDef>Referencia</th>
-              <td mat-cell *matCellDef="let p">{{ p.referencia }}</td></ng-container
+              <td mat-cell *matCellDef="let p">
+                {{ p.referencia }}
+                @if (p.pagoId === repetido()) {
+                  <span class="cdk-visually-hidden"> (ya registrado)</span>
+                }
+              </td></ng-container
             >
             <ng-container matColumnDef="nota"
               ><th mat-header-cell *matHeaderCellDef>Nota</th>
@@ -308,7 +312,7 @@ export class FacturaPagina {
     const p = this.form.getRawValue();
     const saldo = saldoDespuesDe(f.saldo, p.monto);
     return (
-      `Se registra un pago de ${this.bob.transform(montoConDecimales(p.monto))} por ${etiqueta('MedioPago', p.medio).texto.toLowerCase()} ` +
+      `Se registra un pago de ${this.bob.transform(montoConDecimales(p.monto))} ${medioEnFrase(p.medio)} ` +
       `con referencia ${p.referencia.trim()} en la factura ${f.numero}. El saldo queda en ${this.bob.transform(saldo)}. No se puede deshacer.`
     );
   }
@@ -375,7 +379,7 @@ export class FacturaPagina {
     this.repetido.set(existente?.pagoId);
     const texto = existente
       ? `Ese pago ya está registrado: ${this.bob.transform(existente.monto)} del ${this.fecha.transform(existente.fecha)} ` +
-        `por ${etiqueta('MedioPago', existente.medio).texto.toLowerCase()}, referencia ${existente.referencia}. Está marcado en Pagos.`
+        `${medioEnFrase(existente.medio)}, referencia ${existente.referencia}. Está marcado en Pagos.`
       : `${mensajeDe(e)} Revisa la lista de pagos de esta factura.`;
     this.avisos
       .open(texto, 'Ver pagos')

@@ -17,6 +17,7 @@ import { Antiguedad } from '../../compartido/offline/Antiguedad';
 import { useClienteActivo } from '../../compartido/sesion/ClienteActivo';
 import { BotonEnlace } from '../../compartido/ui/BotonEnlace';
 import { EstadoServicio } from '../../compartido/ui/EstadoServicio';
+import { desdeEnlace, Enlace } from '../../compartido/ui/Enlace';
 import { Problema } from '../../compartido/ui/Problema';
 import { Cargando } from '../../compartido/ui/Cargando';
 
@@ -38,7 +39,15 @@ export function PaginaServicios() {
   const nombreRuta = useMemo(() => new Map((rutas.data ?? []).map((r) => [r.rutaId, r.nombre])), [rutas.data]);
   const columnas = useMemo(
     () => [
-      col.accessor('creadoEn', { header: 'Pedido', cell: (c) => fecha(c.getValue().slice(0, 10)) }),
+      // La celda principal es el enlace al detalle: la fila clicable es solo un atajo del mouse (V3-1).
+      col.accessor('creadoEn', {
+        header: 'Pedido',
+        cell: (c) => (
+          <Enlace to="/servicios/$servicioId" params={{ servicioId: c.row.original.servicioId }}>
+            {fecha(c.getValue().slice(0, 10))}
+          </Enlace>
+        ),
+      }),
       col.accessor('rutaId', { header: 'Ruta', cell: (c) => nombreRuta.get(c.getValue() ?? '') ?? 'Sin dato' }),
       col.accessor('tipoCarga', { header: 'Carga', cell: (c) => (c.getValue() ? TIPOS_CARGA[c.getValue()!] : 'Sin dato') }),
       col.accessor('toneladas', { header: 'Toneladas', cell: (c) => c.getValue() ?? 'Sin dato' }),
@@ -85,7 +94,9 @@ export function PaginaServicios() {
                   key={f.id}
                   hover
                   sx={{ cursor: 'pointer' }}
-                  onClick={() => void navegar({ to: '/servicios/$servicioId', params: { servicioId: f.original.servicioId } })}
+                  onClick={(e) => {
+                    if (!desdeEnlace(e)) void navegar({ to: '/servicios/$servicioId', params: { servicioId: f.original.servicioId } });
+                  }}
                 >
                   {f.getVisibleCells().map((c) => (
                     <TableCell key={c.id}>{flexRender(c.column.columnDef.cell, c.getContext())}</TableCell>

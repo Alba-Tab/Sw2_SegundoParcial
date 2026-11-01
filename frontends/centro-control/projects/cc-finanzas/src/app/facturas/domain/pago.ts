@@ -13,6 +13,15 @@ export interface PagoEnEdicion {
 
 export const MEDIOS_PAGO: MedioPago[] = ['TRANSFERENCIA', 'DEPOSITO', 'EFECTIVO', 'CHEQUE'];
 
+/** El medio con su preposición para una frase: «en efectivo», no «por efectivo» (V3-11). */
+const CON_PREPOSICION: Record<MedioPago, string> = {
+  EFECTIVO: 'en efectivo',
+  TRANSFERENCIA: 'por transferencia',
+  DEPOSITO: 'por depósito',
+  CHEQUE: 'con cheque',
+};
+export const medioEnFrase = (medio: MedioPago): string => CON_PREPOSICION[medio];
+
 /** El saldo que queda si se registra ese monto (para el resumen de la confirmación); en centavos, sin float. */
 export const saldoDespuesDe = (saldo: string, monto: string): string => desdeCentavos((aCentavos(saldo) ?? 0n) - (aCentavos(monto) ?? 0n));
 

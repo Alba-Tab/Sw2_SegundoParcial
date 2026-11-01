@@ -15,7 +15,7 @@ import Typography from '@mui/material/Typography';
 import { alpha } from '@mui/material/styles';
 import { useQueryClient } from '@tanstack/react-query';
 import { Navigate, Outlet, useRouterState } from '@tanstack/react-router';
-import type { ReactNode } from 'react';
+import { type ReactNode, useEffect } from 'react';
 import { limpiarCache } from '../offline/cache';
 import { useCacheDelUsuario } from '../offline/useCacheDelUsuario';
 import { useEnLinea } from '../offline/useEnLinea';
@@ -24,6 +24,7 @@ import { useSesion } from '../sesion/useSesion';
 import { AvisoComercial } from './AvisoComercial';
 import { Bienvenida } from './Bienvenida';
 import { BotonEnlace } from './BotonEnlace';
+import { tituloDe } from './titulo';
 
 type Ruta = '/cotizar' | '/servicios' | '/facturas' | '/empresa' | '/clientes';
 // Un icono, un significado (DESIGN.md, "Iconografía"); el icono acompaña al texto y MUI lo marca aria-hidden.
@@ -54,6 +55,9 @@ export function Marco() {
   const ruta = useRouterState({ select: (e) => e.location.pathname });
 
   const cacheLista = useCacheDelUsuario(consultas, s.sub);
+  useEffect(() => {
+    document.title = tituloDe(ruta);
+  }, [ruta]);
 
   const soloCache = !s.autenticado && !enLinea && SIN_CONEXION.some((r) => ruta.startsWith(r));
   let contenido = <Outlet />;
