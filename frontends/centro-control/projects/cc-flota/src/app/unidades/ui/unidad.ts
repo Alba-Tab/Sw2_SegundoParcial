@@ -326,7 +326,7 @@ type Panel = 'programar' | 'editar' | 'baja';
         <p class="secundario">Sin mantenimientos.</p>
       }
       @if (hayMasMantenimientos()) {
-        <p class="secundario">Se muestran los 100 mantenimientos más recientes de esta unidad.</p>
+        <p class="secundario">Se muestran los 50 mantenimientos más recientes de esta unidad.</p>
       }
     }
   `,

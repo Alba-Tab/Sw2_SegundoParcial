@@ -415,7 +415,7 @@ export const UnidadDocument = gql`
       }
       atributos
     }
-    mantenimientos(unidadId: $id, limite: 100) {
+    mantenimientos(unidadId: $id, limite: 50) {
       items {
         mantenimientoId
         tipo

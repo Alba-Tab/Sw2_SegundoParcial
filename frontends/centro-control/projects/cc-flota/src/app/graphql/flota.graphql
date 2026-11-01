@@ -30,8 +30,8 @@ query Unidad($id: ID!) {
     }
     atributos
   }
-  # Los 100 más recientes de la unidad; si hay más, la ficha lo dice.
-  mantenimientos(unidadId: $id, limite: 100) {
+  # Los 50 más recientes de la unidad; si hay más, la ficha lo dice. Con 100 la página pasa de 1.000 de complejidad (D101).
+  mantenimientos(unidadId: $id, limite: 50) {
     items {
       mantenimientoId
       tipo
