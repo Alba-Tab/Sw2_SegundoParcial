@@ -64,7 +64,7 @@ export function PantallaFatiga({ viajeId, alAlertar }: { viajeId: string; alAler
   const alLeer = useCallback(
     (l: Lectura) => {
       const ahora = Date.now();
-      const motivo = detector.current.muestra(ahora, l.medidas);
+      const motivo = detector.current.muestra(ahora, l.medidas, casos.velocidadKmh());
       const nuevo = { lectura: l, bostezos: detector.current.bostezosRecientes(ahora), visible: detector.current.rostroVisible };
       setCuadro((c) => (c && !cambioVisible(c, nuevo) ? c : nuevo));
       // Un cuadro que falló no apaga el detector: si los siguientes andan, el aviso se va.

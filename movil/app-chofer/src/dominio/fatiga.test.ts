@@ -5,11 +5,11 @@ const abiertos: Medidas = { ojos: 0.1, boca: 0.1, cabeceo: 0, alto: 0.3 };
 const cerrados: Medidas = { ...abiertos, ojos: 0.9 };
 const bostezo: Medidas = { ...abiertos, boca: 0.8 };
 
-/** Cuadros cada 100 ms desde `desde` hasta `hasta` (incluido); devuelve las alertas. */
-function serie(d: DetectorFatiga, desde: number, hasta: number, m: Medidas | null) {
+/** Cuadros cada 100 ms desde `desde` hasta `hasta` (incluido), con el camión a `kmh`; devuelve las alertas. */
+function serie(d: DetectorFatiga, desde: number, hasta: number, m: Medidas | null, kmh = 60) {
   const alertas = [];
   for (let t = desde; t <= hasta; t += 100) {
-    const a = d.muestra(t, m);
+    const a = d.muestra(t, m, kmh);
     if (a) alertas.push({ t, a });
   }
   return alertas;
@@ -87,6 +87,31 @@ describe('detector de fatiga (D60)', () => {
     expect(serie(d, 8300, 11_300, null)).toEqual([{ t: 11_300, a: 'SIN_ROSTRO' }]);
   });
 
+  it('SIN_ROSTRO con el camión detenido (5 km/h o menos) no alerta; los ojos cerrados sí', () => {
+    const d = new DetectorFatiga();
+    serie(d, 0, 500, abiertos, 0);
+    expect(serie(d, 600, 15_000, null, 0)).toEqual([]);
+    expect(serie(d, 15_100, 25_000, null, 5)).toEqual([]);
+    expect(serie(d, 25_100, 27_000, cerrados, 0)).toEqual([{ t: 26_600, a: 'OJOS_CERRADOS' }]);
+  });
+
+  it('SIN_ROSTRO en movimiento: los 3 s cuentan desde que el camión pasa de 5 km/h', () => {
+    const d = new DetectorFatiga();
+    serie(d, 0, 500, abiertos, 0);
+    expect(serie(d, 600, 10_000, null, 0)).toEqual([]);
+    expect(serie(d, 10_100, 13_000, null, 6)).toEqual([]);
+    expect(serie(d, 13_100, 15_000, null, 6)).toEqual([{ t: 13_100, a: 'SIN_ROSTRO' }]);
+  });
+
+  it('SIN_ROSTRO: si el camión se detiene a mitad del episodio, el conteo vuelve a empezar al arrancar', () => {
+    const d = new DetectorFatiga();
+    serie(d, 0, 500, abiertos);
+    expect(serie(d, 600, 2600, null, 40)).toEqual([]);
+    expect(serie(d, 2700, 3000, null, 0)).toEqual([]);
+    expect(serie(d, 3100, 6000, null, 40)).toEqual([]);
+    expect(serie(d, 6100, 6100, null, 40)).toEqual([{ t: 6100, a: 'SIN_ROSTRO' }]);
+  });
+
   it('PERCLOS: parpadeos lentos que suman más del 30 % del minuto, sin llegar a 1,5 s seguidos', () => {
     const d = new DetectorFatiga();
     const alertas = [];
@@ -144,7 +169,7 @@ describe('detector de fatiga (D60)', () => {
     const alertas = [];
     for (let t = 0; t < 5000; t += 33) alertas.push(...serie(d, t, t, abiertos));
     for (let t = 5000, g = 0; t < 12_000; t += 33, g = Math.min(45, g + 0.33)) {
-      const a = d.muestra(t, { ...abiertos, cabeceo: g });
+      const a = d.muestra(t, { ...abiertos, cabeceo: g }, 60);
       if (a) alertas.push(a);
     }
     expect(alertas).toEqual(['CABECEO']);
