@@ -15,6 +15,7 @@ export const puntos = new PuntosSqlite();
 export const viajes = new ViajesSqlite();
 export const sesion = new SesionKeycloak();
 export const evidencias = new EvidenciasSqlite();
+export const fatigasSinPosicion = new FatigasSqlite();
 const api = new ApiViajes();
 const subida = new SubidaEvidencias(evidencias, new ApiEvidenciasHttp(), archivos);
 
@@ -32,5 +33,5 @@ export const casos = new CasosDeUso(
   archivos,
   new PosicionSqlite(),
   (fn) => bd.transaction(() => fn()),
-  new FatigasSqlite(),
+  fatigasSinPosicion,
 );
