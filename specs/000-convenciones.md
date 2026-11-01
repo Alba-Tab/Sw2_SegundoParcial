@@ -209,7 +209,7 @@ Claims que usan los servicios:
 | Claim | Uso |
 |---|---|
 | `sub` | Usuario. El chofer ve solo los viajes con su `sub` |
-| `realm_access.roles` | Roles: `chofer`, `despachador`, `jefe_flota`, `administracion`, `gerente`, `comercial`, `cliente`, `agente_lectura` |
+| `realm_access.roles` | Roles: `chofer`, `despachador`, `jefe_flota`, `administracion`, `gerente`, `comercial`, `cliente`, `agente_lectura`. También `interno`: no da permisos; marca a una cuenta interna en el token del portal; por expansión de compuestos también llega a los demás clientes y los servicios lo ignoran |
 | `clienteId` | Cliente del usuario con rol `cliente`. Con ese rol, se ignora cualquier `clienteId` que venga por parámetro |
 | `aud` | El servicio rechaza un token que no lo tenga en la audiencia |
 | `azp` | Qué app hizo la petición; solo para auditoría |
