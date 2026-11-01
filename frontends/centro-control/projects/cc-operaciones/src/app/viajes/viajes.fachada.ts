@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { filter, firstValueFrom, switchMap } from 'rxjs';
+import { filter, switchMap } from 'rxjs';
 import { cargandoDe, completo, Intentos, puedeVer, Sesion } from 'ui-comun';
 import type { EstadoViaje, MapaQuery, OpcionIntervencion } from '../graphql/generado';
 import { ViajesRepositorio } from './data/viajes.repositorio';
@@ -26,10 +26,11 @@ export class ViajeFachada {
   readonly verMonto = this.ver.verMonto;
   readonly verRiesgo = this.ver.verRiesgo;
   readonly id = signal<string | undefined>(undefined);
+  private consulta?: ReturnType<ViajesRepositorio['observarViaje']>;
   readonly datos = toSignal(
     toObservable(this.id).pipe(
       filter((id): id is string => !!id),
-      switchMap((id) => this.repo.observarViaje({ id, ...this.ver }, 20_000)),
+      switchMap((id) => (this.consulta = this.repo.observarViaje({ id, ...this.ver }, 20_000)).valueChanges),
     ),
   );
 
@@ -47,9 +48,9 @@ export class ViajeFachada {
     );
   }
 
+  /** `refetch` del mismo `watch`: al resolver, `datos()` ya trae la respuesta nueva (V4-1). */
   recargar(): Promise<unknown> {
-    const id = this.id();
-    return id ? firstValueFrom(this.repo.recargarViaje({ id, ...this.ver })) : Promise.resolve();
+    return this.consulta?.refetch() ?? Promise.resolve();
   }
 }
 

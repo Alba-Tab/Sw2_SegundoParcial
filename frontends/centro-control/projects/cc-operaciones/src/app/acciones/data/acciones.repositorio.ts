@@ -8,12 +8,9 @@ export class AccionesRepositorio {
   private readonly aprobarGql = inject(AprobarAccionGQL);
   private readonly rechazarGql = inject(RechazarAccionGQL);
 
+  /** El `QueryRef`: `recargar` hace `refetch` sobre él, así la señal ya cambió cuando resuelve (V4-1). */
   observar(cadaMs: number) {
-    return this.gql.watch({ pollInterval: cadaMs }).valueChanges;
-  }
-
-  recargar() {
-    return this.gql.fetch();
+    return this.gql.watch({ pollInterval: cadaMs });
   }
 
   aprobar(id: string, mensaje: string, clave: string) {

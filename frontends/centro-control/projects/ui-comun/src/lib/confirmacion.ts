@@ -17,12 +17,15 @@ import type { Icono } from 'ui-comun/dominio';
         <mat-icon>warning</mat-icon><span>{{ resumen() }}</span>
       </p>
       <div class="fila-acciones">
-        <!-- type="button": dentro de un <form> no lo envían (V2-1). -->
-        <button mat-flat-button type="button" (click)="confirmar.emit()" [disabled]="enviando()">
+        <!-- type="button": dentro de un <form> no lo envían (V2-1). disabledInteractive: el botón que tiene el foco no
+             lo pierde al deshabilitarse mientras se envía; el clic se ignora aquí. -->
+        <button mat-flat-button type="button" (click)="enviando() || confirmar.emit()" [disabled]="enviando()" disabledInteractive>
           <mat-icon>{{ icono() }}</mat-icon
           >{{ accion() }}
         </button>
-        <button mat-button type="button" (click)="volver.emit()" [disabled]="enviando()">No, volver</button>
+        <button mat-button type="button" (click)="enviando() || volver.emit()" [disabled]="enviando()" disabledInteractive>
+          No, volver
+        </button>
       </div>
     </div>
   `,

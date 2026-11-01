@@ -82,7 +82,7 @@ import { ViajeFachada } from '../viajes.fachada';
               <mat-error>{{ textoError(texto) }}</mat-error>
             </mat-form-field>
             @if (!rechazando()) {
-              <button mat-flat-button (click)="aprobar(id(), zonaEntrega)" [disabled]="enviando()">
+              <button mat-flat-button (click)="aprobar(id(), zonaEntrega)" [disabled]="enviando()" disabledInteractive>
                 <mat-icon>thumb_up</mat-icon>Aprobar entrega
               </button>
               <button mat-stroked-button id="pedir-rechazo" (click)="pedirRechazo(zonaEntrega)" [disabled]="enviando()">
@@ -121,10 +121,20 @@ import { ViajeFachada } from '../viajes.fachada';
               <mat-hint>Para marcar resuelto, obligatoria (3 a 500 caracteres); para reintentar, opcional</mat-hint>
               <mat-error>{{ textoError(texto) }}</mat-error>
             </mat-form-field>
-            <button mat-flat-button (click)="resolver(id(), 'REINTENTAR_COMPENSACION', zonaIntervencion)" [disabled]="enviando()">
+            <button
+              mat-flat-button
+              (click)="resolver(id(), 'REINTENTAR_COMPENSACION', zonaIntervencion)"
+              [disabled]="enviando()"
+              disabledInteractive
+            >
               <mat-icon>replay</mat-icon>Reintentar la liberación
             </button>
-            <button mat-stroked-button (click)="resolver(id(), 'MARCAR_RESUELTO', zonaIntervencion)" [disabled]="enviando()">
+            <button
+              mat-stroked-button
+              (click)="resolver(id(), 'MARCAR_RESUELTO', zonaIntervencion)"
+              [disabled]="enviando()"
+              disabledInteractive
+            >
               <mat-icon>task_alt</mat-icon>Marcar resuelto
             </button>
           </div>
@@ -327,6 +337,8 @@ export class ViajePagina {
   }
 
   private async enviar(accion: () => Promise<unknown>, ok: string): Promise<void> {
+    // disabledInteractive: el botón enfocado sigue enfocable mientras se envía; un segundo clic no hace nada.
+    if (this.enviando()) return;
     this.enviando.set(true);
     try {
       await accion();

@@ -12,12 +12,9 @@ export class FacturasRepositorio {
     return this.facturasGql.watch({ variables: { conSaldo }, pollInterval: cadaMs }).valueChanges;
   }
 
+  /** Devuelve el `QueryRef`: `recargar` hace `refetch` sobre él, así el saldo ya cambió cuando resuelve (V4-1). */
   observarFactura(id: string) {
-    return this.facturaGql.watch({ variables: { id } }).valueChanges;
-  }
-
-  recargarFactura(id: string) {
-    return this.facturaGql.fetch({ variables: { id } });
+    return this.facturaGql.watch({ variables: { id } });
   }
 
   registrarPago(input: PagoInput) {

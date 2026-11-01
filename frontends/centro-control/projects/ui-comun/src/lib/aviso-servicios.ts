@@ -3,6 +3,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { Apollo } from 'apollo-angular';
 import { erroresGraphql, mensajeDe, servicioCaido } from './errores';
+import { enfocarTitulo } from './formulario';
 
 /** Qué servicio está detrás de cada campo de la consulta de una página, para decir cuál no está disponible ('' si lo dice la página). */
 export type CamposPorServicio = Record<string, string>;
@@ -39,12 +40,13 @@ export function avisosServicio(error: unknown, campos: CamposPorServicio, sinDat
       <p class="aviso-servicio" role="alert"><mat-icon>cloud_off</mat-icon> {{ a }}</p>
     }
     @if (avisos().length) {
-      <button mat-stroked-button class="reintentar" (click)="reintentarAhora()" [disabled]="reintentando()">
+      <!-- disabledInteractive: con el foco encima, deshabilitarlo de verdad lo mandaría a <body> (V4, foco). -->
+      <button mat-stroked-button class="reintentar" (click)="reintentarAhora()" [disabled]="reintentando()" disabledInteractive>
         <mat-icon>replay</mat-icon>Reintentar
       </button>
     }
-    <!-- Siempre presente para que el lector de pantalla anuncie el cambio (V2-9, V2-10). -->
-    <p class="cdk-visually-hidden" aria-live="polite">{{ reintentando() ? 'Reintentando…' : '' }}</p>
+    <!-- Siempre presente para que el lector de pantalla anuncie el cambio (V2-9, V2-10, V4-4). -->
+    <p class="cdk-visually-hidden" aria-live="polite">{{ anuncio() }}</p>
   `,
   styles: `
     .reintentar {
@@ -82,16 +84,26 @@ export class AvisoServicios {
 
   /** Mientras dura el reintento, el botón se deshabilita y se anuncia "Reintentando…" (V2-9). */
   readonly reintentando = signal(false);
+  /** Lo que dice la región viva: "Reintentando…" y, si vuelve a fallar, que sigue sin responder (V4-4). */
+  readonly anuncio = signal('');
 
   async reintentarAhora(): Promise<void> {
+    // El botón sigue enfocable mientras reintenta (aria-disabled): un segundo clic no hace nada.
+    if (this.reintentando()) return;
     const reintentar = this.reintentar() ?? (() => this.apollo?.client.refetchObservableQueries());
+    const foco = document.activeElement;
     this.reintentando.set(true);
+    this.anuncio.set('Reintentando…');
     try {
       await reintentar();
     } catch {
       // El error de un reintento lo vuelve a mostrar el mismo aviso.
     } finally {
       this.reintentando.set(false);
+      const sigue = this.avisos()[0];
+      this.anuncio.set(sigue ? `Sigue sin responder: ${sigue}` : '');
+      // Funcionó: el aviso y su botón se van; el foco no se queda en <body>, va al título de la página (V4-3).
+      if (!sigue && (document.activeElement === foco || document.activeElement === document.body)) enfocarTitulo();
     }
   }
 }

@@ -40,6 +40,46 @@ describe('Reintentar (revisión E-2)', () => {
     await promesa;
     expect(f.componentInstance.reintentando()).toBe(false);
   });
+
+  it('si vuelve a fallar, lo anuncia; el botón sigue enfocable mientras reintenta (V4-4, foco)', async () => {
+    const f = TestBed.createComponent(AvisoServicios);
+    const recargar = vi.fn(() => Promise.resolve());
+    f.componentRef.setInput('reintentar', recargar);
+    f.componentRef.setInput('extra', 'Finanzas no disponible');
+    f.detectChanges();
+    const vivo = (f.nativeElement as HTMLElement).querySelector('[aria-live]')!;
+    const boton = (f.nativeElement as HTMLElement).querySelector('button')!;
+    const promesa = f.componentInstance.reintentarAhora();
+    f.detectChanges();
+    expect(vivo.textContent).toContain('Reintentando…');
+    expect(boton.disabled).toBe(false);
+    expect(boton.getAttribute('aria-disabled')).toBe('true');
+    await f.componentInstance.reintentarAhora();
+    expect(recargar).toHaveBeenCalledTimes(1);
+    await promesa;
+    f.detectChanges();
+    expect(vivo.textContent).toContain('Sigue sin responder: Finanzas no disponible');
+  });
+
+  it('si funciona, la región queda vacía y el foco va al título, no a <body> (V4-3)', async () => {
+    vi.useFakeTimers();
+    const h1 = Object.assign(document.createElement('h1'), { tabIndex: -1 });
+    const encabezado = document.body.appendChild(document.createElement('cc-encabezado'));
+    encabezado.appendChild(h1);
+    const f = TestBed.createComponent(AvisoServicios);
+    f.componentRef.setInput('reintentar', () => {
+      f.componentRef.setInput('extra', null);
+      return Promise.resolve();
+    });
+    f.componentRef.setInput('extra', 'Finanzas no disponible');
+    f.detectChanges();
+    await f.componentInstance.reintentarAhora();
+    vi.runAllTimers();
+    expect(f.componentInstance.anuncio()).toBe('');
+    expect(document.activeElement).toBe(h1);
+    encabezado.remove();
+    vi.useRealTimers();
+  });
 });
 
 describe('tabla de un reporte', () => {

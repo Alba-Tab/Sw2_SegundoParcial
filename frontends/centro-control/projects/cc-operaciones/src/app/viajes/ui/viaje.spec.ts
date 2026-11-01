@@ -15,7 +15,7 @@ function montar(respuesta: { data?: unknown; error?: unknown }): string {
       provideRouter([]),
       { provide: CONFIG_CENTRO, useValue: { app: 'cc-operaciones', urls: {} } as unknown as ConfigCentro },
       { provide: Sesion, useValue: { roles: signal(['gerente']), tiene: () => false } },
-      { provide: ViajesRepositorio, useValue: { observarViaje: () => of({ loading: false, ...respuesta }) } },
+      { provide: ViajesRepositorio, useValue: { observarViaje: () => ({ valueChanges: of({ loading: false, ...respuesta }) }) } },
     ],
   });
   const f = TestBed.createComponent(ViajePagina);

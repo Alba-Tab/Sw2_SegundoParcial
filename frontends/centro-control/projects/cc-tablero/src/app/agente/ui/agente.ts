@@ -27,7 +27,7 @@ import { mensajeDisparo, urlTraza } from '../domain/mision';
   imports: [Esqueleto, Encabezado, MatButtonModule, MatExpansionModule, FechaPipe, EtiquetaPipe, Estado, AvisoServicios],
   template: `
     <cc-encabezado titulo="Agente «vigilar viajes»">
-      <button mat-flat-button (click)="disparar()" [disabled]="enviando()">Disparar misión</button>
+      <button mat-flat-button (click)="disparar()" [disabled]="enviando()" disabledInteractive>Disparar misión</button>
       <a mat-button [href]="config.urls['cc-operaciones'] + '/acciones'">Ver acciones propuestas →</a>
     </cc-encabezado>
     @if (cargando()) {
@@ -115,6 +115,8 @@ export class AgentePagina {
   }
 
   async disparar(): Promise<void> {
+    // disabledInteractive: el botón enfocado sigue enfocable mientras se envía; un segundo clic no hace nada.
+    if (this.enviando()) return;
     this.enviando.set(true);
     try {
       await this.fachada.disparar();

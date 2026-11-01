@@ -102,7 +102,7 @@ import { CreditoFachada } from '../credito.fachada';
                   />
                 } @else {
                   <div class="fila-acciones">
-                    <button mat-flat-button (click)="decidir(s.servicioId, true, zona)" [disabled]="enviando()">
+                    <button mat-flat-button (click)="decidir(s.servicioId, true, zona)" [disabled]="enviando()" disabledInteractive>
                       <mat-icon>thumb_up</mat-icon>Aprobar
                     </button>
                     <button
@@ -179,6 +179,7 @@ export class AprobacionesPagina {
 
   /** El motivo es opcional para aprobar y obligatorio (3 o más) para rechazar. */
   async decidir(servicioId: string, aprobado: boolean, zona: HTMLElement): Promise<void> {
+    if (this.enviando()) return;
     const control = this.motivoDe(servicioId);
     // El rechazo se validó al pedir la confirmación y el motivo sigue bloqueado mientras se envía (V2-7).
     if (aprobado && !exigirTexto(control, 0, 300, zona)) return;

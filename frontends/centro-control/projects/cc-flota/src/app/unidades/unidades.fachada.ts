@@ -1,6 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { filter, firstValueFrom, switchMap } from 'rxjs';
+import { filter, switchMap } from 'rxjs';
 import { cargandoDe, completo, Intentos } from 'ui-comun';
 import type { UnidadesQuery, UnidadQuery } from '../graphql/generado';
 import { UnidadesRepositorio } from './data/unidades.repositorio';
@@ -22,10 +22,11 @@ export class UnidadFachada {
   private readonly intentos = new Intentos();
   /** La unidad que se mira; la UI la fija desde la ruta. */
   readonly id = signal<string | undefined>(undefined);
+  private consulta?: ReturnType<UnidadesRepositorio['observarUnidad']>;
   private readonly datos = toSignal(
     toObservable(this.id).pipe(
       filter((id): id is string => !!id),
-      switchMap((id) => this.repo.observarUnidad(id)),
+      switchMap((id) => (this.consulta = this.repo.observarUnidad(id)).valueChanges),
     ),
   );
   readonly unidad = computed(() => completo<UnidadQuery>(this.datos())?.unidad);
@@ -47,8 +48,8 @@ export class UnidadFachada {
     );
   }
 
+  /** `refetch` del mismo `watch`: al resolver, `unidad()` ya trae la respuesta nueva (V4-1). */
   recargar(): Promise<unknown> {
-    const id = this.id();
-    return id ? firstValueFrom(this.repo.recargarUnidad(id)) : Promise.resolve();
+    return this.consulta?.refetch() ?? Promise.resolve();
   }
 }

@@ -26,8 +26,9 @@ import { filtrarCuentas } from '../domain/cobranza';
         <mat-icon matPrefix aria-hidden="true">search</mat-icon>
         <input matInput type="search" [value]="busqueda()" (input)="busqueda.set($any($event.target).value)" />
       </mat-form-field>
-      <!-- La región viva está siempre; solo cambia su texto, así se anuncia también la primera búsqueda (V2-10). -->
-      <p class="secundario" role="status">
+      <!-- La región viva está siempre; solo cambia su texto, así se anuncia también la primera búsqueda (V2-10).
+           Vacía, sin margen: no deja hueco entre la búsqueda y la tabla (V4-5). -->
+      <p class="secundario" [class.sin-margen]="!buscando()" role="status">
         @if (buscando()) {
           {{ r.filas.length === 1 ? '1 cuenta coincide' : r.filas.length + ' cuentas coinciden' }}. La fila Total es de todas las cuentas,
           no solo de las que coinciden.
@@ -39,6 +40,9 @@ import { filtrarCuentas } from '../domain/cobranza';
   styles: `
     .busqueda {
       width: min(360px, 100%);
+    }
+    .sin-margen {
+      margin: 0;
     }
   `,
 })

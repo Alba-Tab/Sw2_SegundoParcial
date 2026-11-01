@@ -122,10 +122,13 @@ import { ServiciosFachada } from '../servicios.fachada';
                     <mat-hint>De 3 a 300 caracteres</mat-hint>
                     <mat-error>{{ textoError(motivo) }}</mat-error>
                   </mat-form-field>
-                  <button mat-flat-button (click)="cancelar(s.servicioId, zona)" [disabled]="enviando()">
+                  <!-- disabledInteractive: el botón enfocado no pierde el foco al deshabilitarse; el clic se ignora. -->
+                  <button mat-flat-button (click)="cancelar(s.servicioId, zona)" [disabled]="enviando()" disabledInteractive>
                     <mat-icon>cancel</mat-icon>Sí, cancelar el servicio
                   </button>
-                  <button mat-button (click)="cerrar(s.servicioId)" [disabled]="enviando()">No, volver</button>
+                  <button mat-button (click)="enviando() || cerrar(s.servicioId)" [disabled]="enviando()" disabledInteractive>
+                    No, volver
+                  </button>
                 </div>
               } @else {
                 <button mat-button [id]="'cancelar-' + s.servicioId" (click)="abrir(s.servicioId)" [disabled]="enviando()">
@@ -238,7 +241,7 @@ export class ServiciosPagina {
   }
 
   async cancelar(servicioId: string, zona: HTMLElement): Promise<void> {
-    if (!exigirTexto(this.motivo, 3, 300, zona)) return;
+    if (this.enviando() || !exigirTexto(this.motivo, 3, 300, zona)) return;
     this.enviando.set(true);
     // El motivo no cambia mientras se envía, como en las otras confirmaciones (E-4, V2-13).
     this.motivo.disable();
@@ -251,6 +254,8 @@ export class ServiciosPagina {
       enfocarTitulo();
     } catch (e) {
       this.avisos.open(mensajeDe(e), 'Cerrar');
+      // Como en las otras confirmaciones: el foco vuelve a lo que hay que corregir, el motivo.
+      enfocar(`motivo-${servicioId}`);
     } finally {
       this.motivo.enable();
       this.enviando.set(false);

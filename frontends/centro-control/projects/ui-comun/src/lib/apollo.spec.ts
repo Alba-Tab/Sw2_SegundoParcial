@@ -80,38 +80,57 @@ describe('Apollo: reintento con 401 (spec 016)', () => {
   });
 });
 
-describe('Apollo: recargar después de un fallo sin datos (vuelta 2, sin comprobar)', () => {
-  it('una consulta network-only que responde limpia el error del watch que había fallado', async () => {
+/**
+ * Las fachadas recargan con `refetch` del mismo `watch` (V4-1): cuando resuelve la promesa, la señal que alimenta la
+ * página ya tiene la respuesta nueva. Un `client.query` aparte resolvía antes de que el `watch` emitiera, y el aviso de
+ * PAGO_EXCEDE_SALDO decía el saldo viejo. Por eso se mira justo después del `await`, sin esperar otra tarea.
+ */
+describe('Apollo: recargar con refetch del mismo watch (V4-1)', () => {
+  async function montar(respuesta: () => Observable<{ data: Record<string, unknown> }>) {
     const { ApolloClient, ApolloLink: Link, InMemoryCache, gql } = await import('@apollo/client/core');
-    let falla = true;
-    const link = new Link(() =>
-      falla
-        ? new Observable((o) => o.error(new Error('Gateway caído')))
-        : of({ data: { factura: { __typename: 'Factura', id: '1', saldo: '10.00' } } }),
-    );
     const client = new ApolloClient({
-      link,
+      link: new Link(respuesta),
       cache: new InMemoryCache(),
-      defaultOptions: { watchQuery: { errorPolicy: 'all' }, query: { errorPolicy: 'all' } },
+      // Las mismas que `proveerApollo`.
+      defaultOptions: { watchQuery: { fetchPolicy: 'cache-and-network', errorPolicy: 'all' }, query: { errorPolicy: 'all' } },
     });
-    const query = gql`
-      query Factura {
-        factura {
-          id
-          saldo
+    const consulta = client.watchQuery({
+      // Como `Factura` del Gateway: sin `id`, así la caché no la normaliza (V4-1).
+      query: gql`
+        query Factura {
+          factura {
+            numero
+            saldo
+          }
         }
-      }
-    `;
+      `,
+    });
     const vistos: { data: unknown; error: unknown }[] = [];
-    const sub = client
-      .watchQuery({ query, fetchPolicy: 'cache-and-network', errorPolicy: 'all' })
-      .subscribe((r) => vistos.push({ data: r.data, error: r.error }));
+    const sub = consulta.subscribe((r) => vistos.push({ data: r.data, error: r.error }));
     await new Promise((ok) => setTimeout(ok));
+    return { consulta, vistos, sub };
+  }
+  const factura = (saldo: string) => ({ data: { factura: { __typename: 'Factura', numero: 'F-1', saldo } } });
+
+  it('al resolver, el watch ya tiene el saldo nuevo', async () => {
+    let saldo = '10.00';
+    const { consulta, vistos, sub } = await montar(() => of(factura(saldo)));
+    expect(vistos.at(-1)?.data).toEqual(factura('10.00').data);
+    saldo = '5.00';
+    await consulta.refetch();
+    expect(vistos.at(-1)?.data).toEqual(factura('5.00').data);
+    sub.unsubscribe();
+  });
+
+  it('después de un fallo sin datos, al resolver ya no queda el error', async () => {
+    let falla = true;
+    const { consulta, vistos, sub } = await montar(() =>
+      falla ? new Observable<{ data: Record<string, unknown> }>((o) => o.error(new Error('Gateway caído'))) : of(factura('10.00')),
+    );
     expect(vistos.at(-1)?.error).toBeTruthy();
     falla = false;
-    await client.query({ query, fetchPolicy: 'network-only', errorPolicy: 'all' });
-    await new Promise((ok) => setTimeout(ok));
+    await consulta.refetch();
+    expect(vistos.at(-1)).toEqual({ data: factura('10.00').data, error: undefined });
     sub.unsubscribe();
-    expect(vistos.at(-1)).toEqual({ data: { factura: { __typename: 'Factura', id: '1', saldo: '10.00' } }, error: undefined });
   });
 });

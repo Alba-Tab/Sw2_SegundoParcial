@@ -1,6 +1,5 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { firstValueFrom } from 'rxjs';
 import { cargandoDe, completo, Intentos } from 'ui-comun';
 import type { AccionesQuery } from '../graphql/generado';
 import { AccionesRepositorio } from './data/acciones.repositorio';
@@ -10,7 +9,8 @@ import { AccionesRepositorio } from './data/acciones.repositorio';
 export class AccionesFachada {
   private readonly repo = inject(AccionesRepositorio);
   private readonly intentos = new Intentos();
-  readonly datos = toSignal(this.repo.observar(15_000));
+  private readonly consulta = this.repo.observar(15_000);
+  readonly datos = toSignal(this.consulta.valueChanges);
   readonly acciones = computed(() => completo<AccionesQuery>(this.datos())?.accionesPropuestas ?? []);
   readonly error = computed(() => this.datos()?.error);
   readonly cargando = computed(() => cargandoDe(this.datos()));
@@ -23,7 +23,8 @@ export class AccionesFachada {
     return this.intentos.enviar(`rechazarAccion:${id}`, { motivo }, (clave) => this.repo.rechazar(id, motivo, clave));
   }
 
+  /** `refetch` del mismo `watch`: al resolver, `acciones()` ya trae la respuesta nueva (V4-1). */
   recargar(): Promise<unknown> {
-    return firstValueFrom(this.repo.recargar());
+    return this.consulta.refetch();
   }
 }

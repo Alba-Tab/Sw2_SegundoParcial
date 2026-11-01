@@ -158,7 +158,7 @@ import { UnidadFachada } from '../unidades.fachada';
                 <mat-error>{{ textoError(nuevo.controls.checklist) }}</mat-error>
               </mat-form-field>
               <div class="fila-acciones">
-                <button mat-flat-button type="submit" [disabled]="enviando()">Programar</button>
+                <button mat-flat-button type="submit" [disabled]="enviando()" disabledInteractive>Programar</button>
                 <button mat-button type="button" (click)="cerrarFormulario()" [disabled]="enviando()">Cancelar</button>
               </div>
             </form>
@@ -332,7 +332,8 @@ export class UnidadPagina {
   }
 
   async programar(unidadId: string, raiz: HTMLElement) {
-    if (!listoParaEnviar(this.nuevo, raiz)) return;
+    // disabledInteractive: «Programar» sigue enfocable mientras se envía; otro envío no hace nada.
+    if (this.enviando() || !listoParaEnviar(this.nuevo, raiz)) return;
     const v = this.nuevo.getRawValue();
     const nuevo = { ...v, taller: v.taller.trim(), descripcion: v.descripcion.trim() };
     if (await this.enviar(() => this.fachada.programar(unidadId, nuevo), 'Mantenimiento programado')) {

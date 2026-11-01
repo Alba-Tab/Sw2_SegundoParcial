@@ -31,12 +31,9 @@ export class ViajesRepositorio {
   }
 
   /** Las variables dicen qué campos con `@roles` (monto, riesgo, unidad) pide el rol. */
+  /** Devuelve el `QueryRef`: `recargar` hace `refetch` sobre él (V4-1). */
   observarViaje(variables: ViajeQueryVariables, cadaMs: number) {
-    return this.viajeGql.watch({ variables, pollInterval: cadaMs }).valueChanges;
-  }
-
-  recargarViaje(variables: ViajeQueryVariables) {
-    return this.viajeGql.fetch({ variables });
+    return this.viajeGql.watch({ variables, pollInterval: cadaMs });
   }
 
   observarMapa(variables: MapaQueryVariables, cadaMs: number) {

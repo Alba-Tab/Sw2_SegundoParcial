@@ -28,6 +28,26 @@ describe('Confirmacion dentro de un form (V2-1)', () => {
   });
 });
 
+describe('Confirmacion mientras envía (foco)', () => {
+  it('los botones siguen enfocables (aria-disabled) y un clic no hace nada', () => {
+    const f = TestBed.createComponent(Confirmacion);
+    f.componentRef.setInput('resumen', 'Se cancela el servicio');
+    f.componentRef.setInput('accion', 'Sí, cancelar');
+    f.componentRef.setInput('enviando', true);
+    const emitidos: string[] = [];
+    f.componentInstance.confirmar.subscribe(() => emitidos.push('confirmar'));
+    f.componentInstance.volver.subscribe(() => emitidos.push('volver'));
+    f.detectChanges();
+    const botones = [...(f.nativeElement as HTMLElement).querySelectorAll('button')];
+    expect(botones.map((b) => [b.disabled, b.getAttribute('aria-disabled')])).toEqual([
+      [false, 'true'],
+      [false, 'true'],
+    ]);
+    botones.forEach((b) => b.click());
+    expect(emitidos).toEqual([]);
+  });
+});
+
 describe('ConfirmacionUnica (V2-2, V2-3)', () => {
   const crear = () => {
     const controles: Record<string, FormControl<string>> = {

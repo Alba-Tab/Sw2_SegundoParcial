@@ -8,12 +8,9 @@ export class ServiciosRepositorio {
   private readonly cancelarGql = inject(CancelarServicioGQL);
 
   /** `verMonto`: el despachador no ve `Servicio.monto`, así que no se le pide (sin un SIN_PERMISO por fila). */
+  /** Devuelve el `QueryRef`: `recargar` hace `refetch` sobre él (V4-1). */
   observar(estado: EstadoServicio | null, verMonto: boolean, cadaMs: number) {
-    return this.gql.watch({ variables: { estado, verMonto }, pollInterval: cadaMs }).valueChanges;
-  }
-
-  recargar(estado: EstadoServicio | null, verMonto: boolean) {
-    return this.gql.fetch({ variables: { estado, verMonto } });
+    return this.gql.watch({ variables: { estado, verMonto }, pollInterval: cadaMs });
   }
 
   cancelar(servicioId: string, motivo: string, clave: string) {

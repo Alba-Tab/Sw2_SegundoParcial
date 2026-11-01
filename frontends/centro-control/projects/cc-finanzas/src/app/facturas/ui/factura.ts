@@ -172,9 +172,22 @@ import { FacturaFachada } from '../facturas.fachada';
                 />
               } @else {
                 <div class="fila-acciones">
-                  <button mat-flat-button type="submit" id="guardar-pago"><mat-icon>price_check</mat-icon>Guardar el pago</button>
+                  <!-- Mientras se relee la factura tras un rechazo no se puede volver a guardar (V4-2); sigue enfocable. -->
+                  <button
+                    mat-flat-button
+                    type="submit"
+                    id="guardar-pago"
+                    [disabled]="releyendo()"
+                    disabledInteractive
+                    aria-describedby="estado-relectura"
+                  >
+                    <mat-icon>price_check</mat-icon>Guardar el pago
+                  </button>
                   <button mat-button type="button" (click)="cerrar()">Cancelar</button>
                 </div>
+                <p id="estado-relectura" class="secundario" [class.sin-margen]="!releyendo()" role="status">
+                  {{ releyendo() ? 'Comprobando el saldo actual de la factura; espera un momento para volver a guardar.' : '' }}
+                </p>
               }
             </form>
           </mat-card-content>
@@ -229,6 +242,9 @@ import { FacturaFachada } from '../facturas.fachada';
     .repetido {
       background: var(--mat-sys-advertencia-container);
     }
+    .sin-margen {
+      margin: 0;
+    }
   `,
 })
 export class FacturaPagina {
@@ -243,6 +259,8 @@ export class FacturaPagina {
   readonly medios = MEDIOS_PAGO;
   readonly enviando = signal(false);
   readonly leyendo = signal(false);
+  /** Tras un PAGO_EXCEDE_SALDO o PAGO_DUPLICADO se relee la factura; mientras tanto no se vuelve a guardar (V4-2). */
+  readonly releyendo = signal(false);
   /** El formulario de pago se abre desde la acción del encabezado; solo administración y con saldo. */
   readonly registrando = signal(false);
   readonly puedeRegistrar = computed(() => this.sesion.tiene('administracion') && !!this.factura() && this.factura()!.saldo !== '0.00');
@@ -294,6 +312,7 @@ export class FacturaPagina {
 
   /** Con datos válidos, pide la confirmación con el formulario bloqueado: el resumen no cambia bajo el usuario (E-4). */
   revisar(raiz: HTMLElement): void {
+    if (this.releyendo()) return;
     // El saldo y la fecha de emisión pueden haber llegado después de escribir: se vuelve a validar cada campo.
     for (const c of Object.values(this.form.controls)) c.updateValueAndValidity();
     if (!listoParaEnviar(this.form, raiz)) return;
@@ -360,20 +379,29 @@ export class FacturaPagina {
   private async explicarFallo(e: unknown): Promise<void> {
     const codigo = codigoDe(e);
     const ext = erroresGraphql(e)[0]?.extensions ?? {};
+    if (codigo !== 'PAGO_EXCEDE_SALDO' && codigo !== 'PAGO_DUPLICADO') {
+      this.avisos.open(mensajeDe(e), 'Cerrar');
+      return;
+    }
+    // Otro pago cambió la factura: se relee antes de explicarlo. `recargar` es un `refetch` del mismo `watch`, así que
+    // al volver `factura()` ya trae el saldo y los pagos nuevos (V2-5, V4-1).
+    this.releyendo.set(true);
+    try {
+      await this.fachada.recargar();
+    } catch {
+      // Sin la relectura, se explica con lo que ya se tenía.
+    } finally {
+      this.releyendo.set(false);
+    }
+    // Si otro pago la dejó en 0, el formulario y su botón desaparecen: el foco va al título.
+    if (!this.puedeRegistrar()) enfocarTitulo();
     if (codigo === 'PAGO_EXCEDE_SALDO') {
-      // Otro pago bajó el saldo: se relee antes de decirlo, y el monto se vuelve a validar contra el saldo nuevo (V2-5).
-      await this.fachada.recargar().catch(() => undefined);
       const saldo = saldoDelError(ext['saldo'], this.factura()?.saldo);
       this.form.controls.monto.updateValueAndValidity();
       this.form.controls.monto.markAsTouched();
       this.avisos.open(mensajeDe(e) + (saldo ? ` El saldo es ${this.bob.transform(saldo)}.` : ''), 'Cerrar');
       return;
     }
-    if (codigo !== 'PAGO_DUPLICADO') {
-      this.avisos.open(mensajeDe(e), 'Cerrar');
-      return;
-    }
-    await this.fachada.recargar();
     const p = this.form.getRawValue();
     const existente = pagoRepetido(this.factura()?.pagos ?? [], ext['pagoId'], p.medio, p.referencia);
     this.repetido.set(existente?.pagoId);

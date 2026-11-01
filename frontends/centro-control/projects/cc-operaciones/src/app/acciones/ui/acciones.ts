@@ -96,7 +96,7 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
                 <div class="fila-acciones">
                   <!-- Mientras se confirma el rechazo, aprobar no aplica: se oculta como en crédito (V2-4). -->
                   @if (rechazando() !== a.accionId) {
-                    <button mat-flat-button (click)="aprobar(a.accionId, zona)" [disabled]="enviando()">
+                    <button mat-flat-button (click)="aprobar(a.accionId, zona)" [disabled]="enviando()" disabledInteractive>
                       <mat-icon>send</mat-icon>Aprobar y enviar
                     </button>
                   }
@@ -189,6 +189,7 @@ export class AccionesPagina {
   }
 
   aprobar(id: string, zona: HTMLElement) {
+    if (this.enviando()) return;
     const f = this.forms[id];
     if (!listoParaEnviar(f.controls.mensaje, zona)) return;
     const mensaje = f.controls.mensaje.value.trim();
@@ -210,6 +211,8 @@ export class AccionesPagina {
   }
 
   private async enviar(accion: () => Promise<unknown>, ok: string, rechazo?: string): Promise<void> {
+    // disabledInteractive: el botón enfocado sigue enfocable mientras se envía; un segundo clic no hace nada.
+    if (this.enviando()) return;
     this.enviando.set(true);
     try {
       await accion();

@@ -20,12 +20,9 @@ export class UnidadesRepositorio {
     return this.unidadesGql.watch({ pollInterval: cadaMs }).valueChanges;
   }
 
+  /** El `QueryRef`: `recargar` hace `refetch` sobre él, así la señal ya cambió cuando resuelve (V4-1). */
   observarUnidad(id: string) {
-    return this.unidadGql.watch({ variables: { id } }).valueChanges;
-  }
-
-  recargarUnidad(id: string) {
-    return this.unidadGql.fetch({ variables: { id } });
+    return this.unidadGql.watch({ variables: { id } });
   }
 
   programarMantenimiento(input: MantenimientoInput) {
