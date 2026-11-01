@@ -1,8 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { AvisoServicios, BobPipe, CONFIG_CENTRO, conDesde, Encabezado, Estado, FechaPipe, pct } from 'ui-comun';
+import { AvisoServicios, BobPipe, CONFIG_CENTRO, conDesde, Encabezado, Esqueleto, Estado, FechaPipe, pct } from 'ui-comun';
 import { pendientes, type EstadoTarjeta, type Pendiente } from '../domain/tablero';
 import { TableroFachada } from '../tablero.fachada';
 
@@ -14,7 +13,7 @@ import { TableroFachada } from '../tablero.fachada';
 @Component({
   selector: 'app-tablero',
   providers: [TableroFachada],
-  imports: [MatButtonToggleModule, MatProgressBarModule, MatIconModule, Encabezado, BobPipe, FechaPipe, Estado, AvisoServicios],
+  imports: [MatButtonToggleModule, MatIconModule, Encabezado, Esqueleto, BobPipe, FechaPipe, Estado, AvisoServicios],
   template: `
     <cc-encabezado titulo="Tablero" [subtitulo]="bloques.verAlertas ? 'Datos al ' + (datosAl() ?? '—') : undefined">
       <mat-button-toggle-group [value]="periodo()" (change)="periodo.set($event.value)" aria-label="Periodo de las cifras">
@@ -23,10 +22,10 @@ import { TableroFachada } from '../tablero.fachada';
         <mat-button-toggle value="ESTE_MES">Este mes</mat-button-toggle>
       </mat-button-toggle-group>
     </cc-encabezado>
-    @if (cargando()) {
-      <mat-progress-bar mode="indeterminate" />
-    }
     @let t = datos()?.data?.tablero;
+    @if (cargando() && !t) {
+      <cc-esqueleto [filas]="6" />
+    }
     <!-- Los servicios caídos los avisa cada bloque; aquí solo el error que deja al tablero entero sin datos. -->
     <cc-aviso-servicios [error]="datos()?.error" [sinDatos]="!t && !cargando()" />
 

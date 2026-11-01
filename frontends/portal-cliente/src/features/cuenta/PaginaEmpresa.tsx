@@ -33,7 +33,7 @@ export function PaginaEmpresa() {
       />
     );
   }
-  if (mio.error) return <Problema error={mio.error} />;
+  if (mio.error) return <Problema error={mio.error} reintentar={mio.refetch} />;
   if (!mio.data.vinculado) return <Vinculacion />;
   if (sesion.necesitaEmpresa) return <Renovando />;
   return <DatosDeLaEmpresa cliente={mio.data} />;

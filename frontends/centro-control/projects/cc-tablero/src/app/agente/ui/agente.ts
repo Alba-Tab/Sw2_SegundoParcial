@@ -2,7 +2,18 @@ import { Component, inject, input, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatExpansionModule } from '@angular/material/expansion';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Encabezado, AvisoServicios, codigoDe, CONFIG_CENTRO, Estado, EtiquetaPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import {
+  Encabezado,
+  AvisoServicios,
+  codigoDe,
+  CONFIG_CENTRO,
+  Estado,
+  EtiquetaPipe,
+  FechaPipe,
+  mensajeDe,
+  Sesion,
+  Esqueleto,
+} from 'ui-comun';
 import { AgenteFachada } from '../agente.fachada';
 import { mensajeDisparo, urlTraza } from '../domain/mision';
 
@@ -13,12 +24,15 @@ import { mensajeDisparo, urlTraza } from '../domain/mision';
 @Component({
   selector: 'app-agente',
   providers: [AgenteFachada],
-  imports: [Encabezado, MatButtonModule, MatExpansionModule, FechaPipe, EtiquetaPipe, Estado, AvisoServicios],
+  imports: [Esqueleto, Encabezado, MatButtonModule, MatExpansionModule, FechaPipe, EtiquetaPipe, Estado, AvisoServicios],
   template: `
     <cc-encabezado titulo="Agente «vigilar viajes»">
       <button mat-flat-button (click)="disparar()" [disabled]="enviando()">Disparar misión</button>
       <a mat-button [href]="config.urls['cc-operaciones'] + '/acciones'">Ver acciones propuestas →</a>
     </cc-encabezado>
+    @if (cargando()) {
+      <cc-esqueleto />
+    }
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!misiones().length" />
     <mat-accordion>
       @for (m of misiones(); track m.misionId) {
@@ -54,7 +68,9 @@ import { mensajeDisparo, urlTraza } from '../domain/mision';
           }
         </mat-expansion-panel>
       } @empty {
-        <p class="secundario">Todavía no corrió ninguna misión.</p>
+        @if (!cargando()) {
+          <p class="secundario">Todavía no corrió ninguna misión.</p>
+        }
       }
     </mat-accordion>
   `,
@@ -88,6 +104,7 @@ export class AgentePagina {
   readonly mision = input<string>();
   readonly misiones = this.fachada.misiones;
   readonly error = this.fachada.error;
+  readonly cargando = this.fachada.cargando;
   readonly campos = { misionesAgente: 'Analítica' };
   readonly enviando = signal(false);
   readonly json = (v: unknown) => JSON.stringify(v);

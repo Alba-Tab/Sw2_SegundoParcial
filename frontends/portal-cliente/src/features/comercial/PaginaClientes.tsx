@@ -46,7 +46,7 @@ export function PaginaClientes() {
         </Typography>
         <TextField label="Buscar por razón social o NIT" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
         {clientes.isPending && <CircularProgress size={24} aria-label="Buscando" />}
-        {clientes.isError && <Problema error={clientes.error} />}
+        {clientes.isError && <Problema error={clientes.error} reintentar={clientes.refetch} />}
         <List dense>
           {clientes.data?.items.map((c) => (
             <ListItemButton

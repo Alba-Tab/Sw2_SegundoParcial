@@ -1,6 +1,6 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { completo, fechaLaPaz } from 'ui-comun';
+import { cargandoDe, completo, fechaLaPaz } from 'ui-comun';
 import type { CombustibleQuery } from '../graphql/generado';
 import { CombustibleRepositorio } from './data/combustible.repositorio';
 import { DIAS_ANOMALIAS } from './domain/combustible';
@@ -12,4 +12,5 @@ export class CombustibleFachada {
   readonly anomalias = computed(() => completo<CombustibleQuery>(this.datos())?.anomaliasCombustible ?? []);
   readonly cargas = computed(() => completo<CombustibleQuery>(this.datos())?.cargasCombustible ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly cargando = computed(() => cargandoDe(this.datos()));
 }

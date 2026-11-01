@@ -1,5 +1,5 @@
 import { mensajeDisparo, urlTraza } from '../../agente/domain/mision';
-import { mensajePregunta, mostrarCatalogo, preguntaValida } from '../../voz/domain/voz';
+import { mensajePregunta, mostrarCatalogo } from '../../voz/domain/voz';
 import { paramsLimpios, paramsPorDefecto, usaParametro } from './reporte';
 
 describe('cc-tablero (dominio)', () => {
@@ -25,7 +25,6 @@ describe('cc-tablero (dominio)', () => {
   });
 
   it('spec 015: los avisos de la pregunta se deciden por el código', () => {
-    expect(preguntaValida(' ab ')).toBe(false);
     expect(mensajePregunta('LLM_NO_DISPONIBLE', 'x')).toBe('El asistente no está disponible');
     expect(mensajePregunta(undefined, 'otro')).toBe('otro');
     expect(mostrarCatalogo('PREGUNTA_FUERA_DE_ALCANCE')).toBe(true);

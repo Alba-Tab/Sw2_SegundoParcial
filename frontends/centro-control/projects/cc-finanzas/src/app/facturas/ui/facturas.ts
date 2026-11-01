@@ -93,6 +93,7 @@ import { FacturasFachada } from '../facturas.fachada';
       nombre="facturas"
       [vacio]="saldo() === 'todas' ? 'No hay facturas.' : 'No hay facturas con saldo.'"
       [error]="error()"
+      [cargando]="cargando()"
     />
   `,
 })
@@ -100,6 +101,7 @@ export class FacturasPagina {
   private readonly fachada = inject(FacturasFachada);
   readonly facturas = this.fachada.facturas;
   readonly error = this.fachada.error;
+  readonly cargando = this.fachada.cargando;
   readonly campos = { facturas: 'Finanzas' };
   readonly columnas = ['numero', 'cliente', 'monto', 'saldo', 'vence', 'estado'];
   readonly lista = controlLista({

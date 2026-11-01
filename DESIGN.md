@@ -51,7 +51,7 @@ Las alertas del marco no llevan raya lateral: ícono de severidad, texto de seve
 
 ## Iconografía
 
-Material Symbols Outlined (paquete `material-symbols`), cargado en `base.css` y fijado como fuente por defecto de `<mat-icon>` en `configurarApp`. En el portal, `@mui/icons-material`.
+Material Symbols Outlined, fijado como fuente por defecto de `<mat-icon>` en `configurarApp`. No se sirve la fuente completa del paquete `material-symbols` (4 MB, unos 3 900 glifos): `frontends/centro-control/scripts/iconos.mjs --generar` la recorta a la lista cerrada de `ui-comun/dominio/src/iconos.ts`, con peso 400 y sin relleno (13 KB en WOFF). Para usar un ícono nuevo se agrega a esa lista y se corre `npm run iconos:generar`; `npm run probar` falla si el código usa uno que no está. Mientras la fuente carga, los íconos quedan ocultos (`iconos-listos` en `<html>`), así nunca se lee el nombre del glifo. En el portal, `@mui/icons-material`.
 
 - **Un ícono, un significado.** No se reutiliza un ícono para otra idea.
 - El ícono acompaña al texto; no lo reemplaza. Si va solo (botón de ícono), lleva `aria-label`.
@@ -121,4 +121,10 @@ En el portal la página actual se marca con fondo y peso en el botón del menú,
 
 **Tablero.** Primero «Pide acción»: lista de lo que hay que resolver (viajes en riesgo, facturas vencidas, unidades con mantenimiento pendiente, alertas abiertas), cada línea con ícono, tono de fondo y enlace a la app que lo resuelve con `?desde=cc-tablero`; si un servicio cae, la línea dice cuál en vez de callar. Después «Cifras del periodo» en una franja compacta y, al final, el detalle (viajes en curso, próximas a vencer). Sin grilla de tarjetas con cifra gigante.
 
-**Vacío, carga y error.** Barra de progreso indeterminada mientras carga sin datos; en una lista, `cc-pie-lista` dice qué pasa y cuál es el siguiente paso; `cc-aviso-servicios` cuando falla una fuente.
+**Vacío, carga y error.** Mientras no llega la primera respuesta, esqueleto con la forma de lo que viene (`<cc-esqueleto>`; en una lista lo pone `cc-pie-lista` con `[cargando]`; en el portal, `Cargando`), nunca «No hay …» antes de tiempo. En una lista vacía, `cc-pie-lista` dice qué pasa y cuál es el siguiente paso. Si falla una fuente, `cc-aviso-servicios` dice cuál y ofrece «Reintentar»; en un detalle queda además el «volver» del encabezado. El texto de un error sale del `codigo` de 000 §5 (`ui-comun/dominio/src/errores.ts`; portal: `compartido/ui/Problema.tsx`), nunca del mensaje del servidor.
+
+**Formularios.** `ReactiveForms` con un `<mat-error>` en español bajo cada campo (`textoError`, reglas en `ui-comun/dominio/src/validacion.ts`). El botón de enviar queda activo: al enviar con errores se marcan todos los campos y se enfoca el primero inválido (`listoParaEnviar`). Los montos se escriben como texto decimal con punto («2800.50») y se validan sin pasar por `Number`. Un texto que se exige solo para una de las acciones (motivo para rechazar) lo fija `exigirTexto`. Al cerrar un formulario, el foco vuelve al botón que lo abrió. En el portal, react-hook-form con zod (`shouldFocusError`) y el mismo criterio.
+
+**Acciones que no se deshacen** (registrar pago, cancelar servicio, rechazar entrega, cerrar mantenimiento, rechazar una acción del agente): confirmación en línea con `<cc-confirmacion>`, que dice qué va a pasar con los datos («Se registra un pago de 2.800,00 BOB…») y toma el foco; «No, volver» no hace nada. En el portal, el diálogo de cancelar ya era la confirmación.
+
+**Accesibilidad.** Foco visible (`:focus-visible` con `primary`), objetivos de 44 px en pantallas táctiles (enlaces de tablas y datos), sin texto atenuado con `opacity`, tablas con scroll horizontal dentro de `.tabla-ancha` a 375 px y sin animaciones si el sistema pide menos movimiento. Contraste AA calculado con los tokens (texto sobre fondo y sobre cada contenedor de tono, claro y oscuro): el par más bajo es `primary` sobre `surface-container`, 5,5 en claro.

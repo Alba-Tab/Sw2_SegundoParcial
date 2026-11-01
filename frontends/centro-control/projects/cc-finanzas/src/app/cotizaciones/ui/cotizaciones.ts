@@ -69,13 +69,14 @@ import { estadoCotizacion } from '../domain/cotizacion';
         <tr mat-row *matRowDef="let c; columns: columnas"></tr>
       </table>
     </div>
-    <cc-pie-lista [control]="lista" nombre="cotizaciones" vacio="No hay cotizaciones." [error]="error()" />
+    <cc-pie-lista [control]="lista" nombre="cotizaciones" vacio="No hay cotizaciones." [error]="error()" [cargando]="cargando()" />
   `,
 })
 export class CotizacionesPagina {
   private readonly fachada = inject(CotizacionesFachada);
   readonly cotizaciones = this.fachada.cotizaciones;
   readonly error = this.fachada.error;
+  readonly cargando = this.fachada.cargando;
   readonly campos = { cotizaciones: 'Finanzas', clientes: 'Viajes', rutas: 'Viajes' };
   readonly estado = estadoCotizacion;
   readonly columnas = ['cliente', 'ruta', 'carga', 'monto', 'estado', 'creada'];

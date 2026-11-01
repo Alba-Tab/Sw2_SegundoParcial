@@ -1,7 +1,6 @@
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
-import CircularProgress from '@mui/material/CircularProgress';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
@@ -31,6 +30,7 @@ import { useClienteActivo } from '../../compartido/sesion/ClienteActivo';
 import { EstadoFactura } from '../../compartido/ui/EstadoServicio';
 import { Problema } from '../../compartido/ui/Problema';
 import { Credito } from './Credito';
+import { Cargando } from '../../compartido/ui/Cargando';
 
 const col = createColumnHelper<Factura>();
 
@@ -109,8 +109,8 @@ export function PaginaFacturas() {
         <FormControlLabel control={<Switch checked={conSaldo} onChange={(e) => setConSaldo(e.target.checked)} />} label="Solo con saldo" />
       </Stack>
       {paginas.data && <Antiguedad actualizadoEn={paginas.dataUpdatedAt} fallo={paginas.isError} />}
-      {paginas.isPending && paginas.fetchStatus === 'fetching' && <CircularProgress aria-label="Cargando" />}
-      {paginas.isError && !paginas.data && <Problema error={paginas.error} />}
+      {paginas.isPending && paginas.fetchStatus === 'fetching' && <Cargando />}
+      {paginas.isError && !paginas.data && <Problema error={paginas.error} reintentar={paginas.refetch} />}
       {paginas.data && datos.length === 0 && <Typography color="text.secondary">No hay facturas.</Typography>}
       {elegida && paginas.data && !paginas.hasNextPage && !datos.some((f) => f.facturaId === elegida) && (
         <Alert severity="info">No encontramos la factura del enlace en esta lista.</Alert>

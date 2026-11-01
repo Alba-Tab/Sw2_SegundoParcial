@@ -62,13 +62,20 @@ import { LineasFachada } from '../lineas.fachada';
         <tr mat-row *matRowDef="let c; columns: columnas"></tr>
       </table>
     </div>
-    <cc-pie-lista [control]="lista" nombre="líneas de crédito" vacio="Ningún cliente tiene línea de crédito." [error]="error()" />
+    <cc-pie-lista
+      [control]="lista"
+      nombre="líneas de crédito"
+      vacio="Ningún cliente tiene línea de crédito."
+      [error]="error()"
+      [cargando]="cargando()"
+    />
   `,
 })
 export class LineasPagina {
   private readonly fachada = inject(LineasFachada);
   readonly lineas = this.fachada.lineas;
   readonly error = this.fachada.error;
+  readonly cargando = this.fachada.cargando;
   readonly campos = { clientes: 'Viajes', lineaCredito: 'Finanzas' };
   readonly columnas = ['cliente', 'limite', 'reservado', 'utilizado', 'disponible', 'estado'];
   readonly estado = estadoLinea;

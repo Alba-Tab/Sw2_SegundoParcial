@@ -1,7 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { filter, switchMap } from 'rxjs';
-import { completo, puedeVer, Sesion } from 'ui-comun';
+import { cargandoDe, completo, puedeVer, Sesion } from 'ui-comun';
 import type { ClienteQuery, ClientesQuery } from '../graphql/generado';
 import { ClientesRepositorio } from './data/clientes.repositorio';
 import { buscarCliente } from './domain/cliente';
@@ -13,6 +13,7 @@ export class ClientesFachada {
   private readonly datos = toSignal(inject(ClientesRepositorio).observarClientes(this.verCredito, 60_000));
   readonly clientes = computed(() => completo<ClientesQuery>(this.datos())?.clientes ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly cargando = computed(() => cargandoDe(this.datos()));
 }
 
 /** Fachada de la ficha de un cliente: datos, línea de crédito, servicios y la copia de rutas para nombrarlos. */
@@ -36,4 +37,5 @@ export class ClienteFachada {
   readonly servicios = computed(() => this.respuesta()?.servicios ?? []);
   readonly rutas = computed(() => this.respuesta()?.rutas);
   readonly error = computed(() => this.datos()?.error);
+  readonly cargando = computed(() => cargandoDe(this.datos()));
 }

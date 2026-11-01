@@ -5,7 +5,10 @@
  */
 export * from './dinero';
 export * from './etiquetas';
+export * from './errores';
 export * from './formato';
+export * from './iconos';
 export * from './lista';
 export * from './navegacion';
 export * from './permisos';
+export * from './validacion';

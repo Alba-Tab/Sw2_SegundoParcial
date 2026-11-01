@@ -1,4 +1,5 @@
 import { Component, computed, input } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { erroresGraphql, mensajeDe, servicioCaido } from './errores';
 
@@ -17,22 +18,31 @@ export function avisosServicio(error: unknown, campos: CamposPorServicio, sinDat
     if (e.extensions?.['codigo'] !== 'DEPENDENCIA_NO_DISPONIBLE') continue;
     // El campo más profundo del path manda: en ['viaje', 'unidad'] la que cayó es Flota, no Viajes.
     const campo = [...(e.path ?? [])].reverse().find((p): p is string => typeof p === 'string' && servicioCaido(error, p) && p in campos);
-    caidos.add(campo ? `${campos[campo]} no disponible` : e.message || 'Un servicio no está disponible');
+    caidos.add(campo ? `${campos[campo]} no disponible` : 'Un servicio no está disponible');
   }
   if (caidos.size) return [...caidos];
   return sinDatos ? [mensajeDe(error)] : [];
 }
 
-/** Banner de la respuesta parcial; cada página dice qué servicio responde cada campo de su consulta. */
+/**
+ * Banner de la respuesta parcial; cada página dice qué servicio responde cada campo de su consulta. Siempre con salida:
+ * "Reintentar" (y en un detalle, el "volver" del encabezado).
+ */
 @Component({
   selector: 'cc-aviso-servicios',
-  imports: [MatIconModule],
+  imports: [MatButtonModule, MatIconModule],
   template: `
     @for (a of avisos(); track a) {
-      <p class="aviso-servicio" role="alert"><mat-icon aria-hidden="true">cloud_off</mat-icon> {{ a }}</p>
+      <p class="aviso-servicio" role="alert"><mat-icon>cloud_off</mat-icon> {{ a }}</p>
+    }
+    @if (avisos().length) {
+      <button mat-stroked-button class="reintentar" (click)="reintentarAhora()"><mat-icon>replay</mat-icon>Reintentar</button>
     }
   `,
   styles: `
+    .reintentar {
+      margin: 0 0 16px;
+    }
     .aviso-servicio {
       display: flex;
       align-items: center;
@@ -51,4 +61,12 @@ export class AvisoServicios {
   /** La página no tiene nada que mostrar: también se avisa un error que no es de un servicio caído. */
   readonly sinDatos = input(false);
   readonly avisos = computed(() => avisosServicio(this.error(), this.campos(), this.sinDatos()));
+  /** Qué hacer al reintentar; sin él, se recarga la página (cada página vuelve a pedir su consulta al cargar). */
+  readonly reintentar = input<() => unknown>();
+
+  reintentarAhora(): void {
+    const reintentar = this.reintentar();
+    if (reintentar) void reintentar();
+    else location.reload();
+  }
 }

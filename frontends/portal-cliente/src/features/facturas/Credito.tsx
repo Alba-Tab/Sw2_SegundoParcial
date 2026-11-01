@@ -17,7 +17,7 @@ export function Credito() {
   const linea = activo.modoComercial ? deOtro : mia;
 
   if (linea.isPending) return null;
-  if (!linea.data) return <Problema error={linea.error} />;
+  if (!linea.data) return <Problema error={linea.error} reintentar={linea.refetch} />;
   const l = linea.data;
   const usado = porcentaje(aCentavos(l.utilizado.monto) + aCentavos(l.reservado.monto), aCentavos(l.limite.monto));
   return (

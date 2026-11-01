@@ -1,9 +1,8 @@
 import { Component, computed, effect, inject } from '@angular/core';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, controlLista, Encabezado, Estado, etiqueta, FechaPipe, FiltrosLista, PieLista } from 'ui-comun';
+import { AvisoServicios, cargandoDe, controlLista, Encabezado, Estado, etiqueta, FechaPipe, FiltrosLista, PieLista } from 'ui-comun';
 import type { EstadoViaje } from '../../graphql/generado';
 import { ESTADOS_VIAJE, textoViaje } from '../domain/viaje';
 import { ViajesFachada } from '../viajes.fachada';
@@ -11,24 +10,10 @@ import { ViajesFachada } from '../viajes.fachada';
 @Component({
   selector: 'app-viajes',
   providers: [ViajesFachada],
-  imports: [
-    Encabezado,
-    MatTableModule,
-    MatSortModule,
-    MatProgressBarModule,
-    RouterLink,
-    FechaPipe,
-    Estado,
-    AvisoServicios,
-    FiltrosLista,
-    PieLista,
-  ],
+  imports: [Encabezado, MatTableModule, MatSortModule, RouterLink, FechaPipe, Estado, AvisoServicios, FiltrosLista, PieLista],
   template: `
     <cc-encabezado titulo="Viajes" />
     @let r = datos();
-    @if (r?.loading) {
-      <mat-progress-bar mode="indeterminate" />
-    }
     <cc-aviso-servicios [error]="r?.error" [campos]="campos" [sinDatos]="!r?.data?.viajes?.length" />
     <cc-filtros-lista
       [control]="lista"
@@ -78,7 +63,7 @@ import { ViajesFachada } from '../viajes.fachada';
         <tr mat-row *matRowDef="let v; columns: columnas"></tr>
       </table>
     </div>
-    <cc-pie-lista [control]="lista" nombre="viajes" vacio="No hay viajes." [error]="r?.error" />
+    <cc-pie-lista [control]="lista" nombre="viajes" vacio="No hay viajes." [error]="r?.error" [cargando]="cargandoDe(r)" />
   `,
 })
 export class ViajesPagina {
@@ -86,6 +71,7 @@ export class ViajesPagina {
   readonly estados = ESTADOS_VIAJE;
   readonly columnas = ['placa', 'cliente', 'ruta', 'chofer', 'fecha', 'estado'];
   readonly datos = this.fachada.datos;
+  readonly cargandoDe = cargandoDe;
   readonly lista = controlLista({
     filas: computed(() => this.datos()?.data?.viajes ?? []),
     texto: textoViaje,

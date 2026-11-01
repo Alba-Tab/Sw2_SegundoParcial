@@ -2,7 +2,7 @@
  * Estilos globales de las 4 apps del Centro de Control (DESIGN.md). Cada app lo carga una sola vez desde angular.json,
  * después del tema de Material y de los tokens. Las fuentes salen del hosting de cada app, nunca de Google Fonts.
  */
-@import 'material-symbols/outlined.css';
+@import './iconos.css';
 @import './fuentes.css';
 
 html,
@@ -12,7 +12,6 @@ body {
 body {
   margin: 0;
   font: var(--mat-sys-body-medium);
-  font-family: Roboto, 'Helvetica Neue', sans-serif;
   background: var(--mat-sys-surface);
   color: var(--mat-sys-on-surface);
 }
@@ -94,4 +93,48 @@ table {
 /* Fila marcada al llegar desde una alerta (`/combustible/:id`). */
 tr.marcada {
   background: var(--mat-sys-error-container);
+}
+
+/* Mientras la fuente de iconos no llega, el glifo no se ve como texto ("check_circle"): proveedores.ts pone la clase. */
+html:not(.iconos-listos) .material-symbols-outlined {
+  color: transparent;
+}
+
+/* Foco visible con el teclado en todo lo que se puede enfocar (DESIGN.md, accesible por defecto). */
+:focus-visible {
+  outline: 2px solid var(--mat-sys-primary);
+  outline-offset: 2px;
+}
+[tabindex='-1']:focus {
+  outline: none;
+}
+
+/* Una tabla a 375 px se desplaza dentro de su caja; la página no. */
+.tabla-ancha {
+  overscroll-behavior-x: contain;
+}
+.tabla-ancha th {
+  white-space: nowrap;
+}
+
+/* En pantallas táctiles, los enlaces de las tablas y los datos tienen 44 px de alto para el dedo. */
+@media (pointer: coarse) {
+  td a,
+  .datos a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+}
+
+/* Menos movimiento si el sistema lo pide: sin animaciones ni transiciones largas. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

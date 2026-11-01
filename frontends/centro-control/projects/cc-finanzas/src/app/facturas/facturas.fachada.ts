@@ -1,7 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { filter, firstValueFrom, switchMap } from 'rxjs';
-import { completo, Intentos } from 'ui-comun';
+import { cargandoDe, completo, Intentos } from 'ui-comun';
 import type { FacturaQuery, FacturasQuery } from '../graphql/generado';
 import { FacturasRepositorio } from './data/facturas.repositorio';
 import { leerRecibo } from './data/lector-recibos';
@@ -15,6 +15,7 @@ export class FacturasFachada {
   private readonly datos = toSignal(toObservable(this.conSaldo).pipe(switchMap((c) => this.repo.observarFacturas(c, 30_000))));
   readonly facturas = computed(() => completo<FacturasQuery>(this.datos())?.facturas ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly cargando = computed(() => cargandoDe(this.datos()));
 }
 
 /** Fachada del detalle de una factura y del registro de pagos (spec 008). */
@@ -35,6 +36,7 @@ export class FacturaFachada {
   );
   readonly factura = computed(() => completo<FacturaQuery>(this.datos())?.factura);
   readonly error = computed(() => this.datos()?.error);
+  readonly cargando = computed(() => cargandoDe(this.datos()));
 
   registrarPago(facturaId: string, pago: PagoEnEdicion) {
     const datos = { facturaId, ...pago };

@@ -1,7 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { filter, switchMap } from 'rxjs';
-import { completo } from 'ui-comun';
+import { cargandoDe, completo } from 'ui-comun';
 import type { ChoferesQuery, ChoferQuery } from '../graphql/generado';
 import { ChoferesRepositorio } from './data/choferes.repositorio';
 import { buscarChofer } from './domain/chofer';
@@ -12,6 +12,7 @@ export class ChoferesFachada {
   private readonly datos = toSignal(inject(ChoferesRepositorio).observarChoferes(60_000));
   readonly choferes = computed(() => completo<ChoferesQuery>(this.datos())?.choferes ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly cargando = computed(() => cargandoDe(this.datos()));
 }
 
 /** Fachada de la ficha de un chofer: sus datos (de la lista) y su puntaje de conducción de la semana. */
@@ -30,4 +31,5 @@ export class ChoferFachada {
   readonly chofer = computed(() => buscarChofer(this.respuesta()?.choferes, this.id() ?? ''));
   readonly puntajes = computed(() => this.respuesta()?.puntajesConduccion);
   readonly error = computed(() => this.datos()?.error);
+  readonly cargando = computed(() => cargandoDe(this.datos()));
 }

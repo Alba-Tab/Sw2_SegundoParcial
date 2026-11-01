@@ -1,7 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { filter, firstValueFrom, switchMap } from 'rxjs';
-import { completo, Intentos } from 'ui-comun';
+import { cargandoDe, completo, Intentos } from 'ui-comun';
 import type { UnidadesQuery, UnidadQuery } from '../graphql/generado';
 import { UnidadesRepositorio } from './data/unidades.repositorio';
 import { lineasChecklist, type ItemCierre, type NuevoMantenimiento } from './domain/unidad';
@@ -12,6 +12,7 @@ export class UnidadesFachada {
   private readonly datos = toSignal(inject(UnidadesRepositorio).observarUnidades(30_000));
   readonly unidades = computed(() => completo<UnidadesQuery>(this.datos())?.unidades ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly cargando = computed(() => cargandoDe(this.datos()));
 }
 
 /** Fachada del detalle de una unidad y sus mantenimientos (spec 010). */
@@ -30,6 +31,7 @@ export class UnidadFachada {
   readonly unidad = computed(() => completo<UnidadQuery>(this.datos())?.unidad);
   readonly mantenimientos = computed(() => completo<UnidadQuery>(this.datos())?.mantenimientos ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly cargando = computed(() => cargandoDe(this.datos()));
 
   programar(unidadId: string, nuevo: NuevoMantenimiento) {
     const input = { unidadId, ...nuevo, checklist: lineasChecklist(nuevo.checklist) };

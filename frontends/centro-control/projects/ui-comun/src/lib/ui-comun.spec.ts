@@ -42,7 +42,7 @@ describe('ui-comun', () => {
     expect(servicioCaido(error, 'unidadesPorEstado')).toBe(false);
     expect(sinPermiso(error, 'cuentasPorCobrar')).toBe(false);
     expect(codigoDe(error)).toBe('DEPENDENCIA_NO_DISPONIBLE');
-    expect(mensajeDe(error)).toBe('Finanzas no disponible');
+    expect(mensajeDe(error)).toBe('Un servicio no responde. Intenta de nuevo en unos segundos.');
   });
 
   it('un SIN_PERMISO del campo (rol sin acceso) no se confunde con un servicio caído', () => {
@@ -95,7 +95,9 @@ describe('ui-comun', () => {
       errors: [{ message: 'Tu rol no tiene acceso a este dato', path: ['viaje', 'monto'], extensions: { codigo: 'SIN_PERMISO' } }],
     });
     expect(avisosServicio(soloPermiso, campos)).toEqual([]);
-    expect(avisosServicio(new TypeError('Failed to fetch'), campos, true)).toEqual(['Failed to fetch']);
+    expect(avisosServicio(new TypeError('Failed to fetch'), campos, true)).toEqual([
+      'No se pudo hablar con el servidor. Revisa la conexión e intenta de nuevo.',
+    ]);
     expect(avisosServicio(undefined, campos, true)).toEqual([]);
   });
 

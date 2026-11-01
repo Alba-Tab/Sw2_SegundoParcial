@@ -71,7 +71,7 @@ export function PaginaCotizar() {
               </MenuItem>
             ))}
           </CampoTexto>
-          {rutas.isError && <Problema error={rutas.error} />}
+          {rutas.isError && <Problema error={rutas.error} reintentar={rutas.refetch} />}
           <CampoTexto control={control} nombre="tipoCarga" label="Tipo de carga" select required>
             {Object.entries(TIPOS_CARGA).map(([valor, texto]) => (
               <MenuItem key={valor} value={valor}>

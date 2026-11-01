@@ -11,9 +11,6 @@ export const REPORTES_CATALOGO: { id: ReporteId; titulo: string }[] = [
   { id: 'RENTABILIDAD', titulo: 'Rentabilidad' },
 ];
 
-/** La pregunta va con 3 caracteres o más (D95: el texto se puede corregir antes). */
-export const preguntaValida = (texto: string): boolean => texto.trim().length >= 3;
-
 /** El mensaje según el `codigo` del error (000 §5); la pantalla decide por el código, no por el texto. */
 export function mensajePregunta(codigo: string | undefined, mensaje: string): string {
   if (codigo === 'LLM_NO_DISPONIBLE') return 'El asistente no está disponible';

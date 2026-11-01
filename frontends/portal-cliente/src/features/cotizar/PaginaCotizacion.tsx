@@ -1,6 +1,5 @@
 import ArrowBack from '@mui/icons-material/ArrowBack';
 import Alert from '@mui/material/Alert';
-import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
@@ -14,6 +13,7 @@ import { BotonEnlace } from '../../compartido/ui/BotonEnlace';
 import { CuentaRegresiva } from '../../compartido/ui/CuentaRegresiva';
 import { Problema } from '../../compartido/ui/Problema';
 import { ConfirmarServicio } from '../servicios/ConfirmarServicio';
+import { Cargando } from '../../compartido/ui/Cargando';
 
 /** Spec 002, paso 6: el monto, la cuenta regresiva hasta venceEn y "Confirmar servicio" (spec 003). */
 export function PaginaCotizacion() {
@@ -22,8 +22,8 @@ export function PaginaCotizacion() {
   const rutas = useListarRutas();
   const [vencioAqui, setVencioAqui] = useState(false);
 
-  if (cotizacion.isPending) return conVolver(<CircularProgress aria-label="Cargando" />);
-  if (cotizacion.isError) return conVolver(<Problema error={cotizacion.error} />);
+  if (cotizacion.isPending) return conVolver(<Cargando filas={5} />);
+  if (cotizacion.isError) return conVolver(<Problema error={cotizacion.error} reintentar={cotizacion.refetch} />);
   const c = cotizacion.data;
   const ruta = rutas.data?.find((r) => r.rutaId === c.rutaId);
   const vencida = c.vencida || vencioAqui;

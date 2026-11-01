@@ -1,5 +1,5 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -10,14 +10,18 @@ import { RouterLink } from '@angular/router';
 import {
   AvisoServicios,
   CONFIG_CENTRO,
+  Confirmacion,
   controlLista,
   Encabezado,
   Estado,
   FechaPipe,
   FiltrosLista,
+  largoEntre,
+  listoParaEnviar,
   mensajeDe,
   PieLista,
   Sesion,
+  textoError,
 } from 'ui-comun';
 import { AccionesFachada } from '../acciones.fachada';
 import { conLaElegidaPrimero, type Accion } from '../domain/accion';
@@ -31,7 +35,8 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
   providers: [AccionesFachada],
   imports: [
     Encabezado,
-    FormsModule,
+    ReactiveFormsModule,
+    Confirmacion,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
@@ -73,31 +78,39 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
               </p>
             }
             @if (a.estado === 'PENDIENTE' && sesion.tiene('despachador')) {
-              <mat-form-field class="mensaje">
-                <mat-label>Mensaje al cliente (10 a 1.000)</mat-label>
-                <textarea
-                  matInput
-                  rows="3"
-                  minlength="10"
-                  maxlength="1000"
-                  [(ngModel)]="mensajes[a.accionId]"
-                  [ngModelOptions]="{ standalone: true }"
-                ></textarea>
-              </mat-form-field>
-              <div class="fila-acciones">
-                <button
-                  mat-flat-button
-                  (click)="aprobar(a.accionId)"
-                  [disabled]="enviando() || (mensajes[a.accionId] ?? '').trim().length < 10"
-                >
-                  <mat-icon>send</mat-icon>Aprobar y enviar
-                </button>
-                <mat-form-field
-                  ><mat-label>Motivo del rechazo</mat-label><input matInput [(ngModel)]="motivos[a.accionId]"
-                /></mat-form-field>
-                <button mat-stroked-button (click)="rechazar(a.accionId)" [disabled]="enviando()">
-                  <mat-icon>block</mat-icon>Rechazar
-                </button>
+              @let f = formDe(a);
+              <div [formGroup]="f" #zona>
+                <mat-form-field class="mensaje">
+                  <mat-label>Mensaje al cliente</mat-label>
+                  <textarea matInput rows="3" formControlName="mensaje"></textarea>
+                  <mat-hint>De 10 a 1.000 caracteres</mat-hint>
+                  <mat-error>{{ textoError(f.controls.mensaje) }}</mat-error>
+                </mat-form-field>
+                <div class="fila-acciones">
+                  <button mat-flat-button (click)="aprobar(a.accionId, zona)" [disabled]="enviando()">
+                    <mat-icon>send</mat-icon>Aprobar y enviar
+                  </button>
+                  <mat-form-field>
+                    <mat-label>Motivo del rechazo</mat-label>
+                    <input matInput formControlName="motivo" />
+                    <mat-error>{{ textoError(f.controls.motivo) }}</mat-error>
+                  </mat-form-field>
+                  @if (rechazando() !== a.accionId) {
+                    <button mat-stroked-button (click)="pedirRechazo(a.accionId, zona)" [disabled]="enviando()">
+                      <mat-icon>block</mat-icon>Rechazar
+                    </button>
+                  }
+                </div>
+                @if (rechazando() === a.accionId) {
+                  <cc-confirmacion
+                    [resumen]="'Se rechaza el aviso de retraso a ' + a.razonSocial + ': no se envía ningún correo. No se puede deshacer.'"
+                    accion="Sí, rechazar la acción"
+                    icono="block"
+                    [enviando]="enviando()"
+                    (confirmar)="rechazar(a.accionId)"
+                    (volver)="rechazando.set(null)"
+                  />
+                }
               </div>
             } @else {
               <p class="mensaje-final">“{{ a.mensaje }}”</p>
@@ -109,7 +122,7 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
         </mat-card>
       }
     </div>
-    <cc-pie-lista [control]="lista" nombre="acciones" vacio="El agente no propuso acciones." [error]="error()" />
+    <cc-pie-lista [control]="lista" nombre="acciones" vacio="El agente no propuso acciones." [error]="error()" [cargando]="cargando()" />
   `,
   styles: `
     .lista {
@@ -138,12 +151,9 @@ export class AccionesPagina {
   readonly config = inject(CONFIG_CENTRO);
   readonly id = input<string>();
   readonly datos = this.fachada.datos;
-  readonly visibles = computed(() => {
-    const todas = this.fachada.acciones();
-    for (const a of todas) if (a.estado === 'PENDIENTE' && this.mensajes[a.accionId] === undefined) this.mensajes[a.accionId] = a.mensaje;
-    return conLaElegidaPrimero(todas, this.id());
-  });
+  readonly visibles = computed(() => conLaElegidaPrimero(this.fachada.acciones(), this.id()));
   readonly error = this.fachada.error;
+  readonly cargando = this.fachada.cargando;
   readonly lista = controlLista<Accion>({
     filas: this.visibles,
     texto: (a) => [a.razonSocial, a.viaje?.placa, a.viaje?.ruta?.destino].filter(Boolean).join(' '),
@@ -151,15 +161,27 @@ export class AccionesPagina {
   });
   readonly campos = { accionesPropuestas: 'Analítica', viaje: 'Viajes' };
   readonly enviando = signal(false);
-  mensajes: Record<string, string> = {};
-  motivos: Record<string, string> = {};
+  /** Rechazar no se deshace: la acción que está pidiendo confirmación. */
+  readonly rechazando = signal<string | null>(null);
+  readonly textoError = textoError;
+  private readonly forms: Record<string, ReturnType<typeof formularioAccion>> = {};
 
-  aprobar(id: string) {
-    const mensaje = this.mensajes[id].trim();
+  /** El formulario de cada acción pendiente, con el mensaje que propuso el agente para editarlo. */
+  formDe(a: Accion) {
+    return (this.forms[a.accionId] ??= formularioAccion(a.mensaje));
+  }
+
+  aprobar(id: string, zona: HTMLElement) {
+    const f = this.forms[id];
+    if (!listoParaEnviar(f.controls.mensaje, zona)) return;
+    const mensaje = f.controls.mensaje.value.trim();
     return this.enviar(() => this.fachada.aprobar(id, mensaje), 'Aprobada: el correo sale por n8n');
   }
+  pedirRechazo(id: string, zona: HTMLElement): void {
+    if (listoParaEnviar(this.forms[id].controls.motivo, zona)) this.rechazando.set(id);
+  }
   rechazar(id: string) {
-    const motivo = this.motivos[id]?.trim() || undefined;
+    const motivo = this.forms[id].controls.motivo.value.trim() || undefined;
     return this.enviar(() => this.fachada.rechazar(id, motivo), 'Acción rechazada');
   }
 
@@ -172,7 +194,16 @@ export class AccionesPagina {
     } catch (e) {
       this.avisos.open(mensajeDe(e), 'Cerrar', { duration: 6000 });
     } finally {
+      this.rechazando.set(null);
       this.enviando.set(false);
     }
   }
+}
+
+/** Mensaje de 10 a 1.000 caracteres (spec 014); el motivo del rechazo es opcional. */
+function formularioAccion(mensaje: string) {
+  return new FormGroup({
+    mensaje: new FormControl(mensaje, { nonNullable: true, validators: [Validators.required, largoEntre(10, 1000)] }),
+    motivo: new FormControl('', { nonNullable: true, validators: [largoEntre(0, 300)] }),
+  });
 }

@@ -1,5 +1,5 @@
 import { Component, computed, effect, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -16,14 +16,17 @@ import {
   Encabezado,
   Estado,
   etiqueta,
+  enfocar,
   EtiquetaPipe,
+  exigirTexto,
   FechaPipe,
   FiltrosLista,
   mensajeDe,
   PieLista,
   Sesion,
+  textoError,
 } from 'ui-comun';
-import { estadoServicio, motivoCancelacionValido, puedeCancelarServicio } from '../domain/servicio';
+import { estadoServicio, puedeCancelarServicio, type Servicio } from '../domain/servicio';
 import { ServiciosFachada } from '../servicios.fachada';
 
 /**
@@ -35,7 +38,7 @@ import { ServiciosFachada } from '../servicios.fachada';
   providers: [ServiciosFachada],
   imports: [
     Encabezado,
-    FormsModule,
+    ReactiveFormsModule,
     MatTableModule,
     MatSortModule,
     MatButtonModule,
@@ -98,19 +101,22 @@ import { ServiciosFachada } from '../servicios.fachada';
           <td mat-cell *matCellDef="let s">
             @if (puedeCancelar() && puedeCancelarServicio(s)) {
               @if (confirmando() === s.servicioId) {
-                <!-- Cancelar devuelve el crédito y la unidad: se pide el motivo de esta fila y una confirmación. -->
-                <div class="confirmacion">
-                  <mat-form-field class="motivo"
-                    ><mat-label>Motivo (3 a 300)</mat-label
-                    ><input matInput [(ngModel)]="motivos[s.servicioId]" minlength="3" maxlength="300" required
-                  /></mat-form-field>
-                  <button mat-flat-button (click)="cancelar(s.servicioId)" [disabled]="!motivoValido(s.servicioId) || enviando()">
+                <!-- Cancelar devuelve el crédito y la unidad: se pide el motivo de esta fila y se confirma con un resumen. -->
+                <div class="confirmacion" role="group" aria-label="Cancelar el servicio" #zona>
+                  <p class="resumen">{{ resumen(s) }}</p>
+                  <mat-form-field class="motivo">
+                    <mat-label>Motivo</mat-label>
+                    <input matInput [formControl]="motivo" [id]="'motivo-' + s.servicioId" />
+                    <mat-hint>De 3 a 300 caracteres</mat-hint>
+                    <mat-error>{{ textoError(motivo) }}</mat-error>
+                  </mat-form-field>
+                  <button mat-flat-button (click)="cancelar(s.servicioId, zona)" [disabled]="enviando()">
                     <mat-icon>cancel</mat-icon>Sí, cancelar el servicio
                   </button>
-                  <button mat-button (click)="confirmando.set(null)" [disabled]="enviando()">No</button>
+                  <button mat-button (click)="cerrar(s.servicioId)" [disabled]="enviando()">No, volver</button>
                 </div>
               } @else {
-                <button mat-button (click)="confirmando.set(s.servicioId)" [disabled]="enviando()">
+                <button mat-button [id]="'cancelar-' + s.servicioId" (click)="abrir(s.servicioId)" [disabled]="enviando()">
                   <mat-icon>cancel</mat-icon>Cancelar…
                 </button>
               }
@@ -126,7 +132,7 @@ import { ServiciosFachada } from '../servicios.fachada';
         <tr mat-row *matRowDef="let s; columns: columnas()"></tr>
       </table>
     </div>
-    <cc-pie-lista [control]="lista" nombre="servicios" vacio="No hay servicios." [error]="error()" />
+    <cc-pie-lista [control]="lista" nombre="servicios" vacio="No hay servicios." [error]="error()" [cargando]="cargando()" />
   `,
   styles: `
     .confirmacion {
@@ -139,6 +145,10 @@ import { ServiciosFachada } from '../servicios.fachada';
     .motivo {
       min-width: 240px;
     }
+    .resumen {
+      flex-basis: 100%;
+      margin: 0;
+    }
   `,
 })
 export class ServiciosPagina {
@@ -148,6 +158,7 @@ export class ServiciosPagina {
   readonly config = inject(CONFIG_CENTRO);
   readonly servicios = this.fachada.servicios;
   readonly error = this.fachada.error;
+  readonly cargando = this.fachada.cargando;
   readonly campos = { servicios: 'Viajes', clientes: 'Viajes' };
   readonly puedeCancelar = computed(() => this.sesion.tiene('despachador', 'comercial'));
   /** La columna del monto, solo si el rol lo ve (no se le pide al despachador). */
@@ -171,10 +182,13 @@ export class ServiciosPagina {
     ordenInicial: { orden: 'fecha', dir: 'asc' },
   });
   readonly enviando = signal(false);
-  /** La fila que está pidiendo confirmación; cada fila tiene su propio motivo. */
+  /** La fila que está pidiendo confirmación; el motivo se escribe de nuevo para cada una. */
   readonly confirmando = signal<string | null>(null);
-  motivos: Record<string, string> = {};
+  readonly motivo = new FormControl('', { nonNullable: true });
+  readonly textoError = textoError;
   readonly puedeCancelarServicio = puedeCancelarServicio;
+  private readonly bob = new BobPipe();
+  private readonly fecha = new FechaPipe();
 
   constructor() {
     // El filtro de estado de la URL también se pide a Viajes: el límite de 80 filas se aplica ya filtrado.
@@ -185,18 +199,29 @@ export class ServiciosPagina {
     return this.fachada.nombreCliente(clienteId);
   }
 
-  motivoValido(servicioId: string): boolean {
-    return motivoCancelacionValido(this.motivos[servicioId]);
+  resumen(s: Servicio): string {
+    const monto = this.fachada.verMonto && s.monto ? ` y se devuelven ${this.bob.transform(s.monto)} a su línea de crédito` : '';
+    return `Se cancela el servicio de ${this.nombre(s.clienteId ?? '')} del ${this.fecha.transform(s.fechaViaje)}: se libera la unidad ${s.placa ?? ''}${monto}. No se puede deshacer.`;
   }
 
-  async cancelar(servicioId: string): Promise<void> {
-    if (!this.motivoValido(servicioId)) return;
+  /** Abre la confirmación de la fila con el foco en el motivo; al cerrarla, el foco vuelve a "Cancelar…". */
+  abrir(servicioId: string): void {
+    this.motivo.reset();
+    this.confirmando.set(servicioId);
+    enfocar(`motivo-${servicioId}`);
+  }
+
+  cerrar(servicioId: string): void {
+    this.confirmando.set(null);
+    enfocar(`cancelar-${servicioId}`);
+  }
+
+  async cancelar(servicioId: string, zona: HTMLElement): Promise<void> {
+    if (!exigirTexto(this.motivo, 3, 300, zona)) return;
     this.enviando.set(true);
     try {
-      const motivo = this.motivos[servicioId].trim();
-      await this.fachada.cancelar(servicioId, motivo);
+      await this.fachada.cancelar(servicioId, this.motivo.value.trim());
       this.avisos.open('Servicio cancelado: se devolvieron el crédito y la unidad', undefined, { duration: 5000 });
-      delete this.motivos[servicioId];
       this.confirmando.set(null);
       await this.fachada.recargar();
     } catch (e) {

@@ -1,5 +1,4 @@
 import Button from '@mui/material/Button';
-import CircularProgress from '@mui/material/CircularProgress';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
@@ -19,6 +18,7 @@ import { useClienteActivo } from '../../compartido/sesion/ClienteActivo';
 import { BotonEnlace } from '../../compartido/ui/BotonEnlace';
 import { EstadoServicio } from '../../compartido/ui/EstadoServicio';
 import { Problema } from '../../compartido/ui/Problema';
+import { Cargando } from '../../compartido/ui/Cargando';
 
 const col = createColumnHelper<Servicio>();
 
@@ -52,8 +52,8 @@ export function PaginaServicios() {
   // eslint-disable-next-line react-hooks/incompatible-library
   const tabla = useReactTable({ data: datos, columns: columnas, getCoreRowModel: getCoreRowModel() });
 
-  if (paginas.isPending) return paginas.fetchStatus === 'fetching' ? <CircularProgress aria-label="Cargando" /> : null;
-  if (paginas.isError && !paginas.data) return <Problema error={paginas.error} />;
+  if (paginas.isPending) return paginas.fetchStatus === 'fetching' ? <Cargando /> : null;
+  if (paginas.isError && !paginas.data) return <Problema error={paginas.error} reintentar={paginas.refetch} />;
   return (
     <Stack spacing={2}>
       <Typography variant="h5" component="h2">

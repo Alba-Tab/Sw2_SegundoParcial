@@ -1,6 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, effect, inject, input } from '@angular/core';
-import { AvisoServicios, Encabezado, Estado, FechaPipe } from 'ui-comun';
+import { AvisoServicios, Encabezado, Estado, FechaPipe, Esqueleto } from 'ui-comun';
 import { PUNTAJE_BAJO } from '../../conduccion/domain/conduccion';
 import { ChoferFachada } from '../choferes.fachada';
 import { estadoChofer, vigenciaLicencia } from '../domain/chofer';
@@ -9,7 +9,7 @@ import { estadoChofer, vigenciaLicencia } from '../domain/chofer';
 @Component({
   selector: 'app-chofer',
   providers: [ChoferFachada],
-  imports: [Encabezado, Estado, FechaPipe, DecimalPipe, AvisoServicios],
+  imports: [Esqueleto, Encabezado, Estado, FechaPipe, DecimalPipe, AvisoServicios],
   template: `
     @let titulo = chofer()?.nombre ?? 'Chofer';
     <cc-encabezado [titulo]="titulo" [migas]="[{ texto: 'Choferes', ruta: '/choferes' }, { texto: titulo }]">
@@ -17,6 +17,9 @@ import { estadoChofer, vigenciaLicencia } from '../domain/chofer';
         <cc-estado grupo="EstadoChofer" [valor]="estado(c)" />
       }
     </cc-encabezado>
+    @if (cargando()) {
+      <cc-esqueleto />
+    }
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!chofer()" />
     @if (chofer(); as c) {
       <dl class="datos">
@@ -75,6 +78,7 @@ export class ChoferPagina {
   readonly puntajes = this.fachada.puntajes;
   readonly cargado = this.fachada.cargado;
   readonly error = this.fachada.error;
+  readonly cargando = this.fachada.cargando;
   readonly campos = { choferes: 'Flota', puntajesConduccion: 'Analítica' };
   readonly puntajeBajo = PUNTAJE_BAJO;
   readonly estado = estadoChofer;

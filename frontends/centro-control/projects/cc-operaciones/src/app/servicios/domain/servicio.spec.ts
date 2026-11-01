@@ -1,14 +1,7 @@
 import { conLaElegidaPrimero } from '../../acciones/domain/accion';
-import { estadoServicio, motivoCancelacionValido, nombreCliente, puedeCancelarServicio } from './servicio';
+import { estadoServicio, nombreCliente, puedeCancelarServicio } from './servicio';
 
 describe('cc-operaciones (dominio)', () => {
-  it('spec 004: el motivo de la cancelación va de 3 a 300 caracteres', () => {
-    expect(motivoCancelacionValido('ab')).toBe(false);
-    expect(motivoCancelacionValido('  cliente pidió  ')).toBe(true);
-    expect(motivoCancelacionValido('x'.repeat(301))).toBe(false);
-    expect(motivoCancelacionValido(undefined)).toBe(false);
-  });
-
   it('spec 004: solo se cancela un servicio confirmado con la saga terminada', () => {
     expect(puedeCancelarServicio({ estado: 'CONFIRMADO', confirmacionCompleta: true })).toBe(true);
     expect(puedeCancelarServicio({ estado: 'CONFIRMADO', confirmacionCompleta: false })).toBe(false);

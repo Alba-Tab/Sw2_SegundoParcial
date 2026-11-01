@@ -1,7 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { filter, firstValueFrom, switchMap } from 'rxjs';
-import { completo, Intentos, puedeVer, Sesion } from 'ui-comun';
+import { cargandoDe, completo, Intentos, puedeVer, Sesion } from 'ui-comun';
 import type { EstadoViaje, MapaQuery, OpcionIntervencion } from '../graphql/generado';
 import { ViajesRepositorio } from './data/viajes.repositorio';
 
@@ -61,16 +61,19 @@ export class MapaFachada {
   );
   readonly viajes = computed(() => completo<MapaQuery>(this.datos())?.viajesEnCurso ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly cargando = computed(() => cargandoDe(this.datos()));
 }
 
 @Injectable()
 export class EntregasFachada {
   readonly datos = toSignal(inject(ViajesRepositorio).observarEntregasObservadas(15_000));
   readonly error = computed(() => this.datos()?.error);
+  readonly cargando = computed(() => cargandoDe(this.datos()));
 }
 
 @Injectable()
 export class IntervencionesFachada {
   readonly datos = toSignal(inject(ViajesRepositorio).observarIntervenciones(15_000));
   readonly error = computed(() => this.datos()?.error);
+  readonly cargando = computed(() => cargandoDe(this.datos()));
 }

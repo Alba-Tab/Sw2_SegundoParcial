@@ -85,6 +85,22 @@ describe('Confirmar y seguir (specs 003, 004 y 006)', () => {
     expect(c.encabezados.get('Idempotency-Key')).toBeTruthy();
   });
 
+  it('W4: cancelar sin motivo deja el botón activo, marca el campo, lo enfoca y no llama a Viajes', async () => {
+    const llamadas = simularApi({
+      ...rutas,
+      [`GET /api/v1/servicios/${SERVICIO}`]: { estado: 200, cuerpo: { ...base, estado: 'CONFIRMADO' } },
+    });
+    conConsultas(<PaginaServicio />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancelar servicio' }));
+    expect(screen.getByText(/No se puede deshacer/)).toBeTruthy();
+    const confirmar = screen.getAllByRole('button', { name: 'Cancelar servicio' }).at(-1)!;
+    expect(confirmar.hasAttribute('disabled')).toBe(false);
+    fireEvent.click(confirmar);
+    expect(await screen.findByText('Escribe al menos 3 caracteres.')).toBeTruthy();
+    await waitFor(() => expect(document.activeElement).toBe(screen.getByLabelText('Motivo')));
+    expect(llamadas.some((l) => l.url.endsWith('/cancelacion'))).toBe(false);
+  });
+
   it('cancelar con éxito: el resultado queda en la página y recibe el foco (N6)', async () => {
     simularApi({
       ...rutas,

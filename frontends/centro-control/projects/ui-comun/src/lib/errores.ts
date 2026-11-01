@@ -1,4 +1,5 @@
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { mensajeCodigo, SIN_CONEXION } from 'ui-comun/dominio';
 
 /** El `codigo` de 000 §5 que el Gateway pone en `extensions`: las pantallas deciden por él, no por el texto. */
 export function codigoDe(error: unknown): string | undefined {
@@ -6,23 +7,17 @@ export function codigoDe(error: unknown): string | undefined {
   return undefined;
 }
 
-const MENSAJES: Record<string, string> = {
-  SIN_PERMISO: 'No tienes permiso para esta operación',
-  CONFLICTO_ESTADO: 'El estado cambió; actualiza la pantalla',
-  DEPENDENCIA_NO_DISPONIBLE: 'Un servicio no está disponible; intenta en unos segundos',
-  ERROR_INTERNO: 'Ocurrió un error inesperado; intenta de nuevo y, si se repite, avisa a soporte',
-  VALIDACION: 'Revisa los datos',
-  IDEMPOTENCIA_CUERPO_DISTINTO: 'Esa operación ya se registró con otros datos',
-};
-
+/**
+ * Lo que se dice en pantalla por un error (PRODUCT.md, "Tono"): la frase del `codigo` (ui-comun/dominio, errores.ts),
+ * nunca el `message` del servidor. Sin respuesta GraphQL (red caída, Gateway sin responder), que no hay conexión.
+ */
 export function mensajeDe(error: unknown): string {
-  if (CombinedGraphQLErrors.is(error)) {
-    const e = error.errors[0];
-    const codigo = e?.extensions?.['codigo'] as string | undefined;
-    return e?.message || (codigo && MENSAJES[codigo]) || 'No se pudo completar la operación';
-  }
-  return error instanceof Error ? error.message : 'No se pudo completar la operación';
+  return CombinedGraphQLErrors.is(error) ? mensajeCodigo(codigoDe(error)) : SIN_CONEXION;
 }
+
+/** Mientras no llega la primera respuesta, la página muestra el esqueleto (no "no hay datos"). */
+export const cargandoDe = (resultado: { loading?: boolean; data?: unknown } | undefined | null): boolean =>
+  !resultado || (!!resultado.loading && !resultado.data);
 
 export function erroresGraphql(error: unknown) {
   return CombinedGraphQLErrors.is(error) ? error.errors : [];

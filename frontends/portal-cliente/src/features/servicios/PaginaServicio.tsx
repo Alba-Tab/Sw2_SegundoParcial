@@ -1,6 +1,5 @@
 import ArrowBack from '@mui/icons-material/ArrowBack';
 import Alert from '@mui/material/Alert';
-import CircularProgress from '@mui/material/CircularProgress';
 import Divider from '@mui/material/Divider';
 import LinearProgress from '@mui/material/LinearProgress';
 import Link from '@mui/material/Link';
@@ -17,6 +16,7 @@ import { Problema } from '../../compartido/ui/Problema';
 import { CancelarServicio } from './CancelarServicio';
 import { Pod } from './Pod';
 import { ETAPAS, MOTIVOS } from './textos';
+import { Cargando } from '../../compartido/ui/Cargando';
 
 const CON_POD = ['ENTREGADO', 'CERRADO', 'ENTREGA_OBSERVADA', 'ENTREGA_RECHAZADA'];
 
@@ -34,8 +34,8 @@ export function PaginaServicio() {
   // Tras cancelar aquí, el resultado queda en la página (no solo se cierra el diálogo) y recibe el foco (N6).
   const [recienCancelado, setRecienCancelado] = useState(false);
 
-  if (servicio.isPending) return conVolver(<CircularProgress aria-label="Cargando" />);
-  if (servicio.isError) return conVolver(<Problema error={servicio.error} />);
+  if (servicio.isPending) return conVolver(<Cargando filas={6} />);
+  if (servicio.isError) return conVolver(<Problema error={servicio.error} reintentar={servicio.refetch} />);
   const s = servicio.data;
   const ruta = rutas.data?.find((r) => r.rutaId === s.rutaId);
 

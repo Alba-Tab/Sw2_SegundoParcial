@@ -1,4 +1,4 @@
-import { fechaLaPaz } from 'ui-comun/dominio';
+import { aCentavos, desdeCentavos } from 'ui-comun/dominio';
 import type { MedioPago } from '../../graphql/generado';
 
 /** El pago que administración está cargando (spec 008); el monto va como texto con 2 decimales, nunca en float. */
@@ -11,7 +11,5 @@ export interface PagoEnEdicion {
 
 export const MEDIOS_PAGO: MedioPago[] = ['TRANSFERENCIA', 'DEPOSITO', 'EFECTIVO', 'CHEQUE'];
 
-export const pagoNuevo = (): PagoEnEdicion => ({ monto: '', fecha: fechaLaPaz(), medio: 'TRANSFERENCIA', referencia: '' });
-
-/** Monto con 2 decimales y referencia escrita; los demás límites los decide Finanzas. */
-export const pagoValido = (p: PagoEnEdicion): boolean => /^(0|[1-9]\d{0,11})\.\d{2}$/.test(p.monto) && p.referencia.trim().length > 0;
+/** El saldo que queda si se registra ese monto (para el resumen de la confirmación); en centavos, sin float. */
+export const saldoDespuesDe = (saldo: string, monto: string): string => desdeCentavos((aCentavos(saldo) ?? 0n) - (aCentavos(monto) ?? 0n));

@@ -1,6 +1,6 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { completo, type Resultado } from 'ui-comun';
+import { cargandoDe, completo, type Resultado } from 'ui-comun';
 import type { CobranzaQuery } from '../graphql/generado';
 import { CobranzaRepositorio } from './data/cobranza.repositorio';
 import { paramsCobranza } from './domain/cobranza';
@@ -11,4 +11,5 @@ export class CobranzaFachada {
   private readonly datos = toSignal(inject(CobranzaRepositorio).observar(paramsCobranza()));
   readonly resultado = computed(() => completo<CobranzaQuery>(this.datos())?.reporte as Resultado | undefined);
   readonly error = computed(() => this.datos()?.error);
+  readonly cargando = computed(() => cargandoDe(this.datos()));
 }

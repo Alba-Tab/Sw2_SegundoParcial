@@ -62,7 +62,9 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
           @if (app === config.app) {
             <a mat-button class="actual" aria-current="page" routerLink="/">{{ nombres[app] }}</a>
           } @else if (caidas().has(app)) {
-            <span class="no-disponible" matTooltip="No disponible">{{ nombres[app] }}</span>
+            <span class="no-disponible" matTooltip="No disponible"
+              >{{ nombres[app] }}<span class="cdk-visually-hidden"> (no disponible)</span></span
+            >
           } @else {
             <a mat-button [href]="config.urls[app]">{{ nombres[app] }}</a>
           }
@@ -162,10 +164,11 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
       font-weight: 700;
       box-shadow: inset 0 -3px 0 var(--mat-sys-primary);
     }
+    /* Sin opacidad: el texto atenuado con opacity baja de AA; se usa el color secundario del tema. */
     .no-disponible {
-      opacity: 0.45;
+      color: var(--mat-sys-on-surface-variant);
       padding: 0 12px;
-      font-size: 14px;
+      font: var(--mat-sys-body-medium);
     }
     .espacio {
       flex: 1;
@@ -174,6 +177,11 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
       padding: 24px;
       max-width: 1400px;
       margin: 0 auto;
+    }
+    @media (max-width: 600px) {
+      .contenido {
+        padding: 16px;
+      }
     }
     .aviso {
       padding: 8px 16px;
@@ -196,7 +204,7 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
     }
     .atender {
       font: var(--mat-sys-body-medium);
-      min-height: 36px;
+      min-height: 44px;
     }
     /* La severidad se dice con icono, texto y fondo tintado; nunca solo con color. */
     .alerta[data-tono='aviso'] {
@@ -212,7 +220,7 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
       color: var(--mat-sys-error);
     }
     .alerta.cerrada {
-      opacity: 0.6;
+      color: var(--mat-sys-on-surface-variant);
     }
     .titulo {
       font-weight: 600;

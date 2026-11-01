@@ -3,7 +3,18 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, BobPipe, CONFIG_CENTRO, Encabezado, Estado, estadoLineaCredito, EtiquetaPipe, FechaPipe, Sesion } from 'ui-comun';
+import {
+  AvisoServicios,
+  BobPipe,
+  CONFIG_CENTRO,
+  Encabezado,
+  Estado,
+  estadoLineaCredito,
+  EtiquetaPipe,
+  FechaPipe,
+  Sesion,
+  Esqueleto,
+} from 'ui-comun';
 import { ClienteFachada } from '../clientes.fachada';
 import { nombreRuta } from '../domain/cliente';
 
@@ -12,6 +23,7 @@ import { nombreRuta } from '../domain/cliente';
   selector: 'app-cliente',
   providers: [ClienteFachada],
   imports: [
+    Esqueleto,
     Encabezado,
     MatTableModule,
     MatButtonModule,
@@ -32,6 +44,9 @@ import { nombreRuta } from '../domain/cliente';
         >
       }
     </cc-encabezado>
+    @if (cargando()) {
+      <cc-esqueleto />
+    }
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!cliente()" />
     @if (cliente(); as c) {
       <dl class="datos">
@@ -134,6 +149,7 @@ export class ClientePagina {
   readonly servicios = this.fachada.servicios;
   readonly cargado = this.fachada.cargado;
   readonly error = this.fachada.error;
+  readonly cargando = this.fachada.cargando;
   readonly verCredito = this.fachada.verCredito;
   readonly campos = { clientes: 'Viajes', servicios: 'Viajes', rutas: 'Viajes', lineaCredito: 'Finanzas' };
   readonly columnas = ['fecha', 'estado', 'carga', 'placa', ...(this.fachada.verMonto ? ['monto'] : [])];

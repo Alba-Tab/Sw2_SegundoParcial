@@ -93,7 +93,13 @@ import type { Anomalia, Carga } from '../domain/combustible';
         <tr mat-row *matRowDef="let a; columns: columnasA" [class.marcada]="a.cargaId === id()"></tr>
       </table>
     </div>
-    <cc-pie-lista [control]="listaA" nombre="anomalías" vacio="Sin anomalías en los últimos 30 días." [error]="error()" />
+    <cc-pie-lista
+      [control]="listaA"
+      nombre="anomalías"
+      vacio="Sin anomalías en los últimos 30 días."
+      [error]="error()"
+      [cargando]="cargando()"
+    />
     <h2>Últimas cargas</h2>
     <cc-filtros-lista [control]="listaC" busqueda="Buscar por placa" nombre="cargas" singular="carga" />
     <div class="tabla-ancha">
@@ -129,7 +135,7 @@ import type { Anomalia, Carga } from '../domain/combustible';
         <tr mat-row *matRowDef="let c; columns: columnasC" [class.marcada]="c.cargaId === id()"></tr>
       </table>
     </div>
-    <cc-pie-lista [control]="listaC" nombre="cargas" vacio="Sin cargas registradas." [error]="error()" />
+    <cc-pie-lista [control]="listaC" nombre="cargas" vacio="Sin cargas registradas." [error]="error()" [cargando]="cargando()" />
   `,
 })
 export class CombustiblePagina {
@@ -138,6 +144,7 @@ export class CombustiblePagina {
   readonly anomalias = this.fachada.anomalias;
   readonly cargas = this.fachada.cargas;
   readonly error = this.fachada.error;
+  readonly cargando = this.fachada.cargando;
   readonly campos = { anomaliasCombustible: 'Analítica', cargasCombustible: 'Flota' };
   /** La carga a la que lleva la alerta (`/combustible/:id`), arriba y sin depender de la página de la tabla. */
   readonly anomaliaMarcada = computed(() => this.anomalias().find((a) => a.cargaId === this.id()));

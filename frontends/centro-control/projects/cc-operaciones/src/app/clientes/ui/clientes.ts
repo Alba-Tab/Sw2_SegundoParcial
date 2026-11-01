@@ -85,13 +85,14 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
         <tr mat-row *matRowDef="let c; columns: columnas"></tr>
       </table>
     </div>
-    <cc-pie-lista [control]="lista" nombre="clientes" vacio="No hay clientes registrados." [error]="error()" />
+    <cc-pie-lista [control]="lista" nombre="clientes" vacio="No hay clientes registrados." [error]="error()" [cargando]="cargando()" />
   `,
 })
 export class ClientesPagina {
   private readonly fachada = inject(ClientesFachada);
   readonly clientes = this.fachada.clientes;
   readonly error = this.fachada.error;
+  readonly cargando = this.fachada.cargando;
   readonly verCredito = this.fachada.verCredito;
   readonly campos = { clientes: 'Viajes', lineaCredito: 'Finanzas' };
   readonly columnas = ['razonSocial', 'nit', 'correo', 'canal', ...(this.verCredito ? ['disponible', 'estado'] : [])];

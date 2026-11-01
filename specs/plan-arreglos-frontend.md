@@ -105,6 +105,33 @@ Orden por valor y por lo que ya existe en el backend. Cada paso sigue "contratos
 2. Auditoría con `impeccable audit` por app, a11y con axe (teclado, foco, contraste AA, objetivos táctiles ≥44 px) y vista a 375 px.
 3. Anotar para la documentación ICONIX los nuevos casos de uso de gestión (sin tocar `.docx` ni `.eap`).
 
+**Estado al 31-10-2026.** Hecho: (1) los formularios del Centro de Control pasan a `ReactiveForms` (registrar pago, programar y cerrar mantenimiento, aprobar o rechazar entrega, resolver intervención, aprobar o rechazar crédito, aprobar o rechazar acción del agente, cancelar servicio, parámetros de reporte, pregunta por voz), con `mat-error` por campo, botón siempre activo y foco en el primer campo con error (W4); el foco vuelve al botón que abrió el formulario; los montos se validan como texto decimal. (2) Un solo mapa `codigo → frase` en `ui-comun/dominio/src/errores.ts` y su espejo en `portal-cliente/src/compartido/ui/Problema.tsx`; ningún `message` ni `detail` del servidor llega a la pantalla; `cc-aviso-servicios` y `Problema` ofrecen «Reintentar». (3) `cc-confirmacion` con resumen antes de registrar un pago, rechazar una entrega, cerrar un mantenimiento y rechazar una acción; la cancelación de servicio ya confirmaba y ahora dice qué libera. (4) Esqueleto de carga en listas y fichas (`cc-esqueleto`, `cc-pie-lista [cargando]`; portal `Cargando`). (5) Revisión A-1: la fuente de íconos baja de 4 001 276 a 12 960 bytes (85 glifos, outlined 400, WOFF) con `scripts/iconos.mjs`; `npm run probar` falla con un ícono fuera de la lista; los íconos se ocultan hasta que carga la fuente. (6) Foco visible, objetivos de 44 px en táctil, sin `opacity` en textos, tablas que se desplazan dentro de su caja, `prefers-reduced-motion`; contraste AA comprobado con los tokens en claro y oscuro. Queda para la revisión: la auditoría con axe en el navegador (no hay backend en local) y la vista a 375 px de cada página con datos reales.
+
+## Para ICONIX
+
+Lo que cambia la documentación ICONIX (casos de uso, robustez, secuencia y prototipos de pantalla) por las fases A a E. No se tocan los `.docx` ni los `.eap`: esta lista es la entrada para actualizarlos.
+
+**Casos de uso nuevos (solo lectura, con lo que el Gateway ya da):**
+
+| Caso de uso | Actor | App y pantalla | Notas para el diagrama de robustez |
+|---|---|---|---|
+| Consultar mantenimientos de la flota | jefe_flota, gerente | `cc-flota` › Mantenimientos (lista) | Lista con búsqueda, filtro por estado y orden; enlaza a la ficha de la unidad, donde siguen «Programar» y «Cerrar» |
+| Consultar choferes | jefe_flota, gerente | `cc-flota` › Choferes (lista y ficha `choferes/:id`) | Licencia con aviso de vencimiento y conducción de la semana. La ficha se arma desde la lista (no hay `chofer(id)`) |
+| Consultar clientes | comercial, despachador, gerente | `cc-operaciones` › Clientes (lista y ficha `clientes/:id`) | Línea de crédito y últimos servicios; «Ver como cliente» abre el portal (extiende el CU de atención comercial) |
+| Consultar rutas | despachador, gerente | `cc-operaciones` › Rutas (lista y ficha `rutas/:id`) | Origen, destino y distancia |
+| Consultar líneas de crédito | administracion, gerente | `cc-finanzas` › Líneas de crédito | Límite, reservado, utilizado, disponible y estado (al día, sin disponible, en mora) |
+| Administrar usuarios internos | gerente | Menú de usuario › consola de Keycloak | Sin pantalla propia (decisión 2); actor externo: Keycloak |
+
+**Casos de uso propuestos, pendientes de backend** (sin botón en pantalla; contrato en `specs/pendientes-frontend-web.md` §5): dar de alta, editar y dar de baja una unidad; editar documentos de una unidad; dar de alta, editar e (in)habilitar un chofer; dar de alta y editar una ruta; ajustar, suspender y reactivar una línea de crédito; editar un cliente; gestionar tarifas.
+
+**Cambios en casos de uso existentes:**
+
+- Registrar pago (spec 008), cancelar servicio (spec 004), decidir entrega observada (rechazo, spec 007), cerrar mantenimiento (spec 010) y decidir acción del agente (rechazo, spec 014): nuevo paso «el sistema muestra un resumen de lo que va a pasar; el usuario confirma o vuelve» antes de llamar al Gateway. En robustez, un objeto de interfaz «Confirmación» entre el formulario y el controlador.
+- Todos los formularios: flujo alterno «datos inválidos: el sistema marca cada campo con su mensaje y enfoca el primero; el usuario corrige». Reemplaza al botón deshabilitado.
+- Todo caso de uso que consulta: flujo alterno «un servicio no responde: el sistema dice cuál y ofrece Reintentar»; los mensajes de error salen del `codigo` (000 §5).
+
+**Pantallas nuevas o cambiadas (prototipos):** pestañas de `cc-tablero` (Tablero, Reportes, Pregunta por voz, Agente), encabezado común con migas y «volver», página «No encontrada» en las 4 apps y el portal, tablero priorizado («Pide acción» primero), listas con búsqueda, filtro, orden y paginación, fichas en lista de definiciones, y las pestañas de gestión de la tabla de arriba.
+
 ## 3. Decisiones (respondidas el 31-10-2026)
 
 1. **Gestión de datos maestros: sí va.** Regla de esta iteración: **no se toca backend** (`servicios/`, gateway, `contratos/`). Por eso en el front se construye toda la gestión que el gateway ya permite (listas y fichas de unidades, mantenimientos, choferes, rutas, clientes, líneas de crédito) y las acciones de escritura que faltan en el gateway (alta/edición/baja de unidades, choferes, rutas, ajuste de línea de crédito) quedan como **pendientes de backend** en `specs/pendientes-frontend-web.md`, con el contrato propuesto. En pantalla no se muestran botones muertos.

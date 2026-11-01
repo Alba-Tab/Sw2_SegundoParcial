@@ -1,14 +1,14 @@
 import { Component, inject, OnDestroy, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { Encabezado, codigoDe, mensajeDe, TablaReporte, type Resultado } from 'ui-comun';
+import { codigoDe, Encabezado, largoEntre, listoParaEnviar, mensajeDe, TablaReporte, textoError, type Resultado } from 'ui-comun';
 import type { ReporteId } from '../../graphql/generado';
-import { mensajePregunta, mostrarCatalogo, preguntaValida, REPORTES_CATALOGO, type Respuesta } from '../domain/voz';
+import { mensajePregunta, mostrarCatalogo, REPORTES_CATALOGO, type Respuesta } from '../domain/voz';
 import { VozFachada } from '../voz.fachada';
 import { Grabadora } from './grabadora';
 
@@ -22,7 +22,7 @@ import { Grabadora } from './grabadora';
   providers: [VozFachada],
   imports: [
     Encabezado,
-    FormsModule,
+    ReactiveFormsModule,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
@@ -58,16 +58,19 @@ import { Grabadora } from './grabadora';
         <span class="secundario">Transcribiendo en el navegador…</span>
       }
     </div>
-    <mat-form-field class="pregunta">
-      <mat-label>Tu pregunta (puedes corregirla antes de enviar)</mat-label>
-      <input matInput [(ngModel)]="texto" (keyup.enter)="enviar()" minlength="3" maxlength="300" />
-    </mat-form-field>
-    <button mat-flat-button (click)="enviar()" [disabled]="!puedeEnviar()">Preguntar</button>
+    <form (submit)="$event.preventDefault(); enviar(formPregunta)" #formPregunta novalidate>
+      <mat-form-field class="pregunta">
+        <mat-label>Tu pregunta (puedes corregirla antes de enviar)</mat-label>
+        <input matInput [formControl]="pregunta" />
+        <mat-error>{{ textoError(pregunta) }}</mat-error>
+      </mat-form-field>
+      <button mat-flat-button type="submit" [disabled]="enviando()">Preguntar</button>
+    </form>
     @if (enviando()) {
       <mat-progress-bar mode="indeterminate" />
     }
-    @if (error()) {
-      <p class="no-disponible">{{ error() }}</p>
+    @if (error(); as e) {
+      <p class="no-disponible" role="alert">{{ e }}</p>
     }
     @if (catalogo()) {
       <p class="secundario">Puedo responder sobre estos 5 reportes:</p>
@@ -121,7 +124,8 @@ export class VozPagina implements OnDestroy {
   readonly respuesta = signal<Respuesta | null>(null);
   readonly resultado = signal<Resultado | null>(null);
   private ultimo: { id: ReporteId; params: Record<string, unknown> } | null = null;
-  texto = '';
+  readonly pregunta = new FormControl('', { nonNullable: true, validators: [Validators.required, largoEntre(3, 300)] });
+  readonly textoError = textoError;
   /** El botón está pulsado (puntero o tecla), aunque el micrófono todavía no haya llegado. */
   private pulsado = false;
   readonly reportes = REPORTES_CATALOGO;
@@ -130,7 +134,7 @@ export class VozPagina implements OnDestroy {
     this.trabajador.onmessage = ({ data }: MessageEvent<{ texto?: string; error?: string }>) => {
       this.transcribiendo.set(false);
       if (data.error) this.error.set('No se pudo transcribir; escribe la pregunta');
-      else this.texto = data.texto ?? '';
+      else this.pregunta.setValue(data.texto ?? '');
     };
     // Si el worker no carga o se cae, "Transcribiendo…" no puede quedar para siempre.
     this.trabajador.onerror = () => {
@@ -142,10 +146,6 @@ export class VozPagina implements OnDestroy {
   ngOnDestroy(): void {
     this.grabadora.cancelar();
     this.trabajador.terminate();
-  }
-
-  puedeEnviar(): boolean {
-    return preguntaValida(this.texto) && !this.enviando();
   }
 
   teclaAbajo(evento: Event): void {
@@ -194,15 +194,15 @@ export class VozPagina implements OnDestroy {
     }
   }
 
-  async enviar(): Promise<void> {
-    if (!this.puedeEnviar()) return;
+  async enviar(raiz: HTMLElement): Promise<void> {
+    if (this.enviando() || !listoParaEnviar(this.pregunta, raiz)) return;
     this.enviando.set(true);
     this.error.set(null);
     this.catalogo.set(false);
     this.respuesta.set(null);
     this.resultado.set(null);
     try {
-      const p = await this.fachada.preguntar(this.texto.trim());
+      const p = await this.fachada.preguntar(this.pregunta.value.trim());
       this.respuesta.set(p);
       if (p?.resultado && p.reporteId) {
         this.resultado.set(p.resultado as Resultado);

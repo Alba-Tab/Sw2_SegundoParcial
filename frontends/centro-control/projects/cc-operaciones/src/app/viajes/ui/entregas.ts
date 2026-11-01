@@ -74,12 +74,19 @@ import { EntregasFachada } from '../viajes.fachada';
         <tr mat-row *matRowDef="let v; columns: columnas"></tr>
       </table>
     </div>
-    <cc-pie-lista [control]="lista" nombre="entregas observadas" vacio="No hay entregas observadas." [error]="error()" />
+    <cc-pie-lista
+      [control]="lista"
+      nombre="entregas observadas"
+      vacio="No hay entregas observadas."
+      [error]="error()"
+      [cargando]="cargando()"
+    />
   `,
 })
 export class EntregasPagina {
   private readonly fachada = inject(EntregasFachada);
   readonly error = this.fachada.error;
+  readonly cargando = this.fachada.cargando;
   readonly campos = { entregasObservadas: 'Viajes' };
   readonly columnas = ['placa', 'cliente', 'ruta', 'registrada', 'distancia', 'observacion', 'accion'];
   readonly lista = controlLista({

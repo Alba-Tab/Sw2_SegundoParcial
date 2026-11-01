@@ -1,4 +1,4 @@
-import type { MaterialSymbol } from 'material-symbols';
+import type { Icono } from './iconos';
 
 /** Tono de un estado; cada uno sale de un par de tokens de contenedor (DESIGN.md, "Estados"). */
 export type Tono = 'neutro' | 'info' | 'exito' | 'aviso' | 'error';
@@ -6,11 +6,11 @@ export type Tono = 'neutro' | 'info' | 'exito' | 'aviso' | 'error';
 /** Lo que se muestra en vez del valor crudo de un enum: texto, icono (Material Symbols) y tono. */
 export interface Etiqueta {
   texto: string;
-  icono: MaterialSymbol;
+  icono: Icono;
   tono: Tono;
 }
 
-const e = (texto: string, icono: MaterialSymbol, tono: Tono = 'neutro'): Etiqueta => ({ texto, icono, tono });
+const e = (texto: string, icono: Icono, tono: Tono = 'neutro'): Etiqueta => ({ texto, icono, tono });
 
 // Un icono, un significado: check_circle = hecho, hourglass_top = espera, block = rechazado, warning = revisar, error = falla.
 const ESTADO_VIAJE = {

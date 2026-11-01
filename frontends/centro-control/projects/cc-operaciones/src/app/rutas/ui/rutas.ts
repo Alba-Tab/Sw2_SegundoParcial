@@ -47,13 +47,14 @@ import { RutasFachada } from '../rutas.fachada';
         <tr mat-row *matRowDef="let r; columns: columnas"></tr>
       </table>
     </div>
-    <cc-pie-lista [control]="lista" nombre="rutas" vacio="No hay rutas registradas." [error]="error()" />
+    <cc-pie-lista [control]="lista" nombre="rutas" vacio="No hay rutas registradas." [error]="error()" [cargando]="cargando()" />
   `,
 })
 export class RutasPagina {
   private readonly fachada = inject(RutasFachada);
   readonly rutas = this.fachada.rutas;
   readonly error = this.fachada.error;
+  readonly cargando = this.fachada.cargando;
   readonly campos = { rutas: 'Viajes' };
   readonly columnas = ['nombre', 'origen', 'destino', 'distancia'];
   readonly lista = controlLista<Ruta>({

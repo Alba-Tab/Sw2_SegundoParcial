@@ -8,6 +8,7 @@ import { MatPaginatorIntl, MatPaginatorModule, type PageEvent } from '@angular/m
 import { MatSelectModule } from '@angular/material/select';
 import type { Sort } from '@angular/material/sort';
 import { ActivatedRoute, Router } from '@angular/router';
+import { Esqueleto } from './esqueleto';
 import {
   aParametros,
   filtrar,
@@ -216,11 +217,13 @@ export class FiltrosLista {
 /** Estado vacío con siguiente paso o el paginador (en español). */
 @Component({
   selector: 'cc-pie-lista',
-  imports: [MatButtonModule, MatIconModule, MatPaginatorModule],
+  imports: [MatButtonModule, MatIconModule, MatPaginatorModule, Esqueleto],
   template: `
     @let c = control();
     @if (!c.total()) {
-      @if (c.hayFiltros()) {
+      @if (cargando()) {
+        <cc-esqueleto />
+      } @else if (c.hayFiltros()) {
         <div class="vacio">
           <mat-icon>search_off</mat-icon>
           <p>No hay {{ nombre() }} con ese filtro.</p>
@@ -261,6 +264,8 @@ export class PieLista {
   readonly vacio = input<string>();
   /** Si la fuente falló, lo dice `cc-aviso-servicios`; el pie no afirma que la lista está vacía. */
   readonly error = input<unknown>();
+  /** Todavía no llega la primera respuesta: esqueleto, no "no hay". */
+  readonly cargando = input(false);
   readonly tamanos = TAMANOS_PAGINA;
   readonly minimo = TAMANOS_PAGINA[0];
 }

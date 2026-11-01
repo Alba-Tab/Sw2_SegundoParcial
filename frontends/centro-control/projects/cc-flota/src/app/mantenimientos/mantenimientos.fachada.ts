@@ -1,6 +1,6 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { completo } from 'ui-comun';
+import { cargandoDe, completo } from 'ui-comun';
 import type { MantenimientosQuery } from '../graphql/generado';
 import { MantenimientosRepositorio } from './data/mantenimientos.repositorio';
 
@@ -10,4 +10,5 @@ export class MantenimientosFachada {
   private readonly datos = toSignal(inject(MantenimientosRepositorio).observar(30_000));
   readonly mantenimientos = computed(() => completo<MantenimientosQuery>(this.datos())?.mantenimientos ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly cargando = computed(() => cargandoDe(this.datos()));
 }

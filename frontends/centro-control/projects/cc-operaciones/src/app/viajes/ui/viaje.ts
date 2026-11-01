@@ -1,12 +1,28 @@
 import { Component, effect, inject, input, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Encabezado, sinErroresDe, AvisoServicios, BobPipe, Estado, EtiquetaPipe, FechaPipe, mensajeDe, pct, Sesion } from 'ui-comun';
+import {
+  AvisoServicios,
+  BobPipe,
+  cargandoDe,
+  Confirmacion,
+  Encabezado,
+  Esqueleto,
+  Estado,
+  EtiquetaPipe,
+  FechaPipe,
+  exigirTexto,
+  largoEntre,
+  mensajeDe,
+  pct,
+  Sesion,
+  sinErroresDe,
+  textoError,
+} from 'ui-comun';
 import { RouterLink } from '@angular/router';
 import type { OpcionIntervencion } from '../../graphql/generado';
 import { ViajeFachada } from '../viajes.fachada';
@@ -17,13 +33,14 @@ import { ViajeFachada } from '../viajes.fachada';
   providers: [ViajeFachada],
   imports: [
     Encabezado,
-    FormsModule,
+    ReactiveFormsModule,
+    Confirmacion,
+    Esqueleto,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
     MatIconModule,
     RouterLink,
-    MatProgressBarModule,
     BobPipe,
     FechaPipe,
     EtiquetaPipe,
@@ -32,8 +49,8 @@ import { ViajeFachada } from '../viajes.fachada';
   ],
   template: `
     @let r = datos();
-    @if (r?.loading && !r?.data) {
-      <mat-progress-bar mode="indeterminate" />
+    @if (cargandoDe(r)) {
+      <cc-esqueleto [filas]="6" />
     }
     @let placa = r?.data?.viaje?.placa;
     @let titulo = placa ? 'Viaje ' + placa : 'Viaje';
@@ -52,15 +69,38 @@ import { ViajeFachada } from '../viajes.fachada';
       @if (sesion.tiene('despachador') && v.estado === 'ENTREGA_OBSERVADA') {
         <section class="decision" aria-labelledby="titulo-decision">
           <h2 id="titulo-decision">Decidir la entrega observada</h2>
-          <div class="fila-acciones">
-            <mat-form-field class="ancho"
-              ><mat-label>Nota o motivo (3 a 300)</mat-label><input matInput [(ngModel)]="texto"
-            /></mat-form-field>
-            <button mat-flat-button (click)="aprobar(id())" [disabled]="enviando()"><mat-icon>thumb_up</mat-icon>Aprobar entrega</button>
-            <button mat-stroked-button (click)="rechazar(id())" [disabled]="enviando() || texto.trim().length < 3">
-              <mat-icon>block</mat-icon>Rechazar (no se factura)
-            </button>
+          <div class="fila-acciones" #zonaEntrega>
+            <mat-form-field class="ancho">
+              <mat-label>Nota o motivo</mat-label>
+              <input matInput [formControl]="texto" />
+              <mat-hint>Para rechazar, el motivo es obligatorio (3 a 300 caracteres)</mat-hint>
+              <mat-error>{{ textoError(texto) }}</mat-error>
+            </mat-form-field>
+            @if (!rechazando()) {
+              <button mat-flat-button (click)="aprobar(id(), zonaEntrega)" [disabled]="enviando()">
+                <mat-icon>thumb_up</mat-icon>Aprobar entrega
+              </button>
+              <button mat-stroked-button (click)="pedirRechazo(zonaEntrega)" [disabled]="enviando()">
+                <mat-icon>block</mat-icon>Rechazar (no se factura)
+              </button>
+            }
           </div>
+          @if (rechazando()) {
+            <cc-confirmacion
+              [resumen]="
+                'Se rechaza la entrega del viaje ' +
+                (v.placa ?? '') +
+                ' con el motivo «' +
+                texto.value.trim() +
+                '»: no se factura al cliente. No se puede deshacer.'
+              "
+              accion="Sí, rechazar la entrega"
+              icono="block"
+              [enviando]="enviando()"
+              (confirmar)="rechazar(id())"
+              (volver)="rechazando.set(false)"
+            />
+          }
         </section>
       }
       @if (sesion.tiene('despachador') && v.estado === 'REQUIERE_INTERVENCION') {
@@ -69,14 +109,17 @@ import { ViajeFachada } from '../viajes.fachada';
           @if (v.motivo) {
             <p>{{ v.motivo }}</p>
           }
-          <div class="fila-acciones">
-            <mat-form-field class="ancho"
-              ><mat-label>Nota (obligatoria para marcar resuelto)</mat-label><input matInput [(ngModel)]="texto"
-            /></mat-form-field>
-            <button mat-flat-button (click)="resolver(id(), 'REINTENTAR_COMPENSACION')" [disabled]="enviando()">
+          <div class="fila-acciones" #zonaIntervencion>
+            <mat-form-field class="ancho">
+              <mat-label>Nota</mat-label>
+              <input matInput [formControl]="texto" />
+              <mat-hint>Para marcar resuelto, la nota es obligatoria (3 a 300 caracteres)</mat-hint>
+              <mat-error>{{ textoError(texto) }}</mat-error>
+            </mat-form-field>
+            <button mat-flat-button (click)="resolver(id(), 'REINTENTAR_COMPENSACION', zonaIntervencion)" [disabled]="enviando()">
               <mat-icon>replay</mat-icon>Reintentar la compensación
             </button>
-            <button mat-stroked-button (click)="resolver(id(), 'MARCAR_RESUELTO')" [disabled]="enviando() || texto.trim().length < 3">
+            <button mat-stroked-button (click)="resolver(id(), 'MARCAR_RESUELTO', zonaIntervencion)" [disabled]="enviando()">
               <mat-icon>task_alt</mat-icon>Marcar resuelto
             </button>
           </div>
@@ -212,22 +255,36 @@ export class ViajePagina {
   readonly enviando = signal(false);
   readonly pct = pct;
   readonly campos = { viaje: 'Viajes', unidad: 'Flota' };
-  texto = '';
+  readonly cargandoDe = cargandoDe;
+  readonly textoError = textoError;
+  /** Rechazar la entrega no se deshace: se confirma con un resumen. */
+  readonly rechazando = signal(false);
+  readonly texto = new FormControl('', { nonNullable: true, validators: [largoEntre(0, 300)] });
 
   constructor() {
     effect(() => this.fachada.id.set(this.id()));
   }
 
-  aprobar(viajeId: string) {
-    const nota = this.texto.trim() || undefined;
+  /** La nota es opcional para aprobar o reintentar y obligatoria (3 o más) para rechazar o marcar resuelto. */
+  private valida(obligatoria: boolean, zona: HTMLElement): boolean {
+    return exigirTexto(this.texto, obligatoria ? 3 : 0, 300, zona);
+  }
+
+  aprobar(viajeId: string, zona: HTMLElement) {
+    if (!this.valida(false, zona)) return;
+    const nota = this.texto.value.trim() || undefined;
     return this.enviar(() => this.fachada.aprobarEntrega(viajeId, nota), 'Entrega aprobada: se factura');
   }
+  pedirRechazo(zona: HTMLElement): void {
+    if (this.valida(true, zona)) this.rechazando.set(true);
+  }
   rechazar(viajeId: string) {
-    const motivo = this.texto.trim();
+    const motivo = this.texto.value.trim();
     return this.enviar(() => this.fachada.rechazarEntrega(viajeId, motivo), 'Entrega rechazada');
   }
-  resolver(viajeId: string, opcion: OpcionIntervencion) {
-    const nota = this.texto.trim() || undefined;
+  resolver(viajeId: string, opcion: OpcionIntervencion, zona: HTMLElement) {
+    if (!this.valida(opcion === 'MARCAR_RESUELTO', zona)) return;
+    const nota = this.texto.value.trim() || undefined;
     return this.enviar(() => this.fachada.resolverIntervencion(viajeId, opcion, nota), 'Intervención enviada');
   }
 
@@ -235,10 +292,12 @@ export class ViajePagina {
     this.enviando.set(true);
     try {
       await accion();
-      this.texto = '';
+      this.texto.reset();
+      this.rechazando.set(false);
       this.avisos.open(ok, undefined, { duration: 4000 });
       await this.fachada.recargar();
     } catch (e) {
+      this.rechazando.set(false);
       this.avisos.open(mensajeDe(e), 'Cerrar', { duration: 6000 });
     } finally {
       this.enviando.set(false);

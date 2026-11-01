@@ -50,13 +50,14 @@ import { estadoChofer, textoChofer, vigenciaLicencia, type Chofer } from '../dom
         <tr mat-row *matRowDef="let c; columns: columnas"></tr>
       </table>
     </div>
-    <cc-pie-lista [control]="lista" nombre="choferes" vacio="No hay choferes registrados." [error]="error()" />
+    <cc-pie-lista [control]="lista" nombre="choferes" vacio="No hay choferes registrados." [error]="error()" [cargando]="cargando()" />
   `,
 })
 export class ChoferesPagina {
   private readonly fachada = inject(ChoferesFachada);
   readonly choferes = this.fachada.choferes;
   readonly error = this.fachada.error;
+  readonly cargando = this.fachada.cargando;
   readonly campos = { choferes: 'Flota' };
   readonly columnas = ['nombre', 'licencia', 'vence', 'estado'];
   readonly estado = estadoChofer;

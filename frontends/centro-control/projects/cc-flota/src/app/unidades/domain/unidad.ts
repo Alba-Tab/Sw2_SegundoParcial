@@ -30,6 +30,12 @@ export const lineasChecklist = (texto: string): string[] =>
     .map((l) => l.trim())
     .filter(Boolean);
 
+/** Contrato de Flota (MantenimientoNuevo.checklist): de 1 a 30 ítems de hasta 120 caracteres. */
+export const checklistValido = (texto: string): boolean => {
+  const lineas = lineasChecklist(texto);
+  return lineas.length >= 1 && lineas.length <= 30 && lineas.every((l) => l.length <= 120);
+};
+
 /** Al cerrar, cada ítem empieza marcado como hecho. */
 export const cierreInicial = (m: Mantenimiento): ItemCierre[] => m.checklist.map((i) => ({ item: i.item, ok: true }));
 

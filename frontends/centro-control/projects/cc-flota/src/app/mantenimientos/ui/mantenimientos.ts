@@ -99,7 +99,13 @@ import { MantenimientosFachada } from '../mantenimientos.fachada';
         <tr mat-row *matRowDef="let m; columns: columnas"></tr>
       </table>
     </div>
-    <cc-pie-lista [control]="lista" nombre="mantenimientos" vacio="No hay mantenimientos registrados." [error]="error()" />
+    <cc-pie-lista
+      [control]="lista"
+      nombre="mantenimientos"
+      vacio="No hay mantenimientos registrados."
+      [error]="error()"
+      [cargando]="cargando()"
+    />
   `,
 })
 export class MantenimientosPagina {
@@ -107,6 +113,7 @@ export class MantenimientosPagina {
   readonly sesion = inject(Sesion);
   readonly mantenimientos = this.fachada.mantenimientos;
   readonly error = this.fachada.error;
+  readonly cargando = this.fachada.cargando;
   readonly campos = { mantenimientos: 'Flota' };
   readonly columnas = ['placa', 'tipo', 'fecha', 'taller', 'estado', 'acciones'];
   readonly puedeCerrar = puedeCerrar;

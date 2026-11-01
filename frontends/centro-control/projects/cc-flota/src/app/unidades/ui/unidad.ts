@@ -1,7 +1,7 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, effect, inject, input, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { MatButtonModule } from '@angular/material/button';
+import { Component, computed, effect, inject, input, signal, viewChild } from '@angular/core';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatButton, MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -9,14 +9,32 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Encabezado, AvisoServicios, Estado, EtiquetaPipe, fechaLaPaz, FechaPipe, mensajeDe, Sesion, vigencia } from 'ui-comun';
+import {
+  Encabezado,
+  AvisoServicios,
+  Estado,
+  EtiquetaPipe,
+  fechaLaPaz,
+  FechaPipe,
+  mensajeDe,
+  Sesion,
+  vigencia,
+  Esqueleto,
+  Confirmacion,
+  etiqueta,
+  largoEntre,
+  listoParaEnviar,
+  textoError,
+} from 'ui-comun';
 import {
   AVISO_KM,
   CHECKLIST_POR_DEFECTO,
+  checklistValido,
   cierreInicial,
   documentosEnAviso,
   puedeProgramar,
   type ItemCierre,
+  type Mantenimiento,
   type NuevoMantenimiento,
 } from '../domain/unidad';
 import { UnidadFachada } from '../unidades.fachada';
@@ -26,8 +44,10 @@ import { UnidadFachada } from '../unidades.fachada';
   selector: 'app-unidad',
   providers: [UnidadFachada],
   imports: [
+    Esqueleto,
     Encabezado,
-    FormsModule,
+    ReactiveFormsModule,
+    Confirmacion,
     DecimalPipe,
     MatCardModule,
     MatButtonModule,
@@ -50,12 +70,21 @@ import { UnidadFachada } from '../unidades.fachada';
       }
       @if (unidad(); as u) {
         @if (sesion.tiene('jefe_flota') && puedeProgramar(u.estado)) {
-          <button mat-flat-button (click)="programando.set(!programando())" [attr.aria-expanded]="programando()" aria-controls="programar">
+          <button
+            mat-flat-button
+            #botonProgramar
+            (click)="programando() ? cerrarFormulario() : programando.set(true)"
+            [attr.aria-expanded]="programando()"
+            aria-controls="programar"
+          >
             <mat-icon>build</mat-icon>Programar mantenimiento
           </button>
         }
       }
     </cc-encabezado>
+    @if (cargando()) {
+      <cc-esqueleto />
+    }
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!unidad()" />
     @if (unidad(); as u) {
       @if (documentosEnAviso(u.documentos); as n) {
@@ -89,31 +118,42 @@ import { UnidadFachada } from '../unidades.fachada';
         <mat-card class="formulario" id="programar">
           <mat-card-header><mat-card-title>Programar mantenimiento</mat-card-title></mat-card-header>
           <mat-card-content>
-            <div class="fila-acciones">
-              <mat-form-field
-                ><mat-label>Tipo</mat-label>
-                <mat-select [(ngModel)]="nuevo.tipo"
-                  ><mat-option value="PREVENTIVO">Preventivo</mat-option><mat-option value="CORRECTIVO">Correctivo</mat-option
-                  ><mat-option value="DOCUMENTOS">Documentos</mat-option></mat-select
-                >
+            <form [formGroup]="nuevo" (ngSubmit)="programar(u.unidadId, formProgramar)" #formProgramar novalidate>
+              <div class="fila-acciones">
+                <mat-form-field>
+                  <mat-label>Tipo</mat-label>
+                  <mat-select formControlName="tipo">
+                    @for (t of tiposMantenimiento; track t) {
+                      <mat-option [value]="t">{{ t | etiqueta: 'TipoMantenimiento' }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>Fecha</mat-label>
+                  <input matInput type="date" formControlName="fechaProgramada" />
+                  <mat-error>{{ textoError(nuevo.controls.fechaProgramada) }}</mat-error>
+                </mat-form-field>
+                <mat-form-field>
+                  <mat-label>Taller</mat-label>
+                  <input matInput formControlName="taller" />
+                  <mat-error>{{ textoError(nuevo.controls.taller) }}</mat-error>
+                </mat-form-field>
+              </div>
+              <mat-form-field class="ancho">
+                <mat-label>Descripción</mat-label>
+                <input matInput formControlName="descripcion" />
+                <mat-error>{{ textoError(nuevo.controls.descripcion) }}</mat-error>
               </mat-form-field>
-              <mat-form-field
-                ><mat-label>Fecha</mat-label><input matInput type="date" [(ngModel)]="nuevo.fechaProgramada"
-              /></mat-form-field>
-              <mat-form-field><mat-label>Taller</mat-label><input matInput [(ngModel)]="nuevo.taller" /></mat-form-field>
-            </div>
-            <mat-form-field class="ancho"
-              ><mat-label>Descripción</mat-label><input matInput [(ngModel)]="nuevo.descripcion"
-            /></mat-form-field>
-            <mat-form-field class="ancho"
-              ><mat-label>Checklist (una línea por ítem)</mat-label><textarea matInput rows="4" [(ngModel)]="nuevo.checklist"></textarea>
-            </mat-form-field>
-            <div class="fila-acciones">
-              <button mat-flat-button (click)="programar(u.unidadId)" [disabled]="enviando()">
-                <mat-icon>event_available</mat-icon>Programar
-              </button>
-              <button mat-button (click)="programando.set(false)" [disabled]="enviando()">Cancelar</button>
-            </div>
+              <mat-form-field class="ancho">
+                <mat-label>Checklist (una línea por ítem)</mat-label>
+                <textarea matInput rows="4" formControlName="checklist"></textarea>
+                <mat-error>{{ textoError(nuevo.controls.checklist) }}</mat-error>
+              </mat-form-field>
+              <div class="fila-acciones">
+                <button mat-flat-button type="submit" [disabled]="enviando()"><mat-icon>event_available</mat-icon>Programar</button>
+                <button mat-button type="button" (click)="cerrarFormulario()" [disabled]="enviando()">Cancelar</button>
+              </div>
+            </form>
           </mat-card-content>
         </mat-card>
       }
@@ -126,23 +166,39 @@ import { UnidadFachada } from '../unidades.fachada';
             <mat-card-subtitle><cc-estado grupo="EstadoMantenimiento" [valor]="m.estado" /> {{ m.descripcion }}</mat-card-subtitle>
           </mat-card-header>
           <mat-card-content>
-            @if (m.estado === 'EN_CURSO' && sesion.tiene('jefe_flota')) {
+            @if (m.estado === 'EN_CURSO' && sesion.tiene('jefe_flota') && formsCierre[m.mantenimientoId]; as fc) {
               @for (i of cierres[m.mantenimientoId] ?? []; track i.item) {
-                <mat-checkbox [(ngModel)]="i.ok">{{ i.item }}</mat-checkbox>
+                <mat-checkbox [checked]="i.ok" (change)="i.ok = $event.checked">{{ i.item }}</mat-checkbox>
               }
-              <div class="fila-acciones">
+              <div class="fila-acciones" [formGroup]="fc" #zonaCierre>
                 @if (u.tipoUnidad === 'TRACTO') {
-                  <mat-form-field
-                    ><mat-label>Kilometraje</mat-label><input matInput type="number" [(ngModel)]="km[m.mantenimientoId]"
-                  /></mat-form-field>
+                  <mat-form-field>
+                    <mat-label>Kilometraje</mat-label>
+                    <input matInput type="number" min="0" inputmode="numeric" formControlName="kilometraje" />
+                    <mat-error>{{ textoError(fc.controls.kilometraje) }}</mat-error>
+                  </mat-form-field>
                 }
-                <mat-form-field class="ancho"
-                  ><mat-label>Observaciones</mat-label><input matInput [(ngModel)]="observaciones[m.mantenimientoId]"
-                /></mat-form-field>
-                <button mat-flat-button (click)="cerrar(m.mantenimientoId)" [disabled]="enviando()">
-                  <mat-icon>lock</mat-icon>Cerrar mantenimiento
-                </button>
+                <mat-form-field class="ancho">
+                  <mat-label>Observaciones</mat-label>
+                  <input matInput formControlName="observaciones" />
+                  <mat-error>{{ textoError(fc.controls.observaciones) }}</mat-error>
+                </mat-form-field>
+                @if (cerrando() !== m.mantenimientoId) {
+                  <button mat-flat-button (click)="pedirCierre(m.mantenimientoId, zonaCierre)" [disabled]="enviando()">
+                    <mat-icon>lock</mat-icon>Cerrar mantenimiento
+                  </button>
+                }
               </div>
+              @if (cerrando() === m.mantenimientoId) {
+                <cc-confirmacion
+                  [resumen]="resumenCierre(m, u.placa)"
+                  accion="Sí, cerrar el mantenimiento"
+                  icono="lock"
+                  [enviando]="enviando()"
+                  (confirmar)="cerrar(m.mantenimientoId)"
+                  (volver)="cerrando.set(null)"
+                />
+              }
             } @else {
               @for (i of m.checklist; track i.item) {
                 <span class="secundario">{{ i.ok ? '✔' : i.ok === false ? '✘' : '·' }} {{ i.item }} </span>
@@ -188,6 +244,7 @@ export class UnidadPagina {
   readonly id = input.required<string>();
   readonly unidad = this.fachada.unidad;
   readonly error = this.fachada.error;
+  readonly cargando = this.fachada.cargando;
   readonly campos = { unidad: 'Flota', mantenimientos: 'Flota' };
   readonly puedeProgramar = puedeProgramar;
   readonly vigencia = (venceEl: string) => vigencia(venceEl);
@@ -197,36 +254,75 @@ export class UnidadPagina {
   readonly programando = signal(false);
   readonly mantenimientos = computed(() => {
     const lista = this.fachada.mantenimientos();
-    for (const m of lista) this.cierres[m.mantenimientoId] ??= cierreInicial(m);
+    const tracto = this.unidad()?.tipoUnidad === 'TRACTO';
+    for (const m of lista) {
+      this.cierres[m.mantenimientoId] ??= cierreInicial(m);
+      this.formsCierre[m.mantenimientoId] ??= formularioCierre(tracto);
+    }
     return lista;
   });
   readonly enviando = signal(false);
-  nuevo: NuevoMantenimiento = {
-    tipo: 'PREVENTIVO',
-    fechaProgramada: fechaLaPaz(),
-    taller: '',
-    descripcion: '',
-    checklist: CHECKLIST_POR_DEFECTO,
-  };
+  /** Cerrar un mantenimiento no se deshace: el que está pidiendo confirmación. */
+  readonly cerrando = signal<string | null>(null);
+  readonly textoError = textoError;
+  readonly tiposMantenimiento = ['PREVENTIVO', 'CORRECTIVO', 'DOCUMENTOS'] as const;
+  private readonly botonProgramar = viewChild<MatButton>('botonProgramar');
+  readonly nuevo = new FormGroup({
+    tipo: new FormControl<NuevoMantenimiento['tipo']>('PREVENTIVO', { nonNullable: true }),
+    fechaProgramada: new FormControl(fechaLaPaz(), { nonNullable: true, validators: [Validators.required] }),
+    taller: new FormControl('', { nonNullable: true, validators: [Validators.required, largoEntre(3, 120)] }),
+    descripcion: new FormControl('', { nonNullable: true, validators: [Validators.required, largoEntre(1, 1000)] }),
+    checklist: new FormControl(CHECKLIST_POR_DEFECTO, {
+      nonNullable: true,
+      validators: [(c) => (checklistValido(c.value) ? null : { lineas: true })],
+    }),
+  });
   cierres: Record<string, ItemCierre[]> = {};
-  km: Record<string, number> = {};
-  observaciones: Record<string, string> = {};
+  formsCierre: Record<string, ReturnType<typeof formularioCierre>> = {};
 
   constructor() {
     effect(() => this.fachada.id.set(this.id()));
   }
 
-  async programar(unidadId: string) {
-    if (await this.enviar(() => this.fachada.programar(unidadId, this.nuevo), 'Mantenimiento programado')) this.programando.set(false);
+  /** Cierra el formulario de programar y devuelve el foco al botón que lo abrió. */
+  cerrarFormulario(): void {
+    this.programando.set(false);
+    this.botonProgramar()?.focus();
   }
 
-  cerrar(mantenimientoId: string) {
+  async programar(unidadId: string, raiz: HTMLElement) {
+    if (!listoParaEnviar(this.nuevo, raiz)) return;
+    const v = this.nuevo.getRawValue();
+    const nuevo = { ...v, taller: v.taller.trim(), descripcion: v.descripcion.trim() };
+    if (await this.enviar(() => this.fachada.programar(unidadId, nuevo), 'Mantenimiento programado')) {
+      this.nuevo.reset();
+      this.cerrarFormulario();
+    }
+  }
+
+  pedirCierre(mantenimientoId: string, raiz: HTMLElement): void {
+    if (listoParaEnviar(this.formsCierre[mantenimientoId], raiz)) this.cerrando.set(mantenimientoId);
+  }
+
+  resumenCierre(m: Mantenimiento, placa: string): string {
+    const items = this.cierres[m.mantenimientoId] ?? [];
+    const km = this.formsCierre[m.mantenimientoId]?.controls.kilometraje.value;
+    return (
+      `Se cierra el mantenimiento ${etiqueta('TipoMantenimiento', m.tipo).texto.toLowerCase()} de ${placa} con ` +
+      `${items.filter((i) => i.ok).length} de ${items.length} ítems hechos${km !== null && km !== undefined ? ` y ${km} km` : ''}. ` +
+      'No se puede deshacer.'
+    );
+  }
+
+  async cerrar(mantenimientoId: string) {
+    const v = this.formsCierre[mantenimientoId].getRawValue();
     const cierre = {
-      kilometraje: this.km[mantenimientoId],
+      kilometraje: v.kilometraje ?? undefined,
       checklist: this.cierres[mantenimientoId],
-      observaciones: this.observaciones[mantenimientoId] || undefined,
+      observaciones: v.observaciones.trim() || undefined,
     };
-    return this.enviar(() => this.fachada.cerrar(mantenimientoId, cierre), 'Mantenimiento cerrado');
+    await this.enviar(() => this.fachada.cerrar(mantenimientoId, cierre), 'Mantenimiento cerrado');
+    this.cerrando.set(null);
   }
 
   private async enviar(accion: () => Promise<unknown>, ok: string): Promise<boolean> {
@@ -243,4 +339,12 @@ export class UnidadPagina {
       this.enviando.set(false);
     }
   }
+}
+
+/** Cierre de un mantenimiento: el kilometraje es obligatorio en tractos y prohibido en remolques (contrato de Flota). */
+function formularioCierre(tracto: boolean) {
+  return new FormGroup({
+    kilometraje: new FormControl<number | null>(null, tracto ? [Validators.required, Validators.min(0)] : []),
+    observaciones: new FormControl('', { nonNullable: true, validators: [largoEntre(0, 1000)] }),
+  });
 }

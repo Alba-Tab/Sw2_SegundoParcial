@@ -55,7 +55,13 @@ import { PUNTAJE_BAJO, type PuntajeChofer } from '../domain/conduccion';
           <tr mat-row *matRowDef="let c; columns: columnas"></tr>
         </table>
       </div>
-      <cc-pie-lista [control]="lista" nombre="choferes" vacio="Sin frenadas ni alertas de fatiga esta semana." [error]="error()" />
+      <cc-pie-lista
+        [control]="lista"
+        nombre="choferes"
+        vacio="Sin frenadas ni alertas de fatiga esta semana."
+        [error]="error()"
+        [cargando]="cargando()"
+      />
     }
   `,
 })
@@ -63,6 +69,7 @@ export class ConduccionPagina {
   private readonly fachada = inject(ConduccionFachada);
   readonly puntajes = this.fachada.puntajes;
   readonly error = this.fachada.error;
+  readonly cargando = this.fachada.cargando;
   readonly puntajeBajo = PUNTAJE_BAJO;
   readonly campos = { puntajesConduccion: 'Analítica' };
   readonly columnas = ['nombre', 'frenadas', 'fatigas', 'km', 'puntaje'];

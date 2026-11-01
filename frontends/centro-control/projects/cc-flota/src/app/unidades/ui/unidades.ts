@@ -84,13 +84,14 @@ import { UnidadesFachada } from '../unidades.fachada';
         <tr mat-row *matRowDef="let u; columns: columnas"></tr>
       </table>
     </div>
-    <cc-pie-lista [control]="lista" nombre="unidades" vacio="No hay unidades registradas." [error]="error()" />
+    <cc-pie-lista [control]="lista" nombre="unidades" vacio="No hay unidades registradas." [error]="error()" [cargando]="cargando()" />
   `,
 })
 export class UnidadesPagina {
   private readonly fachada = inject(UnidadesFachada);
   readonly unidades = this.fachada.unidades;
   readonly error = this.fachada.error;
+  readonly cargando = this.fachada.cargando;
   readonly campos = { unidades: 'Flota' };
   readonly columnas = ['placa', 'tipo', 'estado', 'km', 'documentos'];
   readonly avisoKm = AVISO_KM;
