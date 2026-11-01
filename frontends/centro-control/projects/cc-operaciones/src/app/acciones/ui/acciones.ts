@@ -26,6 +26,7 @@ import {
   PieLista,
   Sesion,
   textoError,
+  urlEnApp,
 } from 'ui-comun';
 import { AccionesFachada } from '../acciones.fachada';
 import { conLaElegidaPrimero, type Accion } from '../domain/accion';
@@ -79,8 +80,8 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
               {{ a.viaje?.ruta.destino ? 'hacia ' + a.viaje.ruta.destino : '' }} ·
               <!-- El enlace dice adónde lleva; la placa (o su falta) va fuera (V3-13). -->
               <a [routerLink]="['/viajes', a.viajeId]" [queryParams]="{ de: 'acciones' }">Ver viaje</a>
-              @if (a.misionId) {
-                · <a [href]="config.urls['cc-tablero'] + '/agente?mision=' + a.misionId">Ver la misión del agente</a>
+              @if (a.misionId && urlMision(a.misionId); as url) {
+                · <a [href]="url">Ver la misión del agente</a>
               }
             </mat-card-subtitle>
           </mat-card-header>
@@ -178,6 +179,10 @@ export class AccionesPagina {
   private readonly avisos = inject(MatSnackBar);
   readonly sesion = inject(Sesion);
   readonly config = inject(CONFIG_CENTRO);
+  /** Con `?desde=` para que el panel del agente ofrezca volver aquí (R2F-10). */
+  urlMision(misionId: string): string | null {
+    return urlEnApp(this.config, this.sesion.roles(), 'cc-tablero', `/agente?mision=${encodeURIComponent(misionId)}`);
+  }
   readonly id = input<string>();
   readonly datos = this.fachada.datos;
   readonly visibles = computed(() => conLaElegidaPrimero(this.fachada.acciones(), this.id()));

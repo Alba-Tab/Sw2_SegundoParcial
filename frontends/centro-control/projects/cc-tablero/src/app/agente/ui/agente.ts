@@ -14,6 +14,7 @@ import {
   mensajeDe,
   Sesion,
   Esqueleto,
+  urlEnApp,
 } from 'ui-comun';
 import { AgenteFachada } from '../agente.fachada';
 import { conclusionLegible, mensajeDisparo, pasoLegible, urlTraza } from '../domain/mision';
@@ -29,7 +30,9 @@ import { conclusionLegible, mensajeDisparo, pasoLegible, urlTraza } from '../dom
   template: `
     <cc-encabezado titulo="Agente «vigilar viajes»">
       <button mat-flat-button (click)="disparar()" [disabled]="enviando()" disabledInteractive>Disparar misión</button>
-      <a mat-button [href]="config.urls['cc-operaciones'] + '/acciones'">Ver acciones propuestas</a>
+      @if (urlAcciones; as url) {
+        <a mat-button [href]="url">Ver acciones propuestas</a>
+      }
     </cc-encabezado>
     @if (cargando()) {
       <cc-esqueleto />
@@ -142,6 +145,8 @@ export class AgentePagina {
   private readonly avisos = inject(MatSnackBar);
   readonly sesion = inject(Sesion);
   readonly config = inject(CONFIG_CENTRO);
+  /** Con `?desde=` para que Acciones ofrezca volver aquí (R2F-10). */
+  readonly urlAcciones = urlEnApp(this.config, this.sesion.roles(), 'cc-operaciones', '/acciones');
   /** `?mision=<id>`: el enlace de una acción en cc-operaciones abre esa misión. */
   readonly mision = input<string>();
   readonly misiones = this.fachada.misiones;
