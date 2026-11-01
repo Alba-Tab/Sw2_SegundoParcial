@@ -185,6 +185,7 @@ export const ETIQUETAS = {
     AL_DIA: e('Al día', 'check_circle', 'exito'),
     SIN_DISPONIBLE: e('Sin disponible', 'warning', 'aviso'),
     EN_MORA: e('En mora', 'money_off', 'error'),
+    SUSPENDIDA: e('Suspendida', 'block', 'error'),
   },
   EstadoChofer: {
     DISPONIBLE: e('Disponible', 'check_circle', 'exito'),
