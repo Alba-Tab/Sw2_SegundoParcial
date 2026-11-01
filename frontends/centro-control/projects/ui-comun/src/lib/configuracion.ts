@@ -36,6 +36,10 @@ export const APPS_POR_ROL: Record<string, App[]> = {
   comercial: ['cc-tablero', 'cc-operaciones'],
 };
 
+/** Las apps que abren los roles del token, en el orden de la barra. */
+export const appsDeRoles = (roles: readonly string[]): App[] =>
+  (Object.keys(NOMBRES_APPS) as App[]).filter((a) => roles.some((r) => APPS_POR_ROL[r]?.includes(a)));
+
 /** Destino después del login en cc-tablero (spec 016, paso 2). */
 export const DESTINO_POR_ROL: [string, App][] = [
   ['gerente', 'cc-tablero'],

@@ -81,7 +81,9 @@ describe('Tablero por rol (spec 016, paso 10)', () => {
       data: { tablero: { periodo: 'ESTA_SEMANA', viajesEnCurso: [], unidadesPorEstado: null, alertasAbiertas: null } },
       error,
     });
-    expect(texto).toContain('Sin acceso');
+    // 5a: dice quién lo ve (ROLES_CAMPO), con el ícono de sin permiso y no el de servicio caído.
+    expect(texto).toContain('Sin acceso a unidades con mantenimiento pendiente: las ven gerencia, despacho y flota.');
+    expect(texto).toContain('lock_person');
     expect(texto).toContain('Analítica no disponible');
   });
 

@@ -1,4 +1,4 @@
-import { etiqueta, type Icono, pct, puedeVer, type Tono } from 'ui-comun/dominio';
+import { type CampoConRoles, etiqueta, type Icono, pct, puedeVer, quienesVen, type Tono } from 'ui-comun/dominio';
 import type { TableroQueryVariables } from '../../graphql/generado';
 
 /** Las páginas de cc-tablero y quién las usa (los enlaces del tablero y los guardas de las rutas). */
@@ -82,20 +82,25 @@ export function pendientes(
   puedeAtender = true,
 ): Pendiente[] {
   const lista: Pendiente[] = [];
-  const caido = (campo: string, servicio: string, que: string) => {
+  /** `los` para un `que` masculino («los ven»). Sin permiso: `lock_person` y quién lo ve, de ROLES_CAMPO (5a). */
+  const caido = (campo: CampoConRoles, servicio: string, que: string, los = 'las') => {
     const e = estado(campo);
     if (e)
-      lista.push({
-        clave: `sin-${campo}`,
-        icono: 'cloud_off',
-        tono: 'neutro',
-        texto: e === 'sin-acceso' ? `Sin acceso a ${que}` : `${servicio} no disponible`,
-        detalle: e === 'sin-acceso' ? undefined : `No se puede saber si hay ${que}.`,
-      });
+      lista.push(
+        e === 'sin-acceso'
+          ? { clave: `sin-${campo}`, icono: 'lock_person', tono: 'neutro', texto: `Sin acceso a ${que}: ${los} ven ${quienesVen(campo)}.` }
+          : {
+              clave: `sin-${campo}`,
+              icono: 'cloud_off',
+              tono: 'neutro',
+              texto: `${servicio} no disponible`,
+              detalle: `No se puede saber si hay ${que}.`,
+            },
+      );
     return !!e;
   };
 
-  if (b.verViajes && b.verRiesgo && !caido('viajesEnCurso', 'Viajes', 'viajes en riesgo')) {
+  if (b.verViajes && b.verRiesgo && !caido('viajesEnCurso', 'Viajes', 'viajes en riesgo', 'los')) {
     const enRiesgo = (t?.viajesEnCurso ?? [])
       .filter((v) => v?.riesgo?.enRiesgo)
       .sort((x, y) => (y?.riesgo?.probabilidad ?? 0) - (x?.riesgo?.probabilidad ?? 0));

@@ -97,6 +97,7 @@ Material Symbols Outlined, fijado como fuente por defecto de `<mat-icon>` en `co
 | `remove` | Sin dato |
 | `help` | Valor desconocido |
 | `cloud_off` | Un servicio no responde (aviso de servicios, alertas no disponibles) |
+| `lock_person` | Sin permiso: el rol no ve o no hace esto |
 | `notifications` | Alertas |
 | `thumb_up` | Aprobar, aprobado |
 | `send` | Enviar al cliente |
@@ -166,7 +167,7 @@ Tres errores distintos, cada uno con su ícono y su salida, nunca mezclados:
 |---|---|---|---|
 | Un servicio no responde | `cloud_off` | Lo que no se pudo cargar, no el nombre técnico: «No se pudieron cargar los viajes de este cliente: Viajes no responde.» | «Reintentar» |
 | No existe (`NO_ENCONTRADO`, o el id no está en la lista) | `search_off` | «No encontramos esta unidad. Puede que el enlace esté mal o que ya no exista.» | Solo «Volver»: reintentar no lo arregla |
-| Sin permiso (`SIN_PERMISO`, ruta que el rol no abre) | Por decidir: `lock` ya significa «Cerrado» | Qué no puede hacer y quién sí («Lo programa el jefe de flota»); la página `/sin-acceso` dice a quién pedir el rol | Volver o ir a la app que sí abre |
+| Sin permiso (`SIN_PERMISO`, ruta que el rol no abre) | `lock_person` (no `lock`, que es «Cerrado») | Qué no puede hacer y quién sí, de `ROLES_CAMPO` con `quienesVen` («Sin acceso a facturas en mora: las ven gerencia y administración.»; «Lo programa el jefe de flota») | La página `/sin-acceso` enlaza las apps que el rol abre, y «Cerrar sesión» |
 
 **Lo ya mostrado no desaparece por un fallo.** Un sondeo que falla no vacía la tabla: `conservarUltimoBueno` (`ui-comun/src/lib/sondeo.ts`) deja las últimas filas buenas y `cc-aviso-servicios [datosAl]` dice el error con «Se muestran los datos al …» junto a «Reintentar». «Datos al …» de Analítica (`<cc-datos-al>`, tablero, reportes y conducción) pasa a tono `aviso`, con `warning` y «las cifras pueden no estar al día», cuando lleva más de 30 minutos sin datos nuevos (`MINUTOS_DATOS_VIEJOS` en `ui-comun/dominio/src/formato.ts`): con viajes en ruta llegan posiciones e hitos cada pocos minutos, así que media hora sin nada ya es para mirarlo; no afirma una falla, porque también pasa cuando no hay operación. El texto de un error sale del `codigo` de 000 §5 (`ui-comun/dominio/src/errores.ts`; portal: `compartido/ui/Problema.tsx`), nunca del mensaje del servidor.
 

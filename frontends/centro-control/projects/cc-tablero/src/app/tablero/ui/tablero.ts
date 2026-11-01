@@ -72,7 +72,7 @@ import { TableroFachada } from '../tablero.fachada';
                     <span class="no-disponible">Viajes no disponible</span>
                   }
                   @case ('sin-acceso') {
-                    <span class="no-disponible">Sin acceso</span>
+                    <span class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>Sin acceso</span>
                   }
                   @default {
                     {{ t.viajesEnCurso?.length ?? 'Sin dato' }}
@@ -90,7 +90,7 @@ import { TableroFachada } from '../tablero.fachada';
                     <span class="no-disponible">Analítica no disponible</span>
                   }
                   @case ('sin-acceso') {
-                    <span class="no-disponible">Sin acceso</span>
+                    <span class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>Sin acceso</span>
                   }
                   @default {
                     {{ t.alertasAbiertas ?? 'Sin dato' }}
@@ -108,7 +108,7 @@ import { TableroFachada } from '../tablero.fachada';
                     <span class="no-disponible">Finanzas no disponible</span>
                   }
                   @case ('sin-acceso') {
-                    <span class="no-disponible">Sin acceso</span>
+                    <span class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>Sin acceso</span>
                   }
                   @default {
                     @if (t.cuentasPorCobrar; as c) {
@@ -132,7 +132,7 @@ import { TableroFachada } from '../tablero.fachada';
                     <span class="no-disponible">Flota no disponible</span>
                   }
                   @case ('sin-acceso') {
-                    <span class="no-disponible">Sin acceso</span>
+                    <span class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>Sin acceso</span>
                   }
                   @default {
                     @for (u of t.unidadesPorEstado ?? []; track u.estado) {

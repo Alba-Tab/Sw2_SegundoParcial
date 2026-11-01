@@ -30,3 +30,18 @@ export type CampoConRoles = keyof typeof ROLES_CAMPO;
 /** ¿Alguno de los roles del token está entre los que permite el campo? */
 export const puedeVer = (roles: readonly string[], campo: CampoConRoles): boolean =>
   roles.some((r) => (ROLES_CAMPO[campo] as readonly string[]).includes(r));
+
+/** Cada rol interno como lo nombra una persona («las ven gerencia y administración»). */
+const ROL_EN_FRASE: Record<string, string> = {
+  gerente: 'gerencia',
+  despachador: 'despacho',
+  jefe_flota: 'flota',
+  administracion: 'administración',
+  comercial: 'comercial',
+};
+
+/** Quiénes ven el campo según `ROLES_CAMPO` (la misma tabla que `puedeVer`): "gerencia y administración". */
+export function quienesVen(campo: CampoConRoles): string {
+  const nombres = ROLES_CAMPO[campo].map((r) => ROL_EN_FRASE[r] ?? r);
+  return nombres.length > 1 ? `${nombres.slice(0, -1).join(', ')} y ${nombres.at(-1)}` : nombres.join('');
+}

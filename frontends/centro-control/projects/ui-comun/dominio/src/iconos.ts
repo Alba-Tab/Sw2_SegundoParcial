@@ -51,6 +51,7 @@ export const ICONOS = [
   'local_gas_station',
   'local_shipping',
   'lock',
+  'lock_person',
   'logout',
   'manage_accounts',
   'map',

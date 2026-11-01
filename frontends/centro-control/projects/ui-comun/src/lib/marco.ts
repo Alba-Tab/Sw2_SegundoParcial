@@ -8,7 +8,7 @@ import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { RouterLink, RouterOutlet } from '@angular/router';
 import { Alertas } from './alertas';
-import { APPS_POR_ROL, CONFIG_CENTRO, NOMBRES_APPS, type App } from './configuracion';
+import { appsDeRoles, CONFIG_CENTRO, NOMBRES_APPS, type App } from './configuracion';
 import { etiqueta, urlAdminKeycloak } from 'ui-comun/dominio';
 import { EtiquetaPipe } from './estado';
 import { FechaPipe } from './formato';
@@ -326,10 +326,7 @@ export class Marco implements OnInit {
   readonly alertas = inject(Alertas);
   readonly nombres = NOMBRES_APPS;
   readonly caidas = signal(new Set<App>());
-  readonly apps = computed(() => {
-    const permitidas = new Set(this.sesion.roles().flatMap((r) => APPS_POR_ROL[r] ?? []));
-    return (Object.keys(NOMBRES_APPS) as App[]).filter((a) => permitidas.has(a));
-  });
+  readonly apps = computed(() => appsDeRoles(this.sesion.roles()));
   /** comercial no recibe alertas (la suscripción cerraría con 4403). */
   readonly recibeAlertas = computed(() => this.sesion.tiene('gerente', 'despachador', 'jefe_flota', 'administracion'));
   readonly adminUsuarios = computed(() => (this.sesion.tiene('gerente') ? urlAdminKeycloak(this.config.oidcIssuer) : undefined));

@@ -1,9 +1,9 @@
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { avisosServicio } from './aviso-servicios';
 import { esperaReconexion } from './conexion';
-import { APPS_POR_ROL, DESTINO_POR_ROL, urlEnApp } from './configuracion';
+import { APPS_POR_ROL, appsDeRoles, DESTINO_POR_ROL, urlEnApp } from './configuracion';
 import { codigoDe, mensajeDe, servicioCaido, sinPermiso } from './errores';
-import { aCentavos, datosViejos, fechaLaPaz, pct, puedeVer, sumarMontos } from 'ui-comun/dominio';
+import { aCentavos, datosViejos, fechaLaPaz, pct, puedeVer, quienesVen, sumarMontos } from 'ui-comun/dominio';
 import { BobPipe, FechaPipe, NumeroPipe } from './formato';
 import { reclamos } from './sesion';
 
@@ -36,6 +36,17 @@ describe('ui-comun', () => {
     const config = { app: 'cc-operaciones', urls: { 'cc-flota': 'http://f' } } as never;
     expect(urlEnApp(config, ['gerente'], 'cc-flota', '/unidades/u1')).toBe('http://f/unidades/u1?desde=cc-operaciones');
     expect(urlEnApp(config, ['despachador'], 'cc-flota', '/unidades/u1')).toBeNull();
+  });
+
+  it('R1F-4: /sin-acceso lleva a las apps que el rol sí abre, en el orden de la barra', () => {
+    expect(appsDeRoles(['jefe_flota'])).toEqual(['cc-tablero', 'cc-flota']);
+    expect(appsDeRoles(['comercial', 'administracion'])).toEqual(['cc-tablero', 'cc-operaciones', 'cc-finanzas']);
+    expect(appsDeRoles(['cliente'])).toEqual([]);
+  });
+
+  it('5a: quién ve un campo sale de ROLES_CAMPO, con nombres para personas', () => {
+    expect(quienesVen('cuentasPorCobrar')).toBe('gerencia y administración');
+    expect(quienesVen('unidadesPorEstado')).toBe('gerencia, despacho y flota');
   });
 
   it('respuesta parcial: detecta el campo del servicio caído y el código de un error', () => {
