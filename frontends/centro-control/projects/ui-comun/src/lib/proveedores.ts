@@ -21,7 +21,6 @@ export function configurarApp(config: ConfigCentro, rutas: Routes): ApplicationC
       { provide: MatPaginatorIntl, useClass: PaginadorEs },
       provideHttpClient(),
       provideAppInitializer(() => inject(Sesion).iniciar()),
-      provideAppInitializer(() => void iconosListos()),
       ...proveerApollo(),
       provideRouter(rutas, withComponentInputBinding()),
     ],
@@ -29,16 +28,21 @@ export function configurarApp(config: ConfigCentro, rutas: Routes): ApplicationC
 }
 
 /**
- * Muestra los iconos cuando su fuente cargó (base.css los oculta antes), para que no se lea el nombre del glifo. Si la
- * fuente no llega, mejor un hueco que "check_circle" junto a cada estado: el texto del estado sigue a su lado.
+ * Si la configuración no carga, la app no arranca: se dice en una frase, sin el mensaje técnico (que va a la consola),
+ * con estilos propios (los de Material aún no están) y con "Reintentar". Aquí sí se recarga: no hay nada escrito.
  */
-export async function iconosListos(doc: Document = document): Promise<boolean> {
-  const listos = doc.fonts
-    ? await doc.fonts.load("24px 'Material Symbols Outlined'", 'home').then(
-        (f) => f.length > 0,
-        () => false,
-      )
-    : true;
-  if (listos) doc.documentElement.classList.add('iconos-listos');
-  return listos;
+export function mostrarFalloArranque(app: string, error: unknown, doc: Document = document): void {
+  console.error(error);
+  const caja = doc.createElement('main');
+  caja.setAttribute('role', 'alert');
+  caja.style.cssText = 'font: 16px/1.5 system-ui, sans-serif; max-width: 40rem; margin: 64px auto; padding: 0 16px';
+  const texto = doc.createElement('p');
+  texto.textContent = `No se pudo iniciar ${app}: no se pudo leer la configuración. Revisa tu conexión e intenta de nuevo.`;
+  const boton = doc.createElement('button');
+  boton.type = 'button';
+  boton.textContent = 'Reintentar';
+  boton.style.cssText = 'font: inherit; min-height: 44px; padding: 0 16px; cursor: pointer';
+  boton.addEventListener('click', () => doc.defaultView?.location.reload());
+  caja.append(texto, boton);
+  doc.body.replaceChildren(caja);
 }

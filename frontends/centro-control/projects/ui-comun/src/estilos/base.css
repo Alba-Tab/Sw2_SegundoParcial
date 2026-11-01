@@ -95,11 +95,6 @@ tr.marcada {
   background: var(--mat-sys-error-container);
 }
 
-/* Mientras la fuente de iconos no llega, el glifo no se ve como texto ("check_circle"): proveedores.ts pone la clase. */
-html:not(.iconos-listos) .material-symbols-outlined {
-  color: transparent;
-}
-
 /* Foco visible con el teclado en todo lo que se puede enfocar (DESIGN.md, accesible por defecto). */
 :focus-visible {
   outline: 2px solid var(--mat-sys-primary);

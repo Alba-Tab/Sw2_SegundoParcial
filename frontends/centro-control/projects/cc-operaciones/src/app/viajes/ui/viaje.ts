@@ -8,6 +8,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   AvisoServicios,
   BobPipe,
+  Campo,
   cargandoDe,
   erroresGraphql,
   Confirmacion,
@@ -16,6 +17,8 @@ import {
   Estado,
   EtiquetaPipe,
   FechaPipe,
+  enfocar,
+  enfocarTitulo,
   exigirTexto,
   largoEntre,
   mensajeDe,
@@ -34,6 +37,7 @@ import { ViajeFachada } from '../viajes.fachada';
   imports: [
     Encabezado,
     ReactiveFormsModule,
+    Campo,
     Confirmacion,
     Esqueleto,
     MatButtonModule,
@@ -49,9 +53,6 @@ import { ViajeFachada } from '../viajes.fachada';
   ],
   template: `
     @let r = datos();
-    @if (cargandoDe(r)) {
-      <cc-esqueleto [filas]="6" />
-    }
     @let placa = r?.data?.viaje?.placa;
     @let titulo = placa ? 'Viaje ' + placa : 'Viaje';
     <cc-encabezado [titulo]="titulo" [migas]="[{ texto: 'Viajes', ruta: '/viajes' }, { texto: titulo }]">
@@ -62,8 +63,11 @@ import { ViajeFachada } from '../viajes.fachada';
         <a mat-stroked-button routerLink="/mapa" [queryParams]="{ viaje: id() }"><mat-icon>map</mat-icon>Ver en el mapa</a>
       }
     </cc-encabezado>
+    @if (cargandoDe(r)) {
+      <cc-esqueleto [filas]="6" />
+    }
     <!-- El Gateway ya convierte el 404 de la predicción en null (W3): un error en riesgo es una falla real (B-1). -->
-    <cc-aviso-servicios [error]="r?.error" [campos]="campos" [sinDatos]="!r?.data?.viaje" />
+    <cc-aviso-servicios [error]="r?.error" [campos]="campos" [sinDatos]="!r?.data?.viaje" [reintentar]="recargar" />
     @if (r?.data?.viaje; as v) {
       <!-- Lo que pide una decisión va primero (PRODUCT.md, principio 1). -->
       @if (sesion.tiene('despachador') && v.estado === 'ENTREGA_OBSERVADA') {
@@ -73,14 +77,14 @@ import { ViajeFachada } from '../viajes.fachada';
             <mat-form-field class="ancho">
               <mat-label>Nota o motivo</mat-label>
               <input matInput [formControl]="texto" />
-              <mat-hint>Para rechazar, el motivo es obligatorio (3 a 300 caracteres)</mat-hint>
+              <mat-hint>Opcional al aprobar; para rechazar, obligatorio. De 3 a 300 caracteres</mat-hint>
               <mat-error>{{ textoError(texto) }}</mat-error>
             </mat-form-field>
             @if (!rechazando()) {
               <button mat-flat-button (click)="aprobar(id(), zonaEntrega)" [disabled]="enviando()">
                 <mat-icon>thumb_up</mat-icon>Aprobar entrega
               </button>
-              <button mat-stroked-button (click)="pedirRechazo(zonaEntrega)" [disabled]="enviando()">
+              <button mat-stroked-button id="pedir-rechazo" (click)="pedirRechazo(zonaEntrega)" [disabled]="enviando()">
                 <mat-icon>block</mat-icon>Rechazar (no se factura)
               </button>
             }
@@ -97,8 +101,8 @@ import { ViajeFachada } from '../viajes.fachada';
               accion="Sí, rechazar la entrega"
               icono="block"
               [enviando]="enviando()"
-              (confirmar)="rechazar(id())"
-              (volver)="rechazando.set(false)"
+              (confirmar)="rechazar(id(), zonaEntrega)"
+              (volver)="volver()"
             />
           }
         </section>
@@ -113,7 +117,7 @@ import { ViajeFachada } from '../viajes.fachada';
             <mat-form-field class="ancho">
               <mat-label>Nota</mat-label>
               <input matInput [formControl]="texto" />
-              <mat-hint>Para marcar resuelto, la nota es obligatoria (3 a 300 caracteres)</mat-hint>
+              <mat-hint>Para marcar resuelto, obligatoria (3 a 500 caracteres); para reintentar, opcional</mat-hint>
               <mat-error>{{ textoError(texto) }}</mat-error>
             </mat-form-field>
             <button mat-flat-button (click)="resolver(id(), 'REINTENTAR_COMPENSACION', zonaIntervencion)" [disabled]="enviando()">
@@ -273,15 +277,19 @@ export class ViajePagina {
   readonly textoError = textoError;
   /** Rechazar la entrega no se deshace: se confirma con un resumen. */
   readonly rechazando = signal(false);
-  readonly texto = new FormControl('', { nonNullable: true, validators: [largoEntre(0, 300)] });
+  readonly texto = new FormControl('', { nonNullable: true, validators: [largoEntre(0, 500)] });
+  readonly recargar = () => this.fachada.recargar();
 
   constructor() {
     effect(() => this.fachada.id.set(this.id()));
   }
 
-  /** La nota es opcional para aprobar o reintentar y obligatoria (3 o más) para rechazar o marcar resuelto. */
-  private valida(obligatoria: boolean, zona: HTMLElement): boolean {
-    return exigirTexto(this.texto, obligatoria ? 3 : 0, 300, zona);
+  /**
+   * La nota es opcional para aprobar o reintentar y obligatoria para rechazar o marcar resuelto; si viene, de 3 a 300
+   * caracteres, o hasta 500 para marcar resuelto (specs 007 y 011, revisión E-12).
+   */
+  private valida(obligatoria: boolean, zona: HTMLElement, max = 300): boolean {
+    return exigirTexto(this.texto, 3, max, zona, obligatoria);
   }
 
   aprobar(viajeId: string, zona: HTMLElement) {
@@ -289,15 +297,27 @@ export class ViajePagina {
     const nota = this.texto.value.trim() || undefined;
     return this.enviar(() => this.fachada.aprobarEntrega(viajeId, nota), 'Entrega aprobada: se factura');
   }
+  /** Con el motivo válido, pide confirmar con el campo bloqueado: no se puede borrar después (E-4). */
   pedirRechazo(zona: HTMLElement): void {
-    if (this.valida(true, zona)) this.rechazando.set(true);
+    if (!this.valida(true, zona)) return;
+    this.texto.disable();
+    this.rechazando.set(true);
   }
-  rechazar(viajeId: string) {
+  /** "No, volver" o un envío fallido: el campo se desbloquea y el foco vuelve a "Rechazar" (E-3). */
+  volver(): void {
+    this.texto.enable();
+    this.rechazando.set(false);
+    enfocar('pedir-rechazo');
+  }
+  rechazar(viajeId: string, zona: HTMLElement) {
+    this.texto.enable();
+    if (!this.valida(true, zona)) return this.volver();
     const motivo = this.texto.value.trim();
+    this.texto.disable();
     return this.enviar(() => this.fachada.rechazarEntrega(viajeId, motivo), 'Entrega rechazada');
   }
   resolver(viajeId: string, opcion: OpcionIntervencion, zona: HTMLElement) {
-    if (!this.valida(opcion === 'MARCAR_RESUELTO', zona)) return;
+    if (!this.valida(opcion === 'MARCAR_RESUELTO', zona, opcion === 'MARCAR_RESUELTO' ? 500 : 300)) return;
     const nota = this.texto.value.trim() || undefined;
     return this.enviar(() => this.fachada.resolverIntervencion(viajeId, opcion, nota), 'Intervención enviada');
   }
@@ -306,13 +326,16 @@ export class ViajePagina {
     this.enviando.set(true);
     try {
       await accion();
+      this.texto.enable();
       this.texto.reset();
       this.rechazando.set(false);
       this.avisos.open(ok, undefined, { duration: 4000 });
       await this.fachada.recargar();
+      // La decisión cambia el estado y su sección desaparece con el botón: el foco va al título del viaje (E-3).
+      enfocarTitulo();
     } catch (e) {
-      this.rechazando.set(false);
-      this.avisos.open(mensajeDe(e), 'Cerrar', { duration: 6000 });
+      if (this.rechazando()) this.volver();
+      this.avisos.open(mensajeDe(e), 'Cerrar');
     } finally {
       this.enviando.set(false);
     }

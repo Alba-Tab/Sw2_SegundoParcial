@@ -21,6 +21,11 @@ export const esUuid = (texto: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9
 export type ErroresCampo = Record<string, unknown> | null | undefined;
 
 /** El primer error de un campo, en una frase; el orden es el de importancia (primero lo que falta). */
+/** Un número como se lee en Bolivia (0,5), igual que los hints (revisión E-16). */
+const numero = (n: unknown) => (typeof n === 'number' ? n.toLocaleString('es-BO') : String(n));
+/** "2026-11-03" → "03/11/2026". */
+const fechaCorta = (f: unknown) => String(f).split('-').reverse().join('/');
+
 export function mensajeCampo(errores: ErroresCampo): string {
   if (!errores) return '';
   const arg = (clave: string, prop: string) => (errores[clave] as Record<string, unknown> | undefined)?.[prop];
@@ -29,8 +34,11 @@ export function mensajeCampo(errores: ErroresCampo): string {
   if (errores['montoCero']) return 'El monto debe ser mayor que 0.';
   if (errores['largoMinimo']) return `Escribe al menos ${arg('largoMinimo', 'min')} caracteres.`;
   if (errores['largoMaximo']) return `Como máximo ${arg('largoMaximo', 'max')} caracteres.`;
-  if (errores['min']) return `Debe ser ${arg('min', 'min')} o más.`;
-  if (errores['max']) return `Debe ser ${arg('max', 'max')} o menos.`;
+  if (errores['min']) return `Debe ser ${numero(arg('min', 'min'))} o más.`;
+  if (errores['max']) return `Debe ser ${numero(arg('max', 'max'))} o menos.`;
+  if (errores['montoMaximo']) return `El monto supera el saldo (${arg('montoMaximo', 'saldo')}).`;
+  if (errores['fechaMinima']) return `La fecha no puede ser anterior al ${fechaCorta(arg('fechaMinima', 'min'))}.`;
+  if (errores['fechaMaxima']) return `La fecha no puede ser posterior al ${fechaCorta(arg('fechaMaxima', 'max'))}.`;
   if (errores['lineas']) return 'Escribe de 1 a 30 ítems, uno por línea, de hasta 120 caracteres cada uno.';
   if (errores['fechaOrden']) return 'La fecha final no puede ser anterior a la inicial.';
   if (errores['rango']) return `El periodo no puede pasar de ${arg('rango', 'max')} días.`;

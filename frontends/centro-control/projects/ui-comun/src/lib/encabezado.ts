@@ -40,7 +40,7 @@ import { MemoriaListas } from './lista';
           ><mat-icon>arrow_back</mat-icon></a
         >
       }
-      <h1>{{ titulo() }} <ng-content select="cc-estado" /></h1>
+      <h1 tabindex="-1">{{ titulo() }} <ng-content select="cc-estado" /></h1>
       <div class="acciones"><ng-content /></div>
     </div>
     @if (subtitulo()) {

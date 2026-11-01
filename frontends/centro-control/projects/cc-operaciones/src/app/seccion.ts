@@ -3,11 +3,12 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Sesion } from 'ui-comun';
+import type { Icono } from 'ui-comun/dominio';
 
 /** Las acciones del agente (accionesPropuestas): gerente y despachador (spec 014); comercial no las ve. */
 export const ROLES_ACCIONES = ['gerente', 'despachador'];
 
-const ENLACES: { ruta: string; titulo: string; icono: string; roles?: string[] }[] = [
+const ENLACES: { ruta: string; titulo: string; icono: Icono; roles?: string[] }[] = [
   { ruta: 'viajes', titulo: 'Viajes', icono: 'route' },
   { ruta: 'mapa', titulo: 'Mapa en vivo', icono: 'map' },
   { ruta: 'entregas-observadas', titulo: 'Entregas observadas', icono: 'warning' },

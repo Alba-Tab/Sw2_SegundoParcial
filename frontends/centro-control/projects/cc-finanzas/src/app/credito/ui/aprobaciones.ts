@@ -9,8 +9,12 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   AvisoServicios,
   BobPipe,
+  Campo,
+  Confirmacion,
   controlLista,
   Encabezado,
+  enfocar,
+  enfocarTitulo,
   Estado,
   EtiquetaPipe,
   exigirTexto,
@@ -31,6 +35,8 @@ import { CreditoFachada } from '../credito.fachada';
   imports: [
     Encabezado,
     ReactiveFormsModule,
+    Campo,
+    Confirmacion,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
@@ -46,7 +52,7 @@ import { CreditoFachada } from '../credito.fachada';
   ],
   template: `
     <cc-encabezado titulo="Aprobación de crédito" />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!solicitudes().length" />
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!solicitudes().length" [reintentar]="recargar" />
     <cc-filtros-lista [control]="lista" busqueda="Buscar por cliente" grupo="EstadoAprobacion" nombre="solicitudes" singular="solicitud" />
     <div class="tarjetas">
       @for (s of lista.visibles(); track s.servicioId) {
@@ -76,14 +82,38 @@ import { CreditoFachada } from '../credito.fachada';
                   <mat-hint>Obligatorio para rechazar (3 a 300 caracteres)</mat-hint>
                   <mat-error>{{ textoError(motivo) }}</mat-error>
                 </mat-form-field>
-                <div class="fila-acciones">
-                  <button mat-flat-button (click)="decidir(s.servicioId, true, zona)" [disabled]="enviando()">
-                    <mat-icon>thumb_up</mat-icon>Aprobar
-                  </button>
-                  <button mat-stroked-button (click)="decidir(s.servicioId, false, zona)" [disabled]="enviando()">
-                    <mat-icon>block</mat-icon>Rechazar
-                  </button>
-                </div>
+                @if (rechazando() === s.servicioId) {
+                  <cc-confirmacion
+                    [resumen]="
+                      'Se rechaza el crédito de ' +
+                      s.razonSocial +
+                      ' por ' +
+                      (s.monto | bob) +
+                      ' con el motivo «' +
+                      motivo.value.trim() +
+                      '»: el servicio se cancela. No se puede deshacer.'
+                    "
+                    accion="Sí, rechazar el crédito"
+                    icono="block"
+                    [enviando]="enviando()"
+                    (confirmar)="decidir(s.servicioId, false, zona)"
+                    (volver)="volver(s.servicioId)"
+                  />
+                } @else {
+                  <div class="fila-acciones">
+                    <button mat-flat-button (click)="decidir(s.servicioId, true, zona)" [disabled]="enviando()">
+                      <mat-icon>thumb_up</mat-icon>Aprobar
+                    </button>
+                    <button
+                      mat-stroked-button
+                      [id]="'rechazar-' + s.servicioId"
+                      (click)="pedirRechazo(s.servicioId, zona)"
+                      [disabled]="enviando()"
+                    >
+                      <mat-icon>block</mat-icon>Rechazar
+                    </button>
+                  </div>
+                }
               </div>
             } @else if (s.decididaPor) {
               <p class="secundario">Decidida por {{ s.decididaPor }} {{ s.motivoDecision ?? '' }}</p>
@@ -122,22 +152,48 @@ export class AprobacionesPagina {
   readonly enviando = signal(false);
   readonly textoError = textoError;
   private readonly motivos: Record<string, FormControl<string>> = {};
+  /** Rechazar un crédito no se deshace (la saga cancela el servicio, spec 012): la solicitud que pide confirmación. */
+  readonly rechazando = signal<string | null>(null);
+  readonly recargar = () => this.fachada.recargar();
 
   motivoDe(servicioId: string): FormControl<string> {
     return (this.motivos[servicioId] ??= new FormControl('', { nonNullable: true, validators: [largoEntre(0, 300)] }));
   }
 
+  /** Con el motivo válido, pide confirmar con el campo bloqueado (E-4, E-11). */
+  pedirRechazo(servicioId: string, zona: HTMLElement): void {
+    const control = this.motivoDe(servicioId);
+    if (!exigirTexto(control, 3, 300, zona)) return;
+    control.disable();
+    this.rechazando.set(servicioId);
+  }
+
+  /** "No, volver" o un rechazo fallido: el campo se desbloquea y el foco vuelve a "Rechazar" (E-3). */
+  volver(servicioId: string): void {
+    this.motivoDe(servicioId).enable();
+    this.rechazando.set(null);
+    enfocar(`rechazar-${servicioId}`);
+  }
+
   /** El motivo es opcional para aprobar y obligatorio (3 o más) para rechazar. */
   async decidir(servicioId: string, aprobado: boolean, zona: HTMLElement): Promise<void> {
     const control = this.motivoDe(servicioId);
-    if (!exigirTexto(control, aprobado ? 0 : 3, 300, zona)) return;
+    control.enable();
+    if (!exigirTexto(control, aprobado ? 0 : 3, 300, zona)) {
+      this.rechazando.set(null);
+      return;
+    }
     this.enviando.set(true);
     try {
       await this.fachada.decidir(servicioId, aprobado, control.value.trim() || undefined);
+      this.rechazando.set(null);
       this.avisos.open(aprobado ? 'Crédito aprobado: la saga sigue' : 'Crédito rechazado', undefined, { duration: 5000 });
       await this.fachada.recargar();
+      // La solicitud queda decidida y sus botones desaparecen: el foco va al título de la página.
+      enfocarTitulo();
     } catch (e) {
-      this.avisos.open(mensajeDe(e), 'Cerrar', { duration: 6000 });
+      if (this.rechazando() === servicioId) this.volver(servicioId);
+      this.avisos.open(mensajeDe(e), 'Cerrar');
     } finally {
       this.enviando.set(false);
     }

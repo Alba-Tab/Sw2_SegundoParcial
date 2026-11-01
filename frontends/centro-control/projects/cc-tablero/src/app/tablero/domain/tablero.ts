@@ -1,4 +1,4 @@
-import { etiqueta, pct, puedeVer, type Tono } from 'ui-comun/dominio';
+import { etiqueta, type Icono, pct, puedeVer, type Tono } from 'ui-comun/dominio';
 import type { TableroQueryVariables } from '../../graphql/generado';
 
 /** Las páginas de cc-tablero y quién las usa (los enlaces del tablero y los guardas de las rutas). */
@@ -59,7 +59,7 @@ export interface LecturaTablero {
 /** Una línea de "Pide acción": qué pasa y a dónde ir a resolverlo (la app destino y su ruta; sin app, no hay enlace). */
 export interface Pendiente {
   clave: string;
-  icono: string;
+  icono: Icono;
   tono: Tono;
   texto: string;
   detalle?: string;
@@ -96,8 +96,9 @@ export function pendientes(t: LecturaTablero | null | undefined, b: Bloques, est
     for (const v of enRiesgo)
       lista.push({
         clave: `riesgo-${v!.viajeId}`,
-        icono: 'schedule',
-        tono: 'error',
+        // El mismo ícono y tono que el chip de riesgo (aviso): es una predicción, no una falla.
+        icono: etiqueta('Riesgo', 'EN_RIESGO').icono,
+        tono: etiqueta('Riesgo', 'EN_RIESGO').tono,
         texto: `Viaje ${v!.placa ?? 'sin unidad'} en riesgo de retraso (${pct(v!.riesgo?.probabilidad)})`,
         detalle: [v!.cliente?.razonSocial, v!.ruta?.nombre].filter(Boolean).join(' · ') || undefined,
         app: 'cc-operaciones',

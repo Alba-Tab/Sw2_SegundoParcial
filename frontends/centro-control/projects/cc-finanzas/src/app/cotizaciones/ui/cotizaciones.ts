@@ -32,7 +32,7 @@ import { estadoCotizacion } from '../domain/cotizacion';
       nombre="cotizaciones"
       singular="cotización"
     />
-    <div class="tabla-ancha">
+    <div class="tabla-ancha" role="region" tabindex="0" aria-label="Cotizaciones">
       <table
         mat-table
         [dataSource]="lista.visibles()"

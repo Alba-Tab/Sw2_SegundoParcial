@@ -29,7 +29,7 @@ import { EntregasFachada } from '../viajes.fachada';
     <cc-encabezado titulo="Entregas observadas" subtitulo="Fuera de la geocerca o sin firma: se aprueban o rechazan en el viaje" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!lista.filas().length" />
     <cc-filtros-lista [control]="lista" busqueda="Buscar por placa, cliente, ruta o chofer" nombre="entregas" singular="entrega" />
-    <div class="tabla-ancha">
+    <div class="tabla-ancha" role="region" tabindex="0" aria-label="Entregas observadas">
       <table
         mat-table
         [dataSource]="lista.visibles()"

@@ -36,6 +36,9 @@ export const checklistValido = (texto: string): boolean => {
   return lineas.length >= 1 && lineas.length <= 30 && lineas.every((l) => l.length <= 120);
 };
 
+/** Spec 010: un mantenimiento se cierra solo con todos los ítems hechos (`ok = true`). */
+export const checklistCompleto = (items: readonly ItemCierre[]): boolean => items.length > 0 && items.every((i) => i.ok);
+
 /** Al cerrar, cada ítem empieza marcado como hecho. */
 export const cierreInicial = (m: Mantenimiento): ItemCierre[] => m.checklist.map((i) => ({ item: i.item, ok: true }));
 

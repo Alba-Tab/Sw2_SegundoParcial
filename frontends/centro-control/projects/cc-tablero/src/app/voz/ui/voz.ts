@@ -6,7 +6,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { codigoDe, Encabezado, largoEntre, listoParaEnviar, mensajeDe, TablaReporte, textoError, type Resultado } from 'ui-comun';
+import { Campo, codigoDe, Encabezado, largoEntre, listoParaEnviar, mensajeDe, TablaReporte, textoError, type Resultado } from 'ui-comun';
 import type { ReporteId } from '../../graphql/generado';
 import { mensajePregunta, mostrarCatalogo, REPORTES_CATALOGO, type Respuesta } from '../domain/voz';
 import { VozFachada } from '../voz.fachada';
@@ -23,6 +23,7 @@ import { Grabadora } from './grabadora';
   imports: [
     Encabezado,
     ReactiveFormsModule,
+    Campo,
     MatCardModule,
     MatButtonModule,
     MatIconModule,

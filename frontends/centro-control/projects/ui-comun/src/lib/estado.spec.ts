@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { ETIQUETAS, etiqueta } from 'ui-comun/dominio';
 import esquema from '../../../../../../contratos/graphql/centro-control.graphql' with { loader: 'text' };
+import analitica from '../../../../../../contratos/openapi/analitica.yaml' with { loader: 'text' };
 import comun from '../../../../../../contratos/openapi/comun.yaml' with { loader: 'text' };
 import finanzas from '../../../../../../contratos/openapi/finanzas.yaml' with { loader: 'text' };
 import flota from '../../../../../../contratos/openapi/flota.yaml' with { loader: 'text' };
@@ -28,7 +29,34 @@ const enumsOpenapi = [...[comun, finanzas, flota, viajes].join('\n').matchAll(/^
   .filter(([, nombre]) => nombre in GRUPO_DE_OPENAPI)
   .map(([, nombre, cuerpo]) => ({ nombre, grupo: GRUPO_DE_OPENAPI[nombre], valores: cuerpo.split(',').map((v) => v.trim()) }));
 
+// Enums en línea de OpenAPI (sin esquema con nombre): `Esquema.propiedad` → grupo de ETIQUETAS.
+const GRUPO_EN_LINEA: Record<string, string> = {
+  'Alerta.severidad': 'SeveridadAlerta',
+  'Mision.estado': 'EstadoMision',
+  'Mision.origen': 'OrigenMision',
+  'Documento.tipo': 'TipoDocumento',
+};
+/** Cada esquema de `components.schemas` (4 espacios) con sus propiedades string de valores cerrados (8 espacios). */
+const enumsEnLinea = [analitica, flota].flatMap((yaml) =>
+  yaml.split(/^ {4}(?=\w+:\n)/m).flatMap((bloque) => {
+    const esquema = bloque.match(/^(\w+):/)?.[1];
+    return [...bloque.matchAll(/^ {8}(\w+):\n {10}type: string\n {10}enum: \[([^\]]*)\]/gm)]
+      .map(([, prop, cuerpo]) => ({ campo: `${esquema}.${prop}`, valores: cuerpo.split(',').map((v) => v.trim()) }))
+      .filter((x) => x.campo in GRUPO_EN_LINEA)
+      .map((x) => ({ ...x, grupo: GRUPO_EN_LINEA[x.campo] }));
+  }),
+);
+
 describe('etiquetas de los enums', () => {
+  it('lee los enums en línea de OpenAPI (severidad, misión, documento)', () => {
+    expect(enumsEnLinea.map((x) => x.campo).sort()).toEqual(Object.keys(GRUPO_EN_LINEA).sort());
+  });
+
+  it.each(enumsEnLinea)('$campo (OpenAPI, en línea) → $grupo: todo valor tiene etiqueta', ({ grupo, valores }) => {
+    const g = (ETIQUETAS as Record<string, Record<string, unknown>>)[grupo];
+    for (const v of valores) expect(g[v], `${grupo}.${v}`).toBeDefined();
+  });
+
   it('lee los enums con nombre de OpenAPI', () => {
     expect(enumsOpenapi.map((x) => x.nombre).sort()).toEqual(Object.keys(GRUPO_DE_OPENAPI).sort());
   });

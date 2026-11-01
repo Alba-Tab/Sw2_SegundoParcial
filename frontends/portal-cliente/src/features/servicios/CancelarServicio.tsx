@@ -7,7 +7,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { conClave, ErrorApi } from '../../api/cliente';
@@ -25,13 +25,24 @@ type Datos = z.infer<typeof MotivoCancelacion>;
 /**
  * Spec 004: cancelar antes de que el viaje salga, con el motivo del cliente. El diálogo es la confirmación: dice qué
  * pasa y el botón queda activo; si falta el motivo, lo marca y lo enfoca. Al cerrarse, el foco vuelve al botón.
+ * Una clave por intento, como `ConfirmarServicio` (000 §4.1): un corte de red o un doble clic con el mismo motivo
+ * reusan la clave; una respuesta definitiva, otro motivo o cerrar el diálogo empiezan otro intento.
  */
 export function CancelarServicio({ servicioId, alCancelar }: { servicioId: string; alCancelar?: () => void }) {
   const consultas = useQueryClient();
   const [abierto, setAbierto] = useState(false);
   const { control, handleSubmit, reset } = useForm<Datos>({ resolver: zodResolver(MotivoCancelacion), defaultValues: { motivo: '' } });
+  const intento = useRef<{ motivo: string; clave: string } | null>(null);
+  const claveDe = (motivo: string) => {
+    if (intento.current?.motivo !== motivo) intento.current = { motivo, clave: crypto.randomUUID() };
+    return intento.current.clave;
+  };
   const cancelar = useMutation({
-    mutationFn: (m: string) => cancelarServicio(servicioId, { motivo: m }, conClave(crypto.randomUUID())),
+    mutationFn: (m: string) => cancelarServicio(servicioId, { motivo: m }, conClave(claveDe(m))),
+    retry: (n, e) => e instanceof TypeError && n < 2,
+    onError: (e) => {
+      if (!(e instanceof TypeError)) intento.current = null;
+    },
     onSuccess: (s) => {
       consultas.setQueryData(getObtenerServicioQueryKey(servicioId), s);
       setAbierto(false);
@@ -40,6 +51,7 @@ export function CancelarServicio({ servicioId, alCancelar }: { servicioId: strin
   });
   const error = cancelar.error instanceof ErrorApi && cancelar.error.codigo ? ERRORES_CANCELACION[cancelar.error.codigo] : undefined;
   const cerrar = () => {
+    intento.current = null;
     setAbierto(false);
     reset();
     cancelar.reset();

@@ -1,6 +1,7 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, inject, input } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { Apollo } from 'apollo-angular';
 import { erroresGraphql, mensajeDe, servicioCaido } from './errores';
 
 /** Qué servicio está detrás de cada campo de la consulta de una página, para decir cuál no está disponible. */
@@ -61,12 +62,16 @@ export class AvisoServicios {
   /** La página no tiene nada que mostrar: también se avisa un error que no es de un servicio caído. */
   readonly sinDatos = input(false);
   readonly avisos = computed(() => avisosServicio(this.error(), this.campos(), this.sinDatos()));
-  /** Qué hacer al reintentar; sin él, se recarga la página (cada página vuelve a pedir su consulta al cargar). */
+  /**
+   * Qué hacer al reintentar (el `recargar` de la fachada). Sin él, se vuelven a pedir las consultas activas de la
+   * página. Nunca se recarga la página: se perdería lo escrito en un formulario y su clave de idempotencia (E-2).
+   */
   readonly reintentar = input<() => unknown>();
+  private readonly apollo = inject(Apollo, { optional: true });
 
   reintentarAhora(): void {
-    const reintentar = this.reintentar();
-    if (reintentar) void reintentar();
-    else location.reload();
+    const reintentar = this.reintentar() ?? (() => this.apollo?.client.refetchObservableQueries());
+    // El error de un reintento lo vuelve a mostrar el mismo aviso.
+    void Promise.resolve(reintentar()).catch(() => undefined);
   }
 }

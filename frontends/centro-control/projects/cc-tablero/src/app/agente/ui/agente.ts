@@ -43,7 +43,8 @@ import { mensajeDisparo, urlTraza } from '../domain/mision';
               &nbsp;{{ m.iniciadaEn | fecha: true }} · {{ m.origen | etiqueta: 'OrigenMision' }}
             </mat-panel-title>
             <mat-panel-description>
-              {{ m.pasos.length }} pasos · {{ m.accionesCreadas ?? 0 }} acciones {{ m.codigo ? '· ' + m.codigo : '' }}
+              {{ m.pasos.length }} pasos · {{ m.accionesCreadas ?? 0 }} acciones
+              {{ m.codigo ? '· ' + (m.codigo | etiqueta: 'MotivoMision') : '' }}
             </mat-panel-description>
           </mat-expansion-panel-header>
           @for (p of m.pasos; track p.numero) {
@@ -119,7 +120,7 @@ export class AgentePagina {
       await this.fachada.disparar();
       this.avisos.open('Misión disparada: los pasos aparecen aquí', undefined, { duration: 4000 });
     } catch (e) {
-      this.avisos.open(mensajeDisparo(codigoDe(e), mensajeDe(e)), 'Cerrar', { duration: 6000 });
+      this.avisos.open(mensajeDisparo(codigoDe(e), mensajeDe(e)), 'Cerrar');
     } finally {
       this.enviando.set(false);
     }

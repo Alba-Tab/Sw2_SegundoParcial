@@ -1,6 +1,7 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, input, signal } from '@angular/core';
+import { MatSortModule, type Sort } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
-import { aCentavos, pct, sumarMontos } from 'ui-comun/dominio';
+import { aCentavos, type Direccion, ordenar, pct, sumarMontos } from 'ui-comun/dominio';
 import { BobPipe, FechaPipe } from './formato';
 
 export interface Columna {
@@ -17,13 +18,26 @@ export interface Resultado {
   datosAl?: string | null;
 }
 
+/** El valor de una celda para ordenar: los montos en centavos (sin float), los números como número y lo demás como texto. */
+export function valorParaOrden(valor: unknown, tipo: string): string | number | bigint | null {
+  if (valor === null || valor === undefined || valor === '') return null;
+  if (tipo === 'MONTO') return aCentavos(String(valor));
+  if (tipo === 'NUMERO' || tipo === 'PORCENTAJE') return Number(valor);
+  return String(valor);
+}
+
+/** Las filas de un reporte ordenadas por una columna; los totales no cambian (son de todas las filas). */
+export function ordenarFilas(filas: readonly Record<string, unknown>[], columna: Columna | undefined, dir: Direccion) {
+  return ordenar(filas, columna ? (f) => valorParaOrden(f[columna.clave], columna.tipo) : undefined, dir);
+}
+
 /**
  * Tabla y gráfico de un reporte (spec 015): los números vienen calculados de Analítica; aquí solo se dibujan. Barras en
  * SVG con los colores del tema (sin otra librería).
  */
 @Component({
   selector: 'cc-tabla-reporte',
-  imports: [MatTableModule, FechaPipe],
+  imports: [MatTableModule, MatSortModule, FechaPipe],
   template: `
     @let r = resultado();
     <p class="datos-al">Datos al {{ r.datosAl ? (r.datosAl | fecha: true) : '—' }}</p>
@@ -41,10 +55,11 @@ export interface Resultado {
       </svg>
     }
     <div class="tabla">
-      <table mat-table [dataSource]="r.filas">
+      <!-- Ordenar es local y no toca los totales: siguen siendo los de todas las filas. -->
+      <table mat-table [dataSource]="filas()" matSort (matSortChange)="orden.set($event)">
         @for (c of r.columnas; track c.clave) {
           <ng-container [matColumnDef]="c.clave">
-            <th mat-header-cell *matHeaderCellDef [class.numero]="numerica(c)">{{ c.titulo }}</th>
+            <th mat-header-cell *matHeaderCellDef mat-sort-header [class.numero]="numerica(c)">{{ c.titulo }}</th>
             <td mat-cell *matCellDef="let f" [class.numero]="numerica(c)">{{ celda(f[c.clave], c) }}</td>
             <td mat-footer-cell *matFooterCellDef [class.numero]="numerica(c)">
               {{ $first ? 'Total' : r.totales[c.clave] !== undefined ? celda(r.totales[c.clave], c) : '' }}
@@ -56,7 +71,7 @@ export interface Resultado {
         <tr mat-footer-row *matFooterRowDef="claves()"></tr>
       </table>
       @if (!r.filas.length) {
-        <p class="vacio">Sin datos para estos parámetros.</p>
+        <p class="vacio">{{ vacio() }}</p>
       }
     </div>
   `,
@@ -96,6 +111,18 @@ export interface Resultado {
 })
 export class TablaReporte {
   readonly resultado = input.required<Resultado>();
+  /** El texto sin filas (una búsqueda sin coincidencias dice otra cosa que un reporte vacío). */
+  readonly vacio = input('Sin datos para estos parámetros.');
+  readonly orden = signal<Sort>({ active: '', direction: '' });
+  readonly filas = computed(() => {
+    const { filas, columnas } = this.resultado();
+    const { active, direction } = this.orden();
+    return ordenarFilas(
+      filas,
+      columnas.find((c) => c.clave === active),
+      direction,
+    );
+  });
   readonly ancho = 720;
   private readonly bob = new BobPipe();
   private readonly fecha = new FechaPipe();

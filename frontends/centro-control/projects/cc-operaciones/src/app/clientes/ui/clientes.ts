@@ -64,7 +64,7 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
         <mat-icon>cloud_off</mat-icon>No se pudo leer la línea de crédito de {{ n }} {{ n === 1 ? 'cliente' : 'clientes' }}.
       </p>
     }
-    <div class="tabla-ancha">
+    <div class="tabla-ancha" role="region" tabindex="0" aria-label="Clientes">
       <table
         mat-table
         [dataSource]="lista.visibles()"

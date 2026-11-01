@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import type { Icono } from 'ui-comun/dominio';
 
 @Component({
   selector: 'app-seccion',
@@ -26,7 +27,7 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
   `,
 })
 export class Seccion {
-  readonly enlaces = [
+  readonly enlaces: { ruta: string; titulo: string; icono: Icono }[] = [
     { ruta: 'unidades', titulo: 'Unidades', icono: 'local_shipping' },
     { ruta: 'mantenimientos', titulo: 'Mantenimientos', icono: 'build' },
     { ruta: 'choferes', titulo: 'Choferes', icono: 'id_card' },

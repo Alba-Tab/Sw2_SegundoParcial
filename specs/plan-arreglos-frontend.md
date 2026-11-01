@@ -126,7 +126,7 @@ Lo que cambia la documentación ICONIX (casos de uso, robustez, secuencia y prot
 
 **Cambios en casos de uso existentes:**
 
-- Registrar pago (spec 008), cancelar servicio (spec 004), decidir entrega observada (rechazo, spec 007), cerrar mantenimiento (spec 010) y decidir acción del agente (rechazo, spec 014): nuevo paso «el sistema muestra un resumen de lo que va a pasar; el usuario confirma o vuelve» antes de llamar al Gateway. En robustez, un objeto de interfaz «Confirmación» entre el formulario y el controlador.
+- Registrar pago (spec 008), cancelar servicio (spec 004), decidir entrega observada (rechazo, spec 007), cerrar mantenimiento (spec 010), decidir acción del agente (rechazo, spec 014) y decidir crédito (rechazo, spec 012): nuevo paso «el sistema muestra un resumen de lo que va a pasar; el usuario confirma o vuelve» antes de llamar al Gateway. En robustez, un objeto de interfaz «Confirmación» entre el formulario y el controlador.
 - Todos los formularios: flujo alterno «datos inválidos: el sistema marca cada campo con su mensaje y enfoca el primero; el usuario corrige». Reemplaza al botón deshabilitado.
 - Todo caso de uso que consulta: flujo alterno «un servicio no responde: el sistema dice cuál y ofrece Reintentar»; los mensajes de error salen del `codigo` (000 §5).
 

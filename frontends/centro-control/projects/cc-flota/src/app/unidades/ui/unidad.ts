@@ -1,5 +1,5 @@
 import { DecimalPipe } from '@angular/common';
-import { afterNextRender, Component, computed, effect, inject, Injector, input, signal, viewChild } from '@angular/core';
+import { afterNextRender, Component, effect, inject, Injector, input, signal, viewChild } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButton, MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -12,6 +12,10 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   Encabezado,
   AvisoServicios,
+  Campo,
+  enfocar,
+  enfocarTitulo,
+  fechaEntre,
   Estado,
   EtiquetaPipe,
   fechaLaPaz,
@@ -29,6 +33,7 @@ import {
 import {
   AVISO_KM,
   CHECKLIST_POR_DEFECTO,
+  checklistCompleto,
   checklistValido,
   cierreInicial,
   documentosEnAviso,
@@ -47,6 +52,7 @@ import { UnidadFachada } from '../unidades.fachada';
     Esqueleto,
     Encabezado,
     ReactiveFormsModule,
+    Campo,
     Confirmacion,
     DecimalPipe,
     MatCardModule,
@@ -85,7 +91,7 @@ import { UnidadFachada } from '../unidades.fachada';
     @if (cargando()) {
       <cc-esqueleto />
     }
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!unidad()" />
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!unidad()" [reintentar]="recargar" />
     @if (unidad(); as u) {
       @if (documentosEnAviso(u.documentos); as n) {
         <p class="aviso-documentos" role="status">
@@ -132,7 +138,7 @@ import { UnidadFachada } from '../unidades.fachada';
                 </mat-form-field>
                 <mat-form-field>
                   <mat-label>Fecha</mat-label>
-                  <input matInput type="date" formControlName="fechaProgramada" />
+                  <input matInput type="date" formControlName="fechaProgramada" [min]="hoy" />
                   <mat-error>{{ textoError(nuevo.controls.fechaProgramada) }}</mat-error>
                 </mat-form-field>
                 <mat-form-field>
@@ -170,7 +176,14 @@ import { UnidadFachada } from '../unidades.fachada';
           <mat-card-content>
             @if (m.estado === 'EN_CURSO' && sesion.tiene('jefe_flota') && formsCierre[m.mantenimientoId]; as fc) {
               @for (i of cierres[m.mantenimientoId] ?? []; track i.item) {
-                <mat-checkbox [checked]="i.ok" (change)="i.ok = $event.checked">{{ i.item }}</mat-checkbox>
+                <mat-checkbox [checked]="i.ok" (change)="i.ok = $event.checked" [disabled]="cerrando() === m.mantenimientoId">{{
+                  i.item
+                }}</mat-checkbox>
+              }
+              @if (faltanItems() === m.mantenimientoId) {
+                <p class="no-disponible" role="alert">
+                  Marca todos los ítems; si alguno no se hizo, deja el mantenimiento abierto y anótalo en observaciones.
+                </p>
               }
               <div class="fila-acciones" [formGroup]="fc" #zonaCierre>
                 @if (u.tipoUnidad === 'TRACTO') {
@@ -186,7 +199,12 @@ import { UnidadFachada } from '../unidades.fachada';
                   <mat-error>{{ textoError(fc.controls.observaciones) }}</mat-error>
                 </mat-form-field>
                 @if (cerrando() !== m.mantenimientoId) {
-                  <button mat-stroked-button (click)="pedirCierre(m.mantenimientoId, zonaCierre)" [disabled]="enviando()">
+                  <button
+                    mat-stroked-button
+                    [id]="'cerrar-' + m.mantenimientoId"
+                    (click)="pedirCierre(m.mantenimientoId, zonaCierre)"
+                    [disabled]="enviando()"
+                  >
                     <mat-icon>lock</mat-icon>Cerrar mantenimiento
                   </button>
                 }
@@ -198,7 +216,7 @@ import { UnidadFachada } from '../unidades.fachada';
                   icono="lock"
                   [enviando]="enviando()"
                   (confirmar)="cerrar(m.mantenimientoId)"
-                  (volver)="cerrando.set(null)"
+                  (volver)="volverDelCierre(m.mantenimientoId)"
                 />
               }
             } @else {
@@ -254,15 +272,11 @@ export class UnidadPagina {
   readonly avisoKm = AVISO_KM;
   /** El formulario de programar se abre desde la acción del encabezado. */
   readonly programando = signal(false);
-  readonly mantenimientos = computed(() => {
-    const lista = this.fachada.mantenimientos();
-    const tracto = this.unidad()?.tipoUnidad === 'TRACTO';
-    for (const m of lista) {
-      this.cierres[m.mantenimientoId] ??= cierreInicial(m);
-      this.formsCierre[m.mantenimientoId] ??= formularioCierre(tracto);
-    }
-    return lista;
-  });
+  readonly mantenimientos = this.fachada.mantenimientos;
+  readonly hoy = fechaLaPaz();
+  readonly recargar = () => this.fachada.recargar();
+  /** El mantenimiento que se quiso cerrar con ítems sin marcar (spec 010 exige todos hechos). */
+  readonly faltanItems = signal<string | null>(null);
   readonly enviando = signal(false);
   /** Cerrar un mantenimiento no se deshace: el que está pidiendo confirmación. */
   readonly cerrando = signal<string | null>(null);
@@ -273,7 +287,8 @@ export class UnidadPagina {
   private readonly injector = inject(Injector);
   readonly nuevo = new FormGroup({
     tipo: new FormControl<NuevoMantenimiento['tipo']>('PREVENTIVO', { nonNullable: true }),
-    fechaProgramada: new FormControl(fechaLaPaz(), { nonNullable: true, validators: [Validators.required] }),
+    // Spec 010: hoy o después.
+    fechaProgramada: new FormControl(fechaLaPaz(), { nonNullable: true, validators: [Validators.required, fechaEntre(fechaLaPaz)] }),
     taller: new FormControl('', { nonNullable: true, validators: [Validators.required, largoEntre(3, 120)] }),
     descripcion: new FormControl('', { nonNullable: true, validators: [Validators.required, largoEntre(1, 1000)] }),
     checklist: new FormControl(CHECKLIST_POR_DEFECTO, {
@@ -286,6 +301,15 @@ export class UnidadPagina {
 
   constructor() {
     effect(() => this.fachada.id.set(this.id()));
+    // Los formularios de cierre se crean cuando se sabe si la unidad es tracto (kilometraje obligatorio), no antes (E-20).
+    effect(() => {
+      const unidad = this.unidad();
+      if (!unidad) return;
+      for (const m of this.mantenimientos()) {
+        this.cierres[m.mantenimientoId] ??= cierreInicial(m);
+        this.formsCierre[m.mantenimientoId] ??= formularioCierre(unidad.tipoUnidad === 'TRACTO');
+      }
+    });
   }
 
   /** Abre el formulario de programar con el foco en su primer campo: aparece debajo de los datos, fuera de la vista en móvil (C-7). */
@@ -294,10 +318,17 @@ export class UnidadPagina {
     afterNextRender(() => this.primerCampo()?.focus(), { injector: this.injector });
   }
 
-  /** Cierra el formulario de programar y devuelve el foco al botón que lo abrió. */
+  /** Cierra el formulario de programar y devuelve el foco al botón que lo abrió (o al título, si ya no está). */
   cerrarFormulario(): void {
     this.programando.set(false);
-    this.botonProgramar()?.focus();
+    afterNextRender(
+      () => {
+        const boton = this.botonProgramar();
+        if (boton) boton.focus();
+        else enfocarTitulo();
+      },
+      { injector: this.injector },
+    );
   }
 
   async programar(unidadId: string, raiz: HTMLElement) {
@@ -310,8 +341,21 @@ export class UnidadPagina {
     }
   }
 
+  /** Pide confirmar con todos los ítems marcados y el formulario bloqueado (E-4, E-6). */
   pedirCierre(mantenimientoId: string, raiz: HTMLElement): void {
-    if (listoParaEnviar(this.formsCierre[mantenimientoId], raiz)) this.cerrando.set(mantenimientoId);
+    const form = this.formsCierre[mantenimientoId];
+    const completo = checklistCompleto(this.cierres[mantenimientoId] ?? []);
+    this.faltanItems.set(completo ? null : mantenimientoId);
+    if (!listoParaEnviar(form, raiz) || !completo) return;
+    form.disable();
+    this.cerrando.set(mantenimientoId);
+  }
+
+  /** "No, volver" o un cierre fallido: desbloquea y el foco vuelve a "Cerrar mantenimiento" (E-3). */
+  volverDelCierre(mantenimientoId: string): void {
+    this.formsCierre[mantenimientoId]?.enable();
+    this.cerrando.set(null);
+    enfocar(`cerrar-${mantenimientoId}`);
   }
 
   resumenCierre(m: Mantenimiento, placa: string): string {
@@ -319,7 +363,7 @@ export class UnidadPagina {
     const km = this.formsCierre[m.mantenimientoId]?.controls.kilometraje.value;
     return (
       `Se cierra el mantenimiento ${etiqueta('TipoMantenimiento', m.tipo).texto.toLowerCase()} de ${placa} con ` +
-      `${items.filter((i) => i.ok).length} de ${items.length} ítems hechos${km !== null && km !== undefined ? ` y ${km} km` : ''}. ` +
+      `los ${items.length} ítems hechos${km !== null && km !== undefined ? ` y ${km} km` : ''}. ` +
       'No se puede deshacer.'
     );
   }
@@ -331,8 +375,11 @@ export class UnidadPagina {
       checklist: this.cierres[mantenimientoId],
       observaciones: v.observaciones.trim() || undefined,
     };
-    await this.enviar(() => this.fachada.cerrar(mantenimientoId, cierre), 'Mantenimiento cerrado');
-    this.cerrando.set(null);
+    if (await this.enviar(() => this.fachada.cerrar(mantenimientoId, cierre), 'Mantenimiento cerrado')) {
+      this.cerrando.set(null);
+      // El mantenimiento queda cerrado y su botón desaparece: el foco va al título de la unidad.
+      enfocarTitulo();
+    } else this.volverDelCierre(mantenimientoId);
   }
 
   private async enviar(accion: () => Promise<unknown>, ok: string): Promise<boolean> {
@@ -343,7 +390,7 @@ export class UnidadPagina {
       await this.fachada.recargar();
       return true;
     } catch (e) {
-      this.avisos.open(mensajeDe(e), 'Cerrar', { duration: 6000 });
+      this.avisos.open(mensajeDe(e), 'Cerrar');
       return false;
     } finally {
       this.enviando.set(false);

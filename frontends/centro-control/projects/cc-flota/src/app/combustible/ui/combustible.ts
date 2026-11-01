@@ -60,7 +60,7 @@ import type { Anomalia, Carga } from '../domain/combustible';
     }
     <h2>Anomalías de los últimos 30 días</h2>
     <cc-filtros-lista [control]="listaA" busqueda="Buscar anomalías por placa" nombre="anomalías" singular="anomalía" />
-    <div class="tabla-ancha">
+    <div class="tabla-ancha" role="region" tabindex="0" aria-label="Anomalías de combustible">
       <table
         mat-table
         [dataSource]="listaA.visibles()"
@@ -102,7 +102,7 @@ import type { Anomalia, Carga } from '../domain/combustible';
     />
     <h2>Últimas cargas</h2>
     <cc-filtros-lista [control]="listaC" busqueda="Buscar cargas por placa" nombre="cargas" singular="carga" />
-    <div class="tabla-ancha">
+    <div class="tabla-ancha" role="region" tabindex="0" aria-label="Cargas de combustible">
       <table
         mat-table
         [dataSource]="listaC.visibles()"

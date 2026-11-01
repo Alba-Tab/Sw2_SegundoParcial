@@ -1,14 +1,14 @@
 /*
  * GENERADO por scripts/iconos.mjs --generar; no se edita a mano. lista 4fb3205b28c20400
  * Material Symbols Outlined recortada a la lista cerrada de ui-comun/dominio/src/iconos.ts (89 glifos),
- * peso 400, sin relleno, grado 0 y tamaño óptico 24. El nombre del glifo no se ve mientras carga: base.css oculta los
- * iconos hasta que proveedores.ts confirma la fuente con document.fonts.
+ * peso 400, sin relleno, grado 0 y tamaño óptico 24. font-display: block oculta el glifo mientras carga (unos 3 s
+ * como máximo, luego el navegador lo muestra igual), así nunca se lee el nombre ni se queda oculto toda la sesión.
  */
 @font-face {
   font-family: 'Material Symbols Outlined';
   font-style: normal;
   font-weight: 400;
-  font-display: swap;
+  font-display: block;
   src: url('./material-symbols-outlined.woff') format('woff');
 }
 .material-symbols-outlined {

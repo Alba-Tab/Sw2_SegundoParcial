@@ -9,10 +9,13 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { RouterLink } from '@angular/router';
 import {
   AvisoServicios,
+  Campo,
   CONFIG_CENTRO,
   Confirmacion,
   controlLista,
   Encabezado,
+  enfocar,
+  enfocarTitulo,
   Estado,
   FechaPipe,
   FiltrosLista,
@@ -36,6 +39,7 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
   imports: [
     Encabezado,
     ReactiveFormsModule,
+    Campo,
     Confirmacion,
     MatCardModule,
     MatButtonModule,
@@ -54,7 +58,7 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
       [titulo]="id() ? 'Acción propuesta' : 'Acciones del agente'"
       [migas]="id() ? [{ texto: 'Acciones del agente', ruta: '/acciones' }, { texto: 'Acción propuesta' }] : []"
     />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!visibles().length" />
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!visibles().length" [reintentar]="recargar" />
     <cc-filtros-lista [control]="lista" busqueda="Buscar por cliente o placa" grupo="EstadoAccion" nombre="acciones" singular="acción" />
     <div class="lista">
       @for (a of lista.visibles(); track a.accionId) {
@@ -96,7 +100,12 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
                     <mat-error>{{ textoError(f.controls.motivo) }}</mat-error>
                   </mat-form-field>
                   @if (rechazando() !== a.accionId) {
-                    <button mat-stroked-button (click)="pedirRechazo(a.accionId, zona)" [disabled]="enviando()">
+                    <button
+                      mat-stroked-button
+                      [id]="'rechazar-' + a.accionId"
+                      (click)="pedirRechazo(a.accionId, zona)"
+                      [disabled]="enviando()"
+                    >
                       <mat-icon>block</mat-icon>Rechazar
                     </button>
                   }
@@ -108,7 +117,7 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
                     icono="block"
                     [enviando]="enviando()"
                     (confirmar)="rechazar(a.accionId)"
-                    (volver)="rechazando.set(null)"
+                    (volver)="volver(a.accionId)"
                   />
                 }
               </div>
@@ -165,6 +174,7 @@ export class AccionesPagina {
   readonly rechazando = signal<string | null>(null);
   readonly textoError = textoError;
   private readonly forms: Record<string, ReturnType<typeof formularioAccion>> = {};
+  readonly recargar = () => this.fachada.recargar();
 
   /** El formulario de cada acción pendiente, con el mensaje que propuso el agente para editarlo. */
   formDe(a: Accion) {
@@ -177,24 +187,36 @@ export class AccionesPagina {
     const mensaje = f.controls.mensaje.value.trim();
     return this.enviar(() => this.fachada.aprobar(id, mensaje), 'Aprobada: el correo sale por n8n');
   }
+  /** Pide confirmar con el formulario bloqueado: el motivo no cambia después de leer el resumen (E-4). */
   pedirRechazo(id: string, zona: HTMLElement): void {
-    if (listoParaEnviar(this.forms[id].controls.motivo, zona)) this.rechazando.set(id);
+    if (!listoParaEnviar(this.forms[id].controls.motivo, zona)) return;
+    this.forms[id].disable();
+    this.rechazando.set(id);
+  }
+  /** "No, volver" o un rechazo fallido: desbloquea y el foco vuelve a "Rechazar" (E-3). */
+  volver(id: string): void {
+    this.forms[id]?.enable();
+    this.rechazando.set(null);
+    enfocar(`rechazar-${id}`);
   }
   rechazar(id: string) {
     const motivo = this.forms[id].controls.motivo.value.trim() || undefined;
-    return this.enviar(() => this.fachada.rechazar(id, motivo), 'Acción rechazada');
+    return this.enviar(() => this.fachada.rechazar(id, motivo), 'Acción rechazada', id);
   }
 
-  private async enviar(accion: () => Promise<unknown>, ok: string): Promise<void> {
+  private async enviar(accion: () => Promise<unknown>, ok: string, rechazo?: string): Promise<void> {
     this.enviando.set(true);
     try {
       await accion();
+      this.rechazando.set(null);
       this.avisos.open(ok, undefined, { duration: 5000 });
       await this.fachada.recargar();
+      // La acción queda decidida y sus botones desaparecen: el foco va al título de la página.
+      enfocarTitulo();
     } catch (e) {
-      this.avisos.open(mensajeDe(e), 'Cerrar', { duration: 6000 });
+      if (rechazo) this.volver(rechazo);
+      this.avisos.open(mensajeDe(e), 'Cerrar');
     } finally {
-      this.rechazando.set(null);
       this.enviando.set(false);
     }
   }

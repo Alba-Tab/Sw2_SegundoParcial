@@ -112,6 +112,13 @@ export const ETIQUETAS = {
     SALTADA: e('Saltada', 'skip_next', 'aviso'),
     FALLIDA: e('Fallida', 'error', 'error'),
   },
+  /** `Mision.codigo` (analitica.yaml): por qué quedó SALTADA o FALLIDA; texto libre en el contrato, estos son los que da Analítica. */
+  MotivoMision: {
+    LLM_NO_DISPONIBLE: e('Asistente no disponible', 'cloud_off', 'aviso'),
+    DEPENDENCIA_NO_DISPONIBLE: e('Un servicio no respondió', 'cloud_off', 'aviso'),
+    INTERRUMPIDA: e('Se interrumpió', 'error', 'error'),
+    ERROR_INTERNO: e('Error interno', 'error', 'error'),
+  },
   OrigenMision: {
     PROGRAMADA: e('Programada', 'event_repeat'),
     MANUAL: e('Manual', 'touch_app'),

@@ -53,7 +53,7 @@ import { FacturasFachada } from '../facturas.fachada';
         <mat-button-toggle value="todas">Todas</mat-button-toggle>
       </mat-button-toggle-group>
     </cc-filtros-lista>
-    <div class="tabla-ancha">
+    <div class="tabla-ancha" role="region" tabindex="0" aria-label="Facturas">
       <table
         mat-table
         [dataSource]="lista.visibles()"

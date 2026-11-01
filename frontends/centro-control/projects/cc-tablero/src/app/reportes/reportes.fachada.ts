@@ -1,6 +1,6 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { catchError, firstValueFrom, of } from 'rxjs';
+import { BehaviorSubject, catchError, firstValueFrom, of, switchMap } from 'rxjs';
 import { completo, Intentos, Sesion, type Resultado } from 'ui-comun';
 import { puedeVer } from 'ui-comun/dominio';
 import type { CatalogoQuery, ReporteId } from '../graphql/generado';
@@ -33,10 +33,14 @@ export class ConsultaReportes {
  */
 @Injectable()
 export class ReportesFachada extends ConsultaReportes {
+  private readonly repoCatalogo = inject(ReportesRepositorio);
+  private readonly verClientes = puedeVer(inject(Sesion).roles(), 'clientes');
+  /** Cada "Reintentar" vuelve a pedir el catálogo. */
+  private readonly intento = new BehaviorSubject<void>(undefined);
   private readonly respuesta = toSignal(
-    inject(ReportesRepositorio)
-      .catalogo(puedeVer(inject(Sesion).roles(), 'clientes'))
-      .pipe(catchError((error: unknown) => of({ data: undefined, error }))),
+    this.intento.pipe(
+      switchMap(() => this.repoCatalogo.catalogo(this.verClientes).pipe(catchError((error: unknown) => of({ data: undefined, error })))),
+    ),
   );
   readonly catalogo = computed(() => completo<CatalogoQuery>(this.respuesta()));
   readonly errorCatalogo = computed(() => this.respuesta()?.error);
@@ -44,5 +48,9 @@ export class ReportesFachada extends ConsultaReportes {
 
   constructor() {
     super(inject(ReportesRepositorio));
+  }
+
+  recargarCatalogo(): void {
+    this.intento.next();
   }
 }

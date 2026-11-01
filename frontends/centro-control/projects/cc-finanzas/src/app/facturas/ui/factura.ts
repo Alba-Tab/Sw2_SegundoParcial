@@ -7,22 +7,29 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTableModule } from '@angular/material/table';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   AvisoServicios,
   BobPipe,
+  Campo,
+  codigoDe,
   Confirmacion,
   Encabezado,
   Esqueleto,
   Estado,
   etiqueta,
   EtiquetaPipe,
+  fechaEntre,
   fechaLaPaz,
   FechaPipe,
   largoEntre,
+  enfocar,
+  enfocarTitulo,
   listoParaEnviar,
   mensajeDe,
   montoConDecimales,
+  montoMaximo,
   Sesion,
   textoError,
   validarMonto,
@@ -42,7 +49,9 @@ import { FacturaFachada } from '../facturas.fachada';
     Esqueleto,
     Encabezado,
     ReactiveFormsModule,
+    Campo,
     Confirmacion,
+    MatTableModule,
     MatCardModule,
     MatButtonModule,
     MatFormFieldModule,
@@ -77,7 +86,7 @@ import { FacturaFachada } from '../facturas.fachada';
     @if (cargando()) {
       <cc-esqueleto />
     }
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!factura()" />
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!factura()" [reintentar]="recargar" />
     @if (factura(); as f) {
       <dl class="datos">
         <div>
@@ -107,10 +116,11 @@ import { FacturaFachada } from '../facturas.fachada';
           <mat-card-header><mat-card-title>Registrar pago</mat-card-title></mat-card-header>
           <mat-card-content>
             <div class="fila-acciones">
-              <label class="recibo" mat-stroked-button>
+              <!-- Un botón de verdad (no un label) para que se alcance con el teclado; abre el selector de archivo. -->
+              <button mat-stroked-button type="button" (click)="archivo.click()" [disabled]="leyendo() || confirmando()">
                 <mat-icon>document_scanner</mat-icon>Leer recibo (OCR)
-                <input type="file" accept="image/*" (change)="ocr($event)" hidden />
-              </label>
+              </button>
+              <input #archivo type="file" accept="image/*" (change)="ocr($event)" hidden />
               @if (leyendo()) {
                 <span class="secundario">Leyendo el recibo en el navegador…</span>
               }
@@ -128,7 +138,7 @@ import { FacturaFachada } from '../facturas.fachada';
                 </mat-form-field>
                 <mat-form-field>
                   <mat-label>Fecha</mat-label>
-                  <input matInput type="date" formControlName="fecha" />
+                  <input matInput type="date" formControlName="fecha" [min]="f.emitidaEl.slice(0, 10)" [max]="hoy" />
                   <mat-error>{{ textoError(form.controls.fecha) }}</mat-error>
                 </mat-form-field>
                 <mat-form-field>
@@ -152,11 +162,11 @@ import { FacturaFachada } from '../facturas.fachada';
                   icono="price_check"
                   [enviando]="enviando()"
                   (confirmar)="registrar(f.facturaId)"
-                  (volver)="confirmando.set(false)"
+                  (volver)="volver()"
                 />
               } @else {
                 <div class="fila-acciones">
-                  <button mat-flat-button type="submit"><mat-icon>price_check</mat-icon>Guardar el pago</button>
+                  <button mat-flat-button type="submit" id="guardar-pago"><mat-icon>price_check</mat-icon>Guardar el pago</button>
                   <button mat-button type="button" (click)="cerrar()">Cancelar</button>
                 </div>
               }
@@ -165,13 +175,35 @@ import { FacturaFachada } from '../facturas.fachada';
         </mat-card>
       }
 
-      <h2>Pagos</h2>
-      @for (p of f.pagos ?? []; track p.pagoId) {
-        <p>
-          {{ p.fecha | fecha }} · {{ p.monto | bob }} · {{ p.medio | etiqueta: 'MedioPago' }} · {{ p.referencia }}
-          <span class="secundario">{{ p.nota ?? '' }}</span>
-        </p>
-      } @empty {
+      <h2 id="titulo-pagos">Pagos</h2>
+      @if (f.pagos?.length) {
+        <div class="tabla-ancha" role="region" aria-labelledby="titulo-pagos" tabindex="0">
+          <table mat-table [dataSource]="f.pagos!" aria-labelledby="titulo-pagos">
+            <ng-container matColumnDef="fecha"
+              ><th mat-header-cell *matHeaderCellDef>Fecha</th>
+              <td mat-cell *matCellDef="let p">{{ p.fecha | fecha }}</td></ng-container
+            >
+            <ng-container matColumnDef="monto"
+              ><th mat-header-cell *matHeaderCellDef>Monto</th>
+              <td mat-cell *matCellDef="let p">{{ p.monto | bob }}</td></ng-container
+            >
+            <ng-container matColumnDef="medio"
+              ><th mat-header-cell *matHeaderCellDef>Medio</th>
+              <td mat-cell *matCellDef="let p">{{ p.medio | etiqueta: 'MedioPago' }}</td></ng-container
+            >
+            <ng-container matColumnDef="referencia"
+              ><th mat-header-cell *matHeaderCellDef>Referencia</th>
+              <td mat-cell *matCellDef="let p">{{ p.referencia }}</td></ng-container
+            >
+            <ng-container matColumnDef="nota"
+              ><th mat-header-cell *matHeaderCellDef>Nota</th>
+              <td mat-cell *matCellDef="let p" class="secundario">{{ p.nota ?? '' }}</td></ng-container
+            >
+            <tr mat-header-row *matHeaderRowDef="columnasPagos"></tr>
+            <tr mat-row *matRowDef="let p; columns: columnasPagos"></tr>
+          </table>
+        </div>
+      } @else {
         <p class="secundario">Sin pagos.</p>
       }
     }
@@ -179,12 +211,6 @@ import { FacturaFachada } from '../facturas.fachada';
   styles: `
     .pago {
       margin: 16px 0;
-    }
-    .recibo {
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
     }
   `,
 })
@@ -206,15 +232,25 @@ export class FacturaPagina {
   /** Registrar un pago no se deshace: antes de enviarlo se muestra el resumen y se pide confirmar. */
   readonly confirmando = signal(false);
   readonly textoError = textoError;
+  readonly hoy = fechaLaPaz();
+  readonly columnasPagos = ['fecha', 'monto', 'medio', 'referencia', 'nota'];
+  readonly recargar = () => this.fachada.recargar();
   private readonly bob = new BobPipe();
   private readonly botonPago = viewChild<MatButton>('botonPago');
   private readonly primerCampo = viewChild<ElementRef<HTMLInputElement>>('primerCampo');
   private readonly injector = inject(Injector);
   readonly form = new FormGroup({
-    monto: new FormControl('', { nonNullable: true, validators: [Validators.required, validarMonto] }),
-    fecha: new FormControl(fechaLaPaz(), { nonNullable: true, validators: [Validators.required] }),
+    // Spec 008: monto > 0 y ≤ saldo; fecha entre la emisión y hoy; referencia de 3 a 40 caracteres.
+    monto: new FormControl('', {
+      nonNullable: true,
+      validators: [Validators.required, validarMonto, montoMaximo(() => this.factura()?.saldo)],
+    }),
+    fecha: new FormControl(fechaLaPaz(), {
+      nonNullable: true,
+      validators: [Validators.required, fechaEntre(() => this.factura()?.emitidaEl, fechaLaPaz)],
+    }),
     medio: new FormControl<PagoEnEdicion['medio']>('TRANSFERENCIA', { nonNullable: true }),
-    referencia: new FormControl('', { nonNullable: true, validators: [Validators.required, largoEntre(1, 100)] }),
+    referencia: new FormControl('', { nonNullable: true, validators: [Validators.required, largoEntre(3, 40)] }),
   });
 
   constructor() {
@@ -229,14 +265,26 @@ export class FacturaPagina {
       this.form.setValue(completarConRecibo(this.form.getRawValue(), await this.fachada.leerRecibo(archivo)));
       this.avisos.open('Revisa los datos leídos del recibo antes de registrar', undefined, { duration: 5000 });
     } catch {
-      this.avisos.open('No se pudo leer el recibo; completa los datos a mano', 'Cerrar', { duration: 6000 });
+      this.avisos.open('No se pudo leer el recibo; completa los datos a mano', 'Cerrar');
     } finally {
       this.leyendo.set(false);
     }
   }
 
+  /** Con datos válidos, pide la confirmación con el formulario bloqueado: el resumen no cambia bajo el usuario (E-4). */
   revisar(raiz: HTMLElement): void {
-    if (listoParaEnviar(this.form, raiz)) this.confirmando.set(true);
+    // El saldo y la fecha de emisión pueden haber llegado después de escribir: se vuelve a validar cada campo.
+    for (const c of Object.values(this.form.controls)) c.updateValueAndValidity();
+    if (!listoParaEnviar(this.form, raiz)) return;
+    this.form.disable();
+    this.confirmando.set(true);
+  }
+
+  /** "No, volver" o un envío fallido: desbloquea el formulario y el foco vuelve a "Guardar el pago" (E-3). */
+  volver(): void {
+    this.form.enable();
+    this.confirmando.set(false);
+    enfocar('guardar-pago');
   }
 
   resumen(f: { numero: string; saldo: string }): string {
@@ -256,13 +304,13 @@ export class FacturaPagina {
 
   /** Cierra el formulario y devuelve el foco al botón que lo abrió. */
   cerrar(): void {
+    this.form.enable();
     this.registrando.set(false);
     this.confirmando.set(false);
     this.botonPago()?.focus();
   }
 
   async registrar(facturaId: string): Promise<void> {
-    if (!this.form.valid) return;
     this.enviando.set(true);
     try {
       const p = this.form.getRawValue();
@@ -271,9 +319,15 @@ export class FacturaPagina {
       this.form.reset({ fecha: p.fecha, medio: p.medio });
       this.cerrar();
       await this.fachada.recargar();
+      // Con saldo 0 el botón "Registrar pago" ya no está: el foco va al título de la factura.
+      if (!this.puedeRegistrar()) enfocarTitulo();
     } catch (e) {
-      this.confirmando.set(false);
-      this.avisos.open(mensajeDe(e), 'Cerrar', { duration: 6000 });
+      // Spec 008: si el saldo cambió (otro pago), se dice cuál es y se relee la factura.
+      const saldo =
+        codigoDe(e) === 'PAGO_EXCEDE_SALDO' && this.factura() ? ` El saldo es ${this.bob.transform(this.factura()!.saldo)}.` : '';
+      this.avisos.open(mensajeDe(e) + saldo, 'Cerrar');
+      if (saldo) void this.fachada.recargar();
+      this.volver();
     } finally {
       this.enviando.set(false);
     }

@@ -11,10 +11,12 @@ import {
   aCentavos,
   AvisoServicios,
   BobPipe,
+  Campo,
   CONFIG_CENTRO,
   controlLista,
   Encabezado,
   enfocar,
+  enfocarTitulo,
   Estado,
   etiqueta,
   EtiquetaPipe,
@@ -40,6 +42,7 @@ import { ServiciosFachada } from '../servicios.fachada';
   imports: [
     Encabezado,
     ReactiveFormsModule,
+    Campo,
     MatTableModule,
     MatSortModule,
     MatButtonModule,
@@ -56,7 +59,7 @@ import { ServiciosFachada } from '../servicios.fachada';
   ],
   template: `
     <cc-encabezado titulo="Servicios" />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!servicios().length" />
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!servicios().length" [reintentar]="recargar" />
     <cc-filtros-lista
       [control]="lista"
       busqueda="Buscar por cliente, placa o chofer"
@@ -66,7 +69,7 @@ import { ServiciosFachada } from '../servicios.fachada';
       [limite]="80"
       [estadoEnServidor]="true"
     />
-    <div class="tabla-ancha">
+    <div class="tabla-ancha" role="region" tabindex="0" aria-label="Servicios">
       <table
         mat-table
         [dataSource]="lista.visibles()"
@@ -106,10 +109,15 @@ import { ServiciosFachada } from '../servicios.fachada';
               @if (confirmando() === s.servicioId) {
                 <!-- Cancelar devuelve el crédito y la unidad: se pide el motivo de esta fila y se confirma con un resumen. -->
                 <div class="confirmacion" role="group" aria-label="Cancelar el servicio" #zona>
-                  <p class="resumen">{{ resumen(s) }}</p>
+                  <p class="resumen" [id]="'resumen-' + s.servicioId">{{ resumen(s) }}</p>
                   <mat-form-field class="motivo">
                     <mat-label>Motivo</mat-label>
-                    <input matInput [formControl]="motivo" [id]="'motivo-' + s.servicioId" />
+                    <input
+                      matInput
+                      [formControl]="motivo"
+                      [id]="'motivo-' + s.servicioId"
+                      [attr.aria-describedby]="'resumen-' + s.servicioId"
+                    />
                     <mat-hint>De 3 a 300 caracteres</mat-hint>
                     <mat-error>{{ textoError(motivo) }}</mat-error>
                   </mat-form-field>
@@ -200,6 +208,7 @@ export class ServiciosPagina {
   readonly puedeCancelarServicio = puedeCancelarServicio;
   private readonly bob = new BobPipe();
   private readonly fecha = new FechaPipe();
+  readonly recargar = () => this.fachada.recargar();
 
   constructor() {
     // El filtro de estado de la URL también se pide a Viajes: el límite de 80 filas se aplica ya filtrado.
@@ -235,8 +244,10 @@ export class ServiciosPagina {
       this.avisos.open('Servicio cancelado: se devolvieron el crédito y la unidad', undefined, { duration: 5000 });
       this.confirmando.set(null);
       await this.fachada.recargar();
+      // El servicio cancelado ya no tiene "Cancelar…": el foco va al título de la página.
+      enfocarTitulo();
     } catch (e) {
-      this.avisos.open(mensajeDe(e), 'Cerrar', { duration: 6000 });
+      this.avisos.open(mensajeDe(e), 'Cerrar');
     } finally {
       this.enviando.set(false);
     }

@@ -90,6 +90,7 @@ describe('lo que pide acción (U7)', () => {
     expect(p.map((x) => x.clave)).toEqual(['riesgo-v3', 'riesgo-v1', 'mora', 'mantenimiento', 'alertas']);
     expect(p[1]).toMatchObject({
       texto: 'Viaje AAA-1 en riesgo de retraso (60 %)',
+      tono: 'aviso',
       detalle: 'Soya SA · SCZ-LPZ',
       app: 'cc-operaciones',
       ruta: '/viajes/v1',

@@ -18,7 +18,7 @@ import { PUNTAJE_BAJO, type PuntajeChofer } from '../domain/conduccion';
     @if (puntajes(); as p) {
       <p class="secundario">Semana del {{ p.desde | fecha }} al {{ p.hasta | fecha }} · datos al {{ p.datosAl | fecha: true }}</p>
       <cc-filtros-lista [control]="lista" busqueda="Buscar por chofer" nombre="choferes" singular="chofer" />
-      <div class="tabla-ancha">
+      <div class="tabla-ancha" role="region" tabindex="0" aria-label="Conducción por chofer">
         <table
           mat-table
           [dataSource]="lista.visibles()"

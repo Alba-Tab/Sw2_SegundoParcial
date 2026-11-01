@@ -9,6 +9,7 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   AvisoServicios,
+  Campo,
   Encabezado,
   errorPeriodo,
   Esqueleto,
@@ -33,6 +34,7 @@ import { ReportesFachada } from '../reportes.fachada';
   imports: [
     Encabezado,
     ReactiveFormsModule,
+    Campo,
     Esqueleto,
     MatCardModule,
     MatButtonModule,
@@ -48,7 +50,12 @@ import { ReportesFachada } from '../reportes.fachada';
     @if (cargandoCatalogo()) {
       <cc-esqueleto [filas]="2" />
     }
-    <cc-aviso-servicios [error]="errorCatalogo()" [campos]="campos" [sinDatos]="!catalogo()?.catalogoReportes" />
+    <cc-aviso-servicios
+      [error]="errorCatalogo()"
+      [campos]="campos"
+      [sinDatos]="!catalogo()?.catalogoReportes"
+      [reintentar]="recargarCatalogo"
+    />
     <div class="catalogo">
       @for (r of permitidos(); track r.reporteId) {
         <button
@@ -165,6 +172,7 @@ export class ReportesPagina {
   private readonly sesion = inject(Sesion);
 
   readonly catalogo = this.fachada.catalogo;
+  readonly recargarCatalogo = () => this.fachada.recargarCatalogo();
   readonly errorCatalogo = this.fachada.errorCatalogo;
   readonly cargandoCatalogo = this.fachada.cargandoCatalogo;
   /** Quién responde cada campo del catálogo: los clientes y rutas vienen de Viajes. */
@@ -236,7 +244,7 @@ export class ReportesPagina {
       const url = await this.fachada.exportar(id, params);
       if (url) window.location.assign(url);
     } catch (e) {
-      this.avisos.open(mensajeDe(e), 'Cerrar', { duration: 6000 });
+      this.avisos.open(mensajeDe(e), 'Cerrar');
     } finally {
       this.exportando.set(false);
     }

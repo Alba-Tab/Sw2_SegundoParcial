@@ -85,6 +85,29 @@ describe('Confirmar y seguir (specs 003, 004 y 006)', () => {
     expect(c.encabezados.get('Idempotency-Key')).toBeTruthy();
   });
 
+  it('E-10: cancelar tras un corte de red reintenta con la misma clave; tras una respuesta definitiva, otra', async () => {
+    const llamadas = simularApi({
+      ...rutas,
+      [`GET /api/v1/servicios/${SERVICIO}`]: { estado: 200, cuerpo: { ...base, estado: 'CONFIRMADO' } },
+      [`POST /api/v1/servicios/${SERVICIO}/cancelacion`]: [
+        { estado: 0, sinRed: true },
+        { estado: 409, cuerpo: problema(409, 'CONFIRMACION_EN_CURSO') },
+        { estado: 409, cuerpo: problema(409, 'CONFIRMACION_EN_CURSO') },
+      ],
+    });
+    conConsultas(<PaginaServicio />);
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancelar servicio' }));
+    fireEvent.change(screen.getByLabelText('Motivo'), { target: { value: 'Ya no necesito el envío' } });
+    const confirmar = () => fireEvent.click(screen.getAllByRole('button', { name: 'Cancelar servicio' }).at(-1)!);
+    confirmar();
+    expect(await screen.findByText(/todavía se está confirmando/, undefined, { timeout: 4000 })).toBeTruthy();
+    confirmar();
+    await waitFor(() => expect(llamadas.filter((l) => l.url.endsWith('/cancelacion'))).toHaveLength(3));
+    const [a, b, c] = llamadas.filter((l) => l.url.endsWith('/cancelacion')).map((l) => l.encabezados.get('Idempotency-Key'));
+    expect(a).toBe(b);
+    expect(c).not.toBe(b);
+  });
+
   it('W4: cancelar sin motivo deja el botón activo, marca el campo, lo enfoca y no llama a Viajes', async () => {
     const llamadas = simularApi({
       ...rutas,

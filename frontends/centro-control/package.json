@@ -14,7 +14,7 @@
     "probar": "npm run iconos && ng test ui-comun --watch=false && ng test cc-operaciones --watch=false && ng test cc-finanzas --watch=false && ng test cc-tablero --watch=false && ng test cc-flota --watch=false",
     "complejidad": "node scripts/complejidad.mjs",
     "capas": "node scripts/capas.mjs",
-    "iconos": "node scripts/iconos.mjs",
+    "iconos": "node --test scripts/iconos.test.mjs && node scripts/iconos.mjs",
     "iconos:generar": "node scripts/iconos.mjs --generar",
     "verificar": "npm run formato && npm run complejidad && npm run capas && npm run probar && npm run construir",
     "modelos": "sh scripts/descargar-whisper.sh && sh scripts/descargar-tesseract.sh"

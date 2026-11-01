@@ -32,7 +32,7 @@ import { estadoChofer, textoChofer, vigenciaLicencia, type Chofer } from '../dom
       singular="chofer"
       [limite]="limite"
     />
-    <div class="tabla-ancha">
+    <div class="tabla-ancha" role="region" tabindex="0" aria-label="Choferes">
       <table
         mat-table
         [dataSource]="lista.visibles()"

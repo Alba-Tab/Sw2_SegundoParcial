@@ -3,9 +3,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Sesion } from 'ui-comun';
+import type { Icono } from 'ui-comun/dominio';
 import { puedeAbrir, type Pagina } from './tablero/domain/tablero';
 
-const ENLACES: { ruta: '' | Pagina; titulo: string; icono: string }[] = [
+const ENLACES: { ruta: '' | Pagina; titulo: string; icono: Icono }[] = [
   { ruta: '', titulo: 'Tablero', icono: 'dashboard' },
   { ruta: 'reportes', titulo: 'Reportes', icono: 'bar_chart' },
   { ruta: 'voz', titulo: 'Pregunta por voz', icono: 'mic' },

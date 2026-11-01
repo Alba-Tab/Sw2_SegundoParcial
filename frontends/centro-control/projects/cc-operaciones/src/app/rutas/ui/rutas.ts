@@ -16,7 +16,7 @@ import { RutasFachada } from '../rutas.fachada';
     <cc-encabezado titulo="Rutas" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!rutas().length" />
     <cc-filtros-lista [control]="lista" busqueda="Buscar por nombre, origen o destino" nombre="rutas" singular="ruta" />
-    <div class="tabla-ancha">
+    <div class="tabla-ancha" role="region" tabindex="0" aria-label="Rutas">
       <table
         mat-table
         [dataSource]="lista.visibles()"

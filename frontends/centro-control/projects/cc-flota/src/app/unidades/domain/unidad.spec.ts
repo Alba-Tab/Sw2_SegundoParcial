@@ -1,9 +1,38 @@
 import { filtrar } from 'ui-comun/dominio';
-import { cierreInicial, documentosEnAviso, lineasChecklist, puedeProgramar, textoUnidad, type Mantenimiento, type Unidad } from './unidad';
+import {
+  checklistCompleto,
+  checklistValido,
+  cierreInicial,
+  documentosEnAviso,
+  lineasChecklist,
+  puedeProgramar,
+  textoUnidad,
+  type Mantenimiento,
+  type Unidad,
+} from './unidad';
 
 describe('unidades (dominio)', () => {
   it('el checklist es una línea por ítem, sin líneas vacías', () => {
     expect(lineasChecklist('Aceite y filtros\n  Frenos \n\nLuces\n')).toEqual(['Aceite y filtros', 'Frenos', 'Luces']);
+  });
+
+  it('checklist de 1 a 30 líneas de hasta 120 caracteres (E-19)', () => {
+    expect(checklistValido('')).toBe(false);
+    expect(checklistValido(Array.from({ length: 30 }, (_, i) => `Ítem ${i}`).join('\n'))).toBe(true);
+    expect(checklistValido(Array.from({ length: 31 }, (_, i) => `Ítem ${i}`).join('\n'))).toBe(false);
+    expect(checklistValido('x'.repeat(120))).toBe(true);
+    expect(checklistValido('x'.repeat(121))).toBe(false);
+  });
+
+  it('spec 010: solo se cierra con todos los ítems hechos', () => {
+    expect(checklistCompleto([{ item: 'Frenos', ok: true }])).toBe(true);
+    expect(
+      checklistCompleto([
+        { item: 'Frenos', ok: true },
+        { item: 'Luces', ok: false },
+      ]),
+    ).toBe(false);
+    expect(checklistCompleto([])).toBe(false);
   });
 
   it('al cerrar, cada ítem empieza marcado como hecho', () => {

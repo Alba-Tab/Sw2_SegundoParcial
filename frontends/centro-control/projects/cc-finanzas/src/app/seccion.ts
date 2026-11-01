@@ -2,6 +2,7 @@ import { Component } from '@angular/core';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import type { Icono } from 'ui-comun/dominio';
 
 @Component({
   selector: 'app-seccion',
@@ -27,7 +28,7 @@ import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 })
 export class Seccion {
   // TODO(G5): pestaña "Tarifas" cuando Finanzas y el Gateway la expongan; ver specs/pendientes-frontend-web.md, sección 5.
-  readonly enlaces = [
+  readonly enlaces: { ruta: string; titulo: string; icono: Icono }[] = [
     { ruta: 'facturas', titulo: 'Facturas y pagos', icono: 'receipt_long' },
     { ruta: 'cobranza', titulo: 'Cuentas por cobrar', icono: 'account_balance_wallet' },
     { ruta: 'aprobaciones', titulo: 'Aprobación de crédito', icono: 'credit_score' },

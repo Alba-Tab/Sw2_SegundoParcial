@@ -21,14 +21,18 @@ export function leerLista(texto = readFileSync(ARCHIVO_LISTA, 'utf8')) {
   return [...cuerpo.matchAll(/'([a-z0-9_]+)'/g)].map((m) => m[1]);
 }
 
-/** Los nombres de icono escritos en un archivo fuente: en `<mat-icon>`, en `icono: '…'` o `icono="…"` y en las etiquetas `e('…', '…')`. */
+/**
+ * Los nombres de icono escritos en un archivo fuente: en `<mat-icon>` (también con el cierre que Prettier parte en
+ * `</mat-icon\n>`), en `icono: '…'`, `icono="…"` o `[icono]="'…'"` y en las etiquetas `e('…', '…')`.
+ */
 export function iconosEn(texto) {
   const usados = new Set();
-  for (const [, nombre] of texto.matchAll(/<mat-icon[^>]*>\s*([a-z0-9_]+)\s*<\/mat-icon>/g)) usados.add(nombre);
-  for (const [, expr] of texto.matchAll(/<mat-icon[^>]*>\s*\{\{([^}]*)\}\}\s*<\/mat-icon>/g))
+  for (const [, nombre] of texto.matchAll(/<mat-icon[^>]*>\s*([a-z0-9_]+)\s*<\/mat-icon\s*>/g)) usados.add(nombre);
+  for (const [, expr] of texto.matchAll(/<mat-icon[^>]*>\s*\{\{([^}]*)\}\}\s*<\/mat-icon\s*>/g))
     for (const [, nombre] of expr.matchAll(/'([a-z0-9_]+)'/g)) usados.add(nombre);
   for (const [, nombre] of texto.matchAll(/\bicono:\s*'([a-z0-9_]+)'/g)) usados.add(nombre);
   for (const [, nombre] of texto.matchAll(/\sicono="([a-z0-9_]+)"/g)) usados.add(nombre);
+  for (const [, nombre] of texto.matchAll(/\[icono\]="'([a-z0-9_]+)'"/g)) usados.add(nombre);
   for (const [, nombre] of texto.matchAll(/\be\('[^']*',\s*'([a-z0-9_]+)'/g)) usados.add(nombre);
   return usados;
 }
@@ -84,14 +88,14 @@ function css(lista) {
   return `/*
  * GENERADO por scripts/iconos.mjs --generar; no se edita a mano. lista ${firma(lista)}
  * Material Symbols Outlined recortada a la lista cerrada de ui-comun/dominio/src/iconos.ts (${lista.length} glifos),
- * peso 400, sin relleno, grado 0 y tamaño óptico 24. El nombre del glifo no se ve mientras carga: base.css oculta los
- * iconos hasta que proveedores.ts confirma la fuente con document.fonts.
+ * peso 400, sin relleno, grado 0 y tamaño óptico 24. font-display: block oculta el glifo mientras carga (unos 3 s
+ * como máximo, luego el navegador lo muestra igual), así nunca se lee el nombre ni se queda oculto toda la sesión.
  */
 @font-face {
   font-family: 'Material Symbols Outlined';
   font-style: normal;
   font-weight: 400;
-  font-display: swap;
+  font-display: block;
   src: url('./material-symbols-outlined.woff') format('woff');
 }
 .material-symbols-outlined {
@@ -135,12 +139,19 @@ function generar(lista) {
   console.log(`Fuente recortada: ${statSync(FUENTE).size} → ${woff.length} bytes (${lista.length} glifos)`);
 }
 
-function verificar(lista) {
+/** `archivo: icono` por cada icono usado en `textos` ({ ruta: contenido }) que no está en `lista`. */
+export function faltantes(textos, lista) {
   const enLista = new Set(lista);
-  const faltan = [];
-  for (const archivo of fuentes(join(raiz, 'projects')))
-    for (const icono of iconosEn(readFileSync(archivo, 'utf8')))
-      if (!enLista.has(icono)) faltan.push(`${relative(raiz, archivo)}: ${icono}`);
+  return Object.entries(textos).flatMap(([archivo, texto]) =>
+    [...iconosEn(texto)].filter((i) => !enLista.has(i)).map((i) => `${archivo}: ${i}`),
+  );
+}
+
+function verificar(lista) {
+  const faltan = faltantes(
+    Object.fromEntries(fuentes(join(raiz, 'projects')).map((a) => [relative(raiz, a), readFileSync(a, 'utf8')])),
+    lista,
+  );
   const generado = readFileSync(join(ESTILOS, 'iconos.css'), 'utf8').match(/lista ([0-9a-f]{16})/)?.[1];
   const errores = [
     ...faltan.map((f) => `Icono fuera de la lista cerrada (agrégalo a iconos.ts y corre npm run iconos:generar): ${f}`),

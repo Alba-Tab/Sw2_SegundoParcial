@@ -39,7 +39,7 @@ import { UnidadesFachada } from '../unidades.fachada';
     <cc-encabezado titulo="Unidades" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!unidades().length" />
     <cc-filtros-lista [control]="lista" busqueda="Buscar por placa o tipo" grupo="EstadoUnidad" nombre="unidades" singular="unidad" />
-    <div class="tabla-ancha">
+    <div class="tabla-ancha" role="region" tabindex="0" aria-label="Unidades">
       <table
         mat-table
         [dataSource]="lista.visibles()"

@@ -51,7 +51,7 @@ import { MantenimientosFachada } from '../mantenimientos.fachada';
       [limite]="limite"
       [recientes]="true"
     />
-    <div class="tabla-ancha">
+    <div class="tabla-ancha" role="region" tabindex="0" aria-label="Mantenimientos">
       <table
         mat-table
         [dataSource]="lista.visibles()"

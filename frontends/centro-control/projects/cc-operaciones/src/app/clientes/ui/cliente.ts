@@ -101,7 +101,7 @@ import { nombreRuta } from '../domain/cliente';
 
       <h2>Servicios</h2>
       @if (servicios().length) {
-        <div class="tabla-ancha">
+        <div class="tabla-ancha" role="region" tabindex="0" aria-label="Servicios del cliente">
           <table mat-table [dataSource]="servicios()">
             <ng-container matColumnDef="fecha"
               ><th mat-header-cell *matHeaderCellDef>Fecha</th>

@@ -41,7 +41,7 @@ import { LineasFachada } from '../lineas.fachada';
       nombre="líneas"
       singular="línea"
     />
-    <div class="tabla-ancha">
+    <div class="tabla-ancha" role="region" tabindex="0" aria-label="Líneas de crédito">
       <table
         mat-table
         [dataSource]="lista.visibles()"

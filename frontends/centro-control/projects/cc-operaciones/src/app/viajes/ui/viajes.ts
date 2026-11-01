@@ -25,7 +25,7 @@ import { ViajesFachada } from '../viajes.fachada';
       [limite]="80"
       [estadoEnServidor]="true"
     />
-    <div class="tabla-ancha">
+    <div class="tabla-ancha" role="region" tabindex="0" aria-label="Viajes">
       <table
         mat-table
         [dataSource]="lista.visibles()"
