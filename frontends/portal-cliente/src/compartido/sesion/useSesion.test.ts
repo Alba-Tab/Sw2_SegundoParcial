@@ -58,4 +58,9 @@ describe('esCuentaInterna', () => {
     expect(esCuentaInterna(['cliente'])).toBe(false);
     expect(esCuentaInterna([])).toBe(false);
   });
+
+  it('el token del portal de una cuenta interna solo trae `interno` (PB-1): no se le pide su empresa', () => {
+    expect(esCuentaInterna(['interno'])).toBe(true);
+    expect(esCuentaInterna(['interno', 'comercial'])).toBe(false);
+  });
 });

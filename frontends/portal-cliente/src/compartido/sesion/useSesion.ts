@@ -24,8 +24,11 @@ export interface Sesion {
   renovar: () => Promise<void>;
 }
 
-/** Roles del Centro de Control y de la app del chofer, que no tienen empresa en el portal. */
-const ROLES_INTERNOS = ['gerente', 'despachador', 'jefe_flota', 'administracion', 'chofer'];
+/**
+ * Roles del Centro de Control y de la app del chofer, que no tienen empresa en el portal. `interno` es el único que el
+ * token del portal trae para ellos (PB-1: rol compuesto sin permisos, en el scope de `portal-cliente`).
+ */
+const ROLES_INTERNOS = ['interno', 'gerente', 'despachador', 'jefe_flota', 'administracion', 'chofer'];
 
 export function esCuentaInterna(roles: string[]): boolean {
   return !roles.includes('cliente') && !roles.includes('comercial') && roles.some((rol) => ROLES_INTERNOS.includes(rol));
