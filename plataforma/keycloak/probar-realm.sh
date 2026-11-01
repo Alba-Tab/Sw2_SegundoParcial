@@ -82,6 +82,19 @@ TN=$(login prueba-registro | jq -r .access_token)
 ok "token nuevo trae cliente y clienteId" "$(roles "$TN") $(claims "$TN" | jq -r .clienteId)" "cliente 0193a000-0000-7000-8000-0000000c0099"
 adm -X DELETE "$A/users/$N" >/dev/null
 
+echo "== D103: el gerente administra usuarios en la consola del realm, sin ser administrador del realm"
+# La consola entra por security-admin-console; el token de demo-cli también trae los roles de realm-management (compuestos del scope).
+g() { curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $T" -H 'Content-Type: application/json' "$@"; }
+RM=$(adm "$A/clients?clientId=realm-management" | jq -r '.[0].id')
+RA=$(adm "$A/clients/$RM/roles/realm-admin" | jq -c '{id,name}'); MR=$(adm "$A/clients/$RM/roles/manage-realm" | jq -c '{id,name}')
+ok "la consola que enlaza ui-comun responde" "$(curl -s -o /dev/null -w '%{http_code}' "$KC_URL/admin/transporte/console/")" 200
+ok "gerente1 lista usuarios" "$(g "$A/users")" 200
+ok "gerente1 no ve clientes (sin view-clients)" "$(g "$A/clients")" 403
+ok "gerente1 no se da realm-admin" "$(g -X POST "$A/users/0193a000-0000-7000-8000-000000000001/role-mappings/clients/$RM" -d "[$RA]")" 403
+ok "gerente1 no da manage-realm" "$(g -X POST "$A/users/0193a000-0000-7000-8000-000000000002/role-mappings/clients/$RM" -d "[$MR]")" 403
+ok "gerente1 no impersona" "$(g -X POST "$A/users/0193a000-0000-7000-8000-000000000002/impersonation")" 403
+ok "despachador1 no lista usuarios" "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $(login despachador1 | jq -r .access_token)" "$A/users")" 403
+
 echo "== D39 y D27"
 ok "device grant de demo-cli" "$(curl -s "$O/auth/device" -d client_id=demo-cli | jq -r '.user_code | length > 0')" true
 R=$(login gerente1); RT=$(jq -r .refresh_token <<<"$R")

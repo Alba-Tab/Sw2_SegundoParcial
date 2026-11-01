@@ -75,12 +75,20 @@
       },
       {
         "name": "gerente",
-        "description": "Todo en lectura, tablero, voz y reportes",
+        "description": "Todo en lectura, tablero, voz y reportes; administra usuarios en la consola del realm (D103)",
         "composite": true,
         "composites": {
           "realm": [
             "interno"
-          ]
+          ],
+          "client": {
+            "realm-management": [
+              "view-users",
+              "manage-users",
+              "query-groups",
+              "view-realm"
+            ]
+          }
         }
       },
       {
