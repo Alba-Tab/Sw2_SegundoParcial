@@ -105,7 +105,9 @@ describe('Marco: disponibilidad de las apps (FR3, spec 016 paso 16)', () => {
         'Finanzas',
       ]);
       expect(items[0].getAttribute('aria-current')).toBe('page');
-      expect(items[2].hasAttribute('disabled')).toBe(true);
+      // R1F-7: deshabilitada pero alcanzable con las flechas, para que el lector diga «(no disponible)».
+      expect(items[2].getAttribute('aria-disabled')).toBe('true');
+      expect(items[2].hasAttribute('disabled')).toBe(false);
       expect(items[3].getAttribute('href')).toBe('http://fi');
       // El usuario queda solo con su ícono en angosto, pero el botón sigue teniendo su nombre.
       expect(el.querySelector('.usuario')?.textContent).toContain('Gerente');

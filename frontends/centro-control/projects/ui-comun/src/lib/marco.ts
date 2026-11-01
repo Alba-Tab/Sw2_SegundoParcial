@@ -81,7 +81,7 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
           @if (app === config.app) {
             <a mat-menu-item class="app-actual" routerLink="/" aria-current="page">{{ nombres[app] }}</a>
           } @else if (caidas().has(app)) {
-            <button mat-menu-item disabled><mat-icon>cloud_off</mat-icon>{{ nombres[app] }} (no disponible)</button>
+            <button mat-menu-item disabled disabledInteractive><mat-icon>cloud_off</mat-icon>{{ nombres[app] }} (no disponible)</button>
           } @else {
             <a mat-menu-item [href]="config.urls[app]">{{ nombres[app] }}</a>
           }
