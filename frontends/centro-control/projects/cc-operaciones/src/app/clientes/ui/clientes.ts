@@ -1,7 +1,6 @@
 import { Component, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
@@ -130,7 +129,12 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
     @if (paginas.siguienteCursor()) {
       <!-- E5-1: la búsqueda y el orden usan solo los clientes ya cargados. -->
       <p class="secundario">Se muestran los primeros {{ clientes().length }} clientes; la búsqueda y el orden solo usan esos.</p>
-      <button mat-stroked-button (click)="cargarMas()" [disabled]="paginas.cargandoMas()" disabledInteractive>Cargar más clientes</button>
+      @if (paginas.error(); as e) {
+        <p class="aviso-lista" role="alert">No se pudieron cargar más clientes. {{ mensaje(e) }}</p>
+      }
+      <button mat-stroked-button (click)="paginas.cargarMas()" [disabled]="paginas.cargandoMas()" disabledInteractive>
+        {{ paginas.error() ? 'Reintentar' : 'Cargar más clientes' }}
+      </button>
     }
   `,
 })
@@ -143,18 +147,11 @@ export class ClientesPagina {
   readonly verCredito = this.fachada.verCredito;
   readonly sinLeerCredito = this.fachada.sinLeerCredito;
   readonly paginas = this.fachada.paginas;
-  private readonly avisos = inject(MatSnackBar);
+  readonly mensaje = mensajeDe;
   readonly campos = { clientes: 'Viajes', lineaCredito: 'Finanzas' };
   readonly columnas = columnasConEstado(['razonSocial', 'nit', 'correo', 'canal', ...(this.verCredito ? ['disponible', 'estado'] : [])]);
   readonly estadoLinea = estadoLineaCredito;
   readonly urlLineas = urlEnApp(inject(CONFIG_CENTRO), inject(Sesion).roles(), 'cc-finanzas', '/lineas-credito');
-  async cargarMas(): Promise<void> {
-    try {
-      await this.paginas.cargarMas();
-    } catch (e) {
-      this.avisos.open(mensajeDe(e), 'Cerrar');
-    }
-  }
 
   readonly lista = controlLista<FilaCliente>({
     filas: this.clientes,

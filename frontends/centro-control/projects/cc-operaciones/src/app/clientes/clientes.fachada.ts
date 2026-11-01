@@ -1,7 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { filter, firstValueFrom, switchMap } from 'rxjs';
-import { cargandoDe, completo, esUuid, filasConError, Intentos, PaginasCursor, puedeVer, Sesion } from 'ui-comun';
+import { cargandoDe, completo, esUuid, Intentos, PaginasCursor, puedeVer, Sesion } from 'ui-comun';
 import type { ClienteEdicionInput, ClienteQuery, ClientesQuery } from '../graphql/generado';
 import { ClientesRepositorio } from './data/clientes.repositorio';
 
@@ -13,7 +13,11 @@ export class ClientesFachada {
   private readonly datos = toSignal(this.repo.observarClientes(this.verCredito, 60_000));
   readonly paginas = new PaginasCursor(
     () => completo<ClientesQuery>(this.datos())?.clientes,
-    async (despuesDe) => completo<ClientesQuery>(await firstValueFrom(this.repo.pagina(this.verCredito, despuesDe)))?.clientes,
+    async (despuesDe) => {
+      const r = await firstValueFrom(this.repo.pagina(this.verCredito, despuesDe));
+      return { pagina: completo<ClientesQuery>(r)?.clientes, error: r.error };
+    },
+    (c) => c.clienteId,
   );
   readonly clientes = this.paginas.items;
   readonly error = computed(() => this.datos()?.error);
@@ -21,9 +25,13 @@ export class ClientesFachada {
   readonly cargando = computed(() => cargandoDe(this.datos()));
   /** Clientes cuya línea no se pudo leer (no es lo mismo que no tener línea; D-1). */
   readonly sinLeerCredito = computed(() => {
-    const filas = filasConError(this.datos()?.error, 'clientes.items', 'lineaCredito');
-    // Las que se repusieron con la última línea leída (FB-1) ya tienen dato: no se cuentan.
-    return new Set([...filas].filter((i) => !this.clientes()[i]?.lineaCredito).map((i) => this.clientes()[i]?.clienteId));
+    // De todas las páginas cargadas (E2-2). Las que se repusieron con la última línea leída (FB-1) ya tienen dato.
+    const ids = this.paginas.idsConError('clientes.items', 'lineaCredito', this.datos()?.error);
+    return new Set(
+      this.clientes()
+        .filter((c) => ids.has(c.clienteId) && !c.lineaCredito)
+        .map((c) => c.clienteId),
+    );
   });
 }
 

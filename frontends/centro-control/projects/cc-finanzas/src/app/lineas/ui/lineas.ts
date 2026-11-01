@@ -1,6 +1,5 @@
 import { Component, computed, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
@@ -105,7 +104,12 @@ import { LineasFachada } from '../lineas.fachada';
     @if (paginas.siguienteCursor()) {
       <!-- E5-1: la búsqueda y el orden usan solo los clientes ya cargados. -->
       <p class="secundario">Hay más clientes; la búsqueda y el orden solo usan las líneas ya cargadas.</p>
-      <button mat-stroked-button (click)="cargarMas()" [disabled]="paginas.cargandoMas()" disabledInteractive>Cargar más clientes</button>
+      @if (paginas.error(); as e) {
+        <p class="aviso-lista" role="alert">No se pudieron cargar más clientes. {{ mensaje(e) }}</p>
+      }
+      <button mat-stroked-button (click)="paginas.cargarMas()" [disabled]="paginas.cargandoMas()" disabledInteractive>
+        {{ paginas.error() ? 'Reintentar' : 'Cargar más clientes' }}
+      </button>
     }
   `,
 })
@@ -120,15 +124,7 @@ export class LineasPagina {
     return n ? `No se pudo leer la línea de ${n} ${n === 1 ? 'cliente' : 'clientes'}: la lista está incompleta.` : null;
   });
   readonly paginas = this.fachada.paginas;
-  private readonly avisos = inject(MatSnackBar);
-
-  async cargarMas(): Promise<void> {
-    try {
-      await this.paginas.cargarMas();
-    } catch (e) {
-      this.avisos.open(mensajeDe(e), 'Cerrar');
-    }
-  }
+  readonly mensaje = mensajeDe;
   /** Una línea caída la cuenta el aviso de la lista: sin banner repetido (V1-11). */
   readonly campos = { clientes: 'Viajes', lineaCredito: '' };
   readonly columnas = columnasConEstado(['cliente', 'limite', 'reservado', 'utilizado', 'disponible', 'estado']);
