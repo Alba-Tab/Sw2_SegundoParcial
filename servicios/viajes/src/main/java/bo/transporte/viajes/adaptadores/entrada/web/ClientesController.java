@@ -17,6 +17,7 @@ import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.time.ZoneOffset;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RestController;
@@ -68,8 +69,10 @@ class ClientesController implements ClientesApi {
     }
 
     @Override
-    public ResponseEntity<PaginaClientesDto> listarClientes(String q, Integer limite, String cursor) {
-        var pagina = consulta.listar(SolicitanteActual.obtener(), q, desdeCursor(cursor), limite == null ? 20 : limite);
+    public ResponseEntity<PaginaClientesDto> listarClientes(String q, List<UUID> ids, Integer limite, String cursor) {
+        var pagina = ids != null
+                ? consulta.porIds(SolicitanteActual.obtener(), ids)
+                : consulta.listar(SolicitanteActual.obtener(), q, desdeCursor(cursor), limite == null ? 20 : limite);
         return ResponseEntity.ok(new PaginaClientesDto(
                 pagina.items().stream().map(ClientesController::dto).toList(),
                 pagina.ultimo() == null ? null : aCursor(pagina.ultimo())));

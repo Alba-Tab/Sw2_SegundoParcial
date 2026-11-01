@@ -91,6 +91,21 @@ paths:
           schema:
             type: string
             maxLength: 120
+        - name: ids
+          in: query
+          required: false
+          style: form
+          explode: false
+          description: |
+            Hasta 100 UUID separados por coma (E2-8, lo usa el DataLoader del Gateway). Devuelve esos clientes, activos
+            o no y en cualquier orden, en una sola página (`siguienteCursor` null); un id que no existe no sale (no es
+            error). Con `ids` se ignoran `q`, `limite` y `cursor`.
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 100
+            items:
+              $ref: './comun.yaml#/components/schemas/Uuid'
         - $ref: './comun.yaml#/components/parameters/Limite'
         - $ref: './comun.yaml#/components/parameters/Cursor'
       responses:
@@ -206,7 +221,7 @@ paths:
         - name: incluirInactivas
           in: query
           required: false
-          description: También las inactivas, para la gestión de rutas del Centro de Control (G4).
+          description: También las inactivas, para la gestión de rutas del Centro de Control (G4). Solo con rol gerente o despachador; con otro rol se ignora.
           schema:
             type: boolean
             default: false
@@ -269,7 +284,7 @@ paths:
     get:
       tags: [rutas]
       operationId: obtenerRuta
-      summary: Una ruta, activa o no.
+      summary: Una ruta. Una inactiva solo la ven gerente y despachador; para los demás responde 404.
       responses:
         '200':
           description: Ruta.

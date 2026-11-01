@@ -215,6 +215,10 @@ class ClientesIT {
         var nitMalo = pedir("POST", "/api/v1/clientes", NUEVO, UUID.randomUUID(), empresa("12a"));
         assertEquals(400, nitMalo.estado());
         assertEquals("VALIDACION", nitMalo.cuerpo().get("codigo").asString());
+        // F2-4: el NIT dice qué se espera, no la expresión regular.
+        assertEquals(
+                "Solo números, de 5 a 20 dígitos",
+                nitMalo.cuerpo().get("errores").get(0).get("mensaje").asString());
 
         var sinClave = pedir("POST", "/api/v1/clientes", NUEVO, null, empresa("1023456019"));
         assertEquals(400, sinClave.estado());
@@ -250,6 +254,27 @@ class ClientesIT {
                 pedir("GET", "/api/v1/clientes/" + ajeno, cliente, null, null).estado());
         assertEquals(
                 404, pedir("GET", "/api/v1/clientes/mio", NUEVO, null, null).estado());
+
+        // E2-8: por lotes de ids, sin cursor; un id que no existe no sale.
+        var lote = pedir(
+                "GET", "/api/v1/clientes?ids=" + propio + "," + ajeno + "," + UUID.randomUUID(), comercial, null, null);
+        assertEquals(200, lote.estado());
+        assertEquals(2, lote.cuerpo().get("items").size());
+        assertFalse(lote.cuerpo().hasNonNull("siguienteCursor"));
+        String muchos = String.join(
+                ",",
+                java.util.stream.Stream.generate(UUID::randomUUID)
+                        .limit(101)
+                        .map(UUID::toString)
+                        .toList());
+        assertEquals(
+                400,
+                pedir("GET", "/api/v1/clientes?ids=" + muchos, comercial, null, null)
+                        .estado());
+        assertEquals(
+                403,
+                pedir("GET", "/api/v1/clientes?ids=" + propio, cliente, null, null)
+                        .estado());
     }
 
     @Test
@@ -337,6 +362,18 @@ class ClientesIT {
                 pedir("GET", "/api/v1/rutas?incluirInactivas=true", despacho, null, null)
                         .cuerpo()
                         .size());
+        assertEquals(
+                200, pedir("GET", "/api/v1/rutas/" + id, despacho, null, null).estado());
+
+        // F2-3: las inactivas solo para gerente y despachador; los demás no las ven.
+        String comercial = TokensDePrueba.token("sub-comercial", "comercial", null);
+        assertEquals(
+                0,
+                pedir("GET", "/api/v1/rutas?incluirInactivas=true", comercial, null, null)
+                        .cuerpo()
+                        .size());
+        assertEquals(
+                404, pedir("GET", "/api/v1/rutas/" + id, comercial, null, null).estado());
     }
 
     @Test
@@ -352,6 +389,20 @@ class ClientesIT {
                 403,
                 pedir("POST", "/api/v1/rutas", comercial, UUID.randomUUID(), ruta("Ruta", 300, "10", null))
                         .estado());
+        // E2-11: el rol se valida antes que el cuerpo (403, no 400 por `activa`).
+        assertEquals(
+                403,
+                pedir("POST", "/api/v1/rutas", chofer, UUID.randomUUID(), ruta("Ruta", 300, "10", true))
+                        .estado());
+        assertEquals(
+                403,
+                pedir(
+                                "PUT",
+                                "/api/v1/rutas/" + UUID.randomUUID(),
+                                chofer,
+                                UUID.randomUUID(),
+                                ruta("Ruta", 300, "10", null))
+                        .estado());
 
         var radio = pedir("POST", "/api/v1/rutas", gerente, UUID.randomUUID(), ruta("Ruta", 40, "10", null));
         assertEquals(400, radio.estado());
@@ -366,6 +417,10 @@ class ClientesIT {
         assertEquals(400, conActiva.estado());
         assertEquals(
                 "activa", conActiva.cuerpo().get("errores").get(0).get("campo").asString());
+        // F2-4: el mensaje del campo sin "activa: " delante.
+        assertEquals(
+                "No va en el alta: la ruta nace inactiva hasta tener su tarifa",
+                conActiva.cuerpo().get("errores").get(0).get("mensaje").asString());
         assertEquals(
                 404,
                 pedir(

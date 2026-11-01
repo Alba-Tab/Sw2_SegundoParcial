@@ -36,20 +36,23 @@ class RutasController implements RutasApi {
 
     @Override
     public ResponseEntity<List<RutaDto>> listarRutas(Boolean incluirInactivas) {
-        return ResponseEntity.ok(consulta.listar(Boolean.TRUE.equals(incluirInactivas)).stream()
-                .map(RutasController::dto)
-                .toList());
+        return ResponseEntity.ok(
+                consulta.listar(SolicitanteActual.obtener(), Boolean.TRUE.equals(incluirInactivas)).stream()
+                        .map(RutasController::dto)
+                        .toList());
     }
 
     @Override
     public ResponseEntity<RutaDto> obtenerRuta(UUID rutaId) {
-        return ResponseEntity.ok(dto(consulta.porId(rutaId)));
+        return ResponseEntity.ok(dto(consulta.porId(SolicitanteActual.obtener(), rutaId)));
     }
 
     @Override
     public ResponseEntity<RutaDto> crearRuta(UUID clave, RutaNuevaDto nueva, UUID correlacion) {
+        // E2-11: primero el rol (403) y después el cuerpo (400).
+        GestionDeRutas.exigirPermiso(SolicitanteActual.obtener());
         if (nueva.getActiva() != null) {
-            throw campo("activa", "en el alta no va: la ruta nace inactiva hasta tener su tarifa");
+            throw campo("activa", "No va en el alta: la ruta nace inactiva hasta tener su tarifa");
         }
         Ruta r = gestion.crear(SolicitanteActual.obtener(), datos(nueva, false), clave, HashCuerpo.de(json, nueva));
         return ResponseEntity.status(HttpStatus.CREATED)
@@ -59,7 +62,8 @@ class RutasController implements RutasApi {
 
     @Override
     public ResponseEntity<RutaDto> actualizarRuta(UUID rutaId, UUID clave, RutaNuevaDto nueva, UUID correlacion) {
-        if (nueva.getActiva() == null) throw campo("activa", "es obligatoria al editar");
+        GestionDeRutas.exigirPermiso(SolicitanteActual.obtener());
+        if (nueva.getActiva() == null) throw campo("activa", "Es obligatoria al editar");
         return ResponseEntity.ok(dto(gestion.editar(
                 SolicitanteActual.obtener(),
                 rutaId,

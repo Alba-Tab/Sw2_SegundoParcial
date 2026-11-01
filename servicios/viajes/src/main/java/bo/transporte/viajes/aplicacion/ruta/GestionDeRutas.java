@@ -61,7 +61,7 @@ public class GestionDeRutas {
                 .respuesta();
     }
 
-    private static void exigirPermiso(Solicitante quien) {
+    public static void exigirPermiso(Solicitante quien) {
         if (!quien.tieneAlguno(GESTIONAN)) {
             throw new ErrorDeDominio("SIN_PERMISO", "Solo el gerente y el despachador gestionan rutas");
         }

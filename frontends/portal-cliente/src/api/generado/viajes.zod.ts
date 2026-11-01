@@ -89,6 +89,8 @@ export const CrearClienteResponse = zod
  */
 export const listarClientesQueryQMax = 120;
 
+export const listarClientesQueryIdsMax = 100;
+
 export const listarClientesQueryLimiteDefault = 20;
 export const listarClientesQueryLimiteMax = 100;
 
@@ -96,6 +98,14 @@ export const listarClientesQueryCursorMax = 500;
 
 export const ListarClientesQueryParams = zod.object({
   q: zod.string().max(listarClientesQueryQMax).optional().describe('Busca por razón social o NIT.'),
+  ids: zod
+    .array(zod.uuid())
+    .min(1)
+    .max(listarClientesQueryIdsMax)
+    .optional()
+    .describe(
+      'Hasta 100 UUID separados por coma (E2-8, lo usa el DataLoader del Gateway). Devuelve esos clientes, activos\no no y en cualquier orden, en una sola página (`siguienteCursor` null); un id que no existe no sale (no es\nerror). Con `ids` se ignoran `q`, `limite` y `cursor`.\n',
+    ),
   limite: zod.int().min(1).max(listarClientesQueryLimiteMax).default(listarClientesQueryLimiteDefault),
   cursor: zod.string().max(listarClientesQueryCursorMax).optional().describe('Valor opaco devuelto en `siguienteCursor`.'),
 });
@@ -322,7 +332,9 @@ export const ListarRutasQueryParams = zod.object({
   incluirInactivas: zod
     .boolean()
     .default(listarRutasQueryIncluirInactivasDefault)
-    .describe('También las inactivas, para la gestión de rutas del Centro de Control (G4).'),
+    .describe(
+      'También las inactivas, para la gestión de rutas del Centro de Control (G4). Solo con rol gerente o despachador; con otro rol se ignora.',
+    ),
 });
 
 export const listarRutasResponseOrigenCoordenadasLatMin = -90;
@@ -489,7 +501,7 @@ export const CrearRutaResponse = zod.object({
 });
 
 /**
- * @summary Una ruta, activa o no.
+ * @summary Una ruta. Una inactiva solo la ven gerente y despachador; para los demás responde 404.
  */
 export const ObtenerRutaParams = zod.object({
   rutaId: zod.uuid(),
