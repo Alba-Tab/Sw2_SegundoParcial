@@ -6,7 +6,7 @@ Escenarios de `specs/guion-fallos.md` contra el compose local. Por ahora son sol
 
 ```bash
 cd plataforma/compose
-docker compose --env-file .env --env-file .env.demo --profile core --profile plataforma --profile demo up -d --build
+docker compose --env-file .env --env-file .env.demo --profile core --profile plataforma --profile demo --profile ia up -d --build
 ../semilla/cargar.sh
 ```
 

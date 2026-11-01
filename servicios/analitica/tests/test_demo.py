@@ -7,7 +7,7 @@ from sqlalchemy import func, select
 
 from app import demo
 from app.aplicacion.consultas import hoy
-from app.infraestructura.bd import HechoCombustible, HechoFactura, InboxEvento, Outbox, Ruta, transaccion
+from app.infraestructura.bd import HechoCombustible, HechoFactura, HechoViaje, InboxEvento, Outbox, Ruta, transaccion
 from tests.conftest import token
 
 
@@ -54,3 +54,6 @@ def test_recargar_la_semilla_mueve_las_fechas_de_las_facturas(monkeypatch):
     with transaccion() as s:
         f = s.get(HechoFactura, moroso)
         assert (f.vence_el, f.saldo, f.estado) == (date(2026, 10, 11), 5000, "EMITIDA")
+        # Los viajes de la semilla también se mueven, así Rentabilidad los cuenta en el mismo día que Finanzas.
+        v = s.get(HechoViaje, UUID("01933e00-0000-7000-8000-000000000101"))
+        assert v.terminado_en.date() == f.emitida_el

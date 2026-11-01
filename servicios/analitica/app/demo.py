@@ -135,6 +135,7 @@ def semilla(s: Session) -> None:
             }
             for f in facturas
         ],
+        actualizar=("fecha_viaje", "terminado_en"),
     )
     upsert(
         s,
