@@ -43,7 +43,7 @@ final class CrearCotizacion
         }
         $carga = TipoCarga::from($tipoCarga);
         $tarifa = $this->catalogo->tarifa($rutaId, $carga)
-            ?? throw new ErrorDeDominio('VALIDACION', 'tipoCarga: la ruta no tiene tarifa para esa carga');
+            ?? throw new ErrorDeDominio('RUTA_SIN_TARIFA', 'La ruta no tiene tarifa para esa carga');
         $cotizacion = Cotizacion::calcular($clienteId, $rutaId, $carga, $toneladas, $fechaViaje, $tarifa->porTonelada, $canal,
             $this->reloj->ahora(), $this->vigencia);
         $this->cotizaciones->guardar($cotizacion);

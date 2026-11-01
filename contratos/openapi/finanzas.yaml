@@ -71,7 +71,7 @@ paths:
         '404':
           $ref: './comun.yaml#/components/responses/NoEncontrado'
         '422':
-          description: '`TONELAJE_EXCEDIDO` o `IDEMPOTENCIA_CUERPO_DISTINTO`.'
+          description: '`TONELAJE_EXCEDIDO`, `RUTA_SIN_TARIFA` (la ruta no tiene tarifa para ese tipo de carga) o `IDEMPOTENCIA_CUERPO_DISTINTO`.'
           content:
             application/problem+json:
               schema:

@@ -96,11 +96,13 @@ it('cliente aún no replicado: 503 CLIENTE_NO_REPLICADO con Retry-After 2', func
         ->assertHeader('Retry-After', '2');
 });
 
-it('ruta inexistente 404, sin tarifa 400 y fecha pasada 400', function () use ($laPaz20) {
+it('ruta inexistente 404, sin tarifa 422 RUTA_SIN_TARIFA y fecha pasada 400', function () use ($laPaz20) {
     $u = 'sub-1~cliente~'.CLIENTE;
     cotizar($this, $u, ['rutaId' => '01933a00-0000-7000-8000-0000000000ff'] + $laPaz20)->assertStatus(404)
         ->assertJsonPath('title', 'No encontrado');
-    cotizar($this, $u, ['tipoCarga' => 'CONTENEDOR'] + $laPaz20)->assertStatus(400)->assertJsonPath('codigo', 'VALIDACION');
+    cotizar($this, $u, ['tipoCarga' => 'CONTENEDOR'] + $laPaz20)->assertStatus(422)->assertJsonPath('codigo', 'RUTA_SIN_TARIFA')
+        ->assertJsonPath('title', 'Regla de negocio no cumplida');
+    expect(DB::table('cotizacion')->count())->toBe(0);
     cotizar($this, $u, ['fechaViaje' => '2026-11-01'] + $laPaz20)->assertStatus(400);
     cotizar($this, $u, ['fechaViaje' => '2027-03-01'] + $laPaz20)->assertStatus(400);
 });
