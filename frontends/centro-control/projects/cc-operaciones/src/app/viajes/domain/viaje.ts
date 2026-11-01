@@ -34,3 +34,7 @@ const COLAS_DE_ORIGEN: Readonly<Record<string, { texto: string; ruta: string }>>
 export function colaDeOrigen(de: string | null | undefined): { texto: string; ruta: string } {
   return de && Object.hasOwn(COLAS_DE_ORIGEN, de) ? COLAS_DE_ORIGEN[de] : { texto: 'Viajes', ruta: '/viajes' };
 }
+
+/** El mapa terminó de cargar, sin error, y ningún viaje en ruta tiene posición: se dice en vez de dejarlo vacío (FB-5). */
+export const mapaSinPosiciones = (viajes: readonly Pick<ViajeMapa, 'ultimaPosicion'>[], cargando: boolean, error: unknown): boolean =>
+  !cargando && !error && !viajes.some((v) => v.ultimaPosicion);

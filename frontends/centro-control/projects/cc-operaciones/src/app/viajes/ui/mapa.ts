@@ -1,7 +1,8 @@
-import { afterNextRender, Component, effect, ElementRef, inject, input, OnDestroy, signal, viewChild } from '@angular/core';
+import { afterNextRender, Component, computed, effect, ElementRef, inject, input, OnDestroy, signal, viewChild } from '@angular/core';
 import * as L from 'leaflet';
-import { Encabezado, AvisoServicios, CONFIG_CENTRO, pct } from 'ui-comun';
-import type { ViajeMapa } from '../domain/viaje';
+import { RouterLink } from '@angular/router';
+import { Encabezado, AvisoServicios, CONFIG_CENTRO, Estado, NumeroPipe, pct } from 'ui-comun';
+import { mapaSinPosiciones, type ViajeMapa } from '../domain/viaje';
 import { MapaFachada } from '../viajes.fachada';
 import { Vistas, VISTAS } from '../../vistas';
 
@@ -34,7 +35,7 @@ export function popupViaje(v: ViajeMapa, urlViaje: string): HTMLElement {
 @Component({
   selector: 'app-mapa',
   providers: [MapaFachada],
-  imports: [Vistas, Encabezado, AvisoServicios],
+  imports: [Vistas, Encabezado, AvisoServicios, Estado, NumeroPipe, RouterLink],
   template: `<cc-encabezado titulo="Mapa en vivo" />
     <app-vistas [vistas]="vistas" nombre="Vistas de viajes" />
     <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!viajes().length" />
@@ -42,17 +43,60 @@ export function popupViaje(v: ViajeMapa, urlViaje: string): HTMLElement {
     <p class="secundario" role="status">
       @if (sinPosicion()) {
         Ese viaje aún no reporta posición.
+      } @else if (vacio()) {
+        Ningún viaje en ruta reporta posición ahora.
       }
     </p>
-    <div #mapa class="mapa" role="application" aria-label="Mapa de viajes en ruta"></div>`,
+    <div
+      #mapa
+      class="mapa"
+      role="application"
+      aria-label="Mapa de viajes en ruta"
+      [attr.aria-describedby]="viajes().length ? 'viajes-mapa' : null"
+    ></div>
+    <!-- Lo mismo que el mapa, en texto: para el teclado y el lector de pantalla (CA-6). -->
+    @if (viajes().length) {
+      <h2 id="viajes-mapa">Viajes en ruta ({{ viajes().length }})</h2>
+      <ul class="viajes">
+        @for (v of viajes(); track v.viajeId) {
+          <li>
+            <a [routerLink]="['/viajes', v.viajeId]">{{ v.placa ?? 'Sin unidad' }}</a>
+            <span>{{ v.cliente.razonSocial }} · {{ v.ruta.nombre }}</span>
+            @if (v.ultimaPosicion; as p) {
+              <span class="secundario">Posición {{ p.lat | numero: 4 }}; {{ p.lng | numero: 4 }}</span>
+            } @else {
+              <span class="secundario">Aún no reporta posición</span>
+            }
+            @if (v.riesgo; as r) {
+              @if (r.enRiesgo) {
+                <span><cc-estado grupo="Riesgo" valor="EN_RIESGO" /> {{ pct(r.probabilidad) }}</span>
+              }
+            }
+          </li>
+        }
+      </ul>
+    }`,
   styles: `
     p:empty {
       margin: 0;
     }
     .mapa {
-      height: calc(100vh - 220px);
+      height: calc(100vh - 280px);
       min-height: 420px;
       border-radius: 12px;
+    }
+    .viajes {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+    .viajes li {
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 4px 16px;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--mat-sys-outline-variant);
     }
   `,
 })
@@ -70,6 +114,8 @@ export class MapaPagina implements OnDestroy {
   /** Señal: si los datos llegan antes que el mapa (caché al volver), el centrado espera a que exista (V1-9). */
   private readonly mapa = signal<L.Map | undefined>(undefined);
   readonly sinPosicion = signal(false);
+  readonly pct = pct;
+  readonly vacio = computed(() => mapaSinPosiciones(this.viajes(), this.fachada.cargando(), this.fachada.error()));
   private capa = L.layerGroup();
   private centrado = false;
   /** Cambia con el tema del sistema: los marcadores se repintan con los colores nuevos (A-11). */

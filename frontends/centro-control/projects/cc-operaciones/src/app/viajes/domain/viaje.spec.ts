@@ -1,4 +1,4 @@
-import { colaDeOrigen } from './viaje';
+import { colaDeOrigen, mapaSinPosiciones } from './viaje';
 
 describe('colaDeOrigen (V1-5)', () => {
   it('vuelve a la cola de la que vino el despachador', () => {
@@ -11,5 +11,17 @@ describe('colaDeOrigen (V1-5)', () => {
     for (const de of [undefined, null, '', 'mapa', '//evil.com', 'toString', '__proto__']) {
       expect(colaDeOrigen(de)).toEqual({ texto: 'Viajes', ruta: '/viajes' });
     }
+  });
+});
+
+describe('mapaSinPosiciones (FB-5)', () => {
+  const con = { ultimaPosicion: { lat: -17.78, lng: -63.18 } };
+  const sin = { ultimaPosicion: null };
+  it('solo con la respuesta, sin error y sin ninguna posición', () => {
+    expect(mapaSinPosiciones([], false, undefined)).toBe(true);
+    expect(mapaSinPosiciones([sin], false, undefined)).toBe(true);
+    expect(mapaSinPosiciones([sin, con], false, undefined)).toBe(false);
+    expect(mapaSinPosiciones([], true, undefined)).toBe(false);
+    expect(mapaSinPosiciones([], false, new Error('Viajes no responde'))).toBe(false);
   });
 });
