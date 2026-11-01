@@ -57,6 +57,7 @@ export class CasosDeUso {
   /** Paso 1 (con señal): `GET /viajes/mios` a SQLite para operar sin red. */
   async descargarViajes(): Promise<void> {
     guardarViajesDelServidor(this.viajes, this.cola, await this.api.misViajes(await this.sesion.tokenVigente()));
+    this.encolarFatigasSinPosicion(null);
   }
 
   /** Paso 2: el `opId` y la hora salen del celular al pulsar, no al enviar (FO1). */
@@ -77,7 +78,7 @@ export class CasosDeUso {
     this.ultima = l;
     this.recientes = agregarLectura(this.recientes, l);
     this.posicionGuardada?.guardar({ lat: l.lat, lng: l.lng });
-    this.encolarFatigasSinPosicion(viajeId, { lat: l.lat, lng: l.lng });
+    this.encolarFatigasSinPosicion({ viajeId, posicion: { lat: l.lat, lng: l.lng } });
     const muestreo = this.muestreos.get(viajeId) ?? new MuestreoGps();
     this.muestreos.set(viajeId, muestreo);
     if (!muestreo.aceptar(l)) return false;
@@ -145,19 +146,36 @@ export class CasosDeUso {
   }
 
   /**
-   * Las alertas de este viaje que esperaban una posición salen con esta; `registradoEn` sigue siendo la hora de la
-   * alerta. Las de otro viaje esperan una lectura del suyo (una posición de otro viaje no dice dónde ocurrió).
+   * Las alertas que esperaban una posición salen con la primera lectura de su viaje; `registradoEn` sigue siendo la hora
+   * de la alerta. Las de un viaje que ya no está en ruta (ahí no llegan más lecturas) salen con la posición guardada, si
+   * hay (E2-9). Corre con cada lectura y con cada descarga de viajes.
    */
-  private encolarFatigasSinPosicion(viajeId: string, posicion: { lat: number; lng: number }): void {
+  private encolarFatigasSinPosicion(lectura: { viajeId: string; posicion: { lat: number; lng: number } } | null): void {
     const guardadas = this.fatigasSinPosicion?.leer() ?? [];
-    const delViaje = guardadas.filter((f) => f.viajeId === viajeId);
-    if (delViaje.length === 0) return;
+    if (guardadas.length === 0) return;
+    const guardada = this.posicionGuardada?.leer() ?? null;
+    const salen = guardadas.map((f) => ({
+      f,
+      posicion: f.viajeId === lectura?.viajeId ? lectura.posicion : this.enRuta(f.viajeId) ? null : guardada,
+    }));
+    if (salen.every((s) => !s.posicion)) return;
     this.enTransaccion(() => {
-      for (const f of delViaje) {
-        this.encolar(viajeId, 'EVENTO_CONDUCCION', { eventoId: f.eventoId, tipo: 'ALERTA_FATIGA', posicion, registradoEn: f.registradoEn });
+      for (const { f, posicion } of salen) {
+        if (posicion)
+          this.encolar(f.viajeId, 'EVENTO_CONDUCCION', {
+            eventoId: f.eventoId,
+            tipo: 'ALERTA_FATIGA',
+            posicion,
+            registradoEn: f.registradoEn,
+          });
       }
-      this.fatigasSinPosicion?.guardar(guardadas.filter((f) => f.viajeId !== viajeId));
+      this.fatigasSinPosicion?.guardar(salen.filter((s) => !s.posicion).map((s) => s.f));
     });
+  }
+
+  private enRuta(viajeId: string): boolean {
+    const v = this.viajes.porId(viajeId);
+    return !!v && estadoVisible(v) === 'EN_RUTA';
   }
 
   /**
@@ -309,8 +327,7 @@ export class CasosDeUso {
   }
 
   private exigirEnRuta(viajeId: string): void {
-    const v = this.viajes.porId(viajeId);
-    if (!v || estadoVisible(v) !== 'EN_RUTA') throw new ErrorDeUsuario('Este viaje ya no está en ruta');
+    if (!this.enRuta(viajeId)) throw new ErrorDeUsuario('Este viaje ya no está en ruta');
   }
 
   private exigirPosicion(): { lat: number; lng: number } {

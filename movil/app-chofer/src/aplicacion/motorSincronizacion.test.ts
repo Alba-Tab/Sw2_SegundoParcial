@@ -625,15 +625,31 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     expect(casos.velocidadKmh()).toBeNull();
   });
 
-  it('E12-1: la alerta guardada sale solo con una lectura de su viaje', () => {
+  it('E12-1: con su viaje en ruta, la alerta guardada sale solo con una lectura de ese viaje', () => {
     viajes.guardarDelServidor([viaje('v2')]);
+    casos.iniciarViaje('v1', null);
     casos.registrarFatiga('v1');
     casos.registrarLectura('v2', { lat: -17.6, lng: -63.1, velocidadMs: 20, precisionMetros: 5, en: ahora.getTime() });
-    expect(cola.ops).toHaveLength(0);
+    expect(cola.ops.filter((o) => o.tipo === 'EVENTO_CONDUCCION')).toHaveLength(0);
     expect(fatigas.f.map((f) => f.viajeId)).toEqual(['v1']);
     casos.registrarLectura('v1', { lat: -17.7, lng: -63.18, velocidadMs: 20, precisionMetros: 5, en: ahora.getTime() });
-    expect(cola.ops.map((o) => [o.viajeId, o.cuerpo.posicion])).toEqual([['v1', { lat: -17.7, lng: -63.18 }]]);
+    const eventos = cola.ops.filter((o) => o.tipo === 'EVENTO_CONDUCCION');
+    expect(eventos.map((o) => [o.viajeId, o.cuerpo.posicion])).toEqual([['v1', { lat: -17.7, lng: -63.18 }]]);
     expect(fatigas.f).toEqual([]);
+  });
+
+  it('E2-9: la alerta de un viaje que ya no está en ruta sale con la posición guardada al bajar los viajes', async () => {
+    casos.iniciarViaje('v1', null);
+    casos.registrarFatiga('v1');
+    api.viajesServidor = [{ ...viaje('v1'), estado: 'ENTREGADO' }];
+    await casos.descargarViajes();
+    expect(fatigas.f).toHaveLength(1);
+
+    posicion.p = { lat: -17.75, lng: -63.17 };
+    await casos.descargarViajes();
+    expect(fatigas.f).toEqual([]);
+    const evento = cola.ops.find((o) => o.tipo === 'EVENTO_CONDUCCION')!;
+    expect(evento).toMatchObject({ viajeId: 'v1', cuerpo: { tipo: 'ALERTA_FATIGA', posicion: { lat: -17.75, lng: -63.17 } } });
   });
 
   it('cada lectura del GPS queda guardada como última posición; olvidar limpia la memoria', () => {
