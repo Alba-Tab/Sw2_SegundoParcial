@@ -8,7 +8,7 @@ Configuración del realm como código (T2.2). Se aplica en dos pasos, los dos id
 | `perfil-usuario.json` | Perfil de usuario con `clienteId` (vista y edición solo de administradores) | `configurar-api.sh` (keycloak-config-cli 6.5.1 no lo aplica) |
 | `usuarios-semilla.json` | Usuarios de semilla con **ids fijos** (D12, K5) | `configurar-api.sh` por `partialImport` (keycloak-config-cli ignora el `id`); si el usuario ya existe, se salta |
 | `configurar-api.sh` | Perfil, usuarios de semilla y permisos FGAP v2 de `viajes` (K4) | Lo llama `aplicar-realm.sh` |
-| `probar-realm.sh` | Smoke de 31 pruebas: claims, rol `interno` en el token del portal, cadena de 3 intercambios, agente, K3, FGAP v2, device grant y cierre de sesión | A mano, después de aplicar |
+| `probar-realm.sh` | Smoke de 32 pruebas: claims, rol `interno` en el token del portal, cadena de 3 intercambios, agente, K3, FGAP v2, device grant y cierre de sesión | A mano, después de aplicar |
 
 Los JSON solo llevan marcadores `$(env:KC_SECRETO_*)` y `$(env:KC_CLAVE_*)`. Si falta una variable, keycloak-config-cli falla (`Cannot resolve variable`) y no aplica nada.
 

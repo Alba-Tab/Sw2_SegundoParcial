@@ -40,6 +40,7 @@ PORTAL=$(adm "$A/clients?clientId=portal-cliente" | jq -r '.[0].id')
 rolesPortal() { adm "$A/clients/$PORTAL/evaluate-scopes/generate-example-access-token?scope=openid&userId=$1" \
   | jq -r '[.realm_access.roles[]? | select(. != "default-roles-transporte")] | sort | join(",")'; }
 ok "portal: gerente1 trae solo interno" "$(rolesPortal 0193a000-0000-7000-8000-000000000001)" interno
+ok "portal: chofer1 trae solo interno" "$(rolesPortal 0193a000-0000-7000-8000-000000000011)" interno
 ok "portal: agroexport trae cliente" "$(rolesPortal 0193a000-0000-7000-8000-000000000021)" cliente
 ok "portal: comercial1 trae comercial" "$(rolesPortal 0193a000-0000-7000-8000-000000000005)" comercial
 
