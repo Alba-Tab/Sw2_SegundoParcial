@@ -579,7 +579,7 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     expect(cola.ops).toHaveLength(1);
   });
 
-  it('E2-1: la velocidad sale del GPS; con -1 se calcula por distancia y tiempo; con la lectura de más de 10 s no se sabe', () => {
+  it('E2-1: la velocidad sale del GPS; con -1 se calcula por distancia y tiempo; con la lectura de más de 20 s no se sabe', () => {
     const t0 = ahora.getTime();
     const lectura = (en: number, lat: number, velocidadMs: number) => ({ lat, lng: -63.18, velocidadMs, precisionMetros: 5, en: t0 + en });
     expect(casos.velocidadKmh()).toBeNull();
@@ -591,7 +591,9 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     expect(casos.velocidadKmh()).toBe(40);
     casos.registrarLectura('v1', lectura(10_000, -17.701, 2));
     expect(casos.velocidadKmh()).toBe(7.2);
-    ahora = new Date(t0 + 20_001);
+    ahora = new Date(t0 + 10_000 + 15_000);
+    expect(casos.velocidadKmh()).toBe(7.2);
+    ahora = new Date(t0 + 10_000 + 25_000);
     expect(casos.velocidadKmh()).toBeNull();
   });
 

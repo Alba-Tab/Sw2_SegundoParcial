@@ -1,4 +1,4 @@
-import { GPS_CADA_METROS, GPS_CADA_MS } from './gps';
+import { GPS_CADA_METROS, GPS_CADA_MS, LECTURA_GPS_CADA_MS } from './gps';
 
 export interface Lectura {
   lat: number;
@@ -34,12 +34,15 @@ export class MuestreoGps {
 
 export const kmh = (velocidadMs: number) => Math.max(0, Math.round(velocidadMs * 3.6 * 10) / 10);
 
-/** Una lectura de más de 10 s ya no dice a qué velocidad va el camión. */
-export const LECTURA_VIGENTE_MS = 10_000;
+/**
+ * Una lectura de más de dos intervalos del GPS (20 s) ya no dice a qué velocidad va el camión. Con uno solo, cualquier
+ * lectura algo tardía dejaba la velocidad desconocida y daba SIN_ROSTRO falsos con el camión detenido.
+ */
+export const LECTURA_VIGENTE_MS = 2 * LECTURA_GPS_CADA_MS;
 
 /**
  * km/h de la última lectura: la que da el GPS o, si no la da (`-1`: iOS sin dato, Android sin `hasSpeed`), distancia
- * sobre tiempo desde la anterior. `null` si no se sabe: sin lecturas, con la última de más de 10 s o sin anterior.
+ * sobre tiempo desde la anterior. `null` si no se sabe: sin lecturas, con la última de más de 20 s o sin anterior.
  */
 export function velocidadEstimada(ultima: Lectura | null, anterior: Lectura | null, ahora: number): number | null {
   if (!ultima || ahora - ultima.en > LECTURA_VIGENTE_MS) return null;
