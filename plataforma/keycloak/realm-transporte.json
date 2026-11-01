@@ -38,25 +38,50 @@
         "composite": true,
         "composites": {
           "realm": [
-            "offline_access"
+            "offline_access",
+            "interno"
           ]
         }
       },
       {
         "name": "despachador",
-        "description": "Viajes, entregas observadas, intervenciones y acciones del agente"
+        "description": "Viajes, entregas observadas, intervenciones y acciones del agente",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "interno"
+          ]
+        }
       },
       {
         "name": "jefe_flota",
-        "description": "Unidades, mantenimiento y combustible"
+        "description": "Unidades, mantenimiento y combustible",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "interno"
+          ]
+        }
       },
       {
         "name": "administracion",
-        "description": "Cotizaciones, aprobación de crédito, facturas y pagos"
+        "description": "Cotizaciones, aprobación de crédito, facturas y pagos",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "interno"
+          ]
+        }
       },
       {
         "name": "gerente",
-        "description": "Todo en lectura, tablero, voz y reportes"
+        "description": "Todo en lectura, tablero, voz y reportes",
+        "composite": true,
+        "composites": {
+          "realm": [
+            "interno"
+          ]
+        }
       },
       {
         "name": "comercial",
@@ -69,6 +94,10 @@
       {
         "name": "agente_lectura",
         "description": "Herramientas de lectura del MCP y proponer_accion"
+      },
+      {
+        "name": "interno",
+        "description": "Marca de cuenta interna en el token de portal-cliente; no da permisos en ningún servicio (Viajes rechaza su alta de cliente)"
       }
     ]
   },
@@ -622,7 +651,8 @@
       "client": "portal-cliente",
       "roles": [
         "cliente",
-        "comercial"
+        "comercial",
+        "interno"
       ]
     },
     {

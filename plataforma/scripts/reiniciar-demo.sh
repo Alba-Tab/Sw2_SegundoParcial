@@ -37,14 +37,23 @@ dc run --rm --no-deps analitica sh -c 'alembic upgrade head && python -m app.dem
 dc exec -T postgres-azure psql -U n8n -d n8n -qc "TRUNCATE n8n_inbox" && echo "   n8n_inbox vaciado"
 
 echo "4. Clientes registrados en el portal"
+# Nunca borra cuentas de servicio, aunque hayan caído en el grupo (PB-5): se excluyen por id, como en configurar-api.sh.
 KC="${OIDC_ISSUER%/realms/*}"
 ADMIN=$(curl -sf -X POST "$KC/realms/master/protocol/openid-connect/token" -d grant_type=password -d client_id=admin-cli \
   -d username="$KC_ADMIN" -d password="$KC_ADMIN_CLAVE" | python3 -c 'import json,sys; print(json.load(sys.stdin)["access_token"])')
 GRUPO=$(curl -sf "$KC/admin/realms/transporte/groups?search=registro-portal&exact=true" -H "Authorization: Bearer $ADMIN" \
   | python3 -c 'import json,sys; g=json.load(sys.stdin); print(g[0]["id"] if g else "")')
 if [ -n "$GRUPO" ]; then
+  # Asignaciones fuera del for: si alguna falla, set -e corta antes de borrar con un conjunto incompleto.
+  CLIENTES=$(curl -sf "$KC/admin/realms/transporte/clients?max=200" -H "Authorization: Bearer $ADMIN" \
+    | python3 -c 'import json,sys; print(" ".join(c["id"] for c in json.load(sys.stdin) if c.get("serviceAccountsEnabled")))')
+  CUENTAS=""
+  for cl in $CLIENTES; do
+    CUENTAS="$CUENTAS $(curl -sf "$KC/admin/realms/transporte/clients/$cl/service-account-user" -H "Authorization: Bearer $ADMIN" \
+      | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])')"
+  done
   for u in $(curl -sf "$KC/admin/realms/transporte/groups/$GRUPO/members?max=500" -H "Authorization: Bearer $ADMIN" \
-    | python3 -c 'import json,sys; print(" ".join(u["id"] for u in json.load(sys.stdin)))'); do
+    | CUENTAS="$CUENTAS" python3 -c 'import json,os,sys; sa=set(os.environ["CUENTAS"].split()); print(" ".join(u["id"] for u in json.load(sys.stdin) if u["id"] not in sa))'); do
     curl -sf -X DELETE "$KC/admin/realms/transporte/users/$u" -H "Authorization: Bearer $ADMIN" && echo "   usuario $u borrado"
   done
 fi

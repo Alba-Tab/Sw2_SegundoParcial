@@ -6,7 +6,7 @@ Escenarios de `specs/guion-fallos.md` contra el compose local. Por ahora son sol
 
 ```bash
 cd plataforma/compose
-docker compose --env-file .env --env-file .env.demo --profile core --profile plataforma --profile demo up -d --build
+docker compose --env-file .env --env-file .env.demo --profile core --profile plataforma --profile demo --profile ia up -d --build
 ../semilla/cargar.sh
 ```
 
@@ -27,7 +27,7 @@ Cada uno imprime ✔ o ✘ por cada resultado esperado y termina con código 1 s
 
 | Script | Qué hace |
 |---|---|
-| `reiniciar-demo.sh [--nube]` | Reinicia la demo en el orden de D102: (1) detiene relays y consumidores (los 4 servicios y n8n); (2) purga todas las colas y termina los workflows abiertos de Temporal; (3) corre `demo:reiniciar` en cada servicio y vacía `n8n_inbox`; (4) borra en Keycloak a los usuarios del grupo `registro-portal`; (5) los vuelve a encender. `demo:reiniciar` es un comando, nunca un endpoint: `--semilla.cargar=reiniciar` (Viajes), `node dist/semilla.js --reiniciar` (Flota), `php artisan demo:reiniciar` (Finanzas), `python -m app.demo reiniciar` (Analítica, que carga además los 3 meses sintéticos). `--nube` llega en F11 |
+| `reiniciar-demo.sh [--nube]` | Reinicia la demo en el orden de D102: (1) detiene relays y consumidores (los 4 servicios y n8n); (2) purga todas las colas y termina los workflows abiertos de Temporal; (3) corre `demo:reiniciar` en cada servicio y vacía `n8n_inbox`; (4) borra en Keycloak a los usuarios del grupo `registro-portal` (nunca las cuentas de servicio); (5) los vuelve a encender. `demo:reiniciar` es un comando, nunca un endpoint: `--semilla.cargar=reiniciar` (Viajes), `node dist/semilla.js --reiniciar` (Flota), `php artisan demo:reiniciar` (Finanzas), `python -m app.demo reiniciar` (Analítica, que carga además los 3 meses sintéticos). `--nube` llega en F11 |
 | `escenario-completo.sh [--nube]` | Recorre por API los pasos que ya existen (plan-desarrollo §4): 2-3 (saga del Aula con chofer1 y, con chofer1 ocupado, La Paz con chofer2), 4-5 (inicio, GPS, hito, frenada y la primera carga de 4521KTR), 6 (entrega, factura, cierre y correo) y 7 (FF2 con la carga exagerada y el simulador de chofer2 hasta `RIESGO_RETRASO`). Con `BITACORA_MALICIOSA=1` el simulador siembra la bitácora de FM2. Crece en cada hito |
 
 Antes de cada ensayo: `reiniciar-demo.sh` y después `escenario-completo.sh`.

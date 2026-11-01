@@ -26,20 +26,30 @@ adm() { curl -s -H "Authorization: Bearer $ADM" -H 'Content-Type: application/js
 echo "== Usuarios de semilla (D12)"
 T=$(login gerente1 | jq -r .access_token)
 ok "sub de gerente1 es el id fijo" "$(claims "$T" | jq -r .sub)" 0193a000-0000-7000-8000-000000000001
-ok "gerente1: roles" "$(roles "$T")" gerente
+# interno es hijo compuesto de los roles internos: llega a todo token que trae uno de ellos.
+ok "gerente1: roles" "$(roles "$T")" gerente,interno
 ok "gerente1: sin clienteId" "$(claims "$T" | jq -r '.clienteId // "-"')" -
 TC=$(login agroexport | jq -r .access_token)
 ok "agroexport: rol cliente" "$(roles "$TC")" cliente
 ok "agroexport: clienteId" "$(claims "$TC" | jq -r .clienteId)" 0193a000-0000-7000-8000-0000000c0001
 GRUPO=$(adm "$A/groups?search=registro-portal&exact=true" | jq -r '.[0].id')
-ok "registro-portal sin usuarios de semilla" "$(adm "$A/groups/$GRUPO/members" | jq length)" 0
+ok "registro-portal vacío (sin semilla ni cuentas de servicio)" "$(adm "$A/groups/$GRUPO/members" | jq length)" 0
+
+echo "== Rol interno: el token de portal-cliente marca la cuenta interna sin darle sus roles (PB-1)"
+PORTAL=$(adm "$A/clients?clientId=portal-cliente" | jq -r '.[0].id')
+rolesPortal() { adm "$A/clients/$PORTAL/evaluate-scopes/generate-example-access-token?scope=openid&userId=$1" \
+  | jq -r '[.realm_access.roles[]? | select(. != "default-roles-transporte")] | sort | join(",")'; }
+ok "portal: gerente1 trae solo interno" "$(rolesPortal 0193a000-0000-7000-8000-000000000001)" interno
+ok "portal: chofer1 trae solo interno" "$(rolesPortal 0193a000-0000-7000-8000-000000000011)" interno
+ok "portal: agroexport trae cliente" "$(rolesPortal 0193a000-0000-7000-8000-000000000021)" cliente
+ok "portal: comercial1 trae comercial" "$(rolesPortal 0193a000-0000-7000-8000-000000000005)" comercial
 
 echo "== Intercambio: demo-cli → gateway → analitica (la voz no pasa por el MCP, spec 015)"
 SID=$(claims "$T" | jq -r .sid)
 T1=$(intercambio gateway "$KC_SECRETO_GATEWAY" "$T" analitica)
 ok "salto aud" "$(aud "$T1")" analitica
 ok "conserva sub y sid" "$(claims "$T1" | jq -r '.sub + " " + .sid')" "0193a000-0000-7000-8000-000000000001 $SID"
-ok "conserva roles (fullScopeAllowed=false)" "$(roles "$T1")" gerente
+ok "conserva roles (fullScopeAllowed=false)" "$(roles "$T1")" gerente,interno
 ok "gateway no intercambia hacia mcp-server" "$(intercambio gateway "$KC_SECRETO_GATEWAY" "$T" mcp-server)" ""
 ok "analitica no intercambia hacia mcp-server" "$(intercambio analitica "$KC_SECRETO_ANALITICA" "$T1" mcp-server)" ""
 
@@ -52,7 +62,7 @@ ok "mcp-server intercambia el token del agente" "$(roles "$TA2") $(aud "$TA2")" 
 echo "== K3: offline_access solo para chofer"
 ok "chofer1 recibe refresh Offline" "$(claims "$(login chofer1 'openid offline_access' | jq -r .refresh_token)" | jq -r .typ)" Offline
 ok "gerente1 no recibe offline_access" "$(login gerente1 'openid offline_access' | jq -r '.error // "token"')" not_allowed
-ok "chofer1: roles" "$(roles "$(login chofer1 | jq -r .access_token)")" chofer,offline_access
+ok "chofer1: roles" "$(roles "$(login chofer1 | jq -r .access_token)")" chofer,interno,offline_access
 
 echo "== K4: FGAP v2 de viajes"
 adm -X POST "$A/users" -d '{"username":"prueba-registro","enabled":true,"email":"prueba-registro@transporte.example","firstName":"Prueba","lastName":"Registro","credentials":[{"type":"password","value":"'"$KC_CLAVE_SEMILLA"'","temporary":false}]}' >/dev/null

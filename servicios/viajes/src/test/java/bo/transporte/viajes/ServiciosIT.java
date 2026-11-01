@@ -609,6 +609,7 @@ class ServiciosIT {
         assertEquals("Agroexport SRL", v.get("cliente").get("razonSocial").asString());
         assertEquals(300, v.get("ruta").get("destino").get("radioMetros").asInt());
         assertFalse(v.has("monto"));
+        assertEquals("01933c00-0000-7000-8000-000000000021", v.get("choferId").asString());
         assertEquals(
                 0,
                 pedir("GET", "/api/v1/viajes/mios", TokensDePrueba.token("otro", "chofer", null), null, null)

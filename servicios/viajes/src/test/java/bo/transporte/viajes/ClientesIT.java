@@ -197,6 +197,20 @@ class ClientesIT {
                                 empresa("1023456019"))
                         .estado());
 
+        // Cuenta interna que entra al portal: su token solo trae "interno". No se crea ningún cliente.
+        long antes = jdbc.sql("SELECT count(*) FROM cliente").query(Long.class).single();
+        var interno = pedir(
+                "POST",
+                "/api/v1/clientes",
+                TokensDePrueba.token("sub-gerente", "interno", null),
+                UUID.randomUUID(),
+                empresa("1023456019"));
+        assertEquals(403, interno.estado());
+        assertEquals("SIN_PERMISO", interno.cuerpo().get("codigo").asString());
+        assertEquals(
+                antes,
+                jdbc.sql("SELECT count(*) FROM cliente").query(Long.class).single());
+
         var nitMalo = pedir("POST", "/api/v1/clientes", NUEVO, UUID.randomUUID(), empresa("12a"));
         assertEquals(400, nitMalo.estado());
         assertEquals("VALIDACION", nitMalo.cuerpo().get("codigo").asString());
