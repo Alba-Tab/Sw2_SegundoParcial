@@ -146,3 +146,23 @@ Revisado y aprobado con cambios por un agente revisor el 01-11-2026. **Ningún c
 **ICONIX (anotar):** rol `interno`, pestañas de Operaciones reagrupadas, los tres estados de error.
 
 **Commits:** front en `feat/ui-comun/arreglos-ux-web` con scope por app; backend en las ramas de la sección 3, desde `develop`. Sin `Co-Authored-By`.
+
+## 8. Estado
+
+**Vuelta A (01-11-2026), hecha en `feat/ui-comun/arreglos-ux-web`, sin push.** Cada corrección con su prueba; `generar:verificar`, formato, capas, complejidad, pruebas de las 5 piezas y build de las 4 apps en verde; el portal pasa `npm run verificar`.
+
+| Id | Qué quedó | Prueba |
+|---|---|---|
+| CA-1 | `:where(a), :where(a:visited)` con `--mat-sys-primary`, subrayado fino. Contraste con los tokens: 10,91:1 en oscuro (antes 1,98:1) y 6,13:1 en claro sobre `surface` | Medido con los tokens; sin prueba automática |
+| NG-1 | Pipe `numero` (`ui-comun`) y función `numero` (`ui-comun/dominio`) con `Intl.NumberFormat('es-BO')`; reemplaza los 18 usos de `number` en `cc-flota` y `cc-operaciones` y el `NUMERO` de `tabla-reporte` | `ui-comun.spec.ts` (NG-1) |
+| RS-1 | Bajo 900 px: menú «Apps» (ícono `apps`, fuente regenerada, 90 glifos) con la app actual (`aria-current`) y «(no disponible)» con `cloud_off`; el usuario queda con su ícono y su nombre solo para el lector; la marca se corta con puntos suspensivos | `marco.spec.ts` (RS-1) |
+| FB-1 | Operador `conservarUltimoBueno` (`ui-comun/src/lib/sondeo.ts`) en los 19 sondeos; `cc-aviso-servicios [datosAl]` dice el error aunque haya filas y «Se muestran los datos al …» junto a «Reintentar» | `sondeo.spec.ts` y `aviso-servicios.spec.ts` (FB-1) |
+| FB-2 | `cc-aviso-servicios` con `NO_ENCONTRADO` y sin datos: `search_off`, «No encontramos esta unidad…» (`buscado` en las 6 fichas) y sin «Reintentar» | `aviso-servicios.spec.ts` (FB-2) |
+| NG-2 | `paramsCobranza` pasa a `ui-comun/dominio`; Reportes abre «Cuentas por cobrar» con −61/+30 e `incluirVencidas`; la tabla separa «Vencida» (error) y «Por vencer» (aviso) con chip, enlaza la factura a `cc-finanzas` con `?desde=` y pone «(BOB)» en los encabezados de monto | `reporte.spec.ts` y `aviso-servicios.spec.ts` (NG-2) |
+| JV-2 | Chip «Vencida hace N días» (`Vigencia.VENCIDO`: `event_busy`, error) en la lista y el encabezado de la ficha; el estado se sigue mostrando si no es «Por cobrar»; `cc-estado` acepta `[texto]` | `filtro.spec.ts` (JV-2) |
+| PB-1 paso 3 | `interno` en `ROLES_INTERNOS` del portal | `useSesion.test.ts` |
+
+**Pendiente de la vuelta A:**
+- Verificación en el navegador a 375/800/1280 px y en oscuro: no se pudo abrir una pestaña nueva (tope de pestañas del panel). Falta medir el ancho real a 375 px y ver el menú «Apps».
+- Guardián de NG-1: no hay eslint en `centro-control`, así que no hay `no-restricted-imports` de `DecimalPipe`.
+- Visto al probar: `FechaPipe` con hora sale como «1/11, 10:20 a. m.» en Node 26, donde corren las pruebas (no «01/11 10:20» como dice el comentario del pipe); falta ver si Chrome hace lo mismo. Afecta a todos los «Datos al …»; queda para la vuelta B.
