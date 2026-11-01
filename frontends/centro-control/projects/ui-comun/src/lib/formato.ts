@@ -30,10 +30,10 @@ export class BobPipe implements PipeTransform {
   }
 }
 
-/** "2026-11-03" → "03/11/2026"; un instante → "03/11 10:20" en La Paz. */
+/** "2026-11-03" → "03/11/2026"; un instante → "03/11 10:20" en La Paz, con el año si no es el de `ahora` (R1F-8). */
 @Pipe({ name: 'fecha' })
 export class FechaPipe implements PipeTransform {
-  transform(valor: string | null | undefined, conHora = false): string {
+  transform(valor: string | null | undefined, conHora = false, ahora: Date = new Date()): string {
     if (!valor) return SIN_DATO;
     if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
       const [a, m, d] = valor.split('-');
@@ -41,8 +41,11 @@ export class FechaPipe implements PipeTransform {
     }
     const instante = new Date(valor);
     if (Number.isNaN(instante.getTime())) return valor;
-    const p = Object.fromEntries(partesLaPaz.formatToParts(instante).map((x) => [x.type, x.value]));
-    return conHora ? `${p['day']}/${p['month']} ${p['hour']}:${p['minute']}` : `${p['day']}/${p['month']}/${p['year']}`;
+    const partes = (d: Date) => Object.fromEntries(partesLaPaz.formatToParts(d).map((x) => [x.type, x.value]));
+    const p = partes(instante);
+    if (!conHora) return `${p['day']}/${p['month']}/${p['year']}`;
+    const anio = p['year'] === partes(ahora)['year'] ? '' : `/${p['year']}`;
+    return `${p['day']}/${p['month']}${anio} ${p['hour']}:${p['minute']}`;
   }
 }
 

@@ -16,7 +16,7 @@ const formatos = new Map<string, Intl.NumberFormat>();
  * sin locale, que escribe "1,300" (se lee 1,3). `maximo` y `minimo` son los decimales.
  */
 export function numero(valor: number | string | null | undefined, maximo = 2, minimo = 0): string {
-  if (valor === null || valor === undefined || valor === '') return SIN_DATO;
+  if (valor === null || valor === undefined || String(valor).trim() === '') return SIN_DATO;
   const n = Number(valor);
   if (!Number.isFinite(n)) return String(valor);
   const clave = `${minimo}-${maximo}`;
@@ -25,7 +25,8 @@ export function numero(valor: number | string | null | undefined, maximo = 2, mi
     formato = new Intl.NumberFormat('es-BO', { minimumFractionDigits: minimo, maximumFractionDigits: maximo });
     formatos.set(clave, formato);
   }
-  return formato.format(n);
+  // Un negativo que se redondea a cero se escribe «0», no «-0» (R1F-5; `signDisplay: 'negative'` no está en los tipos de TS).
+  return formato.format(n).replace(/^-(?=0(,0+)?$)/, '');
 }
 
 /** 0.857 → "86 %". */

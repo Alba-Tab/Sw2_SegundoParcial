@@ -88,8 +88,12 @@ describe('ui-comun', () => {
     expect(new BobPipe().transform(null)).toBe('Sin dato');
     expect(new FechaPipe().transform('2026-11-03')).toBe('03/11/2026');
     // Un instante sale en La Paz (UTC−4), en 24 h y sin "a. m.".
-    expect(new FechaPipe().transform('2026-11-01T14:20:00Z', true)).toBe('01/11 10:20');
-    expect(new FechaPipe().transform('2026-11-01T02:05:00Z', true)).toBe('31/10 22:05');
+    const ahora = new Date('2026-11-01T12:00:00Z');
+    expect(new FechaPipe().transform('2026-11-01T14:20:00Z', true, ahora)).toBe('01/11 10:20');
+    expect(new FechaPipe().transform('2026-11-01T02:05:00Z', true, ahora)).toBe('31/10 22:05');
+    // R1F-8: con hora y de otro año (en La Paz), lleva el año.
+    expect(new FechaPipe().transform('2025-12-31T14:20:00Z', true, ahora)).toBe('31/12/2025 10:20');
+    expect(new FechaPipe().transform('2026-01-01T02:00:00Z', true, ahora)).toBe('31/12/2025 22:00');
     expect(new FechaPipe().transform('2026-11-01T02:05:00Z')).toBe('31/10/2026');
     expect(pct(0.857)).toBe('86 %');
   });
@@ -150,6 +154,10 @@ describe('ui-comun', () => {
     expect(p.transform('850')).toBe('850');
     expect(p.transform(null)).toBe('Sin dato');
     expect(p.transform('abc')).toBe('abc');
+    // R1F-5: solo espacios no es un cero, y un negativo que se redondea a cero no lleva signo.
+    expect(p.transform('  ')).toBe('Sin dato');
+    expect(p.transform(-0.001)).toBe('0');
+    expect(p.transform(-1.5)).toBe('-1,5');
   });
 
   it('dinero sin float: BobPipe no pasa por Number y las sumas van en centavos enteros', () => {
