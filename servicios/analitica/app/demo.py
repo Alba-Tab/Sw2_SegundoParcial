@@ -52,9 +52,15 @@ def instante(d: date, hora: float = 7.0) -> datetime:
     return datetime.combine(d, time.min, ZONA) + timedelta(hours=hora)
 
 
-def upsert(s: Session, modelo: type, llave: str, filas: list[dict]) -> None:
+def upsert(s: Session, modelo: type, llave: str, filas: list[dict], actualizar: tuple[str, ...] = ()) -> None:
     if filas:
-        s.execute(insert(modelo).values(filas).on_conflict_do_nothing(index_elements=[llave]))
+        q = insert(modelo).values(filas)
+        q = (
+            q.on_conflict_do_update(index_elements=[llave], set_={c: q.excluded[c] for c in actualizar})
+            if actualizar
+            else q.on_conflict_do_nothing(index_elements=[llave])
+        )
+        s.execute(q)
 
 
 def semilla(s: Session) -> None:
@@ -129,6 +135,7 @@ def semilla(s: Session) -> None:
             }
             for f in facturas
         ],
+        actualizar=("fecha_viaje", "terminado_en"),
     )
     upsert(
         s,
@@ -149,6 +156,8 @@ def semilla(s: Session) -> None:
             }
             for f in facturas
         ],
+        # Como Finanzas (semilla:cargar): al recargar, las fechas relativas se mueven a hoy y la factura vence igual en ambos.
+        ("emitida_el", "vence_el", "saldo", "estado"),
     )
 
 
