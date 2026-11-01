@@ -95,6 +95,17 @@ tr.marcada {
   background: var(--mat-sys-error-container);
 }
 
+/*
+ * Enlaces con el color del tema en claro y oscuro, nunca el azul del navegador (1,98:1 en oscuro; CA-1). Con :where la
+ * especificidad es 0: la marca, los botones y los ítems de menú que son <a> conservan su propio color.
+ */
+:where(a),
+:where(a:visited) {
+  color: var(--mat-sys-primary);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}
+
 /* Foco visible con el teclado en todo lo que se puede enfocar (DESIGN.md, accesible por defecto). */
 :focus-visible {
   outline: 2px solid var(--mat-sys-primary);
