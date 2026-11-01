@@ -13,7 +13,9 @@ import {
   EtiquetaPipe,
   FechaPipe,
   FiltrosLista,
+  LIMITE_GATEWAY,
   PieLista,
+  posicionEstado,
   Sesion,
 } from 'ui-comun';
 import { puedeCerrar, textoMantenimiento, type FilaMantenimiento } from '../domain/mantenimiento';
@@ -46,6 +48,8 @@ import { MantenimientosFachada } from '../mantenimientos.fachada';
       grupo="EstadoMantenimiento"
       nombre="mantenimientos"
       singular="mantenimiento"
+      [limite]="limite"
+      [recientes]="true"
     />
     <div class="tabla-ancha">
       <table
@@ -90,7 +94,7 @@ import { MantenimientosFachada } from '../mantenimientos.fachada';
           <td mat-cell *matCellDef="let m">
             @if (puedeCerrar(m) && sesion.tiene('jefe_flota')) {
               <a mat-button [routerLink]="['/unidades', m.unidadId]"
-                ><mat-icon>lock</mat-icon>Cerrar <span class="cdk-visually-hidden">el mantenimiento de {{ m.placa }}</span></a
+                >Cerrar en la unidad <span class="cdk-visually-hidden">{{ m.placa }}</span></a
               >
             }
           </td>
@@ -117,6 +121,7 @@ export class MantenimientosPagina {
   readonly campos = { mantenimientos: 'Flota' };
   readonly columnas = ['placa', 'tipo', 'fecha', 'taller', 'estado', 'acciones'];
   readonly puedeCerrar = puedeCerrar;
+  readonly limite = LIMITE_GATEWAY;
   readonly lista = controlLista<FilaMantenimiento>({
     filas: this.mantenimientos,
     texto: textoMantenimiento,
@@ -126,7 +131,7 @@ export class MantenimientosPagina {
       tipo: (m) => etiqueta('TipoMantenimiento', m.tipo).texto,
       fecha: (m) => m.fechaProgramada,
       taller: (m) => m.taller,
-      estado: (m) => etiqueta('EstadoMantenimiento', m.estado).texto,
+      estado: (m) => posicionEstado('EstadoMantenimiento', m.estado),
     },
     ordenInicial: { orden: 'fecha', dir: 'desc' },
   });

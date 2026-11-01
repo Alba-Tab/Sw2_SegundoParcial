@@ -47,7 +47,9 @@ Un estado se muestra con **texto + ícono + tono**. El color nunca es la única 
 | `aviso` | Hay que mirarlo pronto | `advertencia-container` / `on-advertencia-container` | `warning` |
 | `error` | Bloquea o falló; pide una decisión | `error-container` / `on-error-container` | `error` |
 
-Las alertas del marco no llevan raya lateral: ícono de severidad, texto de severidad («Severidad crítica») y fondo tintado con el contenedor del tono.
+Las alertas del marco no llevan raya lateral: ícono de severidad, texto de severidad («Severidad crítica», en `label-large`, junto al título y no en el pie) y fondo tintado con el contenedor del tono. El estado de la alerta (abierta, atendida) va como texto en el pie: la severidad ya lleva ícono y tono, y dos chips en una línea de menú no se leen.
+
+Excepción a «los estados con `cc-estado`»: el tipo de hito de la bitácora (`TipoHito`) se muestra como chip, porque su tono es lo que el despachador busca al recorrerla (bloqueo, falla mecánica).
 
 ## Iconografía
 
@@ -62,7 +64,7 @@ Material Symbols Outlined, fijado como fuente por defecto de `<mat-icon>` en `co
 | `check_circle` | Hecho, disponible, pagado |
 | `hourglass_top` | En espera de otro (confirmación, aprobación, pago) |
 | `route` | En ruta, en viaje |
-| `warning` | Hay que revisarlo (observación, mantenimiento pendiente) |
+| `warning` | Hay que revisarlo (observación, mantenimiento pendiente o requerido, documento por vencer) |
 | `error` | Falla o intervención requerida |
 | `block` | Rechazado |
 | `cancel` | Cancelado |
@@ -72,6 +74,21 @@ Material Symbols Outlined, fijado como fuente por defecto de `<mat-icon>` en `co
 | `money_off` | En mora |
 | `build` | Mantenimiento |
 | `schedule` | Riesgo de retraso |
+| `event_available` | Confirmado (solo el estado; ningún botón lo usa) |
+| `bookmark` | Unidad reservada |
+| `assignment_ind` | Chofer ocupado (en viaje o reservado) |
+| `do_not_disturb_on` | Unidad inactiva |
+| `receipt_long` | Factura por cobrar (y la sección Facturas) |
+| `radio_button_unchecked` | Alerta abierta |
+| `check` | Alerta atendida y «Marcar atendida» (atender no es resolver: por eso no es `task_alt`) |
+| `archive` | Acción del agente archivada |
+| `sync`, `timer_off`, `skip_next` | Misión del agente en curso, agotada, saltada |
+| `timer` | Cotización vigente |
+| `event_repeat` | Preventivo, misión programada |
+| `local_gas_station`, `query_stats` | Caída de combustible, anomalía de combustible |
+| `wrong_location`, `draw` | Entrega fuera de la geocerca, sin firma |
+| `info` | Severidad media |
+| `remove` | Sin dato |
 | `help` | Valor desconocido |
 | `cloud_off` | Un servicio no responde (aviso de servicios, alertas no disponibles) |
 | `notifications` | Alertas |
@@ -83,6 +100,8 @@ Material Symbols Outlined, fijado como fuente por defecto de `<mat-icon>` en `co
 | `price_check` | Registrar un pago |
 | `document_scanner` | Leer un recibo (OCR) |
 | `open_in_new` | Se abre en otra pestaña o app |
+| `download` | Exportar |
+| `account_circle`, `manage_accounts` | Menú del usuario, administrar usuarios |
 | `search`, `search_off`, `filter_alt_off` | Buscar, sin resultados, limpiar filtros |
 | `arrow_back`, `logout` | Volver, cerrar sesión |
 
@@ -103,27 +122,30 @@ Material Symbols Outlined, fijado como fuente por defecto de `<mat-icon>` en `co
 | `credit_card` | Líneas de crédito |
 | `business`, `groups` | Portal: Mi empresa, Clientes |
 
+Los tipos que no son estados (carga, unidad, remolque, documento, hito, medio de pago, canal, rol) también tienen ícono en `ETIQUETAS`, pero en pantalla salen solo como texto con el pipe; la excepción es el tipo de hito, arriba.
+
 En el portal la página actual se marca con fondo y peso en el botón del menú, no con subrayado.
 
 ## Patrones de página
 
-**Encabezado.** `<cc-encabezado>` en toda página: `h1` con el nombre de la página o del objeto («Viaje ABC-123») y su estado (`cc-estado` proyectado), subtítulo opcional y las acciones proyectadas a la derecha. En un detalle lleva migas (`Unidades › ABC-123`) y el botón de volver a la lista; si se llegó desde otra app con `?desde=<app>`, ofrece «Volver a <app>». Una sola acción primaria (`mat-flat-button`) por pantalla. En el portal, el detalle empieza con «Volver a …» (ícono `ArrowBack`).
+**Encabezado.** `<cc-encabezado>` en toda página: `h1` con el nombre de la página o del objeto («Viaje ABC-123») y su estado (`cc-estado` proyectado), subtítulo opcional y las acciones proyectadas a la derecha. En un detalle lleva migas (`Unidades › ABC-123`) y el botón de volver a la lista; si se llegó desde otra app con `?desde=<app>`, ofrece «Volver a <app>». Una sola acción primaria (`mat-flat-button`) por pantalla: el botón del encabezado que abre un formulario es `mat-stroked-button` y solo el envío del formulario abierto es `mat-flat-button`. En el portal, el detalle empieza con «Volver a …» (ícono `ArrowBack`).
 
 **Lista.** Tabla de Material dentro de `.tabla-ancha` (scroll horizontal en pantallas angostas). La primera columna enlaza al detalle. El estado va en su columna con `cc-estado`. Si un servicio no responde, `cc-aviso-servicios` dice cuál y la tabla muestra lo que haya.
 
-- `controlLista({ filas, texto, estado, orden, ordenInicial })` (ui-comun) busca sin tildes, filtra por estado, ordena y pagina en el navegador. Las funciones puras viven en `ui-comun/dominio/src/lista.ts`. El filtro vive en la URL (`q`, `estado`, `orden`, `dir`, `pagina`, `tamano`; con `prefijo` si hay dos listas en la página), así volver desde el detalle lo conserva y un enlace puede abrir la lista ya filtrada (`/unidades?estado=MANTENIMIENTO_PENDIENTE`).
+- `controlLista({ filas, texto, estado, orden, ordenInicial })` (ui-comun) busca sin tildes, filtra por estado, ordena y pagina en el navegador. Las funciones puras viven en `ui-comun/dominio/src/lista.ts`. El filtro vive en la URL (`q`, `estado`, `orden`, `dir`, `pagina`, `tamano`; con `prefijo` si hay dos listas en la página), así volver desde el detalle lo conserva (el «volver» y la miga del encabezado llevan la última consulta de la lista, `MemoriaListas`) y un enlace puede abrir la lista ya filtrada (`/unidades?estado=MANTENIMIENTO_PENDIENTE`). Con `estadoInicial` la lista entra mostrando lo que pide acción (Servicios: confirmados, para quien cancela) y «Todos» queda en la URL como `estado=todos`.
 - Arriba `<cc-filtros-lista>`: búsqueda con etiqueta que dice por qué busca, selector de estado con las opciones de `ETIQUETAS` y el número de resultados con `role="status"`. Filtros propios de la página van proyectados y también en la URL (`lista.parametro()`, `lista.poner()`).
-- En la tabla, `matSort` con `mat-sort-header` (pone `aria-sort`). Los montos se ordenan en centavos (`aCentavos`), nunca en float.
+- En la tabla, `matSort` con `mat-sort-header` (pone `aria-sort`); el orden alterna asc y desc, sin «sin orden». Los montos se ordenan en centavos (`aCentavos`), nunca en float, y el estado por su lugar en el ciclo de vida (`posicionEstado`), no alfabético.
+- Si la consulta tiene tope (`limite: 80` en Viajes y Servicios; 100 en clientes, choferes y mantenimientos, el máximo del Gateway sin cursor), `[limite]` en `cc-filtros-lista` dice «Se muestran los primeros N…» cuando llega al tope. Si el filtro de estado ya lo aplicó el servidor (`[estadoEnServidor]`), el conteo no dice «de N».
 - Abajo `<cc-pie-lista>`: sin resultados por filtro, «No hay … con ese filtro» y «Limpiar filtros»; sin datos, el texto propio de la lista; si no, el paginador en español.
 - Una lista de tarjetas con formularios (aprobaciones, acciones del agente) usa el mismo control sin `matSort`.
 
 **Detalle.** Encabezado con el estado y las acciones (el botón de la acción abre su formulario debajo, con `aria-expanded`); si hay una decisión pendiente (entrega observada, intervención), va primero. Los datos van en una lista de definiciones `<dl class="datos">` (dos columnas, una en pantallas angostas; `.completo` ocupa el ancho), nunca en párrafos `<b>Etiqueta:</b> valor` ni en tarjetas anidadas. Después, las secciones con `h2` (riesgo, entrega, bitácora, pagos, mantenimientos). Los formularios de una acción van en su propia tarjeta con título en verbo («Registrar pago», «Programar mantenimiento»).
 
-**Tablero.** Primero «Pide acción»: lista de lo que hay que resolver (viajes en riesgo, facturas vencidas, unidades con mantenimiento pendiente, alertas abiertas), cada línea con ícono, tono de fondo y enlace a la app que lo resuelve con `?desde=cc-tablero`; si un servicio cae, la línea dice cuál en vez de callar. Después «Cifras del periodo» en una franja compacta y, al final, el detalle (viajes en curso, próximas a vencer). Sin grilla de tarjetas con cifra gigante.
+**Tablero.** Primero «Pide acción»: lista de lo que hay que resolver (viajes en riesgo, facturas vencidas, unidades con mantenimiento pendiente, alertas abiertas), cada línea con ícono, tono de fondo y enlace a la app que lo resuelve con `?desde=cc-tablero`; si un servicio cae, la línea dice cuál en vez de callar. Después «Cifras del periodo» en una franja compacta y, al final, el detalle (viajes en curso, próximas a vencer). Sin grilla de tarjetas con cifra gigante. El orden de «Pide acción» es por tono: primero lo que es `error` (viajes en riesgo, facturas vencidas), después lo que es `aviso` (mantenimiento pendiente, alertas abiertas). Un rol que no ve ningún bloque que pueda pedir acción (comercial) no tiene la sección: «Nada pide acción» sería una afirmación que no puede saber.
 
 **Vacío, carga y error.** Mientras no llega la primera respuesta, esqueleto con la forma de lo que viene (`<cc-esqueleto>`; en una lista lo pone `cc-pie-lista` con `[cargando]`; en el portal, `Cargando`), nunca «No hay …» antes de tiempo. En una lista vacía, `cc-pie-lista` dice qué pasa y cuál es el siguiente paso. Si falla una fuente, `cc-aviso-servicios` dice cuál y ofrece «Reintentar»; en un detalle queda además el «volver» del encabezado. El texto de un error sale del `codigo` de 000 §5 (`ui-comun/dominio/src/errores.ts`; portal: `compartido/ui/Problema.tsx`), nunca del mensaje del servidor.
 
-**Formularios.** `ReactiveForms` con un `<mat-error>` en español bajo cada campo (`textoError`, reglas en `ui-comun/dominio/src/validacion.ts`). El botón de enviar queda activo: al enviar con errores se marcan todos los campos y se enfoca el primero inválido (`listoParaEnviar`). Los montos se escriben como texto decimal con punto («2800.50») y se validan sin pasar por `Number`. Un texto que se exige solo para una de las acciones (motivo para rechazar) lo fija `exigirTexto`. Al cerrar un formulario, el foco vuelve al botón que lo abrió. En el portal, react-hook-form con zod (`shouldFocusError`) y el mismo criterio.
+**Formularios.** `ReactiveForms` con un `<mat-error>` en español bajo cada campo (`textoError`, reglas en `ui-comun/dominio/src/validacion.ts`). El botón de enviar queda activo: al enviar con errores se marcan todos los campos y se enfoca el primero inválido (`listoParaEnviar`). Los montos se escriben como texto decimal con punto («2800.50») y se validan sin pasar por `Number`. Un texto que se exige solo para una de las acciones (motivo para rechazar) lo fija `exigirTexto`. Al abrir un formulario, el foco va a su primer campo; al cerrarlo, vuelve al botón que lo abrió. En el portal, react-hook-form con zod (`shouldFocusError`) y el mismo criterio.
 
 **Acciones que no se deshacen** (registrar pago, cancelar servicio, rechazar entrega, cerrar mantenimiento, rechazar una acción del agente): confirmación en línea con `<cc-confirmacion>`, que dice qué va a pasar con los datos («Se registra un pago de 2.800,00 BOB…») y toma el foco; «No, volver» no hace nada. En el portal, el diálogo de cancelar ya era la confirmación.
 

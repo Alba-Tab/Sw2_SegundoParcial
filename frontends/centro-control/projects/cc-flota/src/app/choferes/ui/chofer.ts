@@ -1,6 +1,7 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, effect, inject, input } from '@angular/core';
-import { AvisoServicios, Encabezado, Estado, FechaPipe, Esqueleto } from 'ui-comun';
+import { RouterLink } from '@angular/router';
+import { AvisoServicios, Encabezado, Esqueleto, Estado, FechaPipe, LIMITE_GATEWAY } from 'ui-comun';
 import { PUNTAJE_BAJO } from '../../conduccion/domain/conduccion';
 import { ChoferFachada } from '../choferes.fachada';
 import { estadoChofer, vigenciaLicencia } from '../domain/chofer';
@@ -9,7 +10,7 @@ import { estadoChofer, vigenciaLicencia } from '../domain/chofer';
 @Component({
   selector: 'app-chofer',
   providers: [ChoferFachada],
-  imports: [Esqueleto, Encabezado, Estado, FechaPipe, DecimalPipe, AvisoServicios],
+  imports: [Esqueleto, Encabezado, Estado, FechaPipe, DecimalPipe, AvisoServicios, RouterLink],
   template: `
     @let titulo = chofer()?.nombre ?? 'Chofer';
     <cc-encabezado [titulo]="titulo" [migas]="[{ texto: 'Choferes', ruta: '/choferes' }, { texto: titulo }]">
@@ -57,7 +58,10 @@ import { estadoChofer, vigenciaLicencia } from '../domain/chofer';
           <h3>Viajes</h3>
           <ul>
             @for (v of p.viajes; track v.viajeId) {
-              <li>Viaje {{ v.viajeId?.slice(0, 8) }}: puntaje {{ v.puntaje | number: '1.0-1' }}, {{ v.km | number: '1.0-0' }} km</li>
+              <li>
+                Viaje {{ $index + 1 }}: puntaje {{ v.puntaje | number: '1.0-1' }}, {{ v.km | number: '1.0-0' }} km, {{ v.frenadas }}
+                {{ v.frenadas === 1 ? 'frenada brusca' : 'frenadas bruscas' }}
+              </li>
             } @empty {
               <li class="secundario">Sin viajes en el periodo.</li>
             }
@@ -66,8 +70,15 @@ import { estadoChofer, vigenciaLicencia } from '../domain/chofer';
           <p class="secundario">Sin viajes del {{ p.desde | fecha }} al {{ p.hasta | fecha }}.</p>
         }
       }
-    } @else if (cargado()) {
-      <p class="secundario">No se encontró ese chofer. Vuelve a la lista de choferes.</p>
+    } @else if (cargado() || !idValido()) {
+      <p class="secundario">
+        @if (listaTruncada()) {
+          Ese chofer no está entre los primeros {{ limite }} que lee el Centro de Control.
+        } @else {
+          No se encontró ese chofer.
+        }
+        Vuelve a la <a routerLink="/choferes">lista de choferes</a>.
+      </p>
     }
   `,
 })
@@ -77,6 +88,9 @@ export class ChoferPagina {
   readonly chofer = this.fachada.chofer;
   readonly puntajes = this.fachada.puntajes;
   readonly cargado = this.fachada.cargado;
+  readonly idValido = this.fachada.idValido;
+  readonly listaTruncada = this.fachada.listaTruncada;
+  readonly limite = LIMITE_GATEWAY;
   readonly error = this.fachada.error;
   readonly cargando = this.fachada.cargando;
   readonly campos = { choferes: 'Flota', puntajesConduccion: 'Analítica' };

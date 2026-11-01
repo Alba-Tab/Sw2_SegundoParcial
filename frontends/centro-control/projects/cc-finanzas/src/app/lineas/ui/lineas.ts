@@ -1,8 +1,20 @@
 import { Component, inject } from '@angular/core';
+import { MatIconModule } from '@angular/material/icon';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { aCentavos, AvisoServicios, BobPipe, controlLista, Encabezado, Estado, etiqueta, FiltrosLista, PieLista } from 'ui-comun';
+import {
+  aCentavos,
+  AvisoServicios,
+  BobPipe,
+  controlLista,
+  Encabezado,
+  Estado,
+  FiltrosLista,
+  LIMITE_GATEWAY,
+  PieLista,
+  posicionEstado,
+} from 'ui-comun';
 import { estadoLinea, textoLinea } from '../domain/linea';
 import { LineasFachada } from '../lineas.fachada';
 
@@ -10,10 +22,18 @@ import { LineasFachada } from '../lineas.fachada';
 @Component({
   selector: 'app-lineas',
   providers: [LineasFachada],
-  imports: [Encabezado, MatTableModule, MatSortModule, RouterLink, BobPipe, Estado, AvisoServicios, FiltrosLista, PieLista],
+  imports: [Encabezado, MatIconModule, MatTableModule, MatSortModule, RouterLink, BobPipe, Estado, AvisoServicios, FiltrosLista, PieLista],
   template: `
     <cc-encabezado titulo="Líneas de crédito" />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!lineas().length" />
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!lineas().length || incompletas() > 0" />
+    @if (incompletas(); as n) {
+      <p class="aviso-lista" role="status">
+        <mat-icon>cloud_off</mat-icon>No se pudo leer la línea de {{ n }} {{ n === 1 ? 'cliente' : 'clientes' }}: la lista está incompleta.
+      </p>
+    }
+    @if (clientesLeidos() >= limiteClientes) {
+      <p class="secundario">Se revisan los primeros {{ limiteClientes }} clientes: si hay más, sus líneas no salen aquí.</p>
+    }
     <cc-filtros-lista
       [control]="lista"
       busqueda="Buscar por razón social o NIT"
@@ -76,6 +96,9 @@ export class LineasPagina {
   readonly lineas = this.fachada.lineas;
   readonly error = this.fachada.error;
   readonly cargando = this.fachada.cargando;
+  readonly incompletas = this.fachada.incompletas;
+  readonly clientesLeidos = this.fachada.clientesLeidos;
+  readonly limiteClientes = LIMITE_GATEWAY;
   readonly campos = { clientes: 'Viajes', lineaCredito: 'Finanzas' };
   readonly columnas = ['cliente', 'limite', 'reservado', 'utilizado', 'disponible', 'estado'];
   readonly estado = estadoLinea;
@@ -89,7 +112,7 @@ export class LineasPagina {
       reservado: (c) => aCentavos(c.lineaCredito.reservado),
       utilizado: (c) => aCentavos(c.lineaCredito.utilizado),
       disponible: (c) => aCentavos(c.lineaCredito.disponible),
-      estado: (c) => etiqueta('EstadoLineaCredito', estadoLinea(c)).texto,
+      estado: (c) => posicionEstado('EstadoLineaCredito', estadoLinea(c)),
     },
     ordenInicial: { orden: 'disponible', dir: 'asc' },
   });

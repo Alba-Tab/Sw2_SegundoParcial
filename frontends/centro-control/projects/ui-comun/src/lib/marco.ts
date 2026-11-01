@@ -60,7 +60,8 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
       <nav class="enlaces" aria-label="Apps del Centro de Control">
         @for (app of apps(); track app) {
           @if (app === config.app) {
-            <a mat-button class="actual" aria-current="page" routerLink="/">{{ nombres[app] }}</a>
+            <!-- La marca ya enlaza a "/": la app actual no repite el enlace (B-10). -->
+            <span class="actual" aria-current="page">{{ nombres[app] }}</span>
           } @else if (caidas().has(app)) {
             <span class="no-disponible" matTooltip="No disponible"
               >{{ nombres[app] }}<span class="cdk-visually-hidden"> (no disponible)</span></span
@@ -103,10 +104,9 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
                 ><mat-icon>{{ severidad(a.severidad).icono }}</mat-icon
                 >{{ a.titulo }}</span
               >
+              <span class="severidad">{{ severidad(a.severidad).texto }}</span>
               <span class="detalle">{{ a.detalle }}</span>
-              <span class="pie"
-                >{{ severidad(a.severidad).texto }} · {{ a.creadaEn | fecha: true }} · {{ a.estado | etiqueta: 'EstadoAlerta' }}</span
-              >
+              <span class="pie">{{ a.creadaEn | fecha: true }} · {{ a.estado | etiqueta: 'EstadoAlerta' }}</span>
             </a>
             @if (a.estado === 'ABIERTA' && puedeAtender()) {
               <button mat-menu-item class="atender" (click)="$event.stopPropagation(); alertas.atender(a)">
@@ -124,7 +124,7 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
         <mat-divider />
         @if (adminUsuarios(); as url) {
           <!-- G8: los usuarios internos y sus roles se administran en la consola de Keycloak; solo el gerente. -->
-          <a mat-menu-item [href]="url" target="_blank" rel="noopener"
+          <a mat-menu-item [href]="url" target="_blank" rel="noopener noreferrer"
             ><mat-icon>manage_accounts</mat-icon> Administrar usuarios <span class="cdk-visually-hidden">(se abre en otra pestaña)</span></a
           >
         }
@@ -160,6 +160,12 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
     }
     /* La app actual: fondo, peso y una barra inferior; no solo un tono. */
     .actual {
+      display: inline-flex;
+      align-items: center;
+      min-height: 40px;
+      padding: 0 12px;
+      border-radius: var(--mat-sys-corner-full, 999px);
+      font: var(--mat-sys-label-large);
       background: var(--mat-sys-secondary-container);
       font-weight: 700;
       box-shadow: inset 0 -3px 0 var(--mat-sys-primary);
@@ -233,6 +239,10 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
       margin-right: 8px;
       vertical-align: text-bottom;
       color: var(--mat-sys-primary);
+    }
+    /* La severidad decide: se lee al tamaño de una etiqueta, no en el pie de 12 px (A-4). */
+    .severidad {
+      font: var(--mat-sys-label-large);
     }
     .detalle,
     .pie {

@@ -14,15 +14,16 @@ import {
   CONFIG_CENTRO,
   controlLista,
   Encabezado,
+  enfocar,
   Estado,
   etiqueta,
-  enfocar,
   EtiquetaPipe,
   exigirTexto,
   FechaPipe,
   FiltrosLista,
   mensajeDe,
   PieLista,
+  posicionEstado,
   Sesion,
   textoError,
 } from 'ui-comun';
@@ -62,6 +63,8 @@ import { ServiciosFachada } from '../servicios.fachada';
       grupo="EstadoServicio"
       nombre="servicios"
       singular="servicio"
+      [limite]="80"
+      [estadoEnServidor]="true"
     />
     <div class="tabla-ancha">
       <table
@@ -132,7 +135,13 @@ import { ServiciosFachada } from '../servicios.fachada';
         <tr mat-row *matRowDef="let s; columns: columnas()"></tr>
       </table>
     </div>
-    <cc-pie-lista [control]="lista" nombre="servicios" vacio="No hay servicios." [error]="error()" [cargando]="cargando()" />
+    <cc-pie-lista
+      [control]="lista"
+      nombre="servicios"
+      [vacio]="lista.filtro().estado === 'CONFIRMADO' ? 'No hay servicios confirmados.' : 'No hay servicios.'"
+      [error]="error()"
+      [cargando]="cargando()"
+    />
   `,
   styles: `
     .confirmacion {
@@ -173,13 +182,15 @@ export class ServiciosPagina {
     estado: (s) => s.estado,
     orden: {
       cliente: (s) => this.nombre(s.clienteId ?? ''),
-      estado: (s) => etiqueta('EstadoServicio', s.estado).texto,
+      estado: (s) => posicionEstado('EstadoServicio', s.estado),
       carga: (s) => etiqueta('TipoCarga', s.tipoCarga).texto,
       fecha: (s) => s.fechaViaje,
       unidad: (s) => s.placa,
       monto: (s) => aCentavos(s.monto ?? ''),
     },
-    ordenInicial: { orden: 'fecha', dir: 'asc' },
+    ordenInicial: { orden: 'fecha', dir: 'desc' },
+    // Quien cancela entra a lo que pide acción: los confirmados (spec 004, D-4). "Todos" sigue en el filtro.
+    estadoInicial: this.sesion.tiene('despachador', 'comercial') ? 'CONFIRMADO' : undefined,
   });
   readonly enviando = signal(false);
   /** La fila que está pidiendo confirmación; el motivo se escribe de nuevo para cada una. */

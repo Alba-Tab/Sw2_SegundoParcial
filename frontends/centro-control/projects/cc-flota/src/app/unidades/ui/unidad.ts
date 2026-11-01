@@ -1,5 +1,5 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, computed, effect, inject, input, signal, viewChild } from '@angular/core';
+import { afterNextRender, Component, computed, effect, inject, Injector, input, signal, viewChild } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButton, MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -7,7 +7,7 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatSelectModule } from '@angular/material/select';
+import { MatSelect, MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   Encabezado,
@@ -71,9 +71,9 @@ import { UnidadFachada } from '../unidades.fachada';
       @if (unidad(); as u) {
         @if (sesion.tiene('jefe_flota') && puedeProgramar(u.estado)) {
           <button
-            mat-flat-button
+            mat-stroked-button
             #botonProgramar
-            (click)="programando() ? cerrarFormulario() : programando.set(true)"
+            (click)="programando() ? cerrarFormulario() : abrirFormulario()"
             [attr.aria-expanded]="programando()"
             aria-controls="programar"
           >
@@ -89,8 +89,10 @@ import { UnidadFachada } from '../unidades.fachada';
     @if (unidad(); as u) {
       @if (documentosEnAviso(u.documentos); as n) {
         <p class="aviso-documentos" role="status">
-          <mat-icon>warning</mat-icon>{{ n === 1 ? 'Un documento vencido o por vencer' : n + ' documentos vencidos o por vencer' }}. Para
-          renovarlo, programa un mantenimiento de tipo «Documentos».
+          <mat-icon>warning</mat-icon>{{ n === 1 ? 'Un documento vencido o por vencer' : n + ' documentos vencidos o por vencer' }}.
+          @if (sesion.tiene('jefe_flota')) {
+            Para {{ n === 1 ? 'renovarlo' : 'renovarlos' }}, programa un mantenimiento de tipo «Documentos».
+          }
         </p>
       }
       <dl class="datos">
@@ -122,7 +124,7 @@ import { UnidadFachada } from '../unidades.fachada';
               <div class="fila-acciones">
                 <mat-form-field>
                   <mat-label>Tipo</mat-label>
-                  <mat-select formControlName="tipo">
+                  <mat-select formControlName="tipo" #primerCampo>
                     @for (t of tiposMantenimiento; track t) {
                       <mat-option [value]="t">{{ t | etiqueta: 'TipoMantenimiento' }}</mat-option>
                     }
@@ -150,7 +152,7 @@ import { UnidadFachada } from '../unidades.fachada';
                 <mat-error>{{ textoError(nuevo.controls.checklist) }}</mat-error>
               </mat-form-field>
               <div class="fila-acciones">
-                <button mat-flat-button type="submit" [disabled]="enviando()"><mat-icon>event_available</mat-icon>Programar</button>
+                <button mat-flat-button type="submit" [disabled]="enviando()">Programar</button>
                 <button mat-button type="button" (click)="cerrarFormulario()" [disabled]="enviando()">Cancelar</button>
               </div>
             </form>
@@ -184,7 +186,7 @@ import { UnidadFachada } from '../unidades.fachada';
                   <mat-error>{{ textoError(fc.controls.observaciones) }}</mat-error>
                 </mat-form-field>
                 @if (cerrando() !== m.mantenimientoId) {
-                  <button mat-flat-button (click)="pedirCierre(m.mantenimientoId, zonaCierre)" [disabled]="enviando()">
+                  <button mat-stroked-button (click)="pedirCierre(m.mantenimientoId, zonaCierre)" [disabled]="enviando()">
                     <mat-icon>lock</mat-icon>Cerrar mantenimiento
                   </button>
                 }
@@ -267,6 +269,8 @@ export class UnidadPagina {
   readonly textoError = textoError;
   readonly tiposMantenimiento = ['PREVENTIVO', 'CORRECTIVO', 'DOCUMENTOS'] as const;
   private readonly botonProgramar = viewChild<MatButton>('botonProgramar');
+  private readonly primerCampo = viewChild<MatSelect>('primerCampo');
+  private readonly injector = inject(Injector);
   readonly nuevo = new FormGroup({
     tipo: new FormControl<NuevoMantenimiento['tipo']>('PREVENTIVO', { nonNullable: true }),
     fechaProgramada: new FormControl(fechaLaPaz(), { nonNullable: true, validators: [Validators.required] }),
@@ -282,6 +286,12 @@ export class UnidadPagina {
 
   constructor() {
     effect(() => this.fachada.id.set(this.id()));
+  }
+
+  /** Abre el formulario de programar con el foco en su primer campo: aparece debajo de los datos, fuera de la vista en móvil (C-7). */
+  abrirFormulario(): void {
+    this.programando.set(true);
+    afterNextRender(() => this.primerCampo()?.focus(), { injector: this.injector });
   }
 
   /** Cierra el formulario de programar y devuelve el foco al botón que lo abrió. */

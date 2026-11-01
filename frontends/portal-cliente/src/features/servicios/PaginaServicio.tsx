@@ -7,7 +7,7 @@ import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import { useParams } from '@tanstack/react-router';
-import { type ReactNode, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { type Servicio, useListarRutas, useObtenerServicio } from '../../api/generado/viajes';
 import { dinero, fecha, instante, TIPOS_CARGA } from '../../compartido/formato/formato';
 import { BotonEnlace } from '../../compartido/ui/BotonEnlace';
@@ -33,6 +33,12 @@ export function PaginaServicio() {
   const rutas = useListarRutas();
   // Tras cancelar aquí, el resultado queda en la página (no solo se cierra el diálogo) y recibe el foco (N6).
   const [recienCancelado, setRecienCancelado] = useState(false);
+  const alertaRef = useRef<HTMLDivElement>(null);
+  const cancelado = servicio.data?.estado === 'CANCELADO';
+  // Una sola vez: un ref en línea se vuelve a llamar en cada render y robaría el foco (B-2).
+  useEffect(() => {
+    if (recienCancelado && cancelado) alertaRef.current?.focus();
+  }, [recienCancelado, cancelado]);
 
   if (servicio.isPending) return conVolver(<Cargando filas={6} />);
   if (servicio.isError) return conVolver(<Problema error={servicio.error} reintentar={servicio.refetch} />);
@@ -63,10 +69,8 @@ export function PaginaServicio() {
           <Alert
             severity={recienCancelado ? 'success' : 'info'}
             role={recienCancelado ? 'status' : undefined}
-            tabIndex={-1}
-            ref={(n) => {
-              if (recienCancelado) n?.focus();
-            }}
+            tabIndex={recienCancelado ? -1 : undefined}
+            ref={alertaRef}
           >
             {(s.motivo && MOTIVOS[s.motivo]) ?? 'El servicio se canceló.'}
           </Alert>

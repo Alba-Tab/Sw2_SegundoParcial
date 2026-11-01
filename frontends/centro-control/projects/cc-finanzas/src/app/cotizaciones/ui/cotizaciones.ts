@@ -13,6 +13,7 @@ import {
   FechaPipe,
   FiltrosLista,
   PieLista,
+  posicionEstado,
 } from 'ui-comun';
 import { CotizacionesFachada } from '../cotizaciones.fachada';
 import { estadoCotizacion } from '../domain/cotizacion';
@@ -91,7 +92,7 @@ export class CotizacionesPagina {
       ruta: (c) => this.ruta(c.rutaId),
       carga: (c) => etiqueta('TipoCarga', c.tipoCarga).texto,
       monto: (c) => aCentavos(c.monto),
-      estado: (c) => etiqueta('EstadoCotizacion', estadoCotizacion(c)).texto,
+      estado: (c) => posicionEstado('EstadoCotizacion', estadoCotizacion(c)),
       creada: (c) => c.creadaEn,
     },
     ordenInicial: { orden: 'creada', dir: 'desc' },

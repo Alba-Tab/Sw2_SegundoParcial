@@ -93,7 +93,7 @@ import { Grabadora } from './grabadora';
     @if (resultado(); as res) {
       <div class="fila-acciones">
         <h2>{{ res.titulo }}</h2>
-        <button mat-stroked-button (click)="exportar()"><mat-icon>download</mat-icon> Exportar a Excel</button>
+        <button mat-stroked-button (click)="exportar()"><mat-icon>download</mat-icon>Exportar a Excel</button>
       </div>
       <cc-tabla-reporte [resultado]="res" />
     }

@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { aCentavos, aParametros, filtrar, leerFiltro, normalizar, opcionesEstado, ordenar, paginar } from 'ui-comun/dominio';
-import { controlLista } from './lista';
+import { controlLista, MemoriaListas } from './lista';
 
 const filas = [
   { placa: 'ABC-123', chofer: 'José Peña', estado: 'EN_RUTA', monto: '2800.00', km: 900 },
@@ -85,5 +85,20 @@ describe('ControlLista', () => {
     await new Promise((r) => setTimeout(r));
     expect(router.url).not.toContain('estado=');
     expect(lista.total()).toBe(3);
+  });
+
+  it('la columna del orden inicial en desc pasa a asc (sin "sin orden") y la consulta queda para volver', async () => {
+    TestBed.configureTestingModule({ providers: [provideRouter([])] });
+    const router = TestBed.inject(Router);
+    await router.navigateByUrl('/?q=abc');
+    const lista = TestBed.runInInjectionContext(() =>
+      controlLista({ filas: signal(filas), texto, orden: { placa: (f) => f.placa }, ordenInicial: { orden: 'placa', dir: 'desc' } }),
+    );
+    expect(lista.dir()).toBe('desc');
+    lista.ordenarPor({ active: 'placa', direction: '' });
+    await new Promise((r) => setTimeout(r));
+    expect(lista.dir()).toBe('asc');
+    TestBed.tick();
+    expect(TestBed.inject(MemoriaListas).de('/')).toMatchObject({ q: 'abc', orden: 'placa', dir: 'asc' });
   });
 });

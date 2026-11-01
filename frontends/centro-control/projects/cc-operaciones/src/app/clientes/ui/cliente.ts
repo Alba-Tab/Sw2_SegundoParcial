@@ -8,12 +8,13 @@ import {
   BobPipe,
   CONFIG_CENTRO,
   Encabezado,
+  Esqueleto,
   Estado,
   estadoLineaCredito,
   EtiquetaPipe,
   FechaPipe,
+  LIMITE_GATEWAY,
   Sesion,
-  Esqueleto,
 } from 'ui-comun';
 import { ClienteFachada } from '../clientes.fachada';
 import { nombreRuta } from '../domain/cliente';
@@ -38,8 +39,12 @@ import { nombreRuta } from '../domain/cliente';
   template: `
     @let titulo = cliente()?.razonSocial ?? 'Cliente';
     <cc-encabezado [titulo]="titulo" [migas]="[{ texto: 'Clientes', ruta: '/clientes' }, { texto: titulo }]">
-      @if (sesion.tiene('comercial')) {
-        <a mat-button [href]="config.urls['portal-cliente'] + '/servicios?clienteId=' + id()" target="_blank" rel="noopener"
+      @if (sesion.tiene('comercial') && cliente(); as c) {
+        <a
+          mat-button
+          [href]="config.urls['portal-cliente'] + '/servicios?clienteId=' + encodeURIComponent(c.clienteId)"
+          target="_blank"
+          rel="noopener noreferrer"
           ><mat-icon>open_in_new</mat-icon>Ver como cliente <span class="cdk-visually-hidden">(se abre en otra pestaña)</span></a
         >
       }
@@ -130,12 +135,21 @@ import { nombreRuta } from '../domain/cliente';
             <tr mat-row *matRowDef="let s; columns: columnas"></tr>
           </table>
         </div>
-        <p class="secundario">Se muestran los últimos 50.</p>
+        @if (servicios().length >= limiteServicios) {
+          <p class="secundario">Se muestran los últimos {{ limiteServicios }}.</p>
+        }
       } @else if (!error()) {
         <p class="secundario">El cliente aún no tiene servicios.</p>
       }
-    } @else if (cargado()) {
-      <p class="secundario">No se encontró ese cliente. Vuelve a la lista de clientes.</p>
+    } @else if (cargado() || !idValido()) {
+      <p class="secundario">
+        @if (listaTruncada()) {
+          Ese cliente no está entre los primeros {{ limiteClientes }} que lee el Centro de Control.
+        } @else {
+          No se encontró ese cliente.
+        }
+        Vuelve a la <a routerLink="/clientes">lista de clientes</a>.
+      </p>
     }
   `,
 })
@@ -148,6 +162,11 @@ export class ClientePagina {
   readonly linea = this.fachada.lineaCredito;
   readonly servicios = this.fachada.servicios;
   readonly cargado = this.fachada.cargado;
+  readonly idValido = this.fachada.idValido;
+  readonly listaTruncada = this.fachada.listaTruncada;
+  readonly limiteClientes = LIMITE_GATEWAY;
+  readonly limiteServicios = 50;
+  readonly encodeURIComponent = encodeURIComponent;
   readonly error = this.fachada.error;
   readonly cargando = this.fachada.cargando;
   readonly verCredito = this.fachada.verCredito;

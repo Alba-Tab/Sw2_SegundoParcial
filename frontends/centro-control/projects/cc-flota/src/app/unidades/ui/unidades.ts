@@ -13,6 +13,7 @@ import {
   FechaPipe,
   FiltrosLista,
   PieLista,
+  posicionEstado,
   vigencia,
 } from 'ui-comun';
 import { AVISO_KM, textoUnidad, type Unidad } from '../domain/unidad';
@@ -103,7 +104,7 @@ export class UnidadesPagina {
     orden: {
       placa: (u) => u.placa,
       tipo: (u) => etiqueta('TipoUnidad', u.tipoUnidad).texto,
-      estado: (u) => etiqueta('EstadoUnidad', u.estado).texto,
+      estado: (u) => posicionEstado('EstadoUnidad', u.estado),
       km: (u) => u.kmDesdeUltimoMantenimiento,
       // El documento que vence primero.
       documentos: (u) => u.documentos.map((d) => d.venceEl).sort()[0],

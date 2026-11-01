@@ -1,6 +1,10 @@
 import { TestBed } from '@angular/core/testing';
 import { ETIQUETAS, etiqueta } from 'ui-comun/dominio';
 import esquema from '../../../../../../contratos/graphql/centro-control.graphql' with { loader: 'text' };
+import comun from '../../../../../../contratos/openapi/comun.yaml' with { loader: 'text' };
+import finanzas from '../../../../../../contratos/openapi/finanzas.yaml' with { loader: 'text' };
+import flota from '../../../../../../contratos/openapi/flota.yaml' with { loader: 'text' };
+import viajes from '../../../../../../contratos/openapi/viajes.yaml' with { loader: 'text' };
 import { Estado, EtiquetaPipe } from './estado';
 
 // Enums que no se muestran crudos: tienen su propio texto en la pantalla que los usa.
@@ -11,7 +15,34 @@ const enums = [...esquema.matchAll(/^enum (\w+) \{([^}]*)\}/gm)].map(([, nombre,
   valores: cuerpo.split(/\s+/).filter(Boolean),
 }));
 
+// Campos String del esquema GraphQL con valores cerrados en OpenAPI (A-3): esquema con nombre → grupo de ETIQUETAS.
+const GRUPO_DE_OPENAPI: Record<string, string> = {
+  TipoHito: 'TipoHito',
+  TipoRemolque: 'TipoRemolque',
+  EstadoMantenimiento: 'EstadoMantenimiento',
+  RazonObservacion: 'RazonObservacion',
+  EstadoSolicitud: 'EstadoAprobacion',
+  CanalServicio: 'CanalCotizacion',
+};
+const enumsOpenapi = [...[comun, finanzas, flota, viajes].join('\n').matchAll(/^ {4}(\w+):\n {6}type: string\n {6}enum: \[([^\]]*)\]/gm)]
+  .filter(([, nombre]) => nombre in GRUPO_DE_OPENAPI)
+  .map(([, nombre, cuerpo]) => ({ nombre, grupo: GRUPO_DE_OPENAPI[nombre], valores: cuerpo.split(',').map((v) => v.trim()) }));
+
 describe('etiquetas de los enums', () => {
+  it('lee los enums con nombre de OpenAPI', () => {
+    expect(enumsOpenapi.map((x) => x.nombre).sort()).toEqual(Object.keys(GRUPO_DE_OPENAPI).sort());
+  });
+
+  it.each(enumsOpenapi)('$nombre (OpenAPI) → $grupo: todo valor tiene etiqueta', ({ grupo, valores }) => {
+    const g = (ETIQUETAS as Record<string, Record<string, unknown>>)[grupo];
+    for (const v of valores) expect(g[v], `${grupo}.${v}`).toBeDefined();
+  });
+
+  it('los estados del viaje que piden decisión nunca son neutros (A-12)', () => {
+    for (const v of ['ENTREGA_OBSERVADA', 'ENTREGA_RECHAZADA', 'REQUIERE_INTERVENCION'])
+      expect(etiqueta('EstadoViaje', v).tono).not.toBe('neutro');
+  });
+
   it('lee los enums del esquema GraphQL', () => {
     expect(enums.map((x) => x.nombre)).toContain('EstadoViaje');
   });
@@ -24,7 +55,7 @@ describe('etiquetas de los enums', () => {
 
   it('un valor desconocido sale legible y neutro, nunca crudo', () => {
     expect(etiqueta('EstadoViaje', 'NUEVO_ESTADO')).toEqual({ texto: 'Nuevo estado', icono: 'help', tono: 'neutro' });
-    expect(etiqueta('EstadoViaje', null).texto).toBe('—');
+    expect(etiqueta('EstadoViaje', null).texto).toBe('Sin dato');
   });
 
   it('cc-estado muestra texto e icono decorativo con el tono del valor', () => {

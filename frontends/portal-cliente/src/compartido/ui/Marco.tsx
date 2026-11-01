@@ -66,8 +66,9 @@ export function Marco() {
   const menu = !s.autenticado || s.necesitaEmpresa ? [] : activo.modoComercial ? MENU_COMERCIAL : MENU_CLIENTE;
   return (
     <>
-      {/* La barra y la banda del modo comercial quedan fijas juntas, aunque la barra ocupe dos líneas (N7). */}
-      <Box sx={{ position: 'sticky', top: 0, zIndex: (t) => t.zIndex.appBar }}>
+      {/* La barra y la banda del modo comercial quedan fijas juntas (N7), solo desde md: en un celular las dos líneas
+          de la barra y la banda taparían más de un cuarto de la pantalla (B-4). */}
+      <Box sx={{ position: { xs: 'static', md: 'sticky' }, top: 0, zIndex: (t) => t.zIndex.appBar }}>
         <AppBar position="static" elevation={0}>
           <Toolbar sx={{ gap: 1, flexWrap: 'wrap' }}>
             <Typography variant="h6" component="h1" sx={{ mr: 2 }}>

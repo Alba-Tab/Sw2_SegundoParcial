@@ -13,7 +13,7 @@ import type { Anomalia, Carga } from '../domain/combustible';
   imports: [Encabezado, MatTableModule, MatSortModule, DecimalPipe, BobPipe, FechaPipe, AvisoServicios, FiltrosLista, PieLista],
   template: `
     <cc-encabezado
-      titulo="Combustible"
+      [titulo]="id() ? 'Carga marcada' : 'Combustible'"
       [migas]="id() ? [{ texto: 'Combustible', ruta: '/combustible' }, { texto: 'Carga marcada' }] : []"
     />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!anomalias().length && !cargas().length" />
@@ -21,7 +21,7 @@ import type { Anomalia, Carga } from '../domain/combustible';
       @let a = anomaliaMarcada();
       @let c = cargaMarcada();
       @if (a || c) {
-        <h2>Carga marcada</h2>
+        <h2>Detalle de la carga</h2>
         <dl class="datos">
           <div>
             <dt>Placa</dt>
@@ -59,7 +59,7 @@ import type { Anomalia, Carga } from '../domain/combustible';
       }
     }
     <h2>Anomalías de los últimos 30 días</h2>
-    <cc-filtros-lista [control]="listaA" busqueda="Buscar por placa" nombre="anomalías" singular="anomalía" />
+    <cc-filtros-lista [control]="listaA" busqueda="Buscar anomalías por placa" nombre="anomalías" singular="anomalía" />
     <div class="tabla-ancha">
       <table
         mat-table
@@ -101,7 +101,7 @@ import type { Anomalia, Carga } from '../domain/combustible';
       [cargando]="cargando()"
     />
     <h2>Últimas cargas</h2>
-    <cc-filtros-lista [control]="listaC" busqueda="Buscar por placa" nombre="cargas" singular="carga" />
+    <cc-filtros-lista [control]="listaC" busqueda="Buscar cargas por placa" nombre="cargas" singular="carga" />
     <div class="tabla-ancha">
       <table
         mat-table

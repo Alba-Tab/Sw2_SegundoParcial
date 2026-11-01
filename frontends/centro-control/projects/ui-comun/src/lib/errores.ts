@@ -56,3 +56,11 @@ export function sinErroresDe(error: unknown, campo: string): unknown {
   if (resto.length === error.errors.length) return error;
   return resto.length ? new CombinedGraphQLErrors({ data: error.data, errors: resto }) : undefined;
 }
+
+/** Los índices de una lista cuyas filas salieron con ese campo en null por un error (`clientes[i].lineaCredito`, D-1). */
+export function filasConError(error: unknown, lista: string, campo: string): Set<number> {
+  const filas = erroresGraphql(error)
+    .filter((e) => e.path?.[0] === lista && e.path.includes(campo) && typeof e.path[1] === 'number')
+    .map((e) => e.path![1] as number);
+  return new Set(filas);
+}

@@ -5,6 +5,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { ActivatedRoute, RouterLink } from '@angular/router';
 import { migaPadre, type Miga } from 'ui-comun/dominio';
 import { appOrigen, CONFIG_CENTRO, NOMBRES_APPS } from './configuracion';
+import { MemoriaListas } from './lista';
 
 /**
  * Encabezado común de página (DESIGN.md, "Encabezado"): migas, "volver" a la lista padre, `h1` con su estado
@@ -24,7 +25,7 @@ import { appOrigen, CONFIG_CENTRO, NOMBRES_APPS } from './configuracion';
           @for (m of migas(); track $index) {
             <li>
               @if (m.ruta && !$last) {
-                <a [routerLink]="m.ruta">{{ m.texto }}</a>
+                <a [routerLink]="m.ruta" [queryParams]="memoria.de(m.ruta)">{{ m.texto }}</a>
               } @else {
                 <span [attr.aria-current]="$last ? 'page' : null">{{ m.texto }}</span>
               }
@@ -35,7 +36,7 @@ import { appOrigen, CONFIG_CENTRO, NOMBRES_APPS } from './configuracion';
     }
     <div class="fila">
       @if (padre(); as p) {
-        <a mat-icon-button class="volver" [routerLink]="p.ruta" [attr.aria-label]="'Volver a ' + p.texto"
+        <a mat-icon-button class="volver" [routerLink]="p.ruta" [queryParams]="memoria.de(p.ruta)" [attr.aria-label]="'Volver a ' + p.texto"
           ><mat-icon>arrow_back</mat-icon></a
         >
       }
@@ -113,6 +114,8 @@ export class Encabezado {
   readonly migas = input<Miga[]>([]);
   readonly config = inject(CONFIG_CENTRO);
   readonly nombres = NOMBRES_APPS;
+  /** Volver a la lista con su búsqueda, filtro, orden y página (C-3). */
+  readonly memoria = inject(MemoriaListas);
   readonly padre = computed(() => migaPadre(this.migas()));
   private readonly consulta = toSignal(inject(ActivatedRoute).queryParamMap);
   readonly origen = computed(() => appOrigen(this.consulta()?.get('desde'), this.config.app));

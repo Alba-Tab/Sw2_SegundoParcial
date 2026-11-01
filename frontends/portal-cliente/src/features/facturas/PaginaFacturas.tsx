@@ -22,7 +22,7 @@ import {
   type SortingState,
   useReactTable,
 } from '@tanstack/react-table';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { type Factura, getListarFacturasQueryKey, listarFacturas } from '../../api/generado/finanzas';
 import { compararMontos, dinero, fecha } from '../../compartido/formato/formato';
 import { Antiguedad } from '../../compartido/offline/Antiguedad';
@@ -33,6 +33,9 @@ import { Credito } from './Credito';
 import { Cargando } from '../../compartido/ui/Cargando';
 
 const col = createColumnHelper<Factura>();
+
+/** Páginas que se piden solas para encontrar la factura del enlace; después, el cliente sigue con «Cargar más». */
+const PAGINAS_PARA_BUSCAR = 5;
 
 /** Specs 006 y 008: facturas con su saldo (TanStack Table con orden) y la línea de crédito. */
 export function PaginaFacturas() {
@@ -84,6 +87,13 @@ export function PaginaFacturas() {
     [],
   );
   const datos = useMemo(() => paginas.data?.pages.flatMap((p) => p.items) ?? [], [paginas.data]);
+  // La factura del enlace puede estar en una página que aún no se cargó: se piden más, hasta un tope (B-3).
+  const falta = !!elegida && !datos.some((f) => f.facturaId === elegida);
+  const paginasLeidas = paginas.data?.pages.length ?? 0;
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = paginas;
+  useEffect(() => {
+    if (falta && hasNextPage && !isFetchingNextPage && paginasLeidas < PAGINAS_PARA_BUSCAR) void fetchNextPage();
+  }, [falta, hasNextPage, isFetchingNextPage, paginasLeidas, fetchNextPage]);
   // React Compiler deja sin memoizar este componente (TanStack Table no es compatible); es lo esperado.
   // eslint-disable-next-line react-hooks/incompatible-library
   const tabla = useReactTable({
@@ -112,8 +122,9 @@ export function PaginaFacturas() {
       {paginas.isPending && paginas.fetchStatus === 'fetching' && <Cargando />}
       {paginas.isError && !paginas.data && <Problema error={paginas.error} reintentar={paginas.refetch} />}
       {paginas.data && datos.length === 0 && <Typography color="text.secondary">No hay facturas.</Typography>}
-      {elegida && paginas.data && !paginas.hasNextPage && !datos.some((f) => f.facturaId === elegida) && (
-        <Alert severity="info">No encontramos la factura del enlace en esta lista.</Alert>
+      {falta && paginas.data && !paginas.hasNextPage && <Alert severity="info">No encontramos la factura del enlace en esta lista.</Alert>}
+      {falta && paginas.hasNextPage && paginasLeidas >= PAGINAS_PARA_BUSCAR && (
+        <Alert severity="info">La factura del enlace está más abajo: usa «Ver más» al final de la lista.</Alert>
       )}
       {datos.length > 0 && (
         <Paper variant="outlined" sx={{ overflowX: 'auto' }}>

@@ -1,5 +1,6 @@
 import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
+import { RouterLink } from '@angular/router';
 import { AvisoServicios, Encabezado, Esqueleto } from 'ui-comun';
 import { RutasFachada } from '../rutas.fachada';
 
@@ -7,7 +8,7 @@ import { RutasFachada } from '../rutas.fachada';
 @Component({
   selector: 'app-ruta',
   providers: [RutasFachada],
-  imports: [Esqueleto, Encabezado, DecimalPipe, AvisoServicios],
+  imports: [Esqueleto, Encabezado, DecimalPipe, AvisoServicios, RouterLink],
   template: `
     @let titulo = ruta()?.nombre ?? 'Ruta';
     <cc-encabezado [titulo]="titulo" [migas]="[{ texto: 'Rutas', ruta: '/rutas' }, { texto: titulo }]" />
@@ -31,7 +32,7 @@ import { RutasFachada } from '../rutas.fachada';
         </div>
       </dl>
     } @else if (cargado()) {
-      <p class="secundario">No se encontró esa ruta. Vuelve a la lista de rutas.</p>
+      <p class="secundario">No se encontró esa ruta. Vuelve a la <a routerLink="/rutas">lista de rutas</a>.</p>
     }
   `,
 })

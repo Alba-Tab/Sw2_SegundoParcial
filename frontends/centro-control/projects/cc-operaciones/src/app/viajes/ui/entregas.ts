@@ -4,7 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, controlLista, Encabezado, FechaPipe, FiltrosLista, PieLista } from 'ui-comun';
+import { AvisoServicios, controlLista, Encabezado, EtiquetaPipe, FechaPipe, FiltrosLista, PieLista } from 'ui-comun';
 import { textoViaje } from '../domain/viaje';
 import { EntregasFachada } from '../viajes.fachada';
 
@@ -20,6 +20,7 @@ import { EntregasFachada } from '../viajes.fachada';
     MatIconModule,
     RouterLink,
     FechaPipe,
+    EtiquetaPipe,
     AvisoServicios,
     FiltrosLista,
     PieLista,
@@ -60,8 +61,10 @@ import { EntregasFachada } from '../viajes.fachada';
         <ng-container matColumnDef="observacion"
           ><th mat-header-cell *matHeaderCellDef>Observación</th>
           <td mat-cell *matCellDef="let v">
-            {{ v.entrega?.conFirma ? 'Con firma' : 'Sin firma'
-            }}{{ v.entrega?.razones?.length ? ' · ' + v.entrega.razones.join(', ') : '' }}
+            {{ v.entrega?.conFirma ? 'Con firma' : 'Sin firma' }}
+            @for (razon of v.entrega?.razones ?? []; track razon) {
+              · {{ razon | etiqueta: 'RazonObservacion' }}
+            }
           </td></ng-container
         >
         <ng-container matColumnDef="accion"

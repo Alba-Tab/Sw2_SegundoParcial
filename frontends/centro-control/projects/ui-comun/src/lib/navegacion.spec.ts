@@ -156,4 +156,15 @@ describe('barra común', () => {
     TestBed.resetTestingModule();
     expect(marco(['jefe_flota']).componentInstance.adminUsuarios()).toBeUndefined();
   });
+
+  it('"Administrar usuarios" se abre en otra pestaña sin pasar la página de origen (B-5, B-6)', async () => {
+    const f = marco(['gerente']);
+    const el = f.nativeElement as HTMLElement;
+    [...el.querySelectorAll('button')].find((b) => b.textContent?.includes('Ana'))?.click();
+    f.detectChanges();
+    await f.whenStable();
+    const enlace = document.querySelector<HTMLAnchorElement>('a[href="http://kc:8080/admin/transporte/console/"]');
+    expect(enlace?.target).toBe('_blank');
+    expect(enlace?.rel).toBe('noopener noreferrer');
+  });
 });

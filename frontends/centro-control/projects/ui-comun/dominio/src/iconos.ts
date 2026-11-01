@@ -11,6 +11,7 @@ export const ICONOS = [
   'archive',
   'arrow_back',
   'assignment',
+  'assignment_ind',
   'badge',
   'bar_chart',
   'block',
@@ -29,6 +30,7 @@ export const ICONOS = [
   'do_not_disturb_on',
   'document_scanner',
   'download',
+  'draw',
   'error',
   'event_available',
   'event_busy',
@@ -62,6 +64,7 @@ export const ICONOS = [
   'payments',
   'person_off',
   'price_check',
+  'query_stats',
   'radio_button_unchecked',
   'receipt_long',
   'remove',
@@ -89,6 +92,7 @@ export const ICONOS = [
   'warning',
   'water_drop',
   'where_to_vote',
+  'wrong_location',
 ] as const;
 
 export type Icono = (typeof ICONOS)[number];

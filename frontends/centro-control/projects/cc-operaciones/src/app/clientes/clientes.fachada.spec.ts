@@ -25,15 +25,15 @@ describe('clientes: la línea de crédito y el monto solo a quien los ve', () =>
     const repo = preparar(['despachador']);
     TestBed.inject(ClientesFachada);
     expect(repo.observarClientes).toHaveBeenCalledWith(false, 60_000);
-    TestBed.inject(ClienteFachada).id.set('c1');
+    TestBed.inject(ClienteFachada).id.set('7f3c2a10-0000-4000-8000-000000000001');
     TestBed.tick();
-    expect(repo.observarCliente).toHaveBeenCalledWith('c1', false, false);
+    expect(repo.observarCliente).toHaveBeenCalledWith('7f3c2a10-0000-4000-8000-000000000001', false, false);
   });
 
   it('a comercial sí', () => {
     const repo = preparar(['comercial']);
-    TestBed.inject(ClienteFachada).id.set('c1');
+    TestBed.inject(ClienteFachada).id.set('7f3c2a10-0000-4000-8000-000000000001');
     TestBed.tick();
-    expect(repo.observarCliente).toHaveBeenCalledWith('c1', true, true);
+    expect(repo.observarCliente).toHaveBeenCalledWith('7f3c2a10-0000-4000-8000-000000000001', true, true);
   });
 });

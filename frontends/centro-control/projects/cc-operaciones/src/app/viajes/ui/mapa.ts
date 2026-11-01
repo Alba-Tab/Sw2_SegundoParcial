@@ -1,4 +1,4 @@
-import { afterNextRender, Component, effect, ElementRef, inject, OnDestroy, viewChild } from '@angular/core';
+import { afterNextRender, Component, effect, ElementRef, inject, input, OnDestroy, signal, viewChild } from '@angular/core';
 import * as L from 'leaflet';
 import { Encabezado, AvisoServicios, CONFIG_CENTRO, pct } from 'ui-comun';
 import type { ViajeMapa } from '../domain/viaje';
@@ -52,10 +52,17 @@ export class MapaPagina implements OnDestroy {
   readonly viajes = this.fachada.viajes;
   readonly error = this.fachada.error;
   readonly campos = { viajesEnCurso: 'Viajes', riesgo: 'Analítica' };
+  /** `?viaje=<id>` (desde "Ver en el mapa" del detalle): se centra y abre ese marcador una vez (C-15). */
+  readonly viaje = input<string>();
   private mapa?: L.Map;
   private capa = L.layerGroup();
+  private centrado = false;
+  /** Cambia con el tema del sistema: los marcadores se repintan con los colores nuevos (A-11). */
+  private readonly oscuro = signal(matchMedia('(prefers-color-scheme: dark)').matches);
+  private readonly alCambiarTema = (e: MediaQueryListEvent) => this.oscuro.set(e.matches);
 
   constructor() {
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', this.alCambiarTema);
     afterNextRender(() => {
       this.mapa = L.map(this.contenedor().nativeElement).setView([-17.78, -63.18], 7);
       L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(this.mapa);
@@ -63,6 +70,7 @@ export class MapaPagina implements OnDestroy {
     });
     effect(() => {
       const viajes = this.viajes();
+      this.oscuro();
       // Leaflet pinta en SVG con colores en JS: se leen de los tokens para seguir el tema (claro u oscuro).
       const tokens = getComputedStyle(document.documentElement);
       const conRiesgo = tokens.getPropertyValue('--mat-sys-error').trim();
@@ -73,14 +81,20 @@ export class MapaPagina implements OnDestroy {
         const lng = v.ultimaPosicion?.lng;
         if (lat === undefined || lng === undefined) continue;
         const riesgo = v.riesgo?.enRiesgo;
-        L.circleMarker([lat, lng], { radius: 9, color: riesgo ? conRiesgo : normal, fillOpacity: 0.8 })
+        const marcador = L.circleMarker([lat, lng], { radius: 9, color: riesgo ? conRiesgo : normal, fillOpacity: 0.8 })
           .bindPopup(popupViaje(v, `${this.config.urls['cc-operaciones']}/viajes/${encodeURIComponent(v.viajeId)}`))
           .addTo(this.capa);
+        if (!this.centrado && this.mapa && v.viajeId === this.viaje()) {
+          this.centrado = true;
+          this.mapa.setView([lat, lng], 11);
+          marcador.openPopup();
+        }
       }
     });
   }
 
   ngOnDestroy(): void {
+    matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', this.alCambiarTema);
     this.mapa?.remove();
   }
 }

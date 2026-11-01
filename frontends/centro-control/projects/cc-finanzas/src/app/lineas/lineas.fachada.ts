@@ -1,6 +1,6 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { cargandoDe, completo } from 'ui-comun';
+import { cargandoDe, completo, filasConError } from 'ui-comun';
 import type { LineasCreditoQuery } from '../graphql/generado';
 import { LineasRepositorio } from './data/lineas.repositorio';
 import { conLinea } from './domain/linea';
@@ -12,4 +12,8 @@ export class LineasFachada {
   readonly lineas = computed(() => conLinea(completo<LineasCreditoQuery>(this.datos())?.clientes ?? []));
   readonly error = computed(() => this.datos()?.error);
   readonly cargando = computed(() => cargandoDe(this.datos()));
+  /** Clientes cuya línea no se pudo leer: no salen en la lista, y se dice (D-1). */
+  readonly incompletas = computed(() => filasConError(this.datos()?.error, 'clientes', 'lineaCredito').size);
+  /** `clientes` trae como máximo 100 (LIMITE_MAXIMO del Gateway, sin cursor): se dice si llegó al tope (D-2). */
+  readonly clientesLeidos = computed(() => completo<LineasCreditoQuery>(this.datos())?.clientes?.length ?? 0);
 }

@@ -2,7 +2,7 @@ import { Component, computed, inject } from '@angular/core';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
 import { AvisoServicios, BobPipe, CONFIG_CENTRO, conDesde, Encabezado, Esqueleto, Estado, FechaPipe, pct } from 'ui-comun';
-import { pendientes, type EstadoTarjeta, type Pendiente } from '../domain/tablero';
+import { conPendientes, pendientes, type EstadoTarjeta, type Pendiente } from '../domain/tablero';
 import { TableroFachada } from '../tablero.fachada';
 
 /**
@@ -30,30 +30,32 @@ import { TableroFachada } from '../tablero.fachada';
     <cc-aviso-servicios [error]="datos()?.error" [sinDatos]="!t && !cargando()" />
 
     @if (t) {
-      <section aria-labelledby="titulo-pendientes">
-        <h2 id="titulo-pendientes">Pide acción</h2>
-        <ul class="pendientes">
-          @for (p of lista(); track p.clave) {
-            <li [attr.data-tono]="p.tono">
-              <mat-icon>{{ p.icono }}</mat-icon>
-              <span class="texto">
-                @if (p.app) {
-                  <a [href]="enlace(p)">{{ p.texto }}</a>
-                } @else {
-                  <span class="titulo">{{ p.texto }}</span>
-                }
-                @if (p.detalle) {
-                  <span class="detalle">{{ p.detalle }}</span>
-                }
-              </span>
-            </li>
-          } @empty {
-            <li data-tono="exito">
-              <mat-icon>check_circle</mat-icon><span class="texto"><span class="titulo">Nada pide acción ahora.</span></span>
-            </li>
-          }
-        </ul>
-      </section>
+      @if (conPendientes(bloques)) {
+        <section aria-labelledby="titulo-pendientes">
+          <h2 id="titulo-pendientes">Pide acción</h2>
+          <ul class="pendientes">
+            @for (p of lista(); track p.clave) {
+              <li [attr.data-tono]="p.tono">
+                <mat-icon>{{ p.icono }}</mat-icon>
+                <span class="texto">
+                  @if (p.app) {
+                    <a [href]="enlace(p)">{{ p.texto }}</a>
+                  } @else {
+                    <span class="titulo">{{ p.texto }}</span>
+                  }
+                  @if (p.detalle) {
+                    <span class="detalle">{{ p.detalle }}</span>
+                  }
+                </span>
+              </li>
+            } @empty {
+              <li data-tono="exito">
+                <mat-icon>check_circle</mat-icon><span class="texto"><span class="titulo">Nada pide acción ahora.</span></span>
+              </li>
+            }
+          </ul>
+        </section>
+      }
 
       <section aria-labelledby="titulo-cifras">
         <h2 id="titulo-cifras">Cifras del periodo</h2>
@@ -265,6 +267,7 @@ export class TableroPagina {
   readonly datos = this.fachada.datos;
   readonly cargando = this.fachada.cargando;
   readonly bloques = this.fachada.bloques;
+  readonly conPendientes = conPendientes;
   readonly lista = computed(() => pendientes(this.datos()?.data?.tablero, this.bloques, (c) => this.fachada.estado(c)));
   readonly datosAl = computed(() => {
     const al = this.datos()?.data?.tablero?.datosAl;

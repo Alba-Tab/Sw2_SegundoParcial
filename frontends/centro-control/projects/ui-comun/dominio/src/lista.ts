@@ -17,6 +17,9 @@ export interface FiltroLista {
 }
 
 export const TAMANOS_PAGINA = [10, 25, 50, 100];
+
+/** Lo más que devuelve el Gateway en `clientes`, `choferes` y `mantenimientos` (LIMITE_MAXIMO, sin cursor; D-2, D-3). */
+export const LIMITE_GATEWAY = 100;
 export const TAMANO_POR_DEFECTO = 25;
 
 /** Minúsculas y sin tildes: "Peña" encuentra "pena" y "Logística" encuentra "logistica". */

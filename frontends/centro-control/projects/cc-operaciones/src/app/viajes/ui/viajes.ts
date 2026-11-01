@@ -2,7 +2,7 @@ import { Component, computed, effect, inject } from '@angular/core';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, cargandoDe, controlLista, Encabezado, Estado, etiqueta, FechaPipe, FiltrosLista, PieLista } from 'ui-comun';
+import { AvisoServicios, cargandoDe, controlLista, Encabezado, Estado, FechaPipe, FiltrosLista, PieLista, posicionEstado } from 'ui-comun';
 import type { EstadoViaje } from '../../graphql/generado';
 import { ESTADOS_VIAJE, textoViaje } from '../domain/viaje';
 import { ViajesFachada } from '../viajes.fachada';
@@ -22,6 +22,8 @@ import { ViajesFachada } from '../viajes.fachada';
       [valores]="estados"
       nombre="viajes"
       singular="viaje"
+      [limite]="80"
+      [estadoEnServidor]="true"
     />
     <div class="tabla-ancha">
       <table
@@ -82,7 +84,7 @@ export class ViajesPagina {
       ruta: (v) => v.ruta?.nombre,
       chofer: (v) => v.choferNombre,
       fecha: (v) => v.fechaViaje,
-      estado: (v) => etiqueta('EstadoViaje', v.estado).texto,
+      estado: (v) => posicionEstado('EstadoViaje', v.estado),
     },
     ordenInicial: { orden: 'fecha', dir: 'desc' },
   });

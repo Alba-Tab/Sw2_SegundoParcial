@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, input, signal, viewChild } from '@angular/core';
+import { afterNextRender, Component, computed, effect, ElementRef, inject, Injector, input, signal, viewChild } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButton, MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -64,9 +64,9 @@ import { FacturaFachada } from '../facturas.fachada';
       }
       @if (puedeRegistrar()) {
         <button
-          mat-flat-button
+          mat-stroked-button
           #botonPago
-          (click)="registrando() ? cerrar() : registrando.set(true)"
+          (click)="registrando() ? cerrar() : abrir()"
           [attr.aria-expanded]="registrando()"
           aria-controls="registrar-pago"
         >
@@ -122,7 +122,7 @@ import { FacturaFachada } from '../facturas.fachada';
               <div class="fila-acciones">
                 <mat-form-field>
                   <mat-label>Monto (BOB)</mat-label>
-                  <input matInput formControlName="monto" inputmode="decimal" placeholder="2800.50" autocomplete="off" />
+                  <input matInput #primerCampo formControlName="monto" inputmode="decimal" placeholder="2800.50" autocomplete="off" />
                   <mat-hint>Con punto decimal</mat-hint>
                   <mat-error>{{ textoError(form.controls.monto) }}</mat-error>
                 </mat-form-field>
@@ -208,6 +208,8 @@ export class FacturaPagina {
   readonly textoError = textoError;
   private readonly bob = new BobPipe();
   private readonly botonPago = viewChild<MatButton>('botonPago');
+  private readonly primerCampo = viewChild<ElementRef<HTMLInputElement>>('primerCampo');
+  private readonly injector = inject(Injector);
   readonly form = new FormGroup({
     monto: new FormControl('', { nonNullable: true, validators: [Validators.required, validarMonto] }),
     fecha: new FormControl(fechaLaPaz(), { nonNullable: true, validators: [Validators.required] }),
@@ -244,6 +246,12 @@ export class FacturaPagina {
       `Se registra un pago de ${this.bob.transform(montoConDecimales(p.monto))} por ${etiqueta('MedioPago', p.medio).texto.toLowerCase()} ` +
       `con referencia ${p.referencia.trim()} en la factura ${f.numero}. El saldo queda en ${this.bob.transform(saldo)}. No se puede deshacer.`
     );
+  }
+
+  /** Abre el formulario con el foco en el monto: aparece debajo de los datos, fuera de la vista en móvil (C-7). */
+  abrir(): void {
+    this.registrando.set(true);
+    afterNextRender(() => this.primerCampo()?.nativeElement.focus(), { injector: this.injector });
   }
 
   /** Cierra el formulario y devuelve el foco al botón que lo abrió. */

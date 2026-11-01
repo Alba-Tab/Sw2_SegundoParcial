@@ -1,4 +1,4 @@
-import { Component, effect, inject, input, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -9,6 +9,7 @@ import {
   AvisoServicios,
   BobPipe,
   cargandoDe,
+  erroresGraphql,
   Confirmacion,
   Encabezado,
   Esqueleto,
@@ -20,7 +21,6 @@ import {
   mensajeDe,
   pct,
   Sesion,
-  sinErroresDe,
   textoError,
 } from 'ui-comun';
 import { RouterLink } from '@angular/router';
@@ -59,11 +59,11 @@ import { ViajeFachada } from '../viajes.fachada';
         <cc-estado grupo="EstadoViaje" [valor]="v.estado" />
       }
       @if (r?.data?.viaje?.estado === 'EN_RUTA') {
-        <a mat-stroked-button routerLink="/mapa"><mat-icon>map</mat-icon>Ver en el mapa</a>
+        <a mat-stroked-button routerLink="/mapa" [queryParams]="{ viaje: id() }"><mat-icon>map</mat-icon>Ver en el mapa</a>
       }
     </cc-encabezado>
-    <!-- Sin predicción (404 = null, o el campo con error) no es una falla: lo dice la sección de riesgo (W3). -->
-    <cc-aviso-servicios [error]="sinErroresDe(r?.error, 'riesgo')" [campos]="campos" [sinDatos]="!r?.data?.viaje" />
+    <!-- El Gateway ya convierte el 404 de la predicción en null (W3): un error en riesgo es una falla real (B-1). -->
+    <cc-aviso-servicios [error]="r?.error" [campos]="campos" [sinDatos]="!r?.data?.viaje" />
     @if (r?.data?.viaje; as v) {
       <!-- Lo que pide una decisión va primero (PRODUCT.md, principio 1). -->
       @if (sesion.tiene('despachador') && v.estado === 'ENTREGA_OBSERVADA') {
@@ -150,7 +150,10 @@ import { ViajeFachada } from '../viajes.fachada';
         <div>
           <dt>Unidad</dt>
           <dd>
-            {{ v.unidad?.placa ?? v.placa ?? '—' }}{{ v.unidad?.estado ? ' (' + (v.unidad.estado | etiqueta: 'EstadoUnidad') + ')' : '' }}
+            {{ v.unidad?.placa ?? v.placa ?? 'Sin unidad' }}
+            @if (v.unidad?.estado; as estadoUnidad) {
+              <cc-estado grupo="EstadoUnidad" [valor]="estadoUnidad" />
+            }
           </dd>
         </div>
         @if (verMonto) {
@@ -182,7 +185,11 @@ import { ViajeFachada } from '../viajes.fachada';
         <p class="secundario">Calculado {{ riesgo.calculadaEn | fecha: true }} · umbral {{ pct(riesgo.umbral) }}</p>
       } @else if (verRiesgo && v.estado === 'EN_RUTA') {
         <h2>Riesgo de retraso</h2>
-        <p class="secundario">Aún no hay datos para estimar el retraso.</p>
+        @if (errorRiesgo()) {
+          <p class="secundario">Riesgo no disponible: Analítica no responde. Reintenta en unos minutos.</p>
+        } @else {
+          <p class="secundario">Aún no hay datos para estimar el retraso.</p>
+        }
       }
 
       @if (v.entrega; as e) {
@@ -203,7 +210,11 @@ import { ViajeFachada } from '../viajes.fachada';
           @if (e.razones?.length) {
             <div>
               <dt>Razones</dt>
-              <dd>{{ e.razones.join(', ') }}</dd>
+              <dd>
+                @for (razon of e.razones; track razon) {
+                  {{ razon | etiqueta: 'RazonObservacion' }}{{ $last ? '' : ', ' }}
+                }
+              </dd>
             </div>
           }
           @if (e.motivo) {
@@ -219,7 +230,9 @@ import { ViajeFachada } from '../viajes.fachada';
       @for (h of v.hitos ?? []; track h.hitoId) {
         <p class="hito">
           <cc-estado grupo="TipoHito" [valor]="h.tipo" /> {{ h.registradoEn | fecha: true }} · {{ h.descripcion }}
-          <span class="secundario">({{ h.origen | etiqueta: 'OrigenHito' }})</span>
+          @if (h.origen) {
+            <span class="secundario">({{ h.origen | etiqueta: 'OrigenHito' }})</span>
+          }
         </p>
       } @empty {
         <p class="secundario">Sin hitos.</p>
@@ -251,10 +264,11 @@ export class ViajePagina {
   readonly datos = this.fachada.datos;
   readonly verMonto = this.fachada.verMonto;
   readonly verRiesgo = this.fachada.verRiesgo;
-  readonly sinErroresDe = sinErroresDe;
+  /** La predicción vino con error (no es el 404 de "sin datos", que el Gateway ya deja en null). */
+  readonly errorRiesgo = computed(() => erroresGraphql(this.datos()?.error).some((e) => e.path?.includes('riesgo')));
   readonly enviando = signal(false);
   readonly pct = pct;
-  readonly campos = { viaje: 'Viajes', unidad: 'Flota' };
+  readonly campos = { viaje: 'Viajes', unidad: 'Flota', riesgo: 'Analítica' };
   readonly cargandoDe = cargandoDe;
   readonly textoError = textoError;
   /** Rechazar la entrega no se deshace: se confirma con un resumen. */

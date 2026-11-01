@@ -3,3 +3,7 @@ declare module '*.graphql' {
   const texto: string;
   export default texto;
 }
+declare module '*.yaml' {
+  const texto: string;
+  export default texto;
+}

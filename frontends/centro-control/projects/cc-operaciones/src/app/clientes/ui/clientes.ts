@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import { MatIconModule } from '@angular/material/icon';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
@@ -13,7 +14,9 @@ import {
   etiqueta,
   EtiquetaPipe,
   FiltrosLista,
+  LIMITE_GATEWAY,
   PieLista,
+  posicionEstado,
 } from 'ui-comun';
 import { ClientesFachada } from '../clientes.fachada';
 import { textoCliente, type FilaCliente } from '../domain/cliente';
@@ -22,7 +25,19 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
 @Component({
   selector: 'app-clientes',
   providers: [ClientesFachada],
-  imports: [Encabezado, MatTableModule, MatSortModule, RouterLink, BobPipe, EtiquetaPipe, Estado, AvisoServicios, FiltrosLista, PieLista],
+  imports: [
+    Encabezado,
+    MatIconModule,
+    MatTableModule,
+    MatSortModule,
+    RouterLink,
+    BobPipe,
+    EtiquetaPipe,
+    Estado,
+    AvisoServicios,
+    FiltrosLista,
+    PieLista,
+  ],
   template: `
     <cc-encabezado titulo="Clientes" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!clientes().length" />
@@ -33,9 +48,21 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
         grupo="EstadoLineaCredito"
         nombre="clientes"
         singular="cliente"
+        [limite]="limite"
       />
     } @else {
-      <cc-filtros-lista [control]="lista" busqueda="Buscar por razón social, NIT o correo" nombre="clientes" singular="cliente" />
+      <cc-filtros-lista
+        [control]="lista"
+        busqueda="Buscar por razón social, NIT o correo"
+        nombre="clientes"
+        singular="cliente"
+        [limite]="limite"
+      />
+    }
+    @if (sinLeerCredito().size; as n) {
+      <p class="aviso-lista" role="status">
+        <mat-icon>cloud_off</mat-icon>No se pudo leer la línea de crédito de {{ n }} {{ n === 1 ? 'cliente' : 'clientes' }}.
+      </p>
     }
     <div class="tabla-ancha">
       <table
@@ -69,8 +96,10 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
           <td mat-cell *matCellDef="let c">
             @if (c.lineaCredito; as l) {
               {{ l.disponible | bob }} <span class="secundario">de {{ l.limite | bob }}</span>
+            } @else if (sinLeerCredito().has(c.clienteId)) {
+              <span class="secundario">No se pudo leer</span>
             } @else {
-              <span class="secundario">—</span>
+              <span class="secundario">Sin línea</span>
             }
           </td></ng-container
         >
@@ -94,6 +123,8 @@ export class ClientesPagina {
   readonly error = this.fachada.error;
   readonly cargando = this.fachada.cargando;
   readonly verCredito = this.fachada.verCredito;
+  readonly sinLeerCredito = this.fachada.sinLeerCredito;
+  readonly limite = LIMITE_GATEWAY;
   readonly campos = { clientes: 'Viajes', lineaCredito: 'Finanzas' };
   readonly columnas = ['razonSocial', 'nit', 'correo', 'canal', ...(this.verCredito ? ['disponible', 'estado'] : [])];
   readonly estadoLinea = estadoLineaCredito;
@@ -107,7 +138,7 @@ export class ClientesPagina {
       correo: (c) => c.correo,
       canal: (c) => etiqueta('CanalCotizacion', c.canal).texto,
       disponible: (c) => (c.lineaCredito ? aCentavos(c.lineaCredito.disponible) : null),
-      estado: (c) => (c.lineaCredito ? etiqueta('EstadoLineaCredito', estadoLineaCredito(c.lineaCredito)).texto : null),
+      estado: (c) => (c.lineaCredito ? posicionEstado('EstadoLineaCredito', estadoLineaCredito(c.lineaCredito)) : null),
     },
     ordenInicial: { orden: 'razonSocial', dir: 'asc' },
   });

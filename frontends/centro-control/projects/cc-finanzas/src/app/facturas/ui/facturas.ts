@@ -10,10 +10,10 @@ import {
   controlLista,
   Encabezado,
   Estado,
-  etiqueta,
   FechaPipe,
   FiltrosLista,
   PieLista,
+  posicionEstado,
 } from 'ui-comun';
 import { FacturasFachada } from '../facturas.fachada';
 
@@ -36,7 +36,14 @@ import { FacturasFachada } from '../facturas.fachada';
   template: `
     <cc-encabezado titulo="Facturas" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!facturas().length" />
-    <cc-filtros-lista [control]="lista" busqueda="Buscar por número o cliente" grupo="EstadoFactura" nombre="facturas" singular="factura">
+    <cc-filtros-lista
+      [control]="lista"
+      busqueda="Buscar por número o cliente"
+      grupo="EstadoFactura"
+      [valores]="saldo() === 'todas' ? undefined : estadosConSaldo"
+      nombre="facturas"
+      singular="factura"
+    >
       <mat-button-toggle-group
         [value]="saldo() === 'todas' ? 'todas' : 'con-saldo'"
         (change)="lista.poner({ saldo: $event.value === 'todas' ? 'todas' : null })"
@@ -114,12 +121,14 @@ export class FacturasPagina {
       monto: (f) => aCentavos(f.monto),
       saldo: (f) => aCentavos(f.saldo),
       vence: (f) => f.venceEl,
-      estado: (f) => etiqueta('EstadoFactura', f.estado).texto,
+      estado: (f) => posicionEstado('EstadoFactura', f.estado),
     },
     ordenInicial: { orden: 'vence', dir: 'asc' },
   });
   /** "Con saldo" (por defecto) o "todas": lo filtra Finanzas y vive en la URL como los demás filtros. */
   readonly saldo = this.lista.parametro('saldo');
+  /** Con saldo, una factura pagada no puede salir: el filtro de estado no la ofrece (C-9). */
+  readonly estadosConSaldo = ['EMITIDA', 'PAGADA_PARCIAL'];
 
   constructor() {
     effect(() => this.fachada.conSaldo.set(this.saldo() === 'todas' ? null : true));

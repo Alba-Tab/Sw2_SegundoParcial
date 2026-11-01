@@ -52,6 +52,7 @@ describe('Tablero por rol (spec 016, paso 10)', () => {
     const { texto } = montar(['comercial'], { data: { tablero: { periodo: 'ESTA_SEMANA', viajesEnCurso: [] } } });
     expect(texto).not.toContain('Alertas abiertas');
     expect(texto).not.toContain('Datos al');
+    expect(texto).not.toContain('Nada pide acción');
   });
 
   it('un SIN_PERMISO inesperado se ve como "Sin acceso" y un servicio caído como "no disponible"', () => {

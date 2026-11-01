@@ -1,7 +1,6 @@
 import Block from '@mui/icons-material/Block';
 import Cancel from '@mui/icons-material/Cancel';
 import CheckCircle from '@mui/icons-material/CheckCircle';
-import ErrorIcon from '@mui/icons-material/Error';
 import EventAvailable from '@mui/icons-material/EventAvailable';
 import HourglassTop from '@mui/icons-material/HourglassTop';
 import Lock from '@mui/icons-material/Lock';
@@ -39,7 +38,8 @@ const ESTADOS: Record<EstadoViaje, Etiqueta> = {
   CANCELADO: { texto: 'Cancelado', icono: <Cancel />, color: 'default' },
   ENTREGA_OBSERVADA: { texto: 'Entrega en revisión', icono: <Warning />, color: 'warning' },
   ENTREGA_RECHAZADA: { texto: 'Entrega rechazada', icono: <Block />, color: 'error' },
-  REQUIERE_INTERVENCION: { texto: 'En revisión por la empresa', icono: <ErrorIcon />, color: 'warning' },
+  // Para el cliente es «esperando a la empresa», no una falla: mismo icono y tono que «Confirmando» (A-5).
+  REQUIERE_INTERVENCION: { texto: 'En revisión por la empresa', icono: <HourglassTop />, color: 'primary' },
 };
 
 const EN_APROBACION: Etiqueta = { texto: 'En aprobación', icono: <HourglassTop />, color: 'warning' };

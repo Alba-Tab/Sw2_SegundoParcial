@@ -51,7 +51,7 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
   ],
   template: `
     <cc-encabezado
-      [titulo]="id() ? 'Acción propuesta' : 'Acciones propuestas por el agente'"
+      [titulo]="id() ? 'Acción propuesta' : 'Acciones del agente'"
       [migas]="id() ? [{ texto: 'Acciones del agente', ruta: '/acciones' }, { texto: 'Acción propuesta' }] : []"
     />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!visibles().length" />

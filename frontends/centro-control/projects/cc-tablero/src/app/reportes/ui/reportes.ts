@@ -125,7 +125,7 @@ import { ReportesFachada } from '../reportes.fachada';
             <button mat-flat-button type="submit">Ver</button>
             @if (mostrado) {
               <button mat-stroked-button type="button" (click)="exportar()" [disabled]="exportando()">
-                <mat-icon>download</mat-icon> Exportar a Excel
+                <mat-icon>download</mat-icon>Exportar a Excel
               </button>
             }
           </form>

@@ -70,9 +70,9 @@ export const ETIQUETAS = {
     ENTREGA_OBSERVADA: e('Entrega observada', 'warning', 'aviso'),
     ENTREGA_RECHAZADA: e('Entrega rechazada', 'block', 'error'),
     VIAJE_REQUIERE_INTERVENCION: e('Viaje requiere intervención', 'error', 'error'),
-    MANTENIMIENTO_REQUERIDO: e('Mantenimiento requerido', 'build', 'aviso'),
+    MANTENIMIENTO_REQUERIDO: e('Mantenimiento requerido', 'warning', 'aviso'),
     CAIDA_COMBUSTIBLE: e('Caída de combustible', 'local_gas_station', 'aviso'),
-    ANOMALIA_COMBUSTIBLE: e('Anomalía de combustible', 'local_gas_station', 'aviso'),
+    ANOMALIA_COMBUSTIBLE: e('Anomalía de combustible', 'query_stats', 'aviso'),
     RIESGO_RETRASO: e('Riesgo de retraso', 'schedule', 'aviso'),
     ACCION_PROPUESTA: e('Acción propuesta', 'smart_toy', 'info'),
   },
@@ -128,7 +128,7 @@ export const ETIQUETAS = {
   EstadoAprobacion: {
     PENDIENTE: e('Pendiente', 'hourglass_top', 'aviso'),
     APROBADA: e('Aprobada', 'thumb_up', 'exito'),
-    RECHAZADA: e('Rechazada', 'block', 'error'),
+    RECHAZADA: e('Rechazada', 'block', 'neutro'),
     VENCIDA: e('Vencida', 'event_busy', 'neutro'),
   },
   MotivoAprobacion: {
@@ -159,8 +159,12 @@ export const ETIQUETAS = {
     ENTREGA: e('Entrega', 'check_circle', 'exito'),
     RECHAZO_RECEPTOR: e('Rechazo en destino', 'block', 'error'),
   },
+  RazonObservacion: {
+    FUERA_GEOCERCA: e('Fuera de la geocerca', 'wrong_location', 'aviso'),
+    SIN_FIRMA: e('Sin firma', 'draw', 'aviso'),
+  },
   Riesgo: {
-    EN_RIESGO: e('Riesgo', 'schedule', 'error'),
+    EN_RIESGO: e('Riesgo', 'schedule', 'aviso'),
   },
   // Calculados en el front (no vienen del esquema): ver `vigencia`, `estadoLineaCredito` y `estadoChofer`.
   Vigencia: {
@@ -175,18 +179,24 @@ export const ETIQUETAS = {
   },
   EstadoChofer: {
     DISPONIBLE: e('Disponible', 'check_circle', 'exito'),
-    OCUPADO: e('En viaje o reservado', 'route', 'info'),
+    OCUPADO: e('Ocupado', 'assignment_ind', 'info'),
     INACTIVO: e('Inhabilitado', 'person_off', 'neutro'),
   },
 } satisfies Record<string, Record<string, Etiqueta>>;
 
 export type GrupoEtiqueta = keyof typeof ETIQUETAS;
 
+/** Para ordenar por estado: la posición del valor en su grupo (el orden del ciclo de vida), no el texto alfabético (C-10). */
+export function posicionEstado(grupo: GrupoEtiqueta, valor: string | null | undefined): number | null {
+  const i = valor ? Object.keys(ETIQUETAS[grupo]).indexOf(valor) : -1;
+  return i < 0 ? null : i;
+}
+
 /** "MANTENIMIENTO_PENDIENTE" → "Mantenimiento pendiente": para un valor que el mapa aún no conoce. */
 export const legible = (valor: string): string => (valor.charAt(0) + valor.slice(1).toLowerCase()).replaceAll('_', ' ');
 
 /** La etiqueta del valor; si el backend manda uno nuevo, sale legible y neutro en vez de crudo. */
 export function etiqueta(grupo: GrupoEtiqueta, valor: string | null | undefined): Etiqueta {
-  if (!valor) return e('—', 'remove');
+  if (!valor) return e('Sin dato', 'remove');
   return (ETIQUETAS[grupo] as Record<string, Etiqueta>)[valor] ?? e(legible(valor), 'help');
 }

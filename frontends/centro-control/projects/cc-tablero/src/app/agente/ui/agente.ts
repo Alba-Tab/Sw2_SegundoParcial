@@ -89,7 +89,7 @@ import { mensajeDisparo, urlTraza } from '../domain/mision';
       color: var(--mat-sys-error);
     }
     code {
-      font-size: 12px;
+      font: var(--mat-sys-body-small);
       white-space: pre-wrap;
       word-break: break-all;
     }

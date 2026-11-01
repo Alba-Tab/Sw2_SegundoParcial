@@ -1,4 +1,4 @@
-import { Component, computed, effect, inject, Injectable, input, signal, type Signal } from '@angular/core';
+import { Component, computed, DestroyRef, effect, inject, Injectable, input, signal, type Signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -7,7 +7,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatPaginatorIntl, MatPaginatorModule, type PageEvent } from '@angular/material/paginator';
 import { MatSelectModule } from '@angular/material/select';
 import type { Sort } from '@angular/material/sort';
-import { ActivatedRoute, Router } from '@angular/router';
+import { ActivatedRoute, Router, type Params } from '@angular/router';
 import { Esqueleto } from './esqueleto';
 import {
   aParametros,
@@ -36,7 +36,12 @@ export interface OpcionesLista<T> {
   ordenInicial?: { orden: string; dir: Exclude<Direccion, ''> };
   /** Separa los parámetros de dos listas en la misma página. */
   prefijo?: string;
+  /** El estado que se muestra si la URL no pide otro (lo que pide acción, D-4); "Todos" se escribe como `estado=todos`. */
+  estadoInicial?: string;
 }
+
+/** En la URL, "Todos" explícito cuando la lista tiene un estado inicial. */
+const TODOS = 'todos';
 
 /** Lo que leen los componentes de la lista, sin el tipo de la fila. */
 export type VistaLista = Pick<
@@ -49,6 +54,19 @@ export type VistaLista = Pick<
  * params, sin entrada nueva en el historial) para que volver desde el detalle lo conserve. Se crea en el contexto de
  * inyección del componente: `readonly lista = controlLista({ filas: this.unidades, texto: (u) => u.placa })`.
  */
+/** La última consulta (búsqueda, filtro, orden, página) de cada lista, para que "volver" desde el detalle la conserve (C-3). */
+@Injectable({ providedIn: 'root' })
+export class MemoriaListas {
+  private readonly consultas = new Map<string, Params>();
+  guardar(ruta: string, params: Params): void {
+    this.consultas.set(ruta, params);
+  }
+  /** Los query params guardados de esa ruta (`/viajes`), o null si no se visitó. */
+  de(ruta: string | undefined): Params | null {
+    return (ruta && this.consultas.get(ruta)) || null;
+  }
+}
+
 export class ControlLista<T> {
   private readonly router = inject(Router);
   private readonly ruta = inject(ActivatedRoute);
@@ -68,7 +86,8 @@ export class ControlLista<T> {
     this.filas = o.filas;
     this.filtro = computed(() => {
       const p = this.params();
-      return leerFiltro((n) => p.get(n), o.prefijo);
+      const f = leerFiltro((n) => p.get(n), o.prefijo);
+      return { ...f, estado: f.estado === TODOS ? null : (f.estado ?? o.estadoInicial ?? null) };
     });
     this.orden = computed(() => this.filtro().orden ?? o.ordenInicial?.orden ?? '');
     this.dir = computed(() => (this.filtro().orden ? this.filtro().dir : (o.ordenInicial?.dir ?? '')));
@@ -79,7 +98,12 @@ export class ControlLista<T> {
     this.total = computed(() => this.filtradas().length);
     this.pagina = computed(() => Math.min(this.filtro().pagina, Math.max(0, Math.ceil(this.total() / this.filtro().tamano) - 1)));
     this.visibles = computed(() => paginar(this.filtradas(), this.pagina(), this.filtro().tamano));
-    this.hayFiltros = computed(() => !!this.filtro().q || !!this.filtro().estado);
+    this.hayFiltros = computed(() => !!this.filtro().q || (this.filtro().estado ?? null) !== (o.estadoInicial ?? null));
+    const memoria = inject(MemoriaListas);
+    effect(() => {
+      const p = this.params();
+      memoria.guardar(this.router.url.split(/[?#]/)[0], Object.fromEntries(p.keys.map((k) => [k, p.get(k)])));
+    });
   }
 
   buscar(q: string): void {
@@ -87,19 +111,26 @@ export class ControlLista<T> {
   }
 
   filtrarEstado(estado: string | null): void {
-    this.ir({ estado, pagina: 0 });
+    this.ir({ estado: this.estadoEnUrl(estado), pagina: 0 });
   }
 
+  /** Ciclo asc/desc sin "sin orden": si no, la columna del orden inicial en desc nunca podría ir en asc (C-2). */
   ordenarPor(s: Sort): void {
-    this.ir({ orden: s.direction ? s.active : null, dir: s.direction, pagina: 0 });
+    this.ir({ orden: s.active, dir: s.direction || 'asc', pagina: 0 });
   }
 
   irAPagina(e: PageEvent): void {
     this.ir({ pagina: e.pageIndex, tamano: e.pageSize });
   }
 
+  /** Vuelve a lo que se ve al entrar: sin búsqueda y con el estado inicial. */
   limpiar(): void {
     this.ir({ q: '', estado: null, pagina: 0 });
+  }
+
+  private estadoEnUrl(estado: string | null): string | null {
+    if (!this.o.estadoInicial) return estado;
+    return estado === this.o.estadoInicial ? null : (estado ?? TODOS);
   }
 
   /** Un filtro propio de la página que también vive en la URL (por ejemplo, "con saldo" en facturas). */
@@ -152,6 +183,9 @@ export const controlLista = <T>(o: OpcionesLista<T>): ControlLista<T> => new Con
     }
     <ng-content />
     <p class="conteo" role="status">{{ conteo() }}</p>
+    @if (tope(); as t) {
+      <p class="tope">{{ t }}</p>
+    }
   `,
   styles: `
     :host {
@@ -173,6 +207,12 @@ export const controlLista = <T>(o: OpcionesLista<T>): ControlLista<T> => new Con
       font: var(--mat-sys-body-medium);
       color: var(--mat-sys-on-surface-variant);
     }
+    .tope {
+      flex: 1 1 100%;
+      margin: 0;
+      font: var(--mat-sys-body-medium);
+      color: var(--mat-sys-on-surface-variant);
+    }
   `,
 })
 export class FiltrosLista {
@@ -185,6 +225,12 @@ export class FiltrosLista {
   /** Plural y singular de lo que se lista: "unidades", "unidad". */
   readonly nombre = input.required<string>();
   readonly singular = input.required<string>();
+  /** Cuántas filas pide la página como máximo: si llegan todas, se dice que la lista está truncada (C-8, D-2, D-3). */
+  readonly limite = input<number>();
+  /** El servidor las manda de la más reciente a la más antigua ("los 80 más recientes"); si no, "los primeros 100". */
+  readonly recientes = input(false);
+  /** El filtro de estado ya lo aplicó el servidor: el "de N" solo se muestra si filtra la búsqueda (C-14). */
+  readonly estadoEnServidor = input(false);
   readonly opciones = computed(() => (this.grupo() ? opcionesEstado(this.grupo()!, this.valores()) : []));
   readonly texto = signal('');
   private espera?: ReturnType<typeof setTimeout>;
@@ -193,10 +239,20 @@ export class FiltrosLista {
     const c = this.control();
     const n = c.total();
     const cuantos = `${n} ${n === 1 ? this.singular() : this.nombre()}`;
-    return c.hayFiltros() ? `${cuantos} de ${c.filas().length}` : cuantos;
+    const f = c.filtro();
+    return f.q || (f.estado && !this.estadoEnServidor()) ? `${cuantos} de ${c.filas().length}` : cuantos;
+  });
+
+  readonly tope = computed(() => {
+    const n = this.limite();
+    if (!n || this.control().filas().length < n) return null;
+    const cuales = this.recientes() ? `los ${n} ${this.nombre()} más recientes` : `los primeros ${n} ${this.nombre()}`;
+    return `Se muestran ${cuales}; la búsqueda y el orden solo usan esos.`;
   });
 
   constructor() {
+    // Si la página se cierra antes de los 250 ms, la búsqueda pendiente no debe navegar de vuelta a la lista (C-1).
+    inject(DestroyRef).onDestroy(() => clearTimeout(this.espera));
     // La URL manda (volver atrás, "Limpiar filtros"); mientras se escribe, no se pisa lo tecleado.
     effect(() => {
       const q = this.control().filtro().q;

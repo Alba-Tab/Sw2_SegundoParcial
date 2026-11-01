@@ -14,6 +14,9 @@ export const montoConDecimales = (texto: string): string => {
   return centavos === null ? texto : desdeCentavos(centavos);
 };
 
+/** Un id de la URL con forma de UUID: si no la tiene, la ficha dice "no se encontró" sin consultar al servidor (D-9). */
+export const esUuid = (texto: string): boolean => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(texto);
+
 /** Errores de un campo con la forma de `ValidationErrors` de Angular. */
 export type ErroresCampo = Record<string, unknown> | null | undefined;
 

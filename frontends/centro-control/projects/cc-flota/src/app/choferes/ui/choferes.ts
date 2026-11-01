@@ -2,7 +2,17 @@ import { Component, inject } from '@angular/core';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, controlLista, Encabezado, Estado, etiqueta, FechaPipe, FiltrosLista, PieLista } from 'ui-comun';
+import {
+  AvisoServicios,
+  controlLista,
+  Encabezado,
+  Estado,
+  FechaPipe,
+  FiltrosLista,
+  LIMITE_GATEWAY,
+  PieLista,
+  posicionEstado,
+} from 'ui-comun';
 import { ChoferesFachada } from '../choferes.fachada';
 import { estadoChofer, textoChofer, vigenciaLicencia, type Chofer } from '../domain/chofer';
 
@@ -14,7 +24,14 @@ import { estadoChofer, textoChofer, vigenciaLicencia, type Chofer } from '../dom
   template: `
     <cc-encabezado titulo="Choferes" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!choferes().length" />
-    <cc-filtros-lista [control]="lista" busqueda="Buscar por nombre o licencia" grupo="EstadoChofer" nombre="choferes" singular="chofer" />
+    <cc-filtros-lista
+      [control]="lista"
+      busqueda="Buscar por nombre o licencia"
+      grupo="EstadoChofer"
+      nombre="choferes"
+      singular="chofer"
+      [limite]="limite"
+    />
     <div class="tabla-ancha">
       <table
         mat-table
@@ -59,6 +76,7 @@ export class ChoferesPagina {
   readonly error = this.fachada.error;
   readonly cargando = this.fachada.cargando;
   readonly campos = { choferes: 'Flota' };
+  readonly limite = LIMITE_GATEWAY;
   readonly columnas = ['nombre', 'licencia', 'vence', 'estado'];
   readonly estado = estadoChofer;
   readonly vigencia = (c: Chofer) => vigenciaLicencia(c);
@@ -70,7 +88,7 @@ export class ChoferesPagina {
       nombre: (c) => c.nombre,
       licencia: (c) => c.licenciaCategoria,
       vence: (c) => c.licenciaVenceEl,
-      estado: (c) => etiqueta('EstadoChofer', estadoChofer(c)).texto,
+      estado: (c) => posicionEstado('EstadoChofer', estadoChofer(c)),
     },
     ordenInicial: { orden: 'nombre', dir: 'asc' },
   });

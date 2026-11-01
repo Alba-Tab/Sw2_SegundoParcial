@@ -101,8 +101,9 @@ query LineaCredito($clienteId: ID!) {
   }
 }
 
-# G6: la línea de cada cliente va anidada en `clientes` (una sola petición del navegador). El Gateway la resuelve con
-# una llamada a Finanzas por cliente: con más de ~199 clientes se agota su presupuesto (200) y las demás salen en null.
+# G6: la línea de cada cliente va anidada en `clientes` (una sola petición del navegador). `clientes` trae como máximo
+# 100 (LIMITE_MAXIMO del Gateway, sin cursor) y el Gateway pide a Finanzas una línea por cliente; la pantalla dice
+# si llegó al tope y cuántas líneas vinieron con error (revisión D-1, D-2).
 query LineasCredito {
   clientes {
     clienteId

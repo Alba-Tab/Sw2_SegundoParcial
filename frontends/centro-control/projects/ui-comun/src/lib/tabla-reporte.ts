@@ -73,7 +73,7 @@ export interface Resultado {
     }
     .etiqueta,
     .valor {
-      font-size: 12px;
+      font: var(--mat-sys-body-small);
       fill: var(--mat-sys-on-surface);
     }
     .serie-0 {

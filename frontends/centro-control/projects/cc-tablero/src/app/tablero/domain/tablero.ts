@@ -34,6 +34,9 @@ export function bloquesVisibles(roles: readonly string[]): Omit<TableroQueryVari
 
 export type Bloques = ReturnType<typeof bloquesVisibles>;
 
+/** ¿El rol ve algún bloque que pueda pedir acción? Si no (comercial), "Nada pide acción" sería una afirmación falsa (C-5). */
+export const conPendientes = (b: Bloques): boolean => !!((b.verViajes && b.verRiesgo) || b.verCobranza || b.verUnidades || b.verAlertas);
+
 /** Cómo se ve una tarjeta cuando su bloque salió en null: servicio caído (FR1, FR2) o rol sin acceso. */
 export type EstadoTarjeta = 'no-disponible' | 'sin-acceso' | null;
 

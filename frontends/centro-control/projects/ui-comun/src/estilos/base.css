@@ -138,3 +138,15 @@ html:not(.iconos-listos) .material-symbols-outlined {
     scroll-behavior: auto !important;
   }
 }
+
+/* Una lista incompleta (D-1): tono aviso con icono y texto; lo demás de la lista sí se muestra. */
+.aviso-lista {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--mat-sys-advertencia-container);
+  color: var(--mat-sys-on-advertencia-container);
+}
