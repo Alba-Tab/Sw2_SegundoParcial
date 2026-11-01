@@ -201,6 +201,34 @@ Revisado y aprobado con cambios por un agente revisor el 01-11-2026. **Ningún c
 - JV-4 (pestañas estiradas) sigue para la vuelta C: a 1280 px las 6 pestañas de Operaciones se ven anchas.
 - ICONIX (anotar): pestañas de Operaciones reagrupadas (Viajes con su vista de mapa y Decisiones).
 
+**Vuelta C (01-11-2026), hecha en `feat/ui-comun/arreglos-ux-web`, sin push.** `generar:verificar`, formato, capas, complejidad, pruebas de las 5 piezas (ui-comun 128, operaciones 26, finanzas 20, tablero 37, flota 14) y build de las 4 apps en verde y sin advertencias nuevas; el portal pasa `npm run verificar` (54).
+
+| Id | Qué quedó | Prueba |
+|---|---|---|
+| JV-4 | `MAT_TABS_CONFIG` con `stretchTabs: false` en `configurarApp`: vale para las 4 apps (y cualquier pestaña futura) sin repetir `mat-stretch-tabs="false"` en cada `seccion.ts`. Alineadas a la izquierda (lo de Material por defecto) | Medido a 1280 px en Operaciones: de 117 a 209 px por pestaña según el texto, la primera a 24 px del borde |
+| JV-5 | Reportes abre con el primer reporte que el rol puede ver, ya consultado (el catálogo pone primero cobranza y riesgo: gerente y administración ven Cuentas por cobrar, despacho Viajes en riesgo, flota Combustible) y muestra la descripción del elegido, que antes solo estaba en el `title` | `reportes.spec.ts` |
+| JV-6 | «Unidades por estado (tractos y remolques)»: «En viaje 2» junto a «Viajes en curso 1» ya no parece un error | `tablero.spec.ts` sigue verde |
+| JV-7 | Portal con `@fontsource-variable/roboto` 5.3.0 (la misma del Centro de Control) y `@font-face` propio en `compartido/tema/global.css`, importado en `main.tsx` y en Storybook. Sin Google Fonts | Medido en el navegador: Roboto cargada, latín 43.136 bytes (el latín extendido, 29.392, no se baja en la portada) y ninguna petición a Google; build: los dos `.woff2` (72 KB) entran en el precache de la PWA |
+| JV-8 | `text-wrap: balance` en `h1`–`h3` y `pretty` en `p`, `dd` y `li` (Centro de Control, `base.css`) y en `p` y `li` (portal, `global.css`). La bienvenida ya no deja «crédito.» sola | Medido: `textWrap` `balance` y `pretty` |
+| FB-7 | `<cc-datos-al>` (Tablero, tablas de reporte y Conducción): con más de 30 minutos sin eventos nuevos procesados (`MINUTOS_DATOS_VIEJOS`, `datosViejos` en `ui-comun/dominio`) va en tono aviso, con `warning` y «las cifras pueden no estar al día»; se vuelve a mirar cada minuto aunque la respuesta no cambie. Umbral: con viajes en ruta llegan posiciones e hitos cada pocos minutos; no afirma una falla. Con la semilla (datos al 31/10 18:01) se ve siempre | `ui-comun.spec.ts` y `tablero.spec.ts` (FB-7); contraste 13,28:1 en claro y 7,22:1 en oscuro |
+| NG-5 | «Puntaje (0 a 100)» en Conducción y en la ficha del chofer, con subtítulo que dice qué es 100 y que bajo 70 se marca; el puntaje bajo lleva `warning` y texto para el lector además del color (`.icono-en-linea`, que reemplaza el `.km-aviso` repetido de Unidades). Combustible: «Puntaje (0 a 1)» y una frase con su sentido. Sin columna de severidad | Visto: «0,65» bajo «Puntaje (0 a 1)» |
+| FL-4 | La pestaña «Conducción» abre «Conducción» (título de página y de la pestaña del navegador) | Visto |
+
+**Sección 5 en DESIGN.md.** Las ocho reglas quedan donde corresponden, sin repetir lo que ya estaba: «Navegación de sección», «Ancho mínimo», «Enlaces» y «Un dato, una dueña» al principio de «Patrones de página»; «Números» junto a «Valor vacío»; los tres errores como tabla dentro de «Vacío, carga y error», con «Lo ya mostrado no desaparece»; «Lo bloqueado dice por qué» en «Estados»; Roboto del portal en «Tokens» y `text-wrap` en «Escala tipográfica».
+
+**Verificación de las reglas en el código:**
+- Números: ningún `| number`, `DecimalPipe`, `PercentPipe` ni `CurrencyPipe`. Salían crudos y se corrigieron: toneladas en Servicios, ficha del viaje, ficha del cliente y Cotizaciones; distancia de la entrega en la ficha y en Entregas observadas («Sin dato» si falta); en el portal, toneladas, km de la ruta y la posición (`toFixed(4)`, ahora «-17,7833; -63,1821») con una función `numero` nueva (prueba en `formato.test.ts`). Queda un `toFixed(2)` en `tabla-reporte.ts` que no llega a la pantalla (el total pasa después por `numero`). Los conteos enteros (frenadas, alertas) van tal cual: la regla escrita es para números con decimales o de cuatro cifras.
+- Enlaces: ningún color fijo en componentes; el único hexadecimal es el respaldo de `var(--mat-sys-on-surface-variant, #43474e)` en los `index.html` de FB-3, antes de que cargue el tema.
+- Errores: `cloud_off` y `search_off` como dice la tabla. **Sin permiso no cumple del todo:** el tablero dice «Sin acceso a …» sin decir quién puede, y no tiene ícono porque `lock` ya significa «Cerrado» (la regla 3 del plan choca con «un ícono, un significado»). Queda para decidir el ícono (por ejemplo `lock_person`, que habría que agregar a la fuente) antes de tocar el código.
+- Datos que no desaparecen, lo bloqueado y la dueña: cumplen (FB-1, NG-4, FL-2). Los `[disabled]` que quedan solo duran mientras se envía.
+- 375 px: `scrollWidth` igual al ancho en el Tablero, Combustible y el portal, en oscuro.
+- Seis pestañas como máximo: Tablero 4, Operaciones 6, Flota 5, Finanzas 5, portal 4.
+
+**Pendiente o fuera de la vuelta C:**
+- El ícono de «sin permiso» y el «quién puede» del tablero (arriba): contradicción entre el plan y DESIGN.md, sin elegir.
+- No se vio el portal con sesión de cliente: las toneladas y la posición formateadas solo se probaron con la prueba unitaria.
+- Sigue sin verse con sesión de despachador, jefe de flota, administración ni cliente (sección 7).
+
 ## 9. Para ICONIX
 
 Lo que cambió en la estructura y hay que anotar en la documentación ICONIX. No se editan los `.docx` ni los `.eap`: esta lista es para quien la actualice.
