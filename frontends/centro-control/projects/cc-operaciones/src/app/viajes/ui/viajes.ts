@@ -17,13 +17,15 @@ import {
 import type { EstadoViaje } from '../../graphql/generado';
 import { ESTADOS_VIAJE, textoViaje } from '../domain/viaje';
 import { ViajesFachada } from '../viajes.fachada';
+import { Vistas, VISTAS } from '../../vistas';
 
 @Component({
   selector: 'app-viajes',
   providers: [ViajesFachada],
-  imports: [Encabezado, MatTableModule, MatSortModule, RouterLink, FechaPipe, Estado, AvisoServicios, FiltrosLista, PieLista],
+  imports: [Vistas, Encabezado, MatTableModule, MatSortModule, RouterLink, FechaPipe, Estado, AvisoServicios, FiltrosLista, PieLista],
   template: `
     <cc-encabezado titulo="Viajes" />
+    <app-vistas [vistas]="vistas" nombre="Vistas de viajes" />
     @let r = datos();
     <cc-aviso-servicios [error]="r?.error" [datosAl]="r?.datosAl" [campos]="campos" [sinDatos]="!r?.data?.viajes?.length" />
     <cc-filtros-lista
@@ -82,6 +84,7 @@ import { ViajesFachada } from '../viajes.fachada';
   `,
 })
 export class ViajesPagina {
+  readonly vistas = VISTAS.viajes;
   private readonly fachada = inject(ViajesFachada);
   readonly estados = ESTADOS_VIAJE;
   readonly columnas = columnasConEstado(['placa', 'cliente', 'ruta', 'chofer', 'fecha', 'estado']);

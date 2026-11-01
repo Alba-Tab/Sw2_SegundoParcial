@@ -7,12 +7,14 @@ import { RouterLink } from '@angular/router';
 import { AvisoServicios, controlLista, Encabezado, EtiquetaPipe, FechaPipe, FiltrosLista, PieLista, Sesion } from 'ui-comun';
 import { textoViaje } from '../domain/viaje';
 import { EntregasFachada } from '../viajes.fachada';
+import { Vistas, VISTAS } from '../../vistas';
 
 /** Spec 007: entregas fuera de la geocerca o sin firma, para aprobar o rechazar en el detalle del viaje. */
 @Component({
   selector: 'app-entregas',
   providers: [EntregasFachada],
   imports: [
+    Vistas,
     Encabezado,
     MatTableModule,
     MatSortModule,
@@ -27,6 +29,7 @@ import { EntregasFachada } from '../viajes.fachada';
   ],
   template: `
     <cc-encabezado titulo="Entregas observadas" subtitulo="Fuera de la geocerca o sin firma: apruébalas o recházalas en el viaje" />
+    <app-vistas [vistas]="vistas" nombre="Colas de decisión" />
     <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!lista.filas().length" />
     <cc-filtros-lista
       [control]="lista"
@@ -102,6 +105,7 @@ import { EntregasFachada } from '../viajes.fachada';
   `,
 })
 export class EntregasPagina {
+  readonly vistas = VISTAS.decisiones;
   private readonly fachada = inject(EntregasFachada);
   readonly error = this.fachada.error;
   readonly datosAl = this.fachada.datosAl;

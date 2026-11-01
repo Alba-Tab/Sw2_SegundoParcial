@@ -3,6 +3,7 @@ import * as L from 'leaflet';
 import { Encabezado, AvisoServicios, CONFIG_CENTRO, pct } from 'ui-comun';
 import type { ViajeMapa } from '../domain/viaje';
 import { MapaFachada } from '../viajes.fachada';
+import { Vistas, VISTAS } from '../../vistas';
 
 /**
  * Contenido del popup armado con nodos y `textContent`: la razón social la escribe el cliente al registrarse, así que
@@ -33,8 +34,9 @@ export function popupViaje(v: ViajeMapa, urlViaje: string): HTMLElement {
 @Component({
   selector: 'app-mapa',
   providers: [MapaFachada],
-  imports: [Encabezado, AvisoServicios],
+  imports: [Vistas, Encabezado, AvisoServicios],
   template: `<cc-encabezado titulo="Mapa en vivo" />
+    <app-vistas [vistas]="vistas" nombre="Vistas de viajes" />
     <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!viajes().length" />
     <!-- La región vive siempre en el DOM para que el lector anuncie el texto cuando aparece (V3-6). -->
     <p class="secundario" role="status">
@@ -55,6 +57,7 @@ export function popupViaje(v: ViajeMapa, urlViaje: string): HTMLElement {
   `,
 })
 export class MapaPagina implements OnDestroy {
+  readonly vistas = VISTAS.viajes;
   private readonly contenedor = viewChild.required<ElementRef<HTMLDivElement>>('mapa');
   private readonly config = inject(CONFIG_CENTRO);
   private readonly fachada = inject(MapaFachada);

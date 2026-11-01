@@ -7,12 +7,14 @@ import { RouterLink } from '@angular/router';
 import { AvisoServicios, controlLista, Encabezado, FechaPipe, FiltrosLista, PieLista, Sesion } from 'ui-comun';
 import { textoViaje } from '../domain/viaje';
 import { IntervencionesFachada } from '../viajes.fachada';
+import { Vistas, VISTAS } from '../../vistas';
 
 /** Spec 011: viajes cuya compensación se agotó; el despachador reintenta o marca resuelto en el detalle. */
 @Component({
   selector: 'app-intervenciones',
   providers: [IntervencionesFachada],
   imports: [
+    Vistas,
     Encabezado,
     MatTableModule,
     MatSortModule,
@@ -29,6 +31,7 @@ import { IntervencionesFachada } from '../viajes.fachada';
       titulo="Intervenciones"
       subtitulo="La cancelación automática no terminó (reserva o crédito sin liberar): reintenta o márcalo resuelto en el viaje"
     />
+    <app-vistas [vistas]="vistas" nombre="Colas de decisión" />
     <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!lista.filas().length" />
     <cc-filtros-lista
       [control]="lista"
@@ -93,6 +96,7 @@ import { IntervencionesFachada } from '../viajes.fachada';
   `,
 })
 export class IntervencionesPagina {
+  readonly vistas = VISTAS.decisiones;
   private readonly fachada = inject(IntervencionesFachada);
   readonly error = this.fachada.error;
   readonly datosAl = this.fachada.datosAl;

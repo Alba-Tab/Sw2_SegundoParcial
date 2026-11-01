@@ -113,7 +113,8 @@ Material Symbols Outlined, fijado como fuente por defecto de `<mat-icon>` en `co
 |---|---|
 | `dashboard`, `bar_chart`, `mic`, `smart_toy` | Tablero, Reportes, Pregunta por voz, Agente (y Acciones del agente) |
 | `route` | Viajes |
-| `map` | Mapa en vivo |
+| `view_list`, `map` | Vistas de Viajes: Lista y Mapa en vivo |
+| `pending_actions` | Decisiones (Operaciones): agrupa las dos colas de abajo |
 | `warning`, `error` | Entregas observadas, Intervenciones (los mismos íconos de su estado) |
 | `assignment` | Servicios (portal: «Mis servicios») |
 | `local_shipping`, `local_gas_station`, `speed` | Unidades, Combustible, Conducción |

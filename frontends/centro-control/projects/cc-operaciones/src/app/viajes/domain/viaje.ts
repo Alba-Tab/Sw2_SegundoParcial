@@ -24,13 +24,13 @@ export const ESTADOS_VIAJE: EstadoViaje[] = [
 ];
 
 /** Las colas desde las que se abre un viaje para decidir: `?de=` solo acepta estas (V1-5). */
-const COLAS_DE_ORIGEN: Readonly<Record<string, string>> = {
-  'entregas-observadas': 'Entregas observadas',
-  intervenciones: 'Intervenciones',
-  acciones: 'Acciones del agente',
+const COLAS_DE_ORIGEN: Readonly<Record<string, { texto: string; ruta: string }>> = {
+  'entregas-observadas': { texto: 'Entregas observadas', ruta: '/decisiones/entregas-observadas' },
+  intervenciones: { texto: 'Intervenciones', ruta: '/decisiones/intervenciones' },
+  acciones: { texto: 'Acciones del agente', ruta: '/acciones' },
 };
 
 /** La miga padre del viaje: la cola de origen si `de` es una conocida; si no, la lista de viajes. */
 export function colaDeOrigen(de: string | null | undefined): { texto: string; ruta: string } {
-  return de && Object.hasOwn(COLAS_DE_ORIGEN, de) ? { texto: COLAS_DE_ORIGEN[de], ruta: `/${de}` } : { texto: 'Viajes', ruta: '/viajes' };
+  return de && Object.hasOwn(COLAS_DE_ORIGEN, de) ? COLAS_DE_ORIGEN[de] : { texto: 'Viajes', ruta: '/viajes' };
 }

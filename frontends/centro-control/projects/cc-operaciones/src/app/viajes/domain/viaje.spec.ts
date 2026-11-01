@@ -2,8 +2,8 @@ import { colaDeOrigen } from './viaje';
 
 describe('colaDeOrigen (V1-5)', () => {
   it('vuelve a la cola de la que vino el despachador', () => {
-    expect(colaDeOrigen('entregas-observadas')).toEqual({ texto: 'Entregas observadas', ruta: '/entregas-observadas' });
-    expect(colaDeOrigen('intervenciones')).toEqual({ texto: 'Intervenciones', ruta: '/intervenciones' });
+    expect(colaDeOrigen('entregas-observadas')).toEqual({ texto: 'Entregas observadas', ruta: '/decisiones/entregas-observadas' });
+    expect(colaDeOrigen('intervenciones')).toEqual({ texto: 'Intervenciones', ruta: '/decisiones/intervenciones' });
     expect(colaDeOrigen('acciones')).toEqual({ texto: 'Acciones del agente', ruta: '/acciones' });
   });
 

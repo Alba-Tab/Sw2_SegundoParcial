@@ -61,7 +61,7 @@ import { ViajeFachada } from '../viajes.fachada';
         <cc-estado grupo="EstadoViaje" [valor]="v.estado" />
       }
       @if (r?.data?.viaje?.estado === 'EN_RUTA') {
-        <a mat-stroked-button routerLink="/mapa" [queryParams]="{ viaje: id() }"><mat-icon>map</mat-icon>Ver en el mapa</a>
+        <a mat-stroked-button routerLink="/viajes/mapa" [queryParams]="{ viaje: id() }"><mat-icon>map</mat-icon>Ver en el mapa</a>
       }
     </cc-encabezado>
     @if (cargandoDe(r)) {

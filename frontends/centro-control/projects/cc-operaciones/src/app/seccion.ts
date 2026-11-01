@@ -8,11 +8,10 @@ import type { Icono } from 'ui-comun/dominio';
 /** Las acciones del agente (accionesPropuestas): gerente y despachador (spec 014); comercial no las ve. */
 export const ROLES_ACCIONES = ['gerente', 'despachador'];
 
-const ENLACES: { ruta: string; titulo: string; icono: Icono; roles?: string[] }[] = [
+/** Seis pestañas como máximo (FL-3): el mapa es una vista de Viajes y las dos colas de decisión van juntas. */
+export const ENLACES: { ruta: string; titulo: string; icono: Icono; roles?: string[] }[] = [
   { ruta: 'viajes', titulo: 'Viajes', icono: 'route' },
-  { ruta: 'mapa', titulo: 'Mapa en vivo', icono: 'map' },
-  { ruta: 'entregas-observadas', titulo: 'Entregas observadas', icono: 'warning' },
-  { ruta: 'intervenciones', titulo: 'Intervenciones', icono: 'error' },
+  { ruta: 'decisiones', titulo: 'Decisiones', icono: 'pending_actions' },
   { ruta: 'servicios', titulo: 'Servicios', icono: 'assignment' },
   { ruta: 'clientes', titulo: 'Clientes', icono: 'groups' },
   { ruta: 'rutas', titulo: 'Rutas', icono: 'alt_route' },
