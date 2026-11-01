@@ -67,6 +67,13 @@ export function ordenar<T>(filas: readonly T[], valorDe: ((f: T) => Valor) | und
     .map((x) => x.f);
 }
 
+/** RS-2: en una pantalla angosta el estado pasa a ser la segunda columna; a 375 px, la última quedaba fuera de vista. */
+export function estadoSegunda(columnas: readonly string[], estado = 'estado'): string[] {
+  const i = columnas.indexOf(estado);
+  if (i < 2) return [...columnas];
+  return [columnas[0], estado, ...columnas.slice(1).filter((c) => c !== estado)];
+}
+
 /** La página pedida; si quedó fuera de rango (el filtro achicó la lista), la última que exista. */
 export function paginar<T>(filas: readonly T[], pagina: number, tamano: number): T[] {
   const ultima = Math.max(0, Math.ceil(filas.length / tamano) - 1);

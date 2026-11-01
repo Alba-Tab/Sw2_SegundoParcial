@@ -5,6 +5,7 @@ import {
   aCentavos,
   AvisoServicios,
   BobPipe,
+  columnasConEstado,
   controlLista,
   Encabezado,
   Estado,
@@ -67,8 +68,8 @@ import { estadoCotizacion } from '../domain/cotizacion';
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Creada</th>
           <td mat-cell *matCellDef="let c">{{ c.creadaEn | fecha: true }} · {{ c.canal | etiqueta: 'CanalCotizacion' }}</td></ng-container
         >
-        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
-        <tr mat-row *matRowDef="let c; columns: columnas"></tr>
+        <tr mat-header-row *matHeaderRowDef="columnas()"></tr>
+        <tr mat-row *matRowDef="let c; columns: columnas()"></tr>
       </table>
     </div>
     <cc-pie-lista [control]="lista" nombre="cotizaciones" vacio="No hay cotizaciones." [error]="error()" [cargando]="cargando()" />
@@ -82,7 +83,7 @@ export class CotizacionesPagina {
   readonly cargando = this.fachada.cargando;
   readonly campos = { cotizaciones: 'Finanzas', clientes: 'Viajes', rutas: 'Viajes' };
   readonly estado = estadoCotizacion;
-  readonly columnas = ['cliente', 'ruta', 'carga', 'monto', 'estado', 'creada'];
+  readonly columnas = columnasConEstado(['cliente', 'ruta', 'carga', 'monto', 'estado', 'creada']);
   nombre = (id: string) => this.fachada.nombreCliente(id);
   ruta = (id: string) => this.fachada.nombreRuta(id);
   readonly lista = controlLista({

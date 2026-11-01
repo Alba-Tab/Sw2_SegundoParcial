@@ -2,7 +2,18 @@ import { Component, computed, effect, inject } from '@angular/core';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, cargandoDe, controlLista, Encabezado, Estado, FechaPipe, FiltrosLista, PieLista, posicionEstado } from 'ui-comun';
+import {
+  AvisoServicios,
+  cargandoDe,
+  columnasConEstado,
+  controlLista,
+  Encabezado,
+  Estado,
+  FechaPipe,
+  FiltrosLista,
+  PieLista,
+  posicionEstado,
+} from 'ui-comun';
 import type { EstadoViaje } from '../../graphql/generado';
 import { ESTADOS_VIAJE, textoViaje } from '../domain/viaje';
 import { ViajesFachada } from '../viajes.fachada';
@@ -63,8 +74,8 @@ import { ViajesFachada } from '../viajes.fachada';
           <td mat-cell *matCellDef="let v">
             <cc-estado grupo="EstadoViaje" [valor]="v.estado" /></td
         ></ng-container>
-        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
-        <tr mat-row *matRowDef="let v; columns: columnas"></tr>
+        <tr mat-header-row *matHeaderRowDef="columnas()"></tr>
+        <tr mat-row *matRowDef="let v; columns: columnas()"></tr>
       </table>
     </div>
     <cc-pie-lista [control]="lista" nombre="viajes" vacio="No hay viajes." [error]="r?.error" [cargando]="cargandoDe(r)" />
@@ -73,7 +84,7 @@ import { ViajesFachada } from '../viajes.fachada';
 export class ViajesPagina {
   private readonly fachada = inject(ViajesFachada);
   readonly estados = ESTADOS_VIAJE;
-  readonly columnas = ['placa', 'cliente', 'ruta', 'chofer', 'fecha', 'estado'];
+  readonly columnas = columnasConEstado(['placa', 'cliente', 'ruta', 'chofer', 'fecha', 'estado']);
   readonly datos = this.fachada.datos;
   readonly cargandoDe = cargandoDe;
   readonly lista = controlLista({

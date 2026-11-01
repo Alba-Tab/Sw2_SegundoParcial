@@ -7,6 +7,7 @@ import {
   aCentavos,
   AvisoServicios,
   BobPipe,
+  columnasConEstado,
   controlLista,
   Encabezado,
   Estado,
@@ -67,7 +68,7 @@ import { cambioDeSaldo, ESTADOS_CON_SALDO, textoVencida } from '../domain/filtro
         <ng-container matColumnDef="numero"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Factura</th>
           <td mat-cell *matCellDef="let f">
-            <a [routerLink]="['/facturas', f.facturaId]">{{ f.numero }}</a>
+            <a class="sin-corte" [routerLink]="['/facturas', f.facturaId]">{{ f.numero }}</a>
           </td></ng-container
         >
         <ng-container matColumnDef="cliente"
@@ -97,8 +98,8 @@ import { cambioDeSaldo, ESTADOS_CON_SALDO, textoVencida } from '../domain/filtro
               <cc-estado grupo="EstadoFactura" [valor]="f.estado" />
             }</td
         ></ng-container>
-        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
-        <tr mat-row *matRowDef="let f; columns: columnas"></tr>
+        <tr mat-header-row *matHeaderRowDef="columnas()"></tr>
+        <tr mat-row *matRowDef="let f; columns: columnas()"></tr>
       </table>
     </div>
     <cc-pie-lista
@@ -117,7 +118,7 @@ export class FacturasPagina {
   readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly campos = { facturas: 'Finanzas' };
-  readonly columnas = ['numero', 'cliente', 'monto', 'saldo', 'vence', 'estado'];
+  readonly columnas = columnasConEstado(['numero', 'cliente', 'monto', 'saldo', 'vence', 'estado']);
   readonly lista = controlLista({
     filas: this.facturas,
     texto: (f) => `${f.numero} ${f.razonSocial}`,

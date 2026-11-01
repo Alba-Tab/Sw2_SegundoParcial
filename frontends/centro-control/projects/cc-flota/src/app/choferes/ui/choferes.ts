@@ -4,6 +4,7 @@ import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import {
   AvisoServicios,
+  columnasConEstado,
   controlLista,
   Encabezado,
   Estado,
@@ -64,8 +65,8 @@ import { estadoChofer, textoChofer, vigenciaLicencia, type Chofer } from '../dom
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
           <td mat-cell *matCellDef="let c"><cc-estado grupo="EstadoChofer" [valor]="estado(c)" /></td
         ></ng-container>
-        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
-        <tr mat-row *matRowDef="let c; columns: columnas"></tr>
+        <tr mat-header-row *matHeaderRowDef="columnas()"></tr>
+        <tr mat-row *matRowDef="let c; columns: columnas()"></tr>
       </table>
     </div>
     <cc-pie-lista [control]="lista" nombre="choferes" vacio="No hay choferes registrados." [error]="error()" [cargando]="cargando()" />
@@ -79,7 +80,7 @@ export class ChoferesPagina {
   readonly cargando = this.fachada.cargando;
   readonly campos = { choferes: 'Flota' };
   readonly limite = LIMITE_GATEWAY;
-  readonly columnas = ['nombre', 'licencia', 'vence', 'estado'];
+  readonly columnas = columnasConEstado(['nombre', 'licencia', 'vence', 'estado']);
   readonly estado = estadoChofer;
   readonly vigencia = (c: Chofer) => vigenciaLicencia(c);
   readonly lista = controlLista<Chofer>({

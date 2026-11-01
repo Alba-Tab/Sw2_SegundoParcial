@@ -6,6 +6,7 @@ import {
   aCentavos,
   AvisoServicios,
   BobPipe,
+  columnasConEstado,
   controlLista,
   Encabezado,
   Estado,
@@ -80,8 +81,8 @@ import { LineasFachada } from '../lineas.fachada';
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
           <td mat-cell *matCellDef="let c"><cc-estado grupo="EstadoLineaCredito" [valor]="estado(c)" /></td
         ></ng-container>
-        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
-        <tr mat-row *matRowDef="let c; columns: columnas"></tr>
+        <tr mat-header-row *matHeaderRowDef="columnas()"></tr>
+        <tr mat-row *matRowDef="let c; columns: columnas()"></tr>
       </table>
     </div>
     <cc-pie-lista
@@ -107,7 +108,7 @@ export class LineasPagina {
   readonly limiteClientes = LIMITE_GATEWAY;
   /** Una línea caída la cuenta el aviso de la lista: sin banner repetido (V1-11). */
   readonly campos = { clientes: 'Viajes', lineaCredito: '' };
-  readonly columnas = ['cliente', 'limite', 'reservado', 'utilizado', 'disponible', 'estado'];
+  readonly columnas = columnasConEstado(['cliente', 'limite', 'reservado', 'utilizado', 'disponible', 'estado']);
   readonly estado = estadoLinea;
   readonly lista = controlLista({
     filas: this.lineas,

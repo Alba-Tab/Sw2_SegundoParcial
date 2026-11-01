@@ -11,6 +11,7 @@ import { ActivatedRoute, Router, type Params } from '@angular/router';
 import { Esqueleto } from './esqueleto';
 import {
   aParametros,
+  estadoSegunda,
   filtrar,
   leerFiltro,
   opcionesEstado,
@@ -159,6 +160,22 @@ export class ControlLista<T> {
 }
 
 export const controlLista = <T>(o: OpcionesLista<T>): ControlLista<T> => new ControlLista(o);
+
+/** Ancho bajo el que el estado de una tabla pasa a segunda columna (RS-2). */
+export const CONSULTA_ANGOSTA = '(max-width: 600px)';
+
+/**
+ * Las columnas de una tabla con el estado en segundo lugar en pantallas angostas (RS-2). Se crea en el contexto de
+ * inyección del componente y sigue los cambios de ancho.
+ */
+export function columnasConEstado(columnas: readonly string[]): Signal<string[]> {
+  const consulta = matchMedia(CONSULTA_ANGOSTA);
+  const angosto = signal(consulta.matches);
+  const alCambiar = (e: MediaQueryListEvent) => angosto.set(e.matches);
+  consulta.addEventListener('change', alCambiar);
+  inject(DestroyRef).onDestroy(() => consulta.removeEventListener('change', alCambiar));
+  return computed(() => (angosto() ? estadoSegunda(columnas) : [...columnas]));
+}
 
 /** Búsqueda, filtro por estado y el número de resultados (anunciado con `role="status"`). Proyecta filtros propios. */
 @Component({

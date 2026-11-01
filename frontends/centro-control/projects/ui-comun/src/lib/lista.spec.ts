@@ -64,6 +64,21 @@ describe('listas: lo puro', () => {
   });
 });
 
+describe('estadoSegunda (RS-2)', () => {
+  it('en angosto el estado pasa a segunda columna; si ya está al principio o no hay estado, no cambia', () => {
+    expect(estadoSegunda(['numero', 'cliente', 'monto', 'saldo', 'vence', 'estado'])).toEqual([
+      'numero',
+      'estado',
+      'cliente',
+      'monto',
+      'saldo',
+      'vence',
+    ]);
+    expect(estadoSegunda(['cliente', 'estado', 'carga'])).toEqual(['cliente', 'estado', 'carga']);
+    expect(estadoSegunda(['nombre', 'origen'])).toEqual(['nombre', 'origen']);
+  });
+});
+
 describe('textoTope', () => {
   it('dice la verdad sobre qué parte de la lista cortó el servidor (V1-1, V1-3)', () => {
     expect(textoTope(80, 'viajes', 'antiguos', true)).toBe(

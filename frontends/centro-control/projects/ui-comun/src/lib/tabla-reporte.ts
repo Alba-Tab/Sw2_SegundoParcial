@@ -71,9 +71,9 @@ export function ordenarFilas(filas: readonly Record<string, unknown>[], columna:
             <td mat-cell *matCellDef="let f" [class.numero]="numerica(c)">
               @if (c.clave === 'factura' && f['facturaId']) {
                 @if (config?.app === 'cc-finanzas') {
-                  <a [routerLink]="['/facturas', f['facturaId']]">{{ celda(f[c.clave], c) }}</a>
+                  <a class="sin-corte" [routerLink]="['/facturas', f['facturaId']]">{{ celda(f[c.clave], c) }}</a>
                 } @else if (config) {
-                  <a [href]="urlFactura(f['facturaId'])">{{ celda(f[c.clave], c) }}</a>
+                  <a class="sin-corte" [href]="urlFactura(f['facturaId'])">{{ celda(f[c.clave], c) }}</a>
                 } @else {
                   {{ celda(f[c.clave], c) }}
                 }

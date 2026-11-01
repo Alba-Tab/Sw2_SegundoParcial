@@ -6,6 +6,7 @@ import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import {
   AvisoServicios,
+  columnasConEstado,
   controlLista,
   Encabezado,
   Estado,
@@ -100,8 +101,8 @@ import { MantenimientosFachada } from '../mantenimientos.fachada';
             }
           </td>
         </ng-container>
-        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
-        <tr mat-row *matRowDef="let m; columns: columnas"></tr>
+        <tr mat-header-row *matHeaderRowDef="columnas()"></tr>
+        <tr mat-row *matRowDef="let m; columns: columnas()"></tr>
       </table>
     </div>
     <cc-pie-lista
@@ -121,7 +122,7 @@ export class MantenimientosPagina {
   readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly campos = { mantenimientos: 'Flota' };
-  readonly columnas = ['placa', 'tipo', 'fecha', 'taller', 'estado', 'acciones'];
+  readonly columnas = columnasConEstado(['placa', 'tipo', 'fecha', 'taller', 'estado', 'acciones']);
   readonly puedeCerrar = puedeCerrar;
   readonly limite = LIMITE_GATEWAY;
   readonly lista = controlLista<FilaMantenimiento>({

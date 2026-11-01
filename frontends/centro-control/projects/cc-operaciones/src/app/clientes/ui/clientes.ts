@@ -7,6 +7,7 @@ import {
   aCentavos,
   AvisoServicios,
   BobPipe,
+  columnasConEstado,
   controlLista,
   Encabezado,
   Estado,
@@ -112,8 +113,8 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
               <cc-estado grupo="EstadoLineaCredito" [valor]="estadoLinea(l)" />
             }</td
         ></ng-container>
-        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
-        <tr mat-row *matRowDef="let c; columns: columnas"></tr>
+        <tr mat-header-row *matHeaderRowDef="columnas()"></tr>
+        <tr mat-row *matRowDef="let c; columns: columnas()"></tr>
       </table>
     </div>
     <cc-pie-lista [control]="lista" nombre="clientes" vacio="No hay clientes registrados." [error]="error()" [cargando]="cargando()" />
@@ -129,7 +130,7 @@ export class ClientesPagina {
   readonly sinLeerCredito = this.fachada.sinLeerCredito;
   readonly limite = LIMITE_GATEWAY;
   readonly campos = { clientes: 'Viajes', lineaCredito: 'Finanzas' };
-  readonly columnas = ['razonSocial', 'nit', 'correo', 'canal', ...(this.verCredito ? ['disponible', 'estado'] : [])];
+  readonly columnas = columnasConEstado(['razonSocial', 'nit', 'correo', 'canal', ...(this.verCredito ? ['disponible', 'estado'] : [])]);
   readonly estadoLinea = estadoLineaCredito;
   readonly lista = controlLista<FilaCliente>({
     filas: this.clientes,

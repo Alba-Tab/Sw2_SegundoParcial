@@ -4,6 +4,7 @@ import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
 import {
   AvisoServicios,
+  columnasConEstado,
   controlLista,
   Encabezado,
   Estado,
@@ -88,8 +89,8 @@ import { UnidadesFachada } from '../unidades.fachada';
               }
             }</td
         ></ng-container>
-        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
-        <tr mat-row *matRowDef="let u; columns: columnas"></tr>
+        <tr mat-header-row *matHeaderRowDef="columnas()"></tr>
+        <tr mat-row *matRowDef="let u; columns: columnas()"></tr>
       </table>
     </div>
     <cc-pie-lista [control]="lista" nombre="unidades" vacio="No hay unidades registradas." [error]="error()" [cargando]="cargando()" />
@@ -102,7 +103,7 @@ export class UnidadesPagina {
   readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly campos = { unidades: 'Flota' };
-  readonly columnas = ['placa', 'tipo', 'estado', 'km', 'documentos'];
+  readonly columnas = columnasConEstado(['placa', 'tipo', 'estado', 'km', 'documentos']);
   readonly avisoKm = AVISO_KM;
   readonly vigencia = (venceEl: string) => vigencia(venceEl);
   readonly lista = controlLista<Unidad>({

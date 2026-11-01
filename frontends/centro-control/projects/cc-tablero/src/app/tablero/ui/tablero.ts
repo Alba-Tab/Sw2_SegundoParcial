@@ -161,7 +161,8 @@ import { TableroFachada } from '../tablero.fachada';
         <ul class="lineas">
           @for (f of t.cuentasPorCobrar.proximas; track f.facturaId) {
             <li>
-              <a [href]="enlaceFactura(f.facturaId)">{{ f.numero }}</a> · {{ f.razonSocial }} · {{ f.saldo | bob }} · vence
+              <a class="sin-corte" [href]="enlaceFactura(f.facturaId)">{{ f.numero }}</a> · {{ f.razonSocial }} · {{ f.saldo | bob }} ·
+              vence
               {{ f.venceEl | fecha }}
             </li>
           }
