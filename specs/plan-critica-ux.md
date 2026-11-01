@@ -88,16 +88,16 @@ Prioridad: P1 rompe confianza o accesibilidad; P2 estorba el trabajo diario; P3 
 | FL-3 | P2 | Operaciones (8 pestañas) | Más de 4 opciones en la navegación de sección | Agrupar: «En ruta» (Viajes, Mapa), «Decisiones» (Entregas observadas, Intervenciones, Acciones del agente), «Datos» (Servicios, Clientes, Rutas) |
 | FL-4 | P3 | Flota | La pestaña «Conducción» abre «Puntaje de conducción» | Mismo nombre en pestaña y título |
 
-## 3. Correcciones que necesitan backend o plataforma (pendientes)
+## 3. Backend y plataforma (ahora sí se tocan; ninguna cambia contratos)
 
-Fuera de esta iteración por la regla «no tocar backend». Se agregan a `specs/pendientes-frontend-web.md` §5.
+Revisado y aprobado con cambios por un agente revisor el 01-11-2026. **Ningún contrato cambia** (`venceEl` de `FacturaEmitida` ya es `Fecha` en La Paz; no se toca).
 
-| Id | Pri | Dónde | Problema | Corrección propuesta |
+| Id | Pri | Causa real | Pasos aprobados | Rama |
 |---|---|---|---|---|
-| PB-1 | P1 | `plataforma/keycloak/realm-transporte.json`, cliente `portal-cliente` | `fullScopeAllowed: false` y `scopeMappings` solo `cliente`, `comercial`: el rol `gerente` no llega al token del portal. El front no puede distinguir a un gerente de un cliente recién registrado (los dos llegan sin roles), así que la pantalla «Esta cuenta es del Centro de Control» (`c2fa9fb`) no se activa y el gerente ve «Completa los datos de tu empresa» | Agregar los roles internos al scope del portal; con eso el front ya hace lo correcto. Además, que `CuentaInterna` enlace al Tablero |
-| PB-2 | P1 | `servicios/analitica` | La misma factura vence un día antes en Cobranza y Reportes que en Facturas y Tablero (10/10 frente a 11/10; −22 frente a 21 días). Probable conversión UTC | `venceEl` como `YYYY-MM-DD` en America/La_Paz y prueba que compare ambas fuentes |
-| PB-3 | P2 | datos de semilla / emisor de alertas | La única alerta abierta apunta a una unidad (1111AAA) que no existe en Flota | Corregir la semilla o el emisor |
-| PB-4 | P2 | gateway / Viajes | Viajes corta a menudo en el límite de 3 s del gateway, y la lista aparece y desaparece | Revisar el tiempo del servicio; el front ya queda cubierto con FB-1 |
+| PB-1 | P1 seguridad | El token del portal solo trae `cliente`/`comercial`; un gerente llega sin roles, el portal le pide su empresa y Viajes **no** aplica `SIN_ALTA` (`AltaDeCliente.java:31,83`): se crea un `Cliente` con su `sub` y Finanzas le abre línea. Agregar `gerente`/`administracion` al scope del portal daría lectura total desde un cliente público (`VEN_TODAS` en Finanzas): rechazado | 1) Rol de realm `interno` sin permisos, hijo compuesto de `gerente`, `despachador`, `jefe_flota`, `administracion`, `chofer`; `scopeMappings` de `portal-cliente` agrega **solo** `interno`. 2) Viajes: `interno` en `SIN_ALTA` + prueba (token `["interno"]` → `POST /clientes` 403 `SIN_PERMISO`). 3) Portal: `interno` en `ROLES_INTERNOS` + prueba (en la rama de front). 4) `probar-realm.sh`: token de ejemplo de `portal-cliente` para gerente1 (`interno`), agroexport (`cliente`), comercial1 (`comercial`). 5) README de Keycloak y spec 001 | `fix/plataforma/rol-interno-portal` (desde `develop`) |
+| PB-2 | P1 | No es UTC: Finanzas reescribe `vence_el` al recargar la semilla (`CargarSemilla.php:51-56`) y Analítica conserva la primera carga (`demo.py:57`, `on_conflict_do_nothing`); `cargar.sh` no carga Analítica | 1) Confirmar comparando `factura.vence_el` y `hecho_factura.vence_el` (solo lectura). 2) `demo.py`: `on_conflict_do_update` de `emitida_el`, `vence_el`, `saldo`, `estado` en la semilla de `HechoFactura`. 3) `cargar.sh` corre `python -m app.demo cargar`. 4) Prueba en `tests/test_demo.py` (cargar con D y con D+1 mueve `vence_el`) | `fix/analitica/semilla-fechas` |
+| PB-3 | P2 | La alerta de 1111AAA sale de `servicios/flota/test/integracion/reservas.spec.ts`: levanta `WorkerModule` con `RelayOutbox` sin fijar `AMQP_URL` y publica eventos reales en el RabbitMQ local | `reservas.spec.ts` apunta `AMQP_URL` a un RabbitMQ de Testcontainers (como `flota.spec.ts`) o a una dirección que no responde. La alerta vieja se borra con `reiniciar-demo.sh` (lo corre el usuario: borra los datos de demo locales) | `test/flota/aislar-broker` |
+| PB-4 | Obs. | 3 s es D98; la consulta tiene índice | Solo medir con las trazas OTel y anotarlo en `pendientes-frontend-web.md` §5; FB-1 cubre la pantalla | (sin rama) |
 
 ## 4. Rendimiento y arquitectura (decisión, no arreglo inmediato)
 
@@ -123,3 +123,26 @@ Fuera de esta iteración por la regla «no tocar backend». Se agregan a `specs/
 3. **Vuelta C (P3 y reglas):** el resto y la sección 5 en `DESIGN.md`.
 4. **Pendientes de plataforma y backend:** PB-1 a PB-4 en `specs/pendientes-frontend-web.md` §5. PB-1 es el más urgente.
 5. **Verificación:** recorrer de nuevo en el navegador como gerente, y pedir sesión de `agroexport` (cliente) y de `despachador1` para ver lo que hoy quedó sin revisar.
+
+## 7. Ajustes del revisor a las correcciones de front (aprobados)
+
+- **CA-1:** `:where(a), :where(a:visited) { color: var(--mat-sys-primary) }` (especificidad 0, para no pisar `.marca`, botones ni ítems de menú).
+- **NG-1:** son 18 usos en 8 archivos, no 57 (`cc-flota`: unidades, unidad, conduccion, chofer, combustible; `cc-operaciones`: rutas, ruta) más `tabla-reporte.ts:166` (`toFixed`). Pipe `numero` en `ui-comun/src/lib/formato.ts` con `Intl.NumberFormat('es-BO')`; sin `LOCALE_ID` (cambiaría fechas de Material). Guardián: eslint `no-restricted-imports` de `DecimalPipe` si hay eslint en centro-control.
+- **RS-1:** agregar `apps` a `ui-comun/dominio/src/iconos.ts` y regenerar la fuente; el menú «Apps» conserva la marca «no disponible».
+- **FB-1:** causa común (`errorPolicy: 'all'` escribe `null` en la caché). Un solo operador en `ui-comun` (`conservarUltimoBueno`) aplicado en los repositorios o fachadas con sondeo (19 `pollInterval` en 15 repositorios), con «Datos al …».
+- **FB-2:** el arreglo va en `AvisoServicios` para todas las fichas: con `NO_ENCONTRADO` y sin datos, `search_off`, «No encontramos esta …» y sin «Reintentar».
+- **NG-2:** mover `paramsCobranza` de `cc-finanzas/.../cobranza/domain/cobranza.ts` a `ui-comun/dominio` y usarlo en el reporte del tablero (−61/+30, `incluirVencidas`); actualizar `reporte.spec.ts`. No tocar la semántica de voz «esta semana».
+- **NG-3:** archivo `cc-tablero/src/app/tablero/domain/tablero.ts:141`.
+- **JV-2:** usar `diasVencida`, que ya trae `Factura`.
+- **NG-4:** el motivo solo de lo que ya llega (km frente a `AVISO_KM`, documentos vencidos); si no, texto genérico. **NG-5:** sin columna de severidad (no hay dato; la interfaz no inventa).
+- **FL-2:** «Cuentas por cobrar» se queda en Reportes (spec 015). Clientes resume la línea y enlaza a `cc-finanzas`. Cobranza muestra «Datos al».
+- **FL-3:** máximo 6 pestañas en Operaciones sin mover Servicios (entrada del flujo 004) ni cambiar rutas que genera Analítica (`/viajes/{id}`, `/acciones/{id}`): «Mapa» como vista dentro de Viajes y «Decisiones» con Entregas observadas + Intervenciones; rutas viejas con `redirectTo`.
+- **Quitado:** enlace de `CuentaInterna` al Tablero (necesitaría URL nueva y no sirve a todos los roles).
+
+**Pruebas por corrección:** pipe `numero`; `conservarUltimoBueno`; `AvisoServicios` con `NO_ENCONTRADO`; marco sin desborde y con menú «Apps» bajo 900 px; `reporte.spec`; las de PB-1 a PB-3. En cada app: pruebas, lint y lista de íconos.
+
+**Verificación en navegador:** 375, 800 y 1280 px, claro y oscuro (enlaces ≥ 4,5:1); sesiones gerente1, despachador1, jefeflota1, administracion1, comercial1, agroexport y un usuario recién registrado (sigue viendo «Completa los datos de tu empresa»); gerente1 en el portal ve `CuentaInterna` y su `POST /clientes` da 403.
+
+**ICONIX (anotar):** rol `interno`, pestañas de Operaciones reagrupadas, los tres estados de error.
+
+**Commits:** front en `feat/ui-comun/arreglos-ux-web` con scope por app; backend en las ramas de la sección 3, desde `develop`. Sin `Co-Authored-By`.
