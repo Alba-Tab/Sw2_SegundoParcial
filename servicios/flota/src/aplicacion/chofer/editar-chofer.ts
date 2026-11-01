@@ -3,6 +3,7 @@ import { conIdempotencia, type Peticion, soloJefeFlota } from '../comun/idempote
 import type { ChoferRepositorio } from '../puertos/chofer-repositorio';
 import type { OperacionesIdempotentes } from '../puertos/operaciones-idempotentes';
 import type { RegistroDeEventos } from '../puertos/registro-de-eventos';
+import type { ReservaUnidadRepositorio } from '../puertos/reserva-unidad-repositorio';
 import type { Reloj } from '../puertos/reloj';
 import type { UnidadDeTrabajo } from '../puertos/unidad-de-trabajo';
 import { choferConVersion, guardarConEvento, type ChoferVersionado } from './actualizar-chofer';
@@ -16,6 +17,7 @@ export class EditarChofer {
     private readonly operaciones: OperacionesIdempotentes,
     private readonly choferes: ChoferRepositorio,
     private readonly eventos: RegistroDeEventos,
+    private readonly reservas: ReservaUnidadRepositorio,
     private readonly reloj: Reloj,
   ) {}
 
@@ -25,7 +27,9 @@ export class EditarChofer {
     return this.tx.ejecutar(() =>
       conIdempotencia(this.operaciones, op, async () => {
         const actual = await choferConVersion(this.choferes, choferId);
-        const editado = editarChofer(actual, p.cuerpo, this.reloj.hoy());
+        // Con una reserva activa, la licencia se mide contra el día de ese viaje; una reserva anterior al campo, contra hoy.
+        const reserva = actual.disponible ? null : await this.reservas.activaDeChofer(choferId);
+        const editado = editarChofer(actual, p.cuerpo, reserva?.fechaViaje ?? this.reloj.hoy());
         return guardarConEvento(this.choferes, this.eventos, { ...editado, versionAgregado: actual.versionAgregado });
       }),
     );

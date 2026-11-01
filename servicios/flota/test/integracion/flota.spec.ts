@@ -523,13 +523,36 @@ describe('Flota (Mongo rs0 + RabbitMQ)', () => {
       const corto = await pedir('put', libre, jefe, '0193a000-0000-7000-8000-0000000d0410', { ...edicion, nombre: '  ab ' });
       expect(corto.status).toBe(400);
       expect(corto.body.errores[0].campo).toBe('nombre');
-      expect(corto.body.errores[0].mensaje).toMatch(/Demasiado pequeño/);
-      // Con una reserva activa la licencia no deja de ser C vigente.
+      expect(corto.body.errores[0].mensaje).toBe('Debe tener al menos 3 caracteres');
+      // Con una reserva activa la licencia no deja de ser C vigente el día de ese viaje (spec 003).
       const conViaje = await pedir('put', ocupado, jefe, '0193a000-0000-7000-8000-0000000d0411', {
         ...edicion,
         licenciaCategoria: 'B',
       }).expect(409);
       expect(conViaje.body.codigo).toBe('CONFLICTO_ESTADO');
+      await conexion.collection('reservasUnidad').insertOne({
+        _id: 'r-chofer-ocupado' as never,
+        servicioId: '0193a000-0000-7000-8000-0000000d0412',
+        choferId: ocupado,
+        fechaViaje: '2030-06-01',
+        estado: 'CONFIRMADA',
+        creadaEn: new Date(),
+      });
+      const venceAntes = { ...edicion, licenciaVenceEl: '2030-05-31' };
+      await pedir('put', ocupado, jefe, '0193a000-0000-7000-8000-0000000d0413', venceAntes).expect(409);
+      const venceElDia = { ...edicion, licenciaVenceEl: '2030-06-01' };
+      expect((await pedir('put', ocupado, jefe, '0193a000-0000-7000-8000-0000000d0414', venceElDia).expect(200)).body.licenciaVenceEl).toBe(
+        '2030-06-01',
+      );
+
+      // F2-2: un cursor que no salió de Flota es 400, en choferes y en mantenimientos.
+      for (const ruta of ['/api/v1/choferes', '/api/v1/mantenimientos']) {
+        const r = await request(apiConToken.getHttpServer())
+          .get(ruta)
+          .query({ cursor: 'no-es-un-cursor' })
+          .set('Authorization', `Bearer ${jefe}`);
+        expect([r.status, r.body.codigo, r.body.errores]).toEqual([400, 'VALIDACION', [{ campo: 'cursor', mensaje: 'no es válido' }]]);
+      }
 
       const eventos = await conexion
         .collection('outboxEventos')

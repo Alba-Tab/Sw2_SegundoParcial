@@ -12,13 +12,9 @@ import {
   type ObtenerChoferResponse,
   type ObtenerUnidadResponse,
 } from './contrato/flota.zod';
-import { conBooleanos } from './validar';
+import { aCursor, conBooleanos, desdeCursor } from './validar';
 
 type ConUsuario = { usuario: Usuario };
-
-/** Cursor opaco (000 §4): el último id de la página en base64url. */
-const aCursor = (id: string) => Buffer.from(id).toString('base64url');
-const desdeCursor = (c?: string) => (c ? Buffer.from(c, 'base64url').toString('utf8') : undefined);
 
 function pagina<T extends { [k: string]: unknown }>(items: T[], limite: number, id: (x: T) => string) {
   const visibles = items.slice(0, limite);

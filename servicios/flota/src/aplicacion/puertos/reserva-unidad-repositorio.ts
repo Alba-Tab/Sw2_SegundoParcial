@@ -5,6 +5,8 @@ export interface ReservaUnidadRepositorio {
   porViaje(viajeId: string): Promise<ReservaUnidad | null>;
   /** La reserva PROVISIONAL o CONFIRMADA que tiene a la unidad como tracto o remolque. */
   activaDeUnidad(unidadId: string): Promise<ReservaUnidad | null>;
+  /** La reserva PROVISIONAL o CONFIRMADA del chofer (D11: una a la vez). */
+  activaDeChofer(choferId: string): Promise<ReservaUnidad | null>;
   /** Índice único por servicioId: dos reservas del mismo servicio no pueden existir. */
   insertar(reserva: ReservaUnidad): Promise<void>;
   actualizar(reserva: ReservaUnidad): Promise<void>;

@@ -169,6 +169,13 @@ export class ReservaUnidadRepositorioMongo implements ReservaUnidadRepositorio {
     return { reservaUnidadId: _id, ...resto };
   }
 
+  async activaDeChofer(choferId: string): Promise<ReservaUnidad | null> {
+    const d = await this.col.findOne({ estado: { $in: ['PROVISIONAL', 'CONFIRMADA'] }, choferId }, opciones());
+    if (!d) return null;
+    const { _id, ...resto } = d;
+    return { reservaUnidadId: _id, ...resto };
+  }
+
   async activaDeUnidad(unidadId: string): Promise<ReservaUnidad | null> {
     const d = await this.col.findOne(
       { estado: { $in: ['PROVISIONAL', 'CONFIRMADA'] }, $or: [{ tractoId: unidadId }, { remolqueId: unidadId }] },

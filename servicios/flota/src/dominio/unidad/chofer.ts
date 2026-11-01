@@ -44,10 +44,10 @@ export function cambiarHabilitacion(c: Chofer, activo: boolean, motivo: string |
 
 /**
  * D104: nombre y licencia. Con una reserva activa (`disponible = false`) la licencia tiene que seguir siendo C y vigente
- * hoy, la que pidió la reserva (spec 003): si no, CONFLICTO_ESTADO.
+ * el día del viaje reservado, lo que pidió la reserva (spec 003): si no, CONFLICTO_ESTADO.
  */
-export function editarChofer(c: Chofer, e: Pick<Chofer, 'nombre' | 'licenciaCategoria' | 'licenciaVenceEl'>, hoy: string): Chofer {
-  if (!c.disponible && (e.licenciaCategoria !== 'C' || e.licenciaVenceEl < hoy)) {
+export function editarChofer(c: Chofer, e: Pick<Chofer, 'nombre' | 'licenciaCategoria' | 'licenciaVenceEl'>, fechaViaje: string): Chofer {
+  if (!c.disponible && (e.licenciaCategoria !== 'C' || e.licenciaVenceEl < fechaViaje)) {
     conflicto(c, 'El chofer tiene una reserva activa: su licencia debe seguir siendo C y vigente');
   }
   return { ...c, nombre: e.nombre.trim(), licenciaCategoria: e.licenciaCategoria, licenciaVenceEl: e.licenciaVenceEl };

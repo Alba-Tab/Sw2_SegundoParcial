@@ -426,6 +426,7 @@ export const ProgramarMantenimientoResponse = zod.object({
 });
 
 /**
+ * Un `cursor` que no salió de `siguienteCursor` es 400 `VALIDACION` con `campo = cursor`.
  * @summary Mantenimientos (jefe_flota, despachador, gerente), del más reciente al más antiguo.
  */
 export const listarMantenimientosQueryLimiteDefault = 20;
@@ -567,6 +568,7 @@ export const CerrarMantenimientoResponse = zod.object({
 });
 
 /**
+ * Un `cursor` que no salió de `siguienteCursor` es 400 `VALIDACION` con `campo = cursor`.
  * @summary Choferes (jefe_flota, despachador, gerente). Sin documentos personales (propuesta §8).
  */
 export const listarChoferesQueryLimiteDefault = 20;
@@ -633,8 +635,8 @@ export const ObtenerChoferResponse = zod.object({
 /**
  * Los choferes no tienen alta por API: el usuario se crea en la consola de Keycloak y el chofer llega de la
  * semilla (D102, D103). Sube `versionAgregado` y publica `ChoferActualizado` por Outbox en la misma transacción.
- * Con una reserva activa (`disponible = false`) la licencia tiene que seguir siendo C y vigente hoy: si no, 409
- * `CONFLICTO_ESTADO`.
+ * Con una reserva activa (`disponible = false`) la licencia tiene que seguir siendo C y vigente el día del viaje
+ * reservado (spec 003; hoy, si la reserva es anterior a ese dato): si no, 409 `CONFLICTO_ESTADO`.
  * @summary Edición del nombre y la licencia de un chofer (jefe_flota). D104.
  */
 export const EditarChoferParams = zod.object({
