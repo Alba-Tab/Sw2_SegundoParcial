@@ -2,9 +2,9 @@ import { esPositivo, normalizarMonto } from '../dominio/dinero';
 import { ErrorDeUsuario } from '../dominio/errores';
 import type { TipoEvidencia } from '../dominio/evidencia';
 import { descripcionValida, type OrigenHito, type TipoHito } from '../dominio/hito';
-import { kmh, type Lectura, MuestreoGps } from '../dominio/muestreo';
+import { agregarLectura, kmh, type Lectura, MuestreoGps, velocidadEstimada } from '../dominio/muestreo';
 import type { TipoOperacion } from '../dominio/operacion';
-import { estadoVisible, puedeIniciar } from '../dominio/viaje';
+import { estadoVisible, inicioRechazado, puedeIniciar, type ViajeLocal } from '../dominio/viaje';
 import type {
   Api,
   Archivos,
@@ -12,6 +12,7 @@ import type {
   Dispositivo,
   EnTransaccion,
   Evidencias,
+  FatigasSinPosicion,
   Ids,
   PosicionGuardada,
   PuntosGps,
@@ -20,10 +21,22 @@ import type {
   Viajes,
 } from './puertos';
 
+/**
+ * Guarda lo que bajó de `GET /viajes/mios` y libera los inicios que Viajes rechazó con el viaje todavía CONFIRMADO
+ * (D106). Lo usan la descarga del chofer y la del motor tras un 409: sin red, decide la próxima descarga.
+ */
+export function guardarViajesDelServidor(viajes: Viajes, cola: Cola, delServidor: ViajeLocal[]): void {
+  viajes.guardarDelServidor(delServidor);
+  const ops = cola.visibles();
+  for (const v of viajes.todos()) if (inicioRechazado(v, ops)) viajes.liberarMarca(v.viajeId, 'INICIO');
+}
+
 /** Lo que hace el chofer. Las escrituras van primero a la cola local; el motor las envía cuando hay señal. */
 export class CasosDeUso {
   private readonly muestreos = new Map<string, MuestreoGps>();
   private ultima: Lectura | null = null;
+  /** Las lecturas que sirven para estimar la velocidad cuando el GPS no la da. */
+  private recientes: Lectura[] = [];
 
   constructor(
     private readonly cola: Cola,
@@ -38,11 +51,13 @@ export class CasosDeUso {
     private readonly archivos: Archivos,
     private readonly posicionGuardada: PosicionGuardada | null = null,
     private readonly enTransaccion: EnTransaccion = (fn) => fn(),
+    private readonly fatigasSinPosicion: FatigasSinPosicion | null = null,
   ) {}
 
   /** Paso 1 (con señal): `GET /viajes/mios` a SQLite para operar sin red. */
   async descargarViajes(): Promise<void> {
-    this.viajes.guardarDelServidor(await this.api.misViajes(await this.sesion.tokenVigente()));
+    guardarViajesDelServidor(this.viajes, this.cola, await this.api.misViajes(await this.sesion.tokenVigente()));
+    this.encolarFatigasSinPosicion(null);
   }
 
   /** Paso 2: el `opId` y la hora salen del celular al pulsar, no al enviar (FO1). */
@@ -61,7 +76,9 @@ export class CasosDeUso {
   /** Spec 005, paso 4: cada lectura del GPS; se guarda solo si pasa el muestreo de D52. */
   registrarLectura(viajeId: string, l: Lectura): boolean {
     this.ultima = l;
+    this.recientes = agregarLectura(this.recientes, l);
     this.posicionGuardada?.guardar({ lat: l.lat, lng: l.lng });
+    this.encolarFatigasSinPosicion({ viajeId, posicion: { lat: l.lat, lng: l.lng } });
     const muestreo = this.muestreos.get(viajeId) ?? new MuestreoGps();
     this.muestreos.set(viajeId, muestreo);
     if (!muestreo.aceptar(l)) return false;
@@ -81,8 +98,9 @@ export class CasosDeUso {
     return this.ultima ? { lat: this.ultima.lat, lng: this.ultima.lng } : null;
   }
 
-  velocidadKmh(): number {
-    return this.ultima ? kmh(this.ultima.velocidadMs) : 0;
+  /** La velocidad del camión ahora, o `null` si no se sabe (ver `velocidadEstimada`). */
+  velocidadKmh(): number | null {
+    return velocidadEstimada(this.recientes, this.reloj.ahora().getTime());
   }
 
   /**
@@ -96,6 +114,7 @@ export class CasosDeUso {
   /** Al cerrar sesión: nada de la posición ni del muestreo del chofer anterior queda en memoria. */
   olvidar(): void {
     this.ultima = null;
+    this.recientes = [];
     this.muestreos.clear();
   }
 
@@ -114,17 +133,49 @@ export class CasosDeUso {
 
   /**
    * D60 (FO6): ojos cerrados o bostezos; la alarma ya sonó en el celular, esto solo deja el evento en la cola. Sin
-   * ninguna posición conocida (ni guardada) no se puede encolar: el contrato exige `posicion`.
+   * ninguna posición conocida (ni guardada), la alerta se guarda con su hora y sale con la primera lectura del GPS
+   * (decisión del 01-11-2026); entonces devuelve null.
    */
   registrarFatiga(viajeId: string): string | null {
+    const eventoId = this.ids.nuevo();
+    const registradoEn = this.reloj.ahora().toISOString();
     const posicion = this.posicionParaEvento();
-    if (!posicion) return null;
-    return this.encolar(viajeId, 'EVENTO_CONDUCCION', {
-      eventoId: this.ids.nuevo(),
-      tipo: 'ALERTA_FATIGA',
-      posicion,
-      registradoEn: this.reloj.ahora().toISOString(),
+    if (posicion) return this.encolar(viajeId, 'EVENTO_CONDUCCION', { eventoId, tipo: 'ALERTA_FATIGA', posicion, registradoEn });
+    this.fatigasSinPosicion?.guardar([...this.fatigasSinPosicion.leer(), { viajeId, eventoId, registradoEn }]);
+    return null;
+  }
+
+  /**
+   * Las alertas que esperaban una posición salen con la primera lectura de su viaje; `registradoEn` sigue siendo la hora
+   * de la alerta. Las de un viaje que ya no está en ruta (ahí no llegan más lecturas) salen con la posición guardada, si
+   * hay (E2-9). Corre con cada lectura y con cada descarga de viajes.
+   */
+  private encolarFatigasSinPosicion(lectura: { viajeId: string; posicion: { lat: number; lng: number } } | null): void {
+    const guardadas = this.fatigasSinPosicion?.leer() ?? [];
+    if (guardadas.length === 0) return;
+    const guardada = this.posicionGuardada?.leer() ?? null;
+    const salen = guardadas.map((f) => ({
+      f,
+      posicion: f.viajeId === lectura?.viajeId ? lectura.posicion : this.enRuta(f.viajeId) ? null : guardada,
+    }));
+    if (salen.every((s) => !s.posicion)) return;
+    this.enTransaccion(() => {
+      for (const { f, posicion } of salen) {
+        if (posicion)
+          this.encolar(f.viajeId, 'EVENTO_CONDUCCION', {
+            eventoId: f.eventoId,
+            tipo: 'ALERTA_FATIGA',
+            posicion,
+            registradoEn: f.registradoEn,
+          });
+      }
+      this.fatigasSinPosicion?.guardar(salen.filter((s) => !s.posicion).map((s) => s.f));
     });
+  }
+
+  private enRuta(viajeId: string): boolean {
+    const v = this.viajes.porId(viajeId);
+    return !!v && estadoVisible(v) === 'EN_RUTA';
   }
 
   /**
@@ -276,8 +327,7 @@ export class CasosDeUso {
   }
 
   private exigirEnRuta(viajeId: string): void {
-    const v = this.viajes.porId(viajeId);
-    if (!v || estadoVisible(v) !== 'EN_RUTA') throw new ErrorDeUsuario('Este viaje ya no está en ruta');
+    if (!this.enRuta(viajeId)) throw new ErrorDeUsuario('Este viaje ya no está en ruta');
   }
 
   private exigirPosicion(): { lat: number; lng: number } {

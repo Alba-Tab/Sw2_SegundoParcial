@@ -1,5 +1,6 @@
 import * as Location from 'expo-location';
 import * as TaskManager from 'expo-task-manager';
+import { LECTURA_GPS_CADA_MS } from '../dominio/gps';
 import { estadoVisible } from '../dominio/viaje';
 import { casos, viajes } from './contenedor';
 
@@ -32,7 +33,7 @@ export async function iniciarGps(): Promise<EstadoGps> {
   if ((await Location.requestBackgroundPermissionsAsync()).status !== 'granted') return 'sin-permiso-fondo';
   await Location.startLocationUpdatesAsync(TAREA_GPS, {
     accuracy: Location.Accuracy.High,
-    timeInterval: 10_000,
+    timeInterval: LECTURA_GPS_CADA_MS,
     distanceInterval: 0,
     showsBackgroundLocationIndicator: true,
     pausesUpdatesAutomatically: false,

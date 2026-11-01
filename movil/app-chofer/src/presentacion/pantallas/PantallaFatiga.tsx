@@ -1,4 +1,4 @@
-import { setAudioModeAsync, useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
+import { type AudioPlayer, setAudioModeAsync, useAudioPlayer } from 'expo-audio';
 import { useKeepAwake } from 'expo-keep-awake';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, type LayoutRectangle, StyleSheet, Vibration, View } from 'react-native';
@@ -64,7 +64,8 @@ export function PantallaFatiga({ viajeId, alAlertar }: { viajeId: string; alAler
   const alLeer = useCallback(
     (l: Lectura) => {
       const ahora = Date.now();
-      const motivo = detector.current.muestra(ahora, l.medidas);
+      // Velocidad desconocida (null) = en marcha para SIN_ROSTRO (a propósito): la fatiga falla del lado seguro.
+      const motivo = detector.current.muestra(ahora, l.medidas, casos.velocidadKmh());
       const nuevo = { lectura: l, bostezos: detector.current.bostezosRecientes(ahora), visible: detector.current.rostroVisible };
       setCuadro((c) => (c && !cambioVisible(c, nuevo) ? c : nuevo));
       // Un cuadro que falló no apaga el detector: si los siguientes andan, el aviso se va.
@@ -74,7 +75,9 @@ export function PantallaFatiga({ viajeId, alAlertar }: { viajeId: string; alAler
       AccessibilityInfo.announceForAccessibility(`${MOTIVOS[motivo]}. Detente a descansar`);
       if (abierta.current) return;
       abierta.current = true;
-      // La alarma y la vibración siguen hasta «Estoy bien»: un pitido de 1 s no despierta a nadie.
+      // La alarma y la vibración siguen hasta «Estoy bien»: un pitido de 1 s no despierta a nadie. Con `loop` el sonido
+      // vuelve a empezar en el reproductor nativo, sin el silencio de esperar `didJustFinish` en JS (C-18).
+      repetir(alarma, true);
       alarma.seekTo(0);
       alarma.play();
       Vibration.vibrate([0, 600, 200, 600], true);
@@ -82,15 +85,9 @@ export function PantallaFatiga({ viajeId, alAlertar }: { viajeId: string; alAler
     },
     [alarma, viajeId],
   );
-  // El sonido dura 1,2 s: mientras la alerta siga abierta, vuelve a empezar al terminar.
-  const sonando = useAudioPlayerStatus(alarma);
-  useEffect(() => {
-    if (!sonando.didJustFinish || !abierta.current) return;
-    alarma.seekTo(0);
-    alarma.play();
-  }, [sonando.didJustFinish, alarma]);
   const apagar = useCallback(() => {
     abierta.current = false;
+    repetir(alarma, false);
     alarma.pause();
     Vibration.cancel();
   }, [alarma]);
@@ -223,6 +220,14 @@ export function PantallaFatiga({ viajeId, alAlertar }: { viajeId: string; alAler
       )}
     </View>
   );
+}
+
+/**
+ * `loop` es una propiedad del reproductor nativo, no estado de React: se asigna aquí porque el compilador de React no
+ * deja asignar a lo que devuelve un hook dentro del componente.
+ */
+function repetir(alarma: AudioPlayer, si: boolean) {
+  alarma.loop = si;
 }
 
 /** ¿Cambió algo que se ve? La caja se mueve más de 4 px, los ojos, los bostezos o si el rostro cuenta como visible. */

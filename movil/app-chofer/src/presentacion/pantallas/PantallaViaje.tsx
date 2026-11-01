@@ -71,10 +71,12 @@ export function PantallaViaje({
   const estado = estadoVisible(v);
   const enRuta = estado === 'EN_RUTA';
   const entregaRegistrada = v.entregaLocal && (v.estado === 'EN_RUTA' || v.estado === 'CONFIRMADO');
-  // Un inicio, entrega o rechazo que el servidor rechazó ya no se envía «con la señal»: se dice y se da la salida.
-  const rechazada = cola
-    .visibles()
-    .find((o) => o.viajeId === viajeId && o.estado === 'FALLIDA' && ['INICIO', 'ENTREGA', 'RECHAZO'].includes(o.tipo));
+  // Un inicio, entrega o rechazo que el servidor rechazó libera su marca y se puede registrar de nuevo: se avisa del
+  // último que falló mientras no haya otro en camino.
+  const fallidas = cola.visibles().filter((o) => o.viajeId === viajeId && o.estado === 'FALLIDA');
+  const ultimaFallida = (tipos: string[]) => fallidas.filter((o) => tipos.includes(o.tipo)).at(-1);
+  const rechazada =
+    (v.entregaLocal ? undefined : ultimaFallida(['ENTREGA', 'RECHAZO'])) ?? (v.iniciadoLocal ? undefined : ultimaFallida(['INICIO']));
 
   const iniciar = async () => {
     if (cerrojo.current) return;
@@ -126,8 +128,7 @@ export function PantallaViaje({
       </Card>
       {rechazada && (
         <Banner visible icon="alert-circle-outline" actions={[{ label: 'Ver pendientes', onPress: verPendientes }]}>
-          {rechazada.tipo === 'INICIO' ? 'El inicio' : rechazada.tipo === 'ENTREGA' ? 'La entrega' : 'El rechazo'} no se pudo enviar. Avisa
-          al despachador.
+          {avisoFallida(rechazada.tipo, rechazada.codigoError)}
         </Banner>
       )}
       {entregaRegistrada && !rechazada && (
@@ -184,6 +185,20 @@ export function PantallaViaje({
       )}
     </ScrollView>
   );
+}
+
+const FALLIDA: Record<string, { que: string; otraVez: string; conflicto: string }> = {
+  INICIO: { que: 'El inicio', otraVez: 'Vuelve a iniciarlo', conflicto: 'Viajes no deja iniciarlo ahora (¿otro viaje en ruta?)' },
+  ENTREGA: { que: 'La entrega', otraVez: 'Vuelve a registrarla', conflicto: 'el viaje ya no está en ruta' },
+  RECHAZO: { que: 'El rechazo', otraVez: 'Vuelve a registrarlo', conflicto: 'el viaje ya no está en ruta' },
+};
+
+/** 409 CONFLICTO_ESTADO: Viajes ya no acepta el viaje en ese estado; otro rechazo: se puede registrar de nuevo. */
+function avisoFallida(tipo: string, codigo: string | null): string {
+  const f = FALLIDA[tipo];
+  return codigo === 'CONFLICTO_ESTADO'
+    ? `${f.que} no se pudo enviar: ${f.conflicto}. Avisa al despachador.`
+    : `${f.que} no se pudo enviar. ${f.otraVez} o avisa al despachador.`;
 }
 
 const estilos = StyleSheet.create({
