@@ -15,6 +15,7 @@ import {
   FiltrosLista,
   PieLista,
   posicionEstado,
+  NumeroPipe,
 } from 'ui-comun';
 import { CotizacionesFachada } from '../cotizaciones.fachada';
 import { estadoCotizacion } from '../domain/cotizacion';
@@ -22,7 +23,19 @@ import { estadoCotizacion } from '../domain/cotizacion';
 @Component({
   selector: 'app-cotizaciones',
   providers: [CotizacionesFachada],
-  imports: [Encabezado, MatTableModule, MatSortModule, BobPipe, FechaPipe, EtiquetaPipe, Estado, AvisoServicios, FiltrosLista, PieLista],
+  imports: [
+    NumeroPipe,
+    Encabezado,
+    MatTableModule,
+    MatSortModule,
+    BobPipe,
+    FechaPipe,
+    EtiquetaPipe,
+    Estado,
+    AvisoServicios,
+    FiltrosLista,
+    PieLista,
+  ],
   template: `
     <cc-encabezado titulo="Cotizaciones" />
     <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!cotizaciones().length" />
@@ -53,7 +66,7 @@ import { estadoCotizacion } from '../domain/cotizacion';
         >
         <ng-container matColumnDef="carga"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Carga</th>
-          <td mat-cell *matCellDef="let c">{{ c.tipoCarga | etiqueta: 'TipoCarga' }} · {{ c.toneladas }} t</td></ng-container
+          <td mat-cell *matCellDef="let c">{{ c.tipoCarga | etiqueta: 'TipoCarga' }} · {{ c.toneladas | numero }} t</td></ng-container
         >
         <ng-container matColumnDef="monto"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Monto</th>
