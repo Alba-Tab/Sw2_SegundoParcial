@@ -13,7 +13,10 @@ export function dinero(m: { monto: string; moneda: string }): string {
  */
 export function numero(valor: number | null | undefined, maximo = 2, minimo = 0): string {
   if (valor === null || valor === undefined || !Number.isFinite(valor)) return 'Sin dato';
-  return new Intl.NumberFormat('es-BO', { minimumFractionDigits: minimo, maximumFractionDigits: maximo }).format(valor);
+  // Un negativo que se redondea a cero se escribe «0», no «-0» (R1F-5).
+  return new Intl.NumberFormat('es-BO', { minimumFractionDigits: minimo, maximumFractionDigits: maximo })
+    .format(valor)
+    .replace(/^-(?=0(,0+)?$)/, '');
 }
 
 /** Monto en texto decimal ("1250.00") a centavos exactos con BigInt: la aritmética de dinero nunca usa `number`. */

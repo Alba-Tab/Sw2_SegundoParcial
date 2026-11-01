@@ -38,5 +38,6 @@ describe('números como en Bolivia (DESIGN.md, «Números»)', () => {
     expect(numero(-17.78331, 4, 4)).toBe('-17,7833');
     expect(numero(null)).toBe('Sin dato');
     expect(numero(undefined)).toBe('Sin dato');
+    expect(numero(-0.00001, 4, 4)).toBe('0,0000');
   });
 });
