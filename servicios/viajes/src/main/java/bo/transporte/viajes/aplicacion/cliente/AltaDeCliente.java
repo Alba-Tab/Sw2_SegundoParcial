@@ -28,8 +28,9 @@ import org.slf4j.LoggerFactory;
 public class AltaDeCliente {
     public static final String OPERACION = "CREAR_CLIENTE";
     private static final Logger LOG = LoggerFactory.getLogger(AltaDeCliente.class);
+    // "interno" es lo único que el token de portal-cliente trae de una cuenta interna (realm de Keycloak).
     private static final Set<String> SIN_ALTA =
-            Set.of("chofer", "despachador", "jefe_flota", "administracion", "gerente", "agente_lectura");
+            Set.of("chofer", "despachador", "jefe_flota", "administracion", "gerente", "agente_lectura", "interno");
 
     public record Resultado(ClienteVista cliente, int codigoHttp) {}
 
