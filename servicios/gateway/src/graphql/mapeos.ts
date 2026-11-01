@@ -86,4 +86,10 @@ export const mantenimiento = (m: Json): Json => ({ ...m, checklist: m['checklist
  * Los elementos de una lista REST: `{items}` en las páginas de Viajes, Flota y Finanzas, o un arreglo plano como el de
  * `listarRutas` (contratos/openapi/viajes.yaml).
  */
+/** Una página REST (`{items, siguienteCursor}`) como `XPagina` del esquema, con cada fila mapeada. */
+export const pagina = (r: Json | undefined, fila: (x: Json) => Json): Json => ({
+  items: items(r).map(fila),
+  siguienteCursor: r?.['siguienteCursor'] ?? null,
+});
+
 export const items = <T = Json>(r: Json | Json[] | undefined): T[] => (Array.isArray(r) ? r : (r?.['items'] ?? [])) as T[];

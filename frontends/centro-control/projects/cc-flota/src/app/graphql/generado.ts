@@ -112,47 +112,60 @@ export type UnidadQuery = {
     atributos: any;
     documentos: Array<{ tipo: string; venceEl: string }>;
   } | null;
-  mantenimientos: Array<{
-    mantenimientoId: string;
-    tipo: TipoMantenimiento;
-    estado: string;
-    fechaProgramada: string;
-    taller: string;
-    descripcion: string;
-    programadoEn: string | null;
-    cerradoEn: string | null;
-    observaciones: string | null;
-    checklist: Array<{ item: string; ok: boolean | null; nota: string | null }>;
-  }> | null;
+  mantenimientos: {
+    siguienteCursor: string | null;
+    items: Array<{
+      mantenimientoId: string;
+      tipo: TipoMantenimiento;
+      estado: string;
+      fechaProgramada: string;
+      taller: string;
+      descripcion: string;
+      programadoEn: string | null;
+      cerradoEn: string | null;
+      observaciones: string | null;
+      checklist: Array<{ item: string; ok: boolean | null; nota: string | null }>;
+    }>;
+  } | null;
 };
 
-export type MantenimientosQueryVariables = Exact<{ [key: string]: never }>;
+export type MantenimientosQueryVariables = Exact<{
+  despuesDe?: string | null | undefined;
+}>;
 
 export type MantenimientosQuery = {
-  mantenimientos: Array<{
-    mantenimientoId: string;
-    unidadId: string;
-    placa: string;
-    tipo: TipoMantenimiento;
-    estado: string;
-    fechaProgramada: string;
-    taller: string;
-    descripcion: string;
-    cerradoEn: string | null;
-  }> | null;
+  mantenimientos: {
+    siguienteCursor: string | null;
+    items: Array<{
+      mantenimientoId: string;
+      unidadId: string;
+      placa: string;
+      tipo: TipoMantenimiento;
+      estado: string;
+      fechaProgramada: string;
+      taller: string;
+      descripcion: string;
+      cerradoEn: string | null;
+    }>;
+  } | null;
 };
 
-export type ChoferesQueryVariables = Exact<{ [key: string]: never }>;
+export type ChoferesQueryVariables = Exact<{
+  despuesDe?: string | null | undefined;
+}>;
 
 export type ChoferesQuery = {
-  choferes: Array<{
-    choferId: string;
-    nombre: string;
-    licenciaCategoria: string;
-    licenciaVenceEl: string;
-    activo: boolean;
-    disponible: boolean;
-  }> | null;
+  choferes: {
+    siguienteCursor: string | null;
+    items: Array<{
+      choferId: string;
+      nombre: string;
+      licenciaCategoria: string;
+      licenciaVenceEl: string;
+      activo: boolean;
+      disponible: boolean;
+    }>;
+  } | null;
 };
 
 export type ChoferQueryVariables = Exact<{
@@ -402,21 +415,24 @@ export const UnidadDocument = gql`
       }
       atributos
     }
-    mantenimientos(unidadId: $id) {
-      mantenimientoId
-      tipo
-      estado
-      fechaProgramada
-      taller
-      descripcion
-      checklist {
-        item
-        ok
-        nota
+    mantenimientos(unidadId: $id, limite: 100) {
+      items {
+        mantenimientoId
+        tipo
+        estado
+        fechaProgramada
+        taller
+        descripcion
+        checklist {
+          item
+          ok
+          nota
+        }
+        programadoEn
+        cerradoEn
+        observaciones
       }
-      programadoEn
-      cerradoEn
-      observaciones
+      siguienteCursor
     }
   }
 `;
@@ -432,17 +448,20 @@ export class UnidadGQL extends Apollo.Query<UnidadQuery, UnidadQueryVariables> {
   }
 }
 export const MantenimientosDocument = gql`
-  query Mantenimientos {
-    mantenimientos {
-      mantenimientoId
-      unidadId
-      placa
-      tipo
-      estado
-      fechaProgramada
-      taller
-      descripcion
-      cerradoEn
+  query Mantenimientos($despuesDe: Cursor) {
+    mantenimientos(limite: 50, despuesDe: $despuesDe) {
+      items {
+        mantenimientoId
+        unidadId
+        placa
+        tipo
+        estado
+        fechaProgramada
+        taller
+        descripcion
+        cerradoEn
+      }
+      siguienteCursor
     }
   }
 `;
@@ -458,14 +477,17 @@ export class MantenimientosGQL extends Apollo.Query<MantenimientosQuery, Manteni
   }
 }
 export const ChoferesDocument = gql`
-  query Choferes {
-    choferes {
-      choferId
-      nombre
-      licenciaCategoria
-      licenciaVenceEl
-      activo
-      disponible
+  query Choferes($despuesDe: Cursor) {
+    choferes(limite: 50, despuesDe: $despuesDe) {
+      items {
+        choferId
+        nombre
+        licenciaCategoria
+        licenciaVenceEl
+        activo
+        disponible
+      }
+      siguienteCursor
     }
   }
 `;

@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSortModule } from '@angular/material/sort';
@@ -14,6 +15,7 @@ import {
   EtiquetaPipe,
   FechaPipe,
   FiltrosLista,
+  mensajeDe,
   PieLista,
   posicionEstado,
   Sesion,
@@ -109,6 +111,11 @@ import { MantenimientosFachada } from '../mantenimientos.fachada';
       [error]="error()"
       [cargando]="cargando()"
     />
+    @if (siguienteCursor()) {
+      <div class="fila-acciones">
+        <button mat-stroked-button (click)="cargarMas()" [disabled]="cargandoMas()" disabledInteractive>Cargar más mantenimientos</button>
+      </div>
+    }
   `,
 })
 export class MantenimientosPagina {
@@ -119,6 +126,17 @@ export class MantenimientosPagina {
   readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly campos = { mantenimientos: 'Flota' };
+  readonly siguienteCursor = this.fachada.siguienteCursor;
+  readonly cargandoMas = this.fachada.cargandoMas;
+  private readonly avisos = inject(MatSnackBar);
+
+  async cargarMas(): Promise<void> {
+    try {
+      await this.fachada.cargarMas();
+    } catch (e) {
+      this.avisos.open(mensajeDe(e), 'Cerrar');
+    }
+  }
   readonly columnas = columnasConEstado(['placa', 'tipo', 'fecha', 'taller', 'estado', 'acciones']);
   readonly puedeCerrar = puedeCerrar;
   readonly lista = controlLista<FilaMantenimiento>({

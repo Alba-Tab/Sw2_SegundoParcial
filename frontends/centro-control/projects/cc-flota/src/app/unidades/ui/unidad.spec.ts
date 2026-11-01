@@ -33,7 +33,10 @@ function montar(estado: string) {
         provide: UnidadesRepositorio,
         useValue: {
           observarUnidad: () => ({
-            valueChanges: of({ loading: false, data: { unidad: { ...UNIDAD, estado }, mantenimientos: [] } }),
+            valueChanges: of({
+              loading: false,
+              data: { unidad: { ...UNIDAD, estado }, mantenimientos: { items: [], siguienteCursor: null } },
+            }),
             refetch: () => Promise.resolve(),
           }),
           darDeBaja,

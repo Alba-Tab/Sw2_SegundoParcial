@@ -2,7 +2,7 @@ import { etiqueta, vigencia } from 'ui-comun/dominio';
 import type { ChoferEdicionInput, ChoferesQuery, ChoferQuery } from '../../graphql/generado';
 
 /** Choferes (G3, D104): sin alta (el usuario se crea en Keycloak); se editan la licencia y la habilitación. */
-export type Chofer = NonNullable<ChoferesQuery['choferes']>[number];
+export type Chofer = NonNullable<ChoferesQuery['choferes']>['items'][number];
 export type DetalleChofer = NonNullable<ChoferQuery['chofer']>;
 export type PuntajesChofer = NonNullable<ChoferQuery['puntajesConduccion']>;
 export type EdicionChofer = Omit<ChoferEdicionInput, 'choferId' | 'claveIdempotencia'>;

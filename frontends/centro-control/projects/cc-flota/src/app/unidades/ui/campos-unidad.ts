@@ -6,6 +6,8 @@ import { Campo } from 'ui-comun';
 import { ATRIBUTOS, CAMPOS_ATRIBUTO, mensajeUnidad, PLACA, type ClaseUnidad } from '../domain/unidad';
 
 const entero: ValidatorFn = (c) => (c.value === null || Number.isInteger(c.value) ? null : { entero: true });
+/** Como `UnidadNueva.capacidadToneladas` en flota.yaml: mayor que 0 (exclusiveMinimum). */
+const mayorQueCero: ValidatorFn = (c) => (c.value === null || c.value > 0 ? null : { mayorQueCero: true });
 
 /** La placa del contrato de Flota; se acepta en minúsculas y se envía en mayúsculas. */
 export const validarPlaca: ValidatorFn = (c) => (!c.value || PLACA.test(String(c.value).trim().toUpperCase()) ? null : { placa: true });
@@ -14,7 +16,7 @@ export const validarPlaca: ValidatorFn = (c) => (!c.value || PLACA.test(String(c
 export function formularioCampos() {
   return new FormGroup({
     // Flota: mayor que 0 y hasta 30 t (D03).
-    capacidadToneladas: new FormControl<number | null>(null, [Validators.required, Validators.min(0.1), Validators.max(30)]),
+    capacidadToneladas: new FormControl<number | null>(null, [Validators.required, mayorQueCero, Validators.max(30)]),
     soat: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     inspeccion: new FormControl('', { nonNullable: true, validators: [Validators.required] }),
     atributos: new FormGroup(

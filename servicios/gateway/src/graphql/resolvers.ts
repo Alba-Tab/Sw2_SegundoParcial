@@ -152,11 +152,19 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
           .items(await s.get<Json>(ctx, 'flota', rutaRest`/api/v1/unidades`, { query: { tipo, estado, placa, limite: LIMITE_MAXIMO } }))
           .map(m.unidad),
       unidad: async (_: unknown, { id }: Args, ctx: Ctx) => m.unidad(await s.get<Json>(ctx, 'flota', rutaRest`/api/v1/unidades/${id}`)),
-      // B2: se sigue el cursor (páginas de 100, hasta 20 dentro de los 3 s de D98) en vez de cortar en 100; el tipo sigue
-      // siendo una lista y las pantallas no cambian.
-      mantenimientos: async (_: unknown, { estado, unidadId }: Args, ctx: Ctx) =>
-        (await todas(ctx, 'flota', rutaRest`/api/v1/mantenimientos`, { estado, unidadId })).map(m.mantenimiento),
-      choferes: (_: unknown, __: Args, ctx: Ctx) => todas(ctx, 'flota', rutaRest`/api/v1/choferes`),
+      // Páginas por cursor (E5-1): el cursor de Flota pasa tal cual en `despuesDe` y `siguienteCursor`.
+      mantenimientos: async (_: unknown, { estado, unidadId, limite, despuesDe }: Args, ctx: Ctx) =>
+        m.pagina(
+          await s.get<Json>(ctx, 'flota', rutaRest`/api/v1/mantenimientos`, {
+            query: { estado, unidadId, limite: limiteValido(limite, 50), cursor: despuesDe },
+          }),
+          m.mantenimiento,
+        ),
+      choferes: async (_: unknown, { limite, despuesDe }: Args, ctx: Ctx) =>
+        m.pagina(
+          await s.get<Json>(ctx, 'flota', rutaRest`/api/v1/choferes`, { query: { limite: limiteValido(limite, 50), cursor: despuesDe } }),
+          (c) => c,
+        ),
       ...flota.Query,
       cargasCombustible: async (_: unknown, { placa, limite }: Args, ctx: Ctx) => {
         const n = limiteValido(limite, 50);

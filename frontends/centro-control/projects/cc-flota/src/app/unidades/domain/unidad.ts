@@ -4,7 +4,7 @@ import type { TipoMantenimiento, UnidadEdicionInput, UnidadesQuery, UnidadNuevaI
 /** Tipos y reglas de presentación de unidades y mantenimientos (spec 010). Sin Angular ni Apollo. */
 export type Unidad = NonNullable<UnidadesQuery['unidades']>[number];
 export type DetalleUnidad = NonNullable<UnidadQuery['unidad']>;
-export type Mantenimiento = NonNullable<UnidadQuery['mantenimientos']>[number];
+export type Mantenimiento = NonNullable<UnidadQuery['mantenimientos']>['items'][number];
 export type NuevaUnidad = Omit<UnidadNuevaInput, 'claveIdempotencia'>;
 export type EdicionUnidad = Omit<UnidadEdicionInput, 'claveIdempotencia' | 'unidadId'>;
 export interface ItemCierre {
@@ -163,6 +163,7 @@ export const venceDocumento = (documentos: readonly { tipo: string; venceEl: str
 export function mensajeUnidad(errores: ErroresCampo): string {
   if (errores?.['placa']) return 'Escribe 3 o 4 números y 3 letras, por ejemplo 4521KTR.';
   if (errores?.['entero']) return 'Escribe un número entero.';
+  if (errores?.['mayorQueCero']) return 'Debe ser mayor que 0.';
   return mensajeCampo(errores);
 }
 

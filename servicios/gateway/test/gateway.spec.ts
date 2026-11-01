@@ -761,29 +761,47 @@ describe('gestión de Flota desde el Centro de Control (D104)', () => {
     expect(JSON.parse(pedidos.filter((p) => p.ruta.endsWith('/habilitacion')).at(-1)!.cuerpo)).toEqual({ activo: true });
   });
 
-  it('chofer(id) lee por id y choferes y mantenimientos siguen el cursor más allá de 100', async () => {
+  it('chofer(id) lee por id; choferes y mantenimientos son páginas con despuesDe y siguienteCursor', async () => {
     rutas.set('GET /flota/api/v1/choferes/ch1', () => ({
       json: { ...CHOFER, activo: false, inhabilitacion: { motivo: 'Vacaciones', desde: '2026-11-01T12:00:00Z' } },
     }));
-    const r = await gql(['gerente'], '{ chofer(id: "ch1") { choferId activo motivoInhabilitacion } }');
-    expect(r.body.data.chofer).toEqual({ choferId: 'ch1', activo: false, motivoInhabilitacion: 'Vacaciones' });
+    rutas.set('GET /flota/api/v1/choferes/ch2', () => ({
+      json: { ...CHOFER, choferId: 'ch2', inhabilitacion: { motivo: 'Viejo', desde: '2026-10-01T12:00:00Z' } },
+    }));
+    const r = await gql(
+      ['gerente'],
+      '{ a: chofer(id: "ch1") { activo motivoInhabilitacion } b: chofer(id: "ch2") { motivoInhabilitacion } }',
+    );
+    // Un chofer habilitado no muestra un motivo viejo (E7-1).
+    expect(r.body.data).toEqual({ a: { activo: false, motivoInhabilitacion: 'Vacaciones' }, b: { motivoInhabilitacion: null } });
 
-    const pagina = (n: number, desde: number) => Array.from({ length: n }, (_, i) => ({ ...CHOFER, choferId: `ch${desde + i}` }));
     rutas.set('GET /flota/api/v1/choferes', (_req, _c, url) =>
-      url.searchParams.get('cursor')
-        ? { json: { items: pagina(20, 100), siguienteCursor: null } }
-        : { json: { items: pagina(100, 0), siguienteCursor: 'c2' } },
+      url.searchParams.get('cursor') === 'c2'
+        ? { json: { items: [{ ...CHOFER, choferId: 'ch3' }], siguienteCursor: null } }
+        : { json: { items: [CHOFER, { ...CHOFER, choferId: 'ch2' }], siguienteCursor: 'c2' } },
     );
-    expect((await gql(['gerente'], '{ choferes { choferId } }')).body.data.choferes).toHaveLength(120);
-    rutas.set('GET /flota/api/v1/mantenimientos', (_req, _c, url) =>
-      url.searchParams.get('cursor')
-        ? { json: { items: [{ mantenimientoId: 'm2', unidadId: 'u1' }], siguienteCursor: null } }
-        : { json: { items: [{ mantenimientoId: 'm1', unidadId: 'u1' }], siguienteCursor: 'c2' } },
+    const q = 'query($d: Cursor) { choferes(limite: 2, despuesDe: $d) { items { choferId } siguienteCursor } }';
+    expect((await gql(['gerente'], q)).body.data.choferes).toEqual({
+      items: [{ choferId: 'ch1' }, { choferId: 'ch2' }],
+      siguienteCursor: 'c2',
+    });
+    expect((await gql(['gerente'], q, { d: 'c2' })).body.data.choferes).toEqual({ items: [{ choferId: 'ch3' }], siguienteCursor: null });
+    expect(pedidos.filter((p) => p.ruta.startsWith('/flota/api/v1/choferes?')).map((p) => p.ruta)).toEqual([
+      '/flota/api/v1/choferes?limite=2',
+      '/flota/api/v1/choferes?limite=2&cursor=c2',
+    ]);
+    expect((await gql(['gerente'], '{ choferes(limite: 101) { siguienteCursor } }')).body.errors[0].extensions.codigo).toBe('VALIDACION');
+
+    rutas.set('GET /flota/api/v1/mantenimientos', () => ({
+      json: { items: [{ mantenimientoId: 'm1', unidadId: 'u1' }], siguienteCursor: null },
+    }));
+    const m = await gql(
+      ['jefe_flota'],
+      '{ mantenimientos(unidadId: "u1") { items { mantenimientoId checklist { item } } siguienteCursor } }',
     );
-    const m = await gql(['jefe_flota'], '{ mantenimientos(unidadId: "u1") { mantenimientoId checklist { item } } }');
-    expect(m.body.data.mantenimientos.map((x: { mantenimientoId: string }) => x.mantenimientoId)).toEqual(['m1', 'm2']);
-    const llamadas = pedidos.filter((p) => p.ruta.startsWith('/flota/api/v1/mantenimientos'));
-    expect(llamadas).toHaveLength(2);
-    expect(llamadas.every((p) => p.ruta.includes('unidadId=u1') && p.ruta.includes('limite=100'))).toBe(true);
+    expect(m.body.data.mantenimientos).toEqual({ items: [{ mantenimientoId: 'm1', checklist: [] }], siguienteCursor: null });
+    expect(pedidos.find((p) => p.ruta.startsWith('/flota/api/v1/mantenimientos'))!.ruta).toBe(
+      '/flota/api/v1/mantenimientos?unidadId=u1&limite=50',
+    );
   });
 });

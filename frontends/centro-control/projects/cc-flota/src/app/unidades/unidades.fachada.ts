@@ -31,7 +31,9 @@ export class UnidadFachada {
     ),
   );
   readonly unidad = computed(() => completo<UnidadQuery>(this.datos())?.unidad);
-  readonly mantenimientos = computed(() => completo<UnidadQuery>(this.datos())?.mantenimientos ?? []);
+  readonly mantenimientos = computed(() => completo<UnidadQuery>(this.datos())?.mantenimientos?.items ?? []);
+  /** La unidad tiene más de los 100 mantenimientos que trae la ficha. */
+  readonly hayMasMantenimientos = computed(() => !!completo<UnidadQuery>(this.datos())?.mantenimientos?.siguienteCursor);
   readonly error = computed(() => this.datos()?.error);
   readonly cargando = computed(() => cargandoDe(this.datos()));
 

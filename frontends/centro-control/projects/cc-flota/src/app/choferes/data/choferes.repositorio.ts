@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { conservarUltimoBueno } from 'ui-comun';
 import {
   CambiarHabilitacionChoferGQL,
@@ -19,6 +20,12 @@ export class ChoferesRepositorio {
 
   observarChoferes(cadaMs: number) {
     return this.choferesGql.watch({ pollInterval: cadaMs }).valueChanges.pipe(conservarUltimoBueno());
+  }
+
+  /** La página que sigue a `despuesDe`, una sola vez y sin caché (la primera la trae el sondeo). */
+  async pagina(despuesDe: string) {
+    const { data } = await firstValueFrom(this.choferesGql.fetch({ variables: { despuesDe }, fetchPolicy: 'network-only' }));
+    return data?.choferes;
   }
 
   /** El `QueryRef`: `recargar` hace `refetch` sobre él (V4-1). */

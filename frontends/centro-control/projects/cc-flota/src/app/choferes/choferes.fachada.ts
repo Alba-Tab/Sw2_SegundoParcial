@@ -3,14 +3,24 @@ import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { filter, switchMap } from 'rxjs';
 import { cargandoDe, completo, esUuid, Intentos } from 'ui-comun';
 import type { ChoferesQuery, ChoferQuery } from '../graphql/generado';
+import { PaginasPorCursor } from '../paginas';
 import { ChoferesRepositorio } from './data/choferes.repositorio';
 import type { EdicionChofer } from './domain/chofer';
 
-/** Fachada de la lista de choferes, cada 60 s. */
+/** Fachada de la lista de choferes: la primera página cada 60 s y las demás con «Cargar más». */
 @Injectable()
 export class ChoferesFachada {
-  private readonly datos = toSignal(inject(ChoferesRepositorio).observarChoferes(60_000));
-  readonly choferes = computed(() => completo<ChoferesQuery>(this.datos())?.choferes ?? []);
+  private readonly repo = inject(ChoferesRepositorio);
+  private readonly datos = toSignal(this.repo.observarChoferes(60_000));
+  private readonly paginas = new PaginasPorCursor(
+    computed(() => completo<ChoferesQuery>(this.datos())?.choferes),
+    (despuesDe) => this.repo.pagina(despuesDe),
+    (c) => c.choferId,
+  );
+  readonly choferes = this.paginas.items;
+  readonly siguienteCursor = this.paginas.siguienteCursor;
+  readonly cargandoMas = this.paginas.cargandoMas;
+  readonly cargarMas = () => this.paginas.cargarMas();
   readonly error = computed(() => this.datos()?.error);
   readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));

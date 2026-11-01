@@ -325,6 +325,9 @@ type Panel = 'programar' | 'editar' | 'baja';
       } @empty {
         <p class="secundario">Sin mantenimientos.</p>
       }
+      @if (hayMasMantenimientos()) {
+        <p class="secundario">Se muestran los 100 mantenimientos más recientes de esta unidad.</p>
+      }
     }
   `,
   styles: `
@@ -378,6 +381,7 @@ export class UnidadPagina {
   /** La baja no se deshace: con el motivo escrito se pide un segundo clic. */
   readonly confirmandoBaja = signal(false);
   readonly mantenimientos = this.fachada.mantenimientos;
+  readonly hayMasMantenimientos = this.fachada.hayMasMantenimientos;
   readonly hoy = fechaLaPaz();
   readonly recargar = () => this.fachada.recargar();
   /** El mantenimiento que se quiso cerrar con ítems sin marcar (spec 010 exige todos hechos). */

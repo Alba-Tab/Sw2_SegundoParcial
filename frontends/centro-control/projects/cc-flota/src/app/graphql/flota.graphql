@@ -30,47 +30,58 @@ query Unidad($id: ID!) {
     }
     atributos
   }
-  mantenimientos(unidadId: $id) {
-    mantenimientoId
-    tipo
-    estado
-    fechaProgramada
-    taller
-    descripcion
-    checklist {
-      item
-      ok
-      nota
+  # Los 100 más recientes de la unidad; si hay más, la ficha lo dice.
+  mantenimientos(unidadId: $id, limite: 100) {
+    items {
+      mantenimientoId
+      tipo
+      estado
+      fechaProgramada
+      taller
+      descripcion
+      checklist {
+        item
+        ok
+        nota
+      }
+      programadoEn
+      cerradoEn
+      observaciones
     }
-    programadoEn
-    cerradoEn
-    observaciones
+    siguienteCursor
   }
 }
 
-# Todos los mantenimientos (G9): la lista filtra y ordena en el navegador.
-query Mantenimientos {
-  mantenimientos {
-    mantenimientoId
-    unidadId
-    placa
-    tipo
-    estado
-    fechaProgramada
-    taller
-    descripcion
-    cerradoEn
+# Los mantenimientos (G9) por páginas de 50, del más reciente al más antiguo; «Cargar más» pide la siguiente con
+# `despuesDe`. La lista filtra y ordena en el navegador lo que ya está cargado.
+query Mantenimientos($despuesDe: Cursor) {
+  mantenimientos(limite: 50, despuesDe: $despuesDe) {
+    items {
+      mantenimientoId
+      unidadId
+      placa
+      tipo
+      estado
+      fechaProgramada
+      taller
+      descripcion
+      cerradoEn
+    }
+    siguienteCursor
   }
 }
 
-query Choferes {
-  choferes {
-    choferId
-    nombre
-    licenciaCategoria
-    licenciaVenceEl
-    activo
-    disponible
+query Choferes($despuesDe: Cursor) {
+  choferes(limite: 50, despuesDe: $despuesDe) {
+    items {
+      choferId
+      nombre
+      licenciaCategoria
+      licenciaVenceEl
+      activo
+      disponible
+    }
+    siguienteCursor
   }
 }
 

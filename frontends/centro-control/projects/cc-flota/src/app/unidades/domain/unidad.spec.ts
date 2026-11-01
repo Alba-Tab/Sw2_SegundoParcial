@@ -182,6 +182,7 @@ describe('alta y edición de unidades (D104)', () => {
     expect(PLACA.test('4521KTR') && PLACA.test('452KTR') && !PLACA.test('45KTR') && !PLACA.test('4521kt')).toBe(true);
     expect(mensajeUnidad({ placa: true })).toContain('4521KTR');
     expect(mensajeUnidad({ entero: true })).toBe('Escribe un número entero.');
+    expect(mensajeUnidad({ mayorQueCero: true })).toBe('Debe ser mayor que 0.');
     expect(mensajeUnidad({ required: true })).toBe('Este dato es obligatorio.');
   });
 });
