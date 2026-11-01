@@ -56,6 +56,14 @@ h3 {
 .no-disponible {
   color: var(--mat-sys-error);
 }
+/* Ícono dentro de una línea de texto o de una celda (un número que pide mirarlo): del alto del texto. */
+.icono-en-linea {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  vertical-align: text-bottom;
+  margin-right: 4px;
+}
 .secundario {
   font: var(--mat-sys-body-medium);
   color: var(--mat-sys-on-surface-variant);

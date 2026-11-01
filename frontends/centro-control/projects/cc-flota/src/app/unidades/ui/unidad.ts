@@ -122,7 +122,7 @@ import { UnidadFachada } from '../unidades.fachada';
           <dt>Desde el último mantenimiento</dt>
           <dd [class.no-disponible]="u.kmDesdeUltimoMantenimiento >= avisoKm">
             @if (u.kmDesdeUltimoMantenimiento >= avisoKm) {
-              <mat-icon class="km-aviso">warning</mat-icon>
+              <mat-icon class="icono-en-linea">warning</mat-icon>
             }
             {{ u.kmDesdeUltimoMantenimiento | numero }} km
             @if (u.kmDesdeUltimoMantenimiento >= avisoKm) {
@@ -251,13 +251,6 @@ import { UnidadFachada } from '../unidades.fachada';
     }
   `,
   styles: `
-    .km-aviso {
-      font-size: 18px;
-      width: 18px;
-      height: 18px;
-      vertical-align: text-bottom;
-      margin-right: 4px;
-    }
     .aviso-documentos {
       display: flex;
       align-items: center;

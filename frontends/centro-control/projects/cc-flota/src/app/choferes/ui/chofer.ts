@@ -1,4 +1,5 @@
 import { Component, computed, effect, inject, input } from '@angular/core';
+import { MatIconModule } from '@angular/material/icon';
 import { RouterLink } from '@angular/router';
 import { AvisoServicios, Encabezado, Esqueleto, Estado, FechaPipe, LIMITE_GATEWAY, NumeroPipe } from 'ui-comun';
 import { PUNTAJE_BAJO } from '../../conduccion/domain/conduccion';
@@ -9,7 +10,7 @@ import { estadoChofer, vigenciaLicencia } from '../domain/chofer';
 @Component({
   selector: 'app-chofer',
   providers: [ChoferFachada],
-  imports: [Esqueleto, Encabezado, Estado, FechaPipe, NumeroPipe, AvisoServicios, RouterLink],
+  imports: [MatIconModule, Esqueleto, Encabezado, Estado, FechaPipe, NumeroPipe, AvisoServicios, RouterLink],
   template: `
     @let titulo = chofer()?.nombre ?? 'Chofer';
     <cc-encabezado [titulo]="titulo" [migas]="[{ texto: 'Choferes', ruta: '/choferes' }, { texto: titulo }]">
@@ -44,8 +45,16 @@ import { estadoChofer, vigenciaLicencia } from '../domain/chofer';
         @if (resumen(); as r) {
           <dl class="datos">
             <div>
-              <dt>Puntaje</dt>
-              <dd [class.no-disponible]="r.puntaje < puntajeBajo">{{ r.puntaje | numero: 1 }}</dd>
+              <dt>Puntaje (0 a 100)</dt>
+              <dd [class.no-disponible]="r.puntaje < puntajeBajo">
+                @if (r.puntaje < puntajeBajo) {
+                  <mat-icon class="icono-en-linea">warning</mat-icon>
+                }
+                {{ r.puntaje | numero: 1 }}
+                @if (r.puntaje < puntajeBajo) {
+                  <span class="cdk-visually-hidden">, bajo {{ puntajeBajo }}</span>
+                }
+              </dd>
             </div>
             <div>
               <dt>Kilómetros</dt>

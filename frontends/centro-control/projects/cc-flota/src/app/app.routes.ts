@@ -32,7 +32,7 @@ export const rutas: Routes = [
       {
         path: 'conduccion',
         loadComponent: () => import('./conduccion/ui/conduccion').then((m) => m.ConduccionPagina),
-        title: 'Puntaje de conducción',
+        title: 'Conducción',
       },
     ],
   },

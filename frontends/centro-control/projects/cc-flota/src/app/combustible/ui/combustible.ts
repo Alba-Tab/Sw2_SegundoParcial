@@ -41,7 +41,7 @@ import type { Anomalia, Carga } from '../domain/combustible';
               <dd>{{ a.kmPorLitro | numero: 2 : 2 }}</dd>
             </div>
             <div>
-              <dt>Puntaje de anomalía</dt>
+              <dt>Puntaje de anomalía (0 a 1)</dt>
               <dd>{{ a.puntaje | numero: 2 : 2 }}</dd>
             </div>
           }
@@ -59,6 +59,8 @@ import type { Anomalia, Carga } from '../domain/combustible';
       }
     }
     <h2>Anomalías de los últimos 30 días</h2>
+    <!-- NG-5: escala explícita; no hay dato de severidad y la interfaz no la inventa. -->
+    <p class="secundario">El puntaje va de 0 a 1: cuanto más alto, más se aparta la carga de las demás en litros y rendimiento.</p>
     <cc-filtros-lista
       [control]="listaA"
       [cargando]="cargando()"
@@ -91,7 +93,7 @@ import type { Anomalia, Carga } from '../domain/combustible';
           <td mat-cell *matCellDef="let a">{{ a.kmPorLitro | numero: 2 : 2 }}</td></ng-container
         >
         <ng-container matColumnDef="puntaje"
-          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Puntaje</th>
+          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Puntaje (0 a 1)</th>
           <td mat-cell *matCellDef="let a">{{ a.puntaje | numero: 2 : 2 }}</td></ng-container
         >
         <ng-container matColumnDef="fecha"

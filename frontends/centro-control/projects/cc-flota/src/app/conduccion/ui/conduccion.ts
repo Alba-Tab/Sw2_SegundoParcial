@@ -2,6 +2,7 @@ import { Component, computed, inject } from '@angular/core';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
+import { MatIconModule } from '@angular/material/icon';
 import { AvisoServicios, controlLista, Encabezado, FechaPipe, FiltrosLista, PieLista, NumeroPipe } from 'ui-comun';
 import { ConduccionFachada } from '../conduccion.fachada';
 import { PUNTAJE_BAJO, type PuntajeChofer } from '../domain/conduccion';
@@ -10,9 +11,24 @@ import { PUNTAJE_BAJO, type PuntajeChofer } from '../domain/conduccion';
 @Component({
   selector: 'app-conduccion',
   providers: [ConduccionFachada],
-  imports: [Encabezado, MatTableModule, MatSortModule, RouterLink, NumeroPipe, FechaPipe, AvisoServicios, FiltrosLista, PieLista],
+  imports: [
+    Encabezado,
+    MatIconModule,
+    MatTableModule,
+    MatSortModule,
+    RouterLink,
+    NumeroPipe,
+    FechaPipe,
+    AvisoServicios,
+    FiltrosLista,
+    PieLista,
+  ],
   template: `
-    <cc-encabezado titulo="Puntaje de conducción" />
+    <!-- FL-4: el mismo nombre que la pestaña. NG-5: la escala se dice, no se supone. -->
+    <cc-encabezado
+      titulo="Conducción"
+      [subtitulo]="'Puntaje de 0 a 100 por chofer: 100 es sin frenadas bruscas ni alertas de fatiga; bajo ' + puntajeBajo + ' se marca.'"
+    />
     <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!puntajes()" />
     @if (puntajes(); as p) {
       <p class="secundario">
@@ -50,9 +66,15 @@ import { PUNTAJE_BAJO, type PuntajeChofer } from '../domain/conduccion';
             <td mat-cell *matCellDef="let c">{{ c.km | numero: 0 }}</td></ng-container
           >
           <ng-container matColumnDef="puntaje"
-            ><th mat-header-cell *matHeaderCellDef mat-sort-header>Puntaje</th>
+            ><th mat-header-cell *matHeaderCellDef mat-sort-header>Puntaje (0 a 100)</th>
             <td mat-cell *matCellDef="let c" [class.no-disponible]="c.puntaje < puntajeBajo">
+              @if (c.puntaje < puntajeBajo) {
+                <mat-icon class="icono-en-linea">warning</mat-icon>
+              }
               {{ c.puntaje | numero: 1 }}
+              @if (c.puntaje < puntajeBajo) {
+                <span class="cdk-visually-hidden">, bajo {{ puntajeBajo }}</span>
+              }
             </td></ng-container
           >
           <tr mat-header-row *matHeaderRowDef="columnas"></tr>

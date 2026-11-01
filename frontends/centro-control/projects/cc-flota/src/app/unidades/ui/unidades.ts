@@ -80,7 +80,7 @@ import { UnidadesFachada } from '../unidades.fachada';
           <td mat-cell *matCellDef="let u" [class.no-disponible]="u.kmDesdeUltimoMantenimiento >= avisoKm">
             <!-- Cerca del mantenimiento: ícono y texto además del color (JV-1). -->
             @if (u.kmDesdeUltimoMantenimiento >= avisoKm) {
-              <mat-icon class="km-aviso">warning</mat-icon>
+              <mat-icon class="icono-en-linea">warning</mat-icon>
             }
             {{ u.kmDesdeUltimoMantenimiento | numero }}
             @if (u.kmDesdeUltimoMantenimiento >= avisoKm) {
@@ -103,15 +103,6 @@ import { UnidadesFachada } from '../unidades.fachada';
       </table>
     </div>
     <cc-pie-lista [control]="lista" nombre="unidades" vacio="No hay unidades registradas." [error]="error()" [cargando]="cargando()" />
-  `,
-  styles: `
-    .km-aviso {
-      font-size: 18px;
-      width: 18px;
-      height: 18px;
-      vertical-align: text-bottom;
-      margin-right: 4px;
-    }
   `,
 })
 export class UnidadesPagina {
