@@ -111,6 +111,7 @@ En destino el chofer registra foto, firma y posición. Si está dentro de la geo
 | **FC3** Mensaje que no cumple el esquema | El consumidor lo rechaza sin reencolar | Va a `<cola>.dlq` |
 | **FC5** RabbitMQ detenido | El Outbox guarda; el relay publica al volver | El viaje queda `ENTREGADO` hasta entonces |
 | Cliente pide factura de otro (FK1) | — | `403 SIN_PERMISO` |
+| Entrega que termina `FALLIDA` en la cola de la app (D106) | El servidor no la registró (por ejemplo, evidencia perdida o validación) | La app libera la marca local y el chofer la registra de nuevo con otro `entregaId` y otra clave; fuera de `EN_RUTA`, `409 CONFLICTO_ESTADO` |
 
 ## Criterios de aceptación
 

@@ -43,6 +43,20 @@ Es el paso 2b de la saga (spec 003): cuando el cliente tiene mora o el monto es 
 | Cancelar mientras espera | No se puede: el viaje está en `PROGRAMANDO` (`409 CONFIRMACION_EN_CURSO`, spec 004) |
 | Lo que ve el cliente | `GET /servicios/{id}` con `etapa = ESPERANDO_APROBACION`; el portal muestra "En aprobación" |
 
+### Ajuste y suspensión de la línea (G6, D104)
+
+Administración o gerente gestionan la línea de un cliente desde `cc-finanzas` › Líneas de crédito.
+
+| Regla | Valor |
+|---|---|
+| Quién | `administracion` y `gerente`; otro rol, `403 SIN_PERMISO` |
+| Ajustar el límite | `PUT /api/v1/lineas-credito/{clienteId}` con `{limite: Monto, motivo}` e `Idempotency-Key`. La línea se lee con `FOR UPDATE` (000 §9). El límite nuevo no puede ser menor que `reservado + utilizado`: `409 LIMITE_MENOR_QUE_USADO` con la extensión `usado`. Puede bajar hasta ese valor (disponible 0) |
+| Suspender o reactivar | `POST /api/v1/lineas-credito/{clienteId}/estado` con `{suspendida, motivo}` e `Idempotency-Key`. Pedir el estado que ya tiene es `409 CONFLICTO_ESTADO` |
+| Motivo | Obligatorio en los dos (3 a 300 caracteres, sin contar espacios de los extremos) |
+| Línea suspendida en la saga | El paso 2 rechaza la reserva con `CREDITO_RECHAZADO` (no reintentable) y el detalle «La línea de crédito del cliente está suspendida»; el servicio queda `CANCELADO` con ese motivo. Se usa el código que ya conocen Viajes y el portal, en vez de uno nuevo |
+| Lo que no cambia al suspender | Las reservas ya hechas (también las `PENDIENTE_APROBACION`, que administración sigue decidiendo), la factura que consume su reserva, las liberaciones y los pagos |
+| Auditoría | `AJUSTAR_LINEA_CREDITO` (límite anterior, límite nuevo, motivo) o `SUSPENDER_LINEA_CREDITO` / `REACTIVAR_LINEA_CREDITO` (motivo), entidad `LineaCredito`, en la misma transacción. Sin evento: ningún otro servicio guarda la línea |
+
 ## Estados que cambia
 
 | Entidad | Estados |
@@ -51,12 +65,14 @@ Es el paso 2b de la saga (spec 003): cuando el cliente tiene mora o el monto es 
 | `ReservaCredito` | — → `PENDIENTE_APROBACION` → `ACTIVA` o `LIBERADA` |
 | `Cotizacion` | `ACEPTADA` → `VIGENTE` (si se rechaza o vence y sigue en plazo) |
 | `Viaje` | `PROGRAMANDO` → `CANCELADO` si se rechaza o vence |
+| `LineaCredito` | `limite` cambia con el ajuste; `suspendida` false ↔ true |
 
 ## Contratos que toca
 
 - REST: `contratos/openapi/viajes.yaml` → `decidirAprobacionCredito`; `contratos/openapi/finanzas.yaml` → `listarSolicitudesAprobacion`, `obtenerSolicitudAprobacion`.
 - Temporal: señal `aprobacionCredito`, actividad `Finanzas.registrarDecisionCredito`, consulta `estado`.
 - GraphQL (F9): `aprobarCredito(servicioId, aprobado, motivo)`.
+- G6: `contratos/openapi/finanzas.yaml` → `ajustarLineaCredito`, `cambiarEstadoLineaCredito`, `listarLineasCredito`; GraphQL `ajustarLineaCredito`, `cambiarEstadoLineaCredito` y `LineaCredito.suspendida`.
 
 ## Errores y caminos alternativos
 
@@ -77,6 +93,8 @@ Es el paso 2b de la saga (spec 003): cuando el cliente tiene mora o el monto es 
 - **Dado** un cliente sin mora y Arica con 28 t (18.200), **cuando** confirma, **entonces** la solicitud tiene motivo `MONTO_ALTO`.
 - **Dado** una solicitud ya decidida, **cuando** se envía otra decisión, **entonces** `409 CONFLICTO_ESTADO`.
 - **Dado** un usuario `comercial`, **cuando** intenta decidir, **entonces** `403 SIN_PERMISO`.
+- **Dado** una línea con 7.600 reservados y 2.800 utilizados, **cuando** administración ajusta el límite a 10.000, **entonces** `409 LIMITE_MENOR_QUE_USADO` con `usado = 10400.00`; con 10.400 queda disponible 0.
+- **Dado** la línea de "Agroexport" suspendida, **cuando** confirma un servicio, **entonces** queda `CANCELADO` con `CREDITO_RECHAZADO` y nada reservado; al reactivarla, el siguiente servicio reserva.
 
 ## Cómo se demuestra en la defensa
 

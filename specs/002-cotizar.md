@@ -18,7 +18,7 @@ El cliente (o comercial a su nombre) pide precio para una ruta, un tipo de carga
 
 - El cliente existe en Finanzas (copia creada por `ClienteActualizado`, spec 001).
 - La ruta existe y está activa en Finanzas (copia creada por `RutaActualizada`) y tiene tarifa para el tipo de carga.
-- Semilla de rutas en Viajes (Santa Cruz–Cochabamba, Santa Cruz–La Paz, Santa Cruz–Arica y Aula) con su destino, `radioMetros` y `distanciaKm` (D06), y semilla de tarifas en Finanzas (D10).
+- Semilla de rutas en Viajes (Santa Cruz–Cochabamba, Santa Cruz–La Paz, Santa Cruz–Arica y Aula) con su destino, `radioMetros` y `distanciaKm` (D06), y semilla de tarifas en Finanzas (D10). Una ruta creada desde el Centro de Control nace inactiva hasta tener su tarifa de semilla (D108); si de todos modos se cotiza una ruta sin tarifa, el portal lo dice con un mensaje propio.
 
 ## Pasos (camino feliz)
 
@@ -68,7 +68,7 @@ El cliente (o comercial a su nombre) pide precio para una ruta, un tipo de carga
 
 | Caso | Respuesta |
 |---|---|
-| Ruta inexistente o inactiva | `404 NO_ENCONTRADO` |
+| Ruta inexistente o inactiva | `404 NO_ENCONTRADO` (Finanzas al cotizar; además, Viajes no muestra las rutas inactivas a quien no es gerente ni despachador) |
 | Ruta sin tarifa para ese tipo de carga | `422 RUTA_SIN_TARIFA` (una ruta nueva del Centro de Control nace inactiva hasta tener tarifa; las tarifas siguen de semilla, D10) |
 | Más de 30 t | `422 TONELAJE_EXCEDIDO` |
 | Fecha pasada o a más de 60 días | `400 VALIDACION` |

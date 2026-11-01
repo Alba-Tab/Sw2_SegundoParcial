@@ -27,7 +27,7 @@ export const saldoDespuesDe = (saldo: string, monto: string): string => desdeCen
 
 /**
  * El pago con el que choca un `PAGO_DUPLICADO` (spec 008, "muestra el pago existente"): por el `pagoId` del error si
- * llega; si no (el Gateway hoy no reenvía esa extensión), por medio y referencia, que es lo que el índice único compara.
+ * llega (el Gateway reenvía las extensiones del Problem Details); si no, por medio y referencia, que es lo que el índice único compara.
  */
 export function pagoRepetido<P extends { pagoId: string; medio: string; referencia: string }>(
   pagos: readonly P[],

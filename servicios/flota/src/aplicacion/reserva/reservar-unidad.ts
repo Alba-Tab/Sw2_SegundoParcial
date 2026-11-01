@@ -71,6 +71,7 @@ export class ReservarUnidad {
         tractoId: tracto.unidadId,
         remolqueId: remolque.unidadId,
         choferId: chofer.choferId,
+        fechaViaje: e.fechaViaje,
         estado: 'PROVISIONAL',
         creadaEn: new Date(),
       };

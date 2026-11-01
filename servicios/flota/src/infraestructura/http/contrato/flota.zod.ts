@@ -312,7 +312,11 @@ export const darDeBajaUnidadBodyMotivoMin = 3;
 export const darDeBajaUnidadBodyMotivoMax = 200;
 
 export const DarDeBajaUnidadBody = zod.object({
-  motivo: zod.string().min(darDeBajaUnidadBodyMotivoMin).max(darDeBajaUnidadBodyMotivoMax),
+  motivo: zod
+    .string()
+    .min(darDeBajaUnidadBodyMotivoMin)
+    .max(darDeBajaUnidadBodyMotivoMax)
+    .describe('Se recortan los espacios de los bordes antes de contar el largo.'),
 });
 
 export const darDeBajaUnidadResponsePlacaRegExp = new RegExp('^[0-9]{3,4}[A-Z]{3}$');
@@ -422,6 +426,7 @@ export const ProgramarMantenimientoResponse = zod.object({
 });
 
 /**
+ * Un `cursor` que no salió de `siguienteCursor` es 400 `VALIDACION` con `campo = cursor`.
  * @summary Mantenimientos (jefe_flota, despachador, gerente), del más reciente al más antiguo.
  */
 export const listarMantenimientosQueryLimiteDefault = 20;
@@ -563,6 +568,7 @@ export const CerrarMantenimientoResponse = zod.object({
 });
 
 /**
+ * Un `cursor` que no salió de `siguienteCursor` es 400 `VALIDACION` con `campo = cursor`.
  * @summary Choferes (jefe_flota, despachador, gerente). Sin documentos personales (propuesta §8).
  */
 export const listarChoferesQueryLimiteDefault = 20;
@@ -588,6 +594,13 @@ export const ListarChoferesResponse = zod.object({
       licenciaVenceEl: zod.iso.date().describe('Fecha sin hora, en America/La_Paz.'),
       activo: zod.boolean(),
       disponible: zod.boolean().describe('false si tiene una reserva activa (D11).'),
+      inhabilitacion: zod
+        .object({
+          motivo: zod.string(),
+          desde: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+        })
+        .optional()
+        .describe('Solo en choferes inhabilitados desde la API (`activo = false`).'),
     }),
   ),
   siguienteCursor: zod.string().nullable(),
@@ -610,6 +623,108 @@ export const ObtenerChoferResponse = zod.object({
   licenciaVenceEl: zod.iso.date().describe('Fecha sin hora, en America/La_Paz.'),
   activo: zod.boolean(),
   disponible: zod.boolean().describe('false si tiene una reserva activa (D11).'),
+  inhabilitacion: zod
+    .object({
+      motivo: zod.string(),
+      desde: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+    })
+    .optional()
+    .describe('Solo en choferes inhabilitados desde la API (`activo = false`).'),
+});
+
+/**
+ * Los choferes no tienen alta por API: el usuario se crea en la consola de Keycloak y el chofer llega de la
+ * semilla (D102, D103). Sube `versionAgregado` y publica `ChoferActualizado` por Outbox en la misma transacción.
+ * Con una reserva activa (`disponible = false`) la licencia tiene que seguir siendo C y vigente el día del viaje
+ * reservado (spec 003; hoy, si la reserva es anterior a ese dato): si no, 409 `CONFLICTO_ESTADO`.
+ * @summary Edición del nombre y la licencia de un chofer (jefe_flota). D104.
+ */
+export const EditarChoferParams = zod.object({
+  choferId: zod.uuid(),
+});
+
+export const EditarChoferHeader = zod.object({
+  'Idempotency-Key': zod.uuid().describe('UUID generado por el cliente, uno por intento (000 §4.1).'),
+});
+
+export const editarChoferBodyNombreMin = 3;
+export const editarChoferBodyNombreMax = 120;
+
+export const EditarChoferBody = zod.object({
+  nombre: zod
+    .string()
+    .min(editarChoferBodyNombreMin)
+    .max(editarChoferBodyNombreMax)
+    .describe('Se recortan los espacios de los bordes antes de contar el largo.'),
+  licenciaCategoria: zod.enum(['A', 'B', 'C']),
+  licenciaVenceEl: zod.iso.date().describe('Fecha sin hora, en America/La_Paz.'),
+});
+
+export const editarChoferResponseUsuarioSubMax = 64;
+
+export const EditarChoferResponse = zod.object({
+  choferId: zod.uuid(),
+  nombre: zod.string(),
+  usuarioSub: zod.string().min(1).max(editarChoferResponseUsuarioSubMax).describe('Claim `sub` de Keycloak.'),
+  licenciaCategoria: zod.enum(['A', 'B', 'C']),
+  licenciaVenceEl: zod.iso.date().describe('Fecha sin hora, en America/La_Paz.'),
+  activo: zod.boolean(),
+  disponible: zod.boolean().describe('false si tiene una reserva activa (D11).'),
+  inhabilitacion: zod
+    .object({
+      motivo: zod.string(),
+      desde: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+    })
+    .optional()
+    .describe('Solo en choferes inhabilitados desde la API (`activo = false`).'),
+});
+
+/**
+ * Al inhabilitar (`activo = false`) el `motivo` es obligatorio (400 VALIDACION). No se inhabilita a un chofer con
+ * una reserva activa (`disponible = false`): 409 `CONFLICTO_ESTADO`. Pedir el estado que ya tiene (habilitar a
+ * uno activo o inhabilitar a uno inactivo) también es 409 `CONFLICTO_ESTADO`, sin versión nueva ni evento.
+ * Habilitar borra `inhabilitacion`. Sube `versionAgregado` y publica `ChoferActualizado` por Outbox en la misma
+ * transacción.
+ * @summary Habilita o inhabilita a un chofer (jefe_flota). D104.
+ */
+export const CambiarHabilitacionChoferParams = zod.object({
+  choferId: zod.uuid(),
+});
+
+export const CambiarHabilitacionChoferHeader = zod.object({
+  'Idempotency-Key': zod.uuid().describe('UUID generado por el cliente, uno por intento (000 §4.1).'),
+});
+
+export const cambiarHabilitacionChoferBodyMotivoMin = 3;
+export const cambiarHabilitacionChoferBodyMotivoMax = 200;
+
+export const CambiarHabilitacionChoferBody = zod.object({
+  activo: zod.boolean(),
+  motivo: zod
+    .string()
+    .min(cambiarHabilitacionChoferBodyMotivoMin)
+    .max(cambiarHabilitacionChoferBodyMotivoMax)
+    .optional()
+    .describe('Obligatorio al inhabilitar. Se recortan los espacios de los bordes antes de contar el largo.'),
+});
+
+export const cambiarHabilitacionChoferResponseUsuarioSubMax = 64;
+
+export const CambiarHabilitacionChoferResponse = zod.object({
+  choferId: zod.uuid(),
+  nombre: zod.string(),
+  usuarioSub: zod.string().min(1).max(cambiarHabilitacionChoferResponseUsuarioSubMax).describe('Claim `sub` de Keycloak.'),
+  licenciaCategoria: zod.enum(['A', 'B', 'C']),
+  licenciaVenceEl: zod.iso.date().describe('Fecha sin hora, en America/La_Paz.'),
+  activo: zod.boolean(),
+  disponible: zod.boolean().describe('false si tiene una reserva activa (D11).'),
+  inhabilitacion: zod
+    .object({
+      motivo: zod.string(),
+      desde: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+    })
+    .optional()
+    .describe('Solo en choferes inhabilitados desde la API (`activo = false`).'),
 });
 
 /**

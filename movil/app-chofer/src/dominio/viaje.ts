@@ -1,3 +1,5 @@
+import type { Operacion } from './operacion';
+
 /** El viaje como lo guarda el celular: lo que llegó de `GET /viajes/mios` más lo que el chofer hizo sin señal. */
 export type EstadoViaje =
   | 'PROGRAMANDO'
@@ -35,6 +37,16 @@ export function estadoVisible(v: ViajeLocal): EstadoViaje {
   if (v.entregaLocal && sinSalir) return v.entregaLocal === 'ENTREGA' ? 'ENTREGADO' : 'ENTREGA_RECHAZADA';
   if (v.iniciadoLocal && v.estado === 'CONFIRMADO') return 'EN_RUTA';
   return v.estado;
+}
+
+/**
+ * D106: el inicio volvió con 409 CONFLICTO_ESTADO y el servidor sigue con el viaje CONFIRMADO (por ejemplo, el chofer ya
+ * tiene otro viaje en ruta). La marca local se libera; si el servidor ya lo sacó de CONFIRMADO, manda su estado.
+ */
+export function inicioRechazado(v: ViajeLocal, ops: Operacion[]): boolean {
+  if (!v.iniciadoLocal || v.estado !== 'CONFIRMADO') return false;
+  const ultimo = ops.filter((o) => o.viajeId === v.viajeId && o.tipo === 'INICIO').at(-1);
+  return ultimo?.estado === 'FALLIDA' && ultimo.codigoError === 'CONFLICTO_ESTADO';
 }
 
 export function puedeIniciar(v: ViajeLocal, otros: ViajeLocal[]): boolean {

@@ -128,6 +128,7 @@ export type ViajeQueryVariables = Exact<{
 
 export type ViajeQuery = {
   viaje: {
+    choferId: string | null;
     monto?: string | null;
     viajeId: string;
     servicioId: string;
@@ -564,6 +565,7 @@ export const ViajeDocument = gql`
   query Viaje($id: ID!, $verMonto: Boolean!, $verRiesgo: Boolean!, $verUnidad: Boolean!) {
     viaje(id: $id) {
       ...ViajeFila
+      choferId
       monto @include(if: $verMonto)
       riesgo @include(if: $verRiesgo) {
         probabilidad

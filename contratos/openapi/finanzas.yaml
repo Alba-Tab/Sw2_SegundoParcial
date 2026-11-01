@@ -133,6 +133,38 @@ paths:
         '404':
           $ref: './comun.yaml#/components/responses/NoEncontrado'
 
+  /api/v1/lineas-credito:
+    get:
+      tags: [credito]
+      operationId: listarLineasCredito
+      summary: Las líneas de varios clientes en una llamada (administracion, comercial, gerente). La usa el DataLoader del Gateway.
+      description: Un cliente sin línea no sale en `items` (no es error). Sin cursor; como máximo 100 ids por llamada.
+      parameters:
+        - name: clienteIds
+          in: query
+          required: true
+          style: form
+          explode: false
+          description: UUIDs separados por coma.
+          schema:
+            type: array
+            minItems: 1
+            maxItems: 100
+            items:
+              $ref: './comun.yaml#/components/schemas/Uuid'
+      responses:
+        '200':
+          description: Las líneas que existen, en cualquier orden.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListaLineasCredito'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
   /api/v1/lineas-credito/mia:
     get:
       tags: [credito]
@@ -175,6 +207,85 @@ paths:
           $ref: './comun.yaml#/components/responses/SinPermiso'
         '404':
           $ref: './comun.yaml#/components/responses/NoEncontrado'
+    put:
+      tags: [credito]
+      operationId: ajustarLineaCredito
+      summary: Administración o gerente cambia el límite de la línea (spec 012, G6). Queda en la auditoría.
+      description: |
+        La línea se bloquea con FOR UPDATE (000 §9). El límite nuevo no puede quedar por debajo de `reservado + utilizado`:
+        si pasa, 409 LIMITE_MENOR_QUE_USADO con la extensión `usado` (Monto).
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AjusteLineaCredito'
+      responses:
+        '200':
+          description: La línea actualizada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LineaCredito'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
+  /api/v1/lineas-credito/{clienteId}/estado:
+    parameters:
+      - name: clienteId
+        in: path
+        required: true
+        schema:
+          $ref: './comun.yaml#/components/schemas/Uuid'
+    post:
+      tags: [credito]
+      operationId: cambiarEstadoLineaCredito
+      summary: Administración o gerente suspende o reactiva la línea (spec 012, G6). Queda en la auditoría.
+      description: |
+        Con la línea suspendida, el paso 2 de la saga rechaza la reserva con CREDITO_RECHAZADO; lo ya reservado, facturado
+        y pagado sigue su curso. Pedir el estado que ya tiene es 409 CONFLICTO_ESTADO.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EstadoLineaCreditoNuevo'
+      responses:
+        '200':
+          description: La línea actualizada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LineaCredito'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
+        '503':
+          $ref: './comun.yaml#/components/responses/NoDisponible'
 
   /api/v1/solicitudes-aprobacion:
     get:
@@ -464,7 +575,7 @@ components:
           nullable: true
     LineaCredito:
       type: object
-      required: [clienteId, limite, reservado, utilizado, disponible, enMora]
+      required: [clienteId, limite, reservado, utilizado, disponible, enMora, suspendida]
       properties:
         clienteId:
           $ref: './comun.yaml#/components/schemas/Uuid'
@@ -479,6 +590,39 @@ components:
         enMora:
           type: boolean
           description: Tiene al menos una factura con saldo vencida hace más de 7 días (D04).
+        suspendida:
+          type: boolean
+          description: Suspendida por administración o gerente; el paso 2 de la saga rechaza nuevas reservas (spec 012).
+    ListaLineasCredito:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/LineaCredito'
+    AjusteLineaCredito:
+      type: object
+      required: [limite, motivo]
+      additionalProperties: false
+      properties:
+        limite:
+          $ref: './comun.yaml#/components/schemas/Monto'
+        motivo:
+          type: string
+          minLength: 3
+          maxLength: 300
+    EstadoLineaCreditoNuevo:
+      type: object
+      required: [suspendida, motivo]
+      additionalProperties: false
+      properties:
+        suspendida:
+          type: boolean
+        motivo:
+          type: string
+          minLength: 3
+          maxLength: 300
     EstadoSolicitud:
       type: string
       enum: [PENDIENTE, APROBADA, RECHAZADA, VENCIDA]

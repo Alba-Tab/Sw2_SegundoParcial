@@ -794,3 +794,165 @@ describe('revisión 2 del Gateway', () => {
     expect(r.body.data).toEqual({ a: { choferId: 'ch1' }, b: { choferId: null } });
   });
 });
+
+describe('gestión de Flota desde el Centro de Control (D104)', () => {
+  const UNIDAD = { unidadId: 'u1', tipoUnidad: 'REMOLQUE', placa: '3001FUR', estado: 'DISPONIBLE', kmDesdeUltimoMantenimiento: 0 };
+  const CHOFER = {
+    choferId: 'ch1',
+    nombre: 'Juan Mamani',
+    usuarioSub: 's1',
+    licenciaCategoria: 'C',
+    licenciaVenceEl: '2029-03-15',
+    activo: true,
+    disponible: true,
+  };
+  const documentos = [
+    { tipo: 'SOAT', venceEl: '2027-05-01' },
+    { tipo: 'INSPECCION_TECNICA', venceEl: '2027-04-01' },
+  ];
+
+  it('las mutaciones de unidades llegan a Flota con su Idempotency-Key, sin nulos y con PUT al editar; solo jefe_flota', async () => {
+    rutas.set('POST /flota/api/v1/unidades', () => ({ status: 201, json: { ...UNIDAD, documentos } }));
+    rutas.set('PUT /flota/api/v1/unidades/u1', () => ({ json: { ...UNIDAD, documentos } }));
+    rutas.set('POST /flota/api/v1/unidades/u1/baja', () => ({ json: { ...UNIDAD, estado: 'INACTIVA', documentos } }));
+    const crear = `mutation($i: UnidadNuevaInput!) { crearUnidad(input: $i) { unidadId estado documentos { tipo } } }`;
+    const nueva = {
+      tipoUnidad: 'REMOLQUE',
+      placa: '3001FUR',
+      tipoRemolque: 'FURGON',
+      capacidadToneladas: 30,
+      kilometraje: null,
+      kmDesdeUltimoMantenimiento: 0,
+      documentos,
+      atributos: { volumenM3: 85 },
+      claveIdempotencia: 'k-alta',
+    };
+    expect((await gql(['despachador'], crear, { i: nueva })).body.errors[0].extensions.codigo).toBe('SIN_PERMISO');
+    expect(aServicios().filter((p) => p.metodo !== 'GET')).toHaveLength(0);
+    expect((await gql(['jefe_flota'], crear, { i: nueva })).body.data.crearUnidad).toMatchObject({ unidadId: 'u1', estado: 'DISPONIBLE' });
+    const alta = pedidos.find((p) => p.metodo === 'POST' && p.ruta === '/flota/api/v1/unidades')!;
+    expect(alta.cabeceras['idempotency-key']).toBe('k-alta');
+    const { claveIdempotencia: _c, kilometraje: _k, ...cuerpoAlta } = nueva;
+    expect(JSON.parse(alta.cuerpo)).toEqual(cuerpoAlta);
+
+    const editar = `mutation($i: UnidadEdicionInput!) { editarUnidad(input: $i) { unidadId } }`;
+    const edicion = { unidadId: 'u1', capacidadToneladas: 28, documentos, atributos: { volumenM3: 90 }, claveIdempotencia: 'k-ed' };
+    expect((await gql(['jefe_flota'], editar, { i: edicion })).body.data.editarUnidad.unidadId).toBe('u1');
+    const put = pedidos.find((p) => p.metodo === 'PUT')!;
+    expect(put.ruta).toBe('/flota/api/v1/unidades/u1');
+    expect(put.cabeceras['idempotency-key']).toBe('k-ed');
+    expect(JSON.parse(put.cuerpo)).toEqual({ capacidadToneladas: 28, documentos, atributos: { volumenM3: 90 } });
+
+    const baja = await gql(
+      ['jefe_flota'],
+      'mutation { darDeBajaUnidad(unidadId: "u1", motivo: "Vendida", claveIdempotencia: "k-b") { estado } }',
+    );
+    expect(baja.body.data.darDeBajaUnidad.estado).toBe('INACTIVA');
+    const post = pedidos.find((p) => p.ruta === '/flota/api/v1/unidades/u1/baja')!;
+    expect(post.cabeceras['idempotency-key']).toBe('k-b');
+    expect(JSON.parse(post.cuerpo)).toEqual({ motivo: 'Vendida' });
+  });
+
+  it('editar e inhabilitar un chofer; el 409 de una reserva activa llega con su código', async () => {
+    rutas.set('PUT /flota/api/v1/choferes/ch1', () => ({ json: CHOFER }));
+    const editar = `mutation($i: ChoferEdicionInput!) { editarChofer(input: $i) { choferId licenciaVenceEl } }`;
+    const input = {
+      choferId: 'ch1',
+      nombre: 'Juan Mamani',
+      licenciaCategoria: 'C',
+      licenciaVenceEl: '2029-03-15',
+      claveIdempotencia: 'k-ch',
+    };
+    expect((await gql(['jefe_flota'], editar, { i: input })).body.data.editarChofer).toEqual({
+      choferId: 'ch1',
+      licenciaVenceEl: '2029-03-15',
+    });
+    const put = pedidos.find((p) => p.metodo === 'PUT')!;
+    expect(put.cabeceras['idempotency-key']).toBe('k-ch');
+    expect(JSON.parse(put.cuerpo)).toEqual({ nombre: 'Juan Mamani', licenciaCategoria: 'C', licenciaVenceEl: '2029-03-15' });
+
+    const habilitacion =
+      'mutation($a: Boolean!, $m: String) { cambiarHabilitacionChofer(choferId: "ch1", activo: $a, motivo: $m, claveIdempotencia: "k-h") { activo motivoInhabilitacion } }';
+    rutas.set('POST /flota/api/v1/choferes/ch1/habilitacion', () => ({
+      status: 409,
+      json: { codigo: 'CONFLICTO_ESTADO', detail: 'El chofer tiene una reserva activa y no se puede inhabilitar' },
+    }));
+    const conflicto = await gql(['jefe_flota'], habilitacion, { a: false, m: 'Licencia retenida' });
+    expect(conflicto.body.errors[0].extensions).toMatchObject({ codigo: 'CONFLICTO_ESTADO', status: 409, servicio: 'flota' });
+    rutas.set('POST /flota/api/v1/choferes/ch1/habilitacion', () => ({
+      json: { ...CHOFER, activo: false, inhabilitacion: { motivo: 'Licencia retenida', desde: '2026-11-01T12:00:00Z' } },
+    }));
+    const ok = await gql(['jefe_flota'], habilitacion, { a: false, m: 'Licencia retenida' });
+    expect(ok.body.data.cambiarHabilitacionChofer).toEqual({ activo: false, motivoInhabilitacion: 'Licencia retenida' });
+    const posts = pedidos.filter((p) => p.ruta === '/flota/api/v1/choferes/ch1/habilitacion');
+    expect(posts.map((p) => p.cabeceras['idempotency-key'])).toEqual(['k-h', 'k-h']);
+    expect(JSON.parse(posts[1].cuerpo)).toEqual({ activo: false, motivo: 'Licencia retenida' });
+    // Habilitar sin motivo: no se manda `motivo: null`.
+    await gql(['jefe_flota'], habilitacion, { a: true, m: null });
+    expect(JSON.parse(pedidos.filter((p) => p.ruta.endsWith('/habilitacion')).at(-1)!.cuerpo)).toEqual({ activo: true });
+  });
+
+  it('chofer(id) lee por id; choferes y mantenimientos son páginas con despuesDe y siguienteCursor', async () => {
+    rutas.set('GET /flota/api/v1/choferes/ch1', () => ({
+      json: { ...CHOFER, activo: false, inhabilitacion: { motivo: 'Vacaciones', desde: '2026-11-01T12:00:00Z' } },
+    }));
+    rutas.set('GET /flota/api/v1/choferes/ch2', () => ({
+      json: { ...CHOFER, choferId: 'ch2', inhabilitacion: { motivo: 'Viejo', desde: '2026-10-01T12:00:00Z' } },
+    }));
+    const r = await gql(
+      ['gerente'],
+      '{ a: chofer(id: "ch1") { activo motivoInhabilitacion } b: chofer(id: "ch2") { motivoInhabilitacion } }',
+    );
+    // Un chofer habilitado no muestra un motivo viejo (E7-1).
+    expect(r.body.data).toEqual({ a: { activo: false, motivoInhabilitacion: 'Vacaciones' }, b: { motivoInhabilitacion: null } });
+
+    rutas.set('GET /flota/api/v1/choferes', (_req, _c, url) =>
+      url.searchParams.get('cursor') === 'c2'
+        ? { json: { items: [{ ...CHOFER, choferId: 'ch3' }], siguienteCursor: null } }
+        : { json: { items: [CHOFER, { ...CHOFER, choferId: 'ch2' }], siguienteCursor: 'c2' } },
+    );
+    const q = 'query($d: Cursor) { choferes(limite: 2, despuesDe: $d) { items { choferId } siguienteCursor } }';
+    expect((await gql(['gerente'], q)).body.data.choferes).toEqual({
+      items: [{ choferId: 'ch1' }, { choferId: 'ch2' }],
+      siguienteCursor: 'c2',
+    });
+    expect((await gql(['gerente'], q, { d: 'c2' })).body.data.choferes).toEqual({ items: [{ choferId: 'ch3' }], siguienteCursor: null });
+    expect(pedidos.filter((p) => p.ruta.startsWith('/flota/api/v1/choferes?')).map((p) => p.ruta)).toEqual([
+      '/flota/api/v1/choferes?limite=2',
+      '/flota/api/v1/choferes?limite=2&cursor=c2',
+    ]);
+    expect((await gql(['gerente'], '{ choferes(limite: 101) { siguienteCursor } }')).body.errors[0].extensions.codigo).toBe('VALIDACION');
+
+    rutas.set('GET /flota/api/v1/mantenimientos', () => ({
+      json: { items: [{ mantenimientoId: 'm1', unidadId: 'u1' }], siguienteCursor: null },
+    }));
+    const m = await gql(
+      ['jefe_flota'],
+      '{ mantenimientos(unidadId: "u1") { items { mantenimientoId checklist { item } } siguienteCursor } }',
+    );
+    expect(m.body.data.mantenimientos).toEqual({ items: [{ mantenimientoId: 'm1', checklist: [] }], siguienteCursor: null });
+    expect(pedidos.find((p) => p.ruta.startsWith('/flota/api/v1/mantenimientos'))!.ruta).toBe(
+      '/flota/api/v1/mantenimientos?unidadId=u1&limite=50',
+    );
+  });
+
+  it('F2-2: un despuesDe inválido llega como VALIDACION de Flota, con su campo, y no como una página vacía', async () => {
+    const invalido = () => ({
+      status: 400,
+      json: { codigo: 'VALIDACION', detail: 'cursor: no es válido', errores: [{ campo: 'cursor', mensaje: 'no es válido' }] },
+    });
+    rutas.set('GET /flota/api/v1/choferes', invalido);
+    rutas.set('GET /flota/api/v1/mantenimientos', invalido);
+    for (const q of ['{ choferes(despuesDe: "x") { siguienteCursor } }', '{ mantenimientos(despuesDe: "x") { siguienteCursor } }']) {
+      const r = await gql(['jefe_flota'], q);
+      expect(r.body.data).toEqual({ [q.includes('choferes') ? 'choferes' : 'mantenimientos']: null });
+      expect(r.body.errors[0].extensions).toMatchObject({
+        codigo: 'VALIDACION',
+        status: 400,
+        servicio: 'flota',
+        errores: [{ campo: 'cursor', mensaje: 'no es válido' }],
+      });
+    }
+    expect(pedidos.filter((p) => p.ruta.includes('cursor=x'))).toHaveLength(2);
+  });
+});

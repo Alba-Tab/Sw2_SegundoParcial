@@ -168,7 +168,14 @@ export type LineasCreditoQuery = {
       clienteId: string;
       razonSocial: string;
       nit: string | null;
-      lineaCredito: { limite: string; reservado: string; utilizado: string; disponible: string; enMora: boolean } | null;
+      lineaCredito: {
+        limite: string;
+        reservado: string;
+        utilizado: string;
+        disponible: string;
+        enMora: boolean;
+        suspendida: boolean;
+      } | null;
     }>;
   } | null;
 };
@@ -207,6 +214,30 @@ export type AprobarCreditoMutation = {
   aprobarCredito: { servicioId: string; aprobado: boolean; servicio: { estado: EstadoServicio } | null };
 };
 
+export type LineaGestionadaFragment = { clienteId: string; limite: string; disponible: string; suspendida: boolean };
+
+export type AjustarLineaCreditoMutationVariables = Exact<{
+  clienteId: string | number;
+  limite: string;
+  motivo: string;
+  clave: string | number;
+}>;
+
+export type AjustarLineaCreditoMutation = {
+  ajustarLineaCredito: { clienteId: string; limite: string; disponible: string; suspendida: boolean };
+};
+
+export type CambiarEstadoLineaCreditoMutationVariables = Exact<{
+  clienteId: string | number;
+  suspendida: boolean;
+  motivo: string;
+  clave: string | number;
+}>;
+
+export type CambiarEstadoLineaCreditoMutation = {
+  cambiarEstadoLineaCredito: { clienteId: string; limite: string; disponible: string; suspendida: boolean };
+};
+
 export const FacturaFilaFragmentDoc = gql`
   fragment FacturaFila on Factura {
     facturaId
@@ -220,6 +251,14 @@ export const FacturaFilaFragmentDoc = gql`
     venceEl
     vencida
     diasVencida
+  }
+`;
+export const LineaGestionadaFragmentDoc = gql`
+  fragment LineaGestionada on LineaCredito {
+    clienteId
+    limite
+    disponible
+    suspendida
   }
 `;
 export const FacturasDocument = gql`
@@ -380,6 +419,7 @@ export const LineasCreditoDocument = gql`
           utilizado
           disponible
           enMora
+          suspendida
         }
       }
       siguienteCursor
@@ -463,6 +503,47 @@ export const AprobarCreditoDocument = gql`
 })
 export class AprobarCreditoGQL extends Apollo.Mutation<AprobarCreditoMutation, AprobarCreditoMutationVariables> {
   override document = AprobarCreditoDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const AjustarLineaCreditoDocument = gql`
+  mutation AjustarLineaCredito($clienteId: ID!, $limite: Dinero!, $motivo: String!, $clave: ID!) {
+    ajustarLineaCredito(clienteId: $clienteId, limite: $limite, motivo: $motivo, claveIdempotencia: $clave) {
+      ...LineaGestionada
+    }
+  }
+  ${LineaGestionadaFragmentDoc}
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class AjustarLineaCreditoGQL extends Apollo.Mutation<AjustarLineaCreditoMutation, AjustarLineaCreditoMutationVariables> {
+  override document = AjustarLineaCreditoDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const CambiarEstadoLineaCreditoDocument = gql`
+  mutation CambiarEstadoLineaCredito($clienteId: ID!, $suspendida: Boolean!, $motivo: String!, $clave: ID!) {
+    cambiarEstadoLineaCredito(clienteId: $clienteId, suspendida: $suspendida, motivo: $motivo, claveIdempotencia: $clave) {
+      ...LineaGestionada
+    }
+  }
+  ${LineaGestionadaFragmentDoc}
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class CambiarEstadoLineaCreditoGQL extends Apollo.Mutation<
+  CambiarEstadoLineaCreditoMutation,
+  CambiarEstadoLineaCreditoMutationVariables
+> {
+  override document = CambiarEstadoLineaCreditoDocument;
 
   constructor(apollo: Apollo.Apollo) {
     super(apollo);

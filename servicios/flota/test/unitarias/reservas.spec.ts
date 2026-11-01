@@ -1,4 +1,4 @@
-import { choferHabilitado, type Chofer } from '../../src/dominio/unidad/chofer';
+import { aplicarCambio, cambiarHabilitacion, choferHabilitado, editarChofer, type Chofer } from '../../src/dominio/unidad/chofer';
 import { documentosVigentes, porPrioridad, remolqueCompatible, reservable, type Unidad } from '../../src/dominio/unidad/unidad';
 import { aLiberar, confirmar } from '../../src/dominio/reserva/reserva-unidad';
 
@@ -81,5 +81,64 @@ describe('Elección de unidad (spec 003, D11)', () => {
     expect(aLiberar(r)).toEqual({ unidades: ['t', 'm'], choferId: 'c' });
     expect(aLiberar({ ...r, estado: 'LIBERADA' })).toEqual({ unidades: [] });
     expect(() => confirmar({ ...r, estado: 'LIBERADA' })).toThrow('ya se liberó');
+  });
+});
+
+describe('Habilitación del chofer (D104)', () => {
+  const c: Chofer = {
+    choferId: 'c',
+    nombre: 'Juan',
+    usuarioSub: 's',
+    licenciaCategoria: 'C',
+    licenciaVenceEl: '2028-01-01',
+    activo: true,
+    disponible: true,
+  };
+  const ahora = new Date('2026-11-01T12:00:00Z');
+  const codigo = (f: () => unknown) => {
+    try {
+      f();
+      return 'OK';
+    } catch (e) {
+      return (e as { codigo: string }).codigo;
+    }
+  };
+
+  it('inhabilitar pide motivo y no se puede con una reserva activa; habilitar borra el motivo', () => {
+    expect(codigo(() => cambiarHabilitacion(c, false, '  ', ahora))).toBe('VALIDACION');
+    expect(codigo(() => cambiarHabilitacion({ ...c, disponible: false }, false, 'Licencia retenida', ahora))).toBe('CONFLICTO_ESTADO');
+    const inactivo = cambiarHabilitacion(c, false, ' Licencia retenida ', ahora);
+    expect(inactivo).toMatchObject({ activo: false, inhabilitacion: { motivo: 'Licencia retenida', desde: '2026-11-01T12:00:00.000Z' } });
+    expect(choferHabilitado(inactivo, '2026-11-02')).toBe(false);
+    const activo = cambiarHabilitacion(inactivo, true, undefined, ahora);
+    expect(activo.activo).toBe(true);
+    expect(activo).not.toHaveProperty('inhabilitacion');
+  });
+
+  it('pedir el estado que ya tiene es CONFLICTO_ESTADO', () => {
+    expect(codigo(() => cambiarHabilitacion(c, true, undefined, ahora))).toBe('CONFLICTO_ESTADO');
+    expect(codigo(() => cambiarHabilitacion({ ...c, activo: false }, false, 'Otra vez', ahora))).toBe('CONFLICTO_ESTADO');
+  });
+
+  it('con una reserva activa la licencia sigue siendo C y vigente hoy', () => {
+    const ocupado = { ...c, disponible: false };
+    const hoy = '2026-11-01';
+    expect(codigo(() => editarChofer(ocupado, { nombre: 'Juan', licenciaCategoria: 'B', licenciaVenceEl: '2028-01-01' }, hoy))).toBe(
+      'CONFLICTO_ESTADO',
+    );
+    expect(codigo(() => editarChofer(ocupado, { nombre: 'Juan', licenciaCategoria: 'C', licenciaVenceEl: '2026-10-31' }, hoy))).toBe(
+      'CONFLICTO_ESTADO',
+    );
+    expect(editarChofer(ocupado, { nombre: ' Juan M ', licenciaCategoria: 'C', licenciaVenceEl: hoy }, hoy)).toMatchObject({
+      nombre: 'Juan M',
+      licenciaVenceEl: hoy,
+    });
+    expect(editarChofer(c, { nombre: 'Juan', licenciaCategoria: 'A', licenciaVenceEl: '2020-01-01' }, hoy).licenciaCategoria).toBe('A');
+  });
+
+  it('la CLI con activo=true borra el motivo de la inhabilitación', () => {
+    const inactivo = { ...c, activo: false, inhabilitacion: { motivo: 'Vacaciones', desde: 'x' } };
+    expect(aplicarCambio(inactivo, { activo: true })).not.toHaveProperty('inhabilitacion');
+    expect(aplicarCambio(inactivo, { licenciaVenceEl: '2030-01-01' }).inhabilitacion?.motivo).toBe('Vacaciones');
   });
 });

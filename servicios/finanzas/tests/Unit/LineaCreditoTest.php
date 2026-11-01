@@ -22,3 +22,35 @@ it('liberar o consumir más de lo reservado rompe la invariante en vez de dejar 
         expect($e->codigo)->toBe('CONFLICTO_ESTADO');
     }
 });
+
+it('el límite baja hasta lo usado y no menos (LIMITE_MENOR_QUE_USADO con lo usado)', function () {
+    $l = LineaCredito::porDefecto('c')->reservar(Monto::bob('7600'))->reservar(Monto::bob('2800'))->consumir(Monto::bob('2800'));
+    $justo = $l->ajustarLimite(Monto::bob('10400'));
+    expect($justo->limite->aContrato()['monto'])->toBe('10400.00')
+        ->and($justo->disponible()->aContrato()['monto'])->toBe('0.00');
+    $error = null;
+    try {
+        $l->ajustarLimite(Monto::bob('10399.99'));
+    } catch (ErrorDeDominio $e) {
+        $error = $e;
+    }
+    expect($error?->codigo)->toBe('LIMITE_MENOR_QUE_USADO')
+        ->and($error?->datos['usado'])->toBe(['monto' => '10400.00', 'moneda' => 'BOB']);
+});
+
+it('suspendida no reserva (CREDITO_RECHAZADO) pero libera, consume y abona; repetir el estado es CONFLICTO_ESTADO', function () {
+    $l = LineaCredito::porDefecto('c')->reservar(Monto::bob('1000'))->cambiarEstado(true);
+    expect($l->suspendida)->toBeTrue()
+        ->and($l->ajustarLimite(Monto::bob('5000'))->suspendida)->toBeTrue()
+        ->and($l->consumir(Monto::bob('1000'))->abonar(Monto::bob('1000'))->suspendida)->toBeTrue()
+        ->and($l->liberar(Monto::bob('1000'))->reservado->aContrato()['monto'])->toBe('0.00')
+        ->and(fn () => $l->cambiarEstado(true))->toThrow(ErrorDeDominio::class, 'ya está suspendida')
+        ->and($l->cambiarEstado(false)->reservar(Monto::bob('1'))->reservado->aContrato()['monto'])->toBe('1001.00');
+    $error = null;
+    try {
+        $l->reservar(Monto::bob('1'));
+    } catch (ErrorDeDominio $e) {
+        $error = $e;
+    }
+    expect($error?->codigo)->toBe('CREDITO_RECHAZADO')->and($error?->getMessage())->toContain('suspendida');
+});

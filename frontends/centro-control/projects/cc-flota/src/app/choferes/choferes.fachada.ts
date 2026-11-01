@@ -1,39 +1,65 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { filter, switchMap } from 'rxjs';
-import { cargandoDe, completo, esUuid, LIMITE_GATEWAY } from 'ui-comun';
+import { cargandoDe, completo, esUuid, Intentos } from 'ui-comun';
 import type { ChoferesQuery, ChoferQuery } from '../graphql/generado';
+import { PaginasPorCursor } from '../paginas';
 import { ChoferesRepositorio } from './data/choferes.repositorio';
-import { buscarChofer } from './domain/chofer';
+import type { EdicionChofer } from './domain/chofer';
 
-/** Fachada de la lista de choferes, cada 60 s. */
+/** Fachada de la lista de choferes: la primera página cada 60 s y las demás con «Cargar más». */
 @Injectable()
 export class ChoferesFachada {
-  private readonly datos = toSignal(inject(ChoferesRepositorio).observarChoferes(60_000));
-  readonly choferes = computed(() => completo<ChoferesQuery>(this.datos())?.choferes ?? []);
+  private readonly repo = inject(ChoferesRepositorio);
+  private readonly datos = toSignal(this.repo.observarChoferes(60_000));
+  private readonly paginas = new PaginasPorCursor(
+    computed(() => completo<ChoferesQuery>(this.datos())?.choferes),
+    (despuesDe) => this.repo.pagina(despuesDe),
+    (c) => c.choferId,
+  );
+  readonly choferes = this.paginas.items;
+  readonly siguienteCursor = this.paginas.siguienteCursor;
+  readonly cargandoMas = this.paginas.cargandoMas;
+  readonly cargarMas = () => this.paginas.cargarMas();
   readonly error = computed(() => this.datos()?.error);
   readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
 }
 
-/** Fachada de la ficha de un chofer: sus datos (de la lista) y su puntaje de conducción de la semana. */
+/** Fachada de la ficha de un chofer: sus datos, su puntaje de conducción de la semana, la edición y la habilitación. */
 @Injectable()
 export class ChoferFachada {
   private readonly repo = inject(ChoferesRepositorio);
+  private readonly intentos = new Intentos();
   readonly id = signal<string | undefined>(undefined);
   readonly idValido = computed(() => esUuid(this.id() ?? ''));
+  private consulta?: ReturnType<ChoferesRepositorio['observarChofer']>;
   private readonly datos = toSignal(
     toObservable(this.id).pipe(
       filter((id): id is string => !!id && esUuid(id)),
-      switchMap((id) => this.repo.observarChofer(id)),
+      switchMap((id) => (this.consulta = this.repo.observarChofer(id)).valueChanges),
     ),
   );
   private readonly respuesta = computed(() => completo<ChoferQuery>(this.datos()));
-  readonly cargado = computed(() => !!this.respuesta()?.choferes);
-  /** La lista llegó al tope: un chofer que no está puede existir más allá (D-3). */
-  readonly listaTruncada = computed(() => (this.respuesta()?.choferes?.length ?? 0) >= LIMITE_GATEWAY);
-  readonly chofer = computed(() => buscarChofer(this.respuesta()?.choferes, this.id() ?? ''));
+  readonly chofer = computed(() => this.respuesta()?.chofer ?? undefined);
   readonly puntajes = computed(() => this.respuesta()?.puntajesConduccion);
   readonly error = computed(() => this.datos()?.error);
   readonly cargando = computed(() => this.idValido() && cargandoDe(this.datos()));
+
+  editar(choferId: string, edicion: EdicionChofer) {
+    const input = { choferId, ...edicion };
+    return this.intentos.enviar(`editarChofer:${choferId}`, input, (clave) => this.repo.editar({ ...input, claveIdempotencia: clave }));
+  }
+
+  /** Habilitar o inhabilitar; el motivo solo viaja al inhabilitar (Flota lo exige). */
+  cambiarHabilitacion(choferId: string, activo: boolean, motivo?: string) {
+    const datos = { choferId, activo, ...(activo ? {} : { motivo }) };
+    return this.intentos.enviar(`cambiarHabilitacionChofer:${choferId}`, datos, (clave) =>
+      this.repo.cambiarHabilitacion({ ...datos, claveIdempotencia: clave }),
+    );
+  }
+
+  recargar(): Promise<unknown> {
+    return this.consulta?.refetch() ?? Promise.resolve();
+  }
 }

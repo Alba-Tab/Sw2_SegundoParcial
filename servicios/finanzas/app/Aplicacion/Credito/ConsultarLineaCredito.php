@@ -36,6 +36,24 @@ final class ConsultarLineaCredito
         return $this->de($clienteId);
     }
 
+    /**
+     * Las líneas que existen de varios clientes (B5: el DataLoader del Gateway), con la mora en una sola consulta.
+     *
+     * @param  list<string>  $clienteIds
+     * @return list<array{linea: LineaCredito, enMora: bool}>
+     */
+    public function deClientes(Solicitante $quien, array $clienteIds): array
+    {
+        if (! $quien->tieneAlguno(['administracion', 'comercial', 'gerente'])) {
+            throw new ErrorDeDominio('SIN_PERMISO', 'Sin permiso para ver líneas de crédito');
+        }
+        $ids = array_values(array_unique($clienteIds));
+        $enMora = $this->mora->clientesEnMora($ids, $this->reloj->ahora());
+
+        return array_map(fn (LineaCredito $l) => ['linea' => $l, 'enMora' => in_array($l->clienteId, $enMora, true)],
+            $this->lineas->porClientes($ids));
+    }
+
     /** @return array{linea: LineaCredito, enMora: bool} */
     private function de(string $clienteId): array
     {

@@ -11,10 +11,10 @@ import { generateKeyPair, SignJWT } from 'jose';
 import mongoose, { mongo } from 'mongoose';
 import { ErrorDeDominio } from '../../src/dominio/comun/error-de-dominio';
 import { AutenticacionMiddleware } from '../../src/infraestructura/http/autenticacion.middleware';
-import { CrearUnidadBody, ListarChoferesQueryParams } from '../../src/infraestructura/http/contrato/flota.zod';
+import { CrearUnidadBody, EditarChoferBody, ListarChoferesQueryParams } from '../../src/infraestructura/http/contrato/flota.zod';
 import { FiltroProblemas } from '../../src/infraestructura/http/filtro-problemas';
 import { hashPeticion } from '../../src/infraestructura/http/hash-cuerpo';
-import { claveObligatoria, conBooleanos, validar } from '../../src/infraestructura/http/validar';
+import { aCursor, claveObligatoria, conBooleanos, desdeCursor, mensajeZod, validar } from '../../src/infraestructura/http/validar';
 import { esperaParaReencolar } from '../../src/infraestructura/mensajeria/consumidor-eventos';
 import { traceparentValido } from '../../src/infraestructura/observabilidad/contexto';
 
@@ -209,6 +209,34 @@ describe('Idempotencia y parámetros (000 §4)', () => {
     expect(p({ activo: 'true', limite: '5' }).data).toMatchObject({ activo: true, limite: 5 });
     expect(p({}).data?.activo).toBeUndefined();
     expect(p({ activo: 'si' }).success).toBe(false);
+  });
+
+  it('F2-2: un cursor que no salió de Flota es 400 VALIDACION; uno propio vuelve a su id', () => {
+    const id = '0193a000-0000-7000-8000-0000000d0101';
+    expect(desdeCursor(aCursor(id))).toBe(id);
+    expect(desdeCursor(undefined)).toBeUndefined();
+    for (const cursor of ['abc', aCursor('no-es-uuid'), `${aCursor(id)}x`]) {
+      expect(() => desdeCursor(cursor)).toThrow(expect.objectContaining({ codigo: 'VALIDACION', datos: { campo: 'cursor' } }));
+    }
+  });
+
+  it('F2-4: los mensajes de validación son frases propias en español', () => {
+    const mensaje = (cuerpo: unknown) => {
+      try {
+        validar(EditarChoferBody, cuerpo);
+      } catch (e) {
+        return (e as Error).message;
+      }
+      return 'sin error';
+    };
+    const ok = { nombre: 'Juan Mamani', licenciaCategoria: 'C', licenciaVenceEl: '2029-03-15' };
+    expect(mensaje({ ...ok, nombre: 'ab' })).toBe('nombre: Debe tener al menos 3 caracteres');
+    expect(mensaje({ ...ok, nombre: 'x'.repeat(121) })).toBe('nombre: Debe tener como máximo 120 caracteres');
+    expect(mensaje({ ...ok, licenciaCategoria: 'D' })).toBe('licenciaCategoria: Debe ser una de: A, B, C');
+    expect(mensaje({ ...ok, licenciaVenceEl: '15/03/2029' })).toBe('licenciaVenceEl: Debe ser una fecha AAAA-MM-DD');
+    expect(mensaje({ licenciaCategoria: 'C', licenciaVenceEl: '2029-03-15' })).toBe('nombre: Es obligatorio');
+    expect(mensaje({ ...ok, nombre: 5 })).toBe('nombre: Debe ser un texto');
+    expect(mensajeZod({ code: 'too_small', origin: 'number', minimum: 0, inclusive: false })).toBe('Debe ser mayor que 0');
   });
 });
 

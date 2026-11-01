@@ -57,7 +57,7 @@ Nombres **explícitos**, iguales en los tres SDK:
 - `CLIENTE_NO_REPLICADO` y `DEPENDENCIA_NO_DISPONIBLE` son **reintentables** (`nonRetryable = false`).
 - Cualquier otra excepción es técnica y se reintenta según la tabla.
 - `REQUIERE_APROBACION` **no** es un error: es `resultado` de `validarYReservarCredito`.
-- Errores que lanza el propio workflow (no una actividad): `CREDITO_RECHAZADO` (señal con `aprobado = false`) y `APROBACION_VENCIDA` (vence `esperaAprobacion`).
+- Errores que lanza el propio workflow (no una actividad): `CREDITO_RECHAZADO` (señal con `aprobado = false`) y `APROBACION_VENCIDA` (vence `esperaAprobacion`). `CREDITO_RECHAZADO` también sale de `Finanzas.validarYReservarCredito` si la línea del cliente está suspendida; Finanzas lo marca no reintentable y el motivo del viaje es el mismo.
 
 ## Orden y compensaciones
 

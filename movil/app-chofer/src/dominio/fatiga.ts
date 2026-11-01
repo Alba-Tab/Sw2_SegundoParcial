@@ -6,9 +6,10 @@
  * - OJOS_CERRADOS: ojos cerrados 1,5 s seguidos.
  * - SOMNOLENCIA: PERCLOS, ojos cerrados más del 30 % del último minuto (parpadeo lento que no llega a 1,5 s).
  * - CABECEO: la cabeza cae 20° o más respecto de su posición habitual durante 1 s.
- * - SIN_ROSTRO: no se ve el rostro (mirada fuera, gorra o mano encima) durante 3 s. Con los ojos tapados la malla se
- *   acomoda sobre la mitad de abajo de la cara y sigue viendo "un rostro" de la mitad del tamaño: un rostro que se
- *   encoge de golpe por debajo del 60 % de su tamaño habitual también cuenta como no visible.
+ * - SIN_ROSTRO: no se ve el rostro (mirada fuera, gorra o mano encima) durante 3 s con el camión a más de 5 km/h (el
+ *   umbral de D58; detenido, el chofer carga, muestra papeles en un control o mira los espejos). Con los ojos tapados la
+ *   malla se acomoda sobre la mitad de abajo de la cara y sigue viendo "un rostro" de la mitad del tamaño: un rostro que
+ *   se encoge de golpe por debajo del 60 % de su tamaño habitual también cuenta como no visible.
  * - BOSTEZOS: 3 bostezos en 2 minutos.
  */
 export const OJO_CERRADO = 0.5;
@@ -20,6 +21,8 @@ export const PERCLOS_MINIMO_MS = 30_000;
 export const CABECEO_GRADOS = 20;
 export const CABECEO_MS = 1000;
 export const SIN_ROSTRO_MS = 3000;
+/** D58: por encima de esto el camión está en marcha (decisión del 01-11-2026 para SIN_ROSTRO). */
+export const SIN_ROSTRO_KMH = 5;
 export const ROSTRO_CUBIERTO = 0.6;
 export const BOCA_BOSTEZO = 0.6;
 export const BOSTEZO_MS = 1000;
@@ -80,11 +83,15 @@ export class DetectorFatiga {
   /** Si la última muestra contó como rostro visible (para que la pantalla no diga «vigilando» cuando no puede). */
   rostroVisible = false;
 
-  muestra(en: number, m: Medidas | null): MotivoFatiga | null {
+  /**
+   * `velocidadKmh` solo la usa SIN_ROSTRO. `null` (no se sabe) cuenta como en marcha: el detector solo corre con el
+   * viaje en ruta, y es mejor una alerta de más que quedar ciego.
+   */
+  muestra(en: number, m: Medidas | null, velocidadKmh: number | null): MotivoFatiga | null {
     this.alfa = this.anterior === null ? 1 : 1 - Math.exp(-(en - this.anterior) / BASE_TAU_MS);
     this.anterior = en;
     this.rostroVisible = false;
-    if (!m) return this.sinRostro(en);
+    if (!m) return this.sinRostro(en, velocidadKmh);
     if (this.altoBase === null) {
       this.calibracion ??= { desde: en, altos: [] };
       this.calibracion.altos.push(m.alto);
@@ -94,7 +101,7 @@ export class DetectorFatiga {
       }
     } else if (m.alto < this.altoBase * ROSTRO_CUBIERTO) {
       this.encogidoDesde ??= en;
-      if (en - this.encogidoDesde < REBASE_ALTO_MS) return this.sinRostro(en);
+      if (en - this.encogidoDesde < REBASE_ALTO_MS) return this.sinRostro(en, velocidadKmh);
       this.altoBase = m.alto;
     }
     this.encogidoDesde = null;
@@ -111,7 +118,7 @@ export class DetectorFatiga {
     return this.bostezos.filter((t) => en - t <= VENTANA_BOSTEZOS_MS).length;
   }
 
-  private sinRostro(en: number): MotivoFatiga | null {
+  private sinRostro(en: number, velocidadKmh: number | null): MotivoFatiga | null {
     // Un hueco corto no corta el episodio; uno de 0,5 s o más sí (sin olvidar los bostezos de la ventana).
     if (this.ultimoRostro === null || en - this.ultimoRostro >= HUECO_SIN_ROSTRO_MS) {
       this.cerradosDesde = null;
@@ -121,8 +128,9 @@ export class DetectorFatiga {
       this.bostezoDesde = null;
       this.bostezoContado = false;
     }
-    this.sinRostroDesde ??= en;
-    if (this.avisoSinRostro || en - this.sinRostroDesde < SIN_ROSTRO_MS) return null;
+    // Detenido no cuenta, y al arrancar los 3 s empiezan de nuevo.
+    this.sinRostroDesde = velocidadKmh === null || velocidadKmh > SIN_ROSTRO_KMH ? (this.sinRostroDesde ?? en) : null;
+    if (this.sinRostroDesde === null || this.avisoSinRostro || en - this.sinRostroDesde < SIN_ROSTRO_MS) return null;
     this.avisoSinRostro = true;
     return 'SIN_ROSTRO';
   }

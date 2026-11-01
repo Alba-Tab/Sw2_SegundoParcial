@@ -9,6 +9,8 @@ export interface PuntoGps {
   precisionMetros: number | null;
 }
 
+/** Cada cuánto pide una lectura el GPS de fondo (`timeInterval`); el muestreo de D52 decide cuáles se guardan. */
+export const LECTURA_GPS_CADA_MS = 10_000;
 /** D52: un punto cada 20 s o cada 100 m, lo que ocurra primero. */
 export const GPS_CADA_MS = 20_000;
 export const GPS_CADA_METROS = 100;

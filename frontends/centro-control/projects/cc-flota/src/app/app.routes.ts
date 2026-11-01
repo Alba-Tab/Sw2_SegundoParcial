@@ -11,6 +11,12 @@ export const rutas: Routes = [
     children: [
       { path: '', pathMatch: 'full', redirectTo: 'unidades' },
       { path: 'unidades', loadComponent: () => import('./unidades/ui/unidades').then((m) => m.UnidadesPagina), title: 'Unidades' },
+      {
+        path: 'unidades/nueva',
+        canActivate: [soloRoles('jefe_flota')],
+        loadComponent: () => import('./unidades/ui/nueva-unidad').then((m) => m.NuevaUnidadPagina),
+        title: 'Nueva unidad',
+      },
       { path: 'unidades/:id', loadComponent: () => import('./unidades/ui/unidad').then((m) => m.UnidadPagina), title: 'Unidad' },
       {
         path: 'mantenimientos',

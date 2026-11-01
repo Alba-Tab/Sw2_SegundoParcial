@@ -1,5 +1,62 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 import { ErrorDeDominio } from '../../dominio/comun/error-de-dominio';
+
+const TIPOS: Record<string, string> = {
+  string: 'un texto',
+  number: 'un número',
+  int: 'un número entero',
+  boolean: 'true o false',
+  object: 'un objeto',
+  array: 'una lista',
+};
+const FORMATOS: Record<string, string> = {
+  date: 'Debe ser una fecha AAAA-MM-DD',
+  datetime: 'Debe ser un instante ISO-8601 en UTC',
+  uuid: 'Debe ser un UUID',
+  email: 'Debe ser un correo válido',
+};
+const cuantos = (n: unknown, origen: unknown) =>
+  origen === 'string'
+    ? `${n} ${n === 1 ? 'carácter' : 'caracteres'}`
+    : origen === 'array'
+      ? `${n} ${n === 1 ? 'elemento' : 'elementos'}`
+      : null;
+
+/**
+ * Mensajes de validación propios en español (000 §5), en vez de la traducción automática de zod ("Demasiado pequeño: se
+ * esperaba que texto tuviera >=3 caracteres"). Lo que no está aquí sale con un texto genérico, nunca en inglés.
+ */
+export function mensajeZod(i: { code?: string; input?: unknown } & Record<string, unknown>): string {
+  switch (i.code) {
+    case 'invalid_type':
+      return i.input === undefined ? 'Es obligatorio' : `Debe ser ${TIPOS[String(i['expected'])] ?? String(i['expected'])}`;
+    case 'too_small': {
+      const n = cuantos(i['minimum'], i['origin']);
+      if (n) return `Debe tener al menos ${n}`;
+      return `Debe ser ${i['inclusive'] === false ? 'mayor que' : 'mayor o igual que'} ${String(i['minimum'])}`;
+    }
+    case 'too_big': {
+      const n = cuantos(i['maximum'], i['origin']);
+      if (n) return `Debe tener como máximo ${n}`;
+      return `Debe ser ${i['inclusive'] === false ? 'menor que' : 'menor o igual que'} ${String(i['maximum'])}`;
+    }
+    case 'invalid_value':
+      return `Debe ser una de: ${((i['values'] as unknown[]) ?? []).map(String).join(', ')}`;
+    case 'invalid_format':
+      return FORMATOS[String(i['format'])] ?? 'No tiene el formato esperado';
+    case 'unrecognized_keys':
+      return `No se aceptan estos campos: ${((i['keys'] as string[]) ?? []).join(', ')}`;
+    default:
+      return 'No es válido';
+  }
+}
+z.config({ customError: (i) => mensajeZod(i as unknown as Parameters<typeof mensajeZod>[0]) });
+
+/**
+ * Texto con los espacios de los bordes recortados antes de contar el largo: el esquema generado del contrato no recorta,
+ * y "  ab " pasaría un mínimo de 3 para llegar como "ab" al dominio y al Outbox.
+ */
+export const textoRecortado = (min: number, max: number) => z.string().trim().min(min).max(max);
 
 /**
  * Valida contra el esquema zod generado del contrato; el primer error va como `campo` (000 §5).
@@ -54,6 +111,16 @@ export function conBooleanos(q: unknown, campos: string[]): unknown {
   return r;
 }
 
-/** Cursor opaco (000 §4): el último id de la página en base64url. */
+/** Cursor opaco (000 §4): el último id de la página (un UUID) en base64url. */
 export const aCursor = (id: string) => Buffer.from(id).toString('base64url');
-export const desdeCursor = (c?: string) => (c ? Buffer.from(c, 'base64url').toString('utf8') : undefined);
+
+/**
+ * El id de un cursor de `aCursor`. Uno que no salió de aquí (no es base64url de un UUID) es 400 VALIDACION, como en
+ * Viajes: antes daba una página vacía y terminada, o se ignoraba.
+ */
+export function desdeCursor(c?: string): string | undefined {
+  if (!c) return undefined;
+  const id = Buffer.from(c, 'base64url').toString('utf8');
+  if (!UUID.test(id) || aCursor(id) !== c) throw new ErrorDeDominio('VALIDACION', 'cursor: no es válido', { campo: 'cursor' });
+  return id;
+}

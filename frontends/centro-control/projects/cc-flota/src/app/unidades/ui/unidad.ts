@@ -1,6 +1,6 @@
-import { afterNextRender, Component, effect, inject, Injector, input, signal, viewChild } from '@angular/core';
+import { afterNextRender, Component, computed, effect, inject, Injector, input, signal, viewChild } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { MatButton, MatButtonModule } from '@angular/material/button';
+import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -36,15 +36,23 @@ import {
   checklistCompleto,
   checklistValido,
   cierreInicial,
+  claseUnidad,
   documentosEnAviso,
+  edicionDesde,
   KM_MANTENIMIENTO,
   motivoBloqueo,
   puedeProgramar,
+  venceDocumento,
+  type DetalleUnidad,
   type ItemCierre,
   type Mantenimiento,
   type NuevoMantenimiento,
 } from '../domain/unidad';
 import { UnidadFachada } from '../unidades.fachada';
+import { ajustarCampos, CamposUnidad, formularioCampos } from './campos-unidad';
+
+/** El formulario abierto de la ficha: uno a la vez, cada uno con su botón en el encabezado. */
+type Panel = 'programar' | 'editar' | 'baja';
 
 /** Spec 010: programar un mantenimiento (la unidad pasa a EN_MANTENIMIENTO) y cerrarlo con su checklist. */
 @Component({
@@ -56,6 +64,7 @@ import { UnidadFachada } from '../unidades.fachada';
     ReactiveFormsModule,
     Campo,
     Confirmacion,
+    CamposUnidad,
     NumeroPipe,
     MatCardModule,
     MatButtonModule,
@@ -80,12 +89,31 @@ import { UnidadFachada } from '../unidades.fachada';
         @if (sesion.tiene('jefe_flota') && puedeProgramar(u.estado)) {
           <button
             mat-stroked-button
-            #botonProgramar
-            (click)="programando() ? cerrarFormulario() : abrirFormulario()"
+            id="boton-programar"
+            (click)="programando() ? cerrarPanel() : abrirFormulario()"
             [attr.aria-expanded]="programando()"
             aria-controls="programar"
           >
             <mat-icon>build</mat-icon>Programar mantenimiento
+          </button>
+          <!-- D104: editar (capacidad, documentos y atributos) y dar de baja, con la unidad disponible o pendiente. -->
+          <button
+            mat-stroked-button
+            id="boton-editar"
+            (click)="panel() === 'editar' ? cerrarPanel() : abrirEdicion(u)"
+            [attr.aria-expanded]="panel() === 'editar'"
+            aria-controls="editar"
+          >
+            <mat-icon>draw</mat-icon>Editar
+          </button>
+          <button
+            mat-stroked-button
+            id="boton-baja"
+            (click)="panel() === 'baja' ? cerrarPanel() : abrirPanel('baja')"
+            [attr.aria-expanded]="panel() === 'baja'"
+            aria-controls="baja"
+          >
+            <mat-icon>archive</mat-icon>Dar de baja
           </button>
         }
       }
@@ -106,7 +134,8 @@ import { UnidadFachada } from '../unidades.fachada';
         <p class="aviso-documentos" role="status">
           <mat-icon>warning</mat-icon>{{ n === 1 ? 'Un documento vencido o por vencer' : n + ' documentos vencidos o por vencer' }}.
           @if (sesion.tiene('jefe_flota')) {
-            Para {{ n === 1 ? 'renovarlo' : 'renovarlos' }}, programa un mantenimiento de tipo «Documentos».
+            Para {{ n === 1 ? 'renovarlo' : 'renovarlos' }}, programa un mantenimiento de tipo «Documentos» o, si ya
+            {{ n === 1 ? 'está renovado' : 'están renovados' }}, anota la fecha nueva con «Editar».
           }
         </p>
       }
@@ -141,6 +170,50 @@ import { UnidadFachada } from '../unidades.fachada';
           </div>
         }
       </dl>
+
+      @if (panel() === 'editar' && sesion.tiene('jefe_flota') && puedeProgramar(u.estado)) {
+        <mat-card class="formulario" id="editar">
+          <mat-card-header><mat-card-title>Editar unidad</mat-card-title></mat-card-header>
+          <mat-card-content>
+            <form [formGroup]="edicion" (ngSubmit)="editar(u, formEditar)" #formEditar novalidate>
+              <app-campos-unidad [form]="edicion" [clase]="clase()" />
+              <div class="fila-acciones">
+                <button mat-flat-button type="submit" [disabled]="enviando()" disabledInteractive>Guardar</button>
+                <button mat-button type="button" (click)="cerrarPanel()" [disabled]="enviando()">Cancelar</button>
+              </div>
+            </form>
+          </mat-card-content>
+        </mat-card>
+      }
+
+      @if (panel() === 'baja' && sesion.tiene('jefe_flota') && puedeProgramar(u.estado)) {
+        <mat-card class="formulario" id="baja">
+          <mat-card-header><mat-card-title>Dar de baja</mat-card-title></mat-card-header>
+          <mat-card-content #zonaBaja>
+            <mat-form-field class="ancho">
+              <mat-label>Motivo</mat-label>
+              <input matInput [formControl]="motivoBaja" id="motivo-baja" />
+              <mat-hint>De 3 a 200 caracteres</mat-hint>
+              <mat-error>{{ textoError(motivoBaja) }}</mat-error>
+            </mat-form-field>
+            @if (confirmandoBaja()) {
+              <cc-confirmacion
+                [resumen]="resumenBaja(u.placa)"
+                accion="Sí, dar de baja"
+                icono="archive"
+                [enviando]="enviando()"
+                (confirmar)="darDeBaja(u.unidadId)"
+                (volver)="volverDeBaja()"
+              />
+            } @else {
+              <div class="fila-acciones">
+                <button mat-flat-button type="button" id="pedir-baja" (click)="pedirBaja(zonaBaja)">Dar de baja…</button>
+                <button mat-button type="button" (click)="cerrarPanel()">Cancelar</button>
+              </div>
+            }
+          </mat-card-content>
+        </mat-card>
+      }
 
       @if (programando() && sesion.tiene('jefe_flota') && puedeProgramar(u.estado)) {
         <mat-card class="formulario" id="programar">
@@ -179,7 +252,7 @@ import { UnidadFachada } from '../unidades.fachada';
               </mat-form-field>
               <div class="fila-acciones">
                 <button mat-flat-button type="submit" [disabled]="enviando()" disabledInteractive>Programar</button>
-                <button mat-button type="button" (click)="cerrarFormulario()" [disabled]="enviando()">Cancelar</button>
+                <button mat-button type="button" (click)="cerrarPanel()" [disabled]="enviando()">Cancelar</button>
               </div>
             </form>
           </mat-card-content>
@@ -252,6 +325,9 @@ import { UnidadFachada } from '../unidades.fachada';
       } @empty {
         <p class="secundario">Sin mantenimientos.</p>
       }
+      @if (hayMasMantenimientos()) {
+        <p class="secundario">Se muestran los 50 mantenimientos más recientes de esta unidad.</p>
+      }
     }
   `,
   styles: `
@@ -293,9 +369,19 @@ export class UnidadPagina {
   readonly documentosEnAviso = documentosEnAviso;
   readonly avisoKm = AVISO_KM;
   readonly kmMantenimiento = KM_MANTENIMIENTO;
-  /** El formulario de programar se abre desde la acción del encabezado. */
-  readonly programando = signal(false);
+  /** El formulario abierto (programar, editar o dar de baja) se abre desde su acción del encabezado. */
+  readonly panel = signal<Panel | null>(null);
+  readonly programando = computed(() => this.panel() === 'programar');
+  readonly clase = computed(() => {
+    const u = this.unidad();
+    return u ? claseUnidad(u.tipoUnidad, u.tipoRemolque) : null;
+  });
+  readonly edicion = formularioCampos();
+  readonly motivoBaja = new FormControl('', { nonNullable: true, validators: [Validators.required, largoEntre(3, 200)] });
+  /** La baja no se deshace: con el motivo escrito se pide un segundo clic. */
+  readonly confirmandoBaja = signal(false);
   readonly mantenimientos = this.fachada.mantenimientos;
+  readonly hayMasMantenimientos = this.fachada.hayMasMantenimientos;
   readonly hoy = fechaLaPaz();
   readonly recargar = () => this.fachada.recargar();
   /** El mantenimiento que se quiso cerrar con ítems sin marcar (spec 010 exige todos hechos). */
@@ -305,7 +391,6 @@ export class UnidadPagina {
   readonly cerrando = signal<string | null>(null);
   readonly textoError = textoError;
   readonly tiposMantenimiento = ['PREVENTIVO', 'CORRECTIVO', 'DOCUMENTOS'] as const;
-  private readonly botonProgramar = viewChild<MatButton>('botonProgramar');
   private readonly primerCampo = viewChild<MatSelect>('primerCampo');
   private readonly injector = inject(Injector);
   readonly nuevo = new FormGroup({
@@ -337,21 +422,80 @@ export class UnidadPagina {
 
   /** Abre el formulario de programar con el foco en su primer campo: aparece debajo de los datos, fuera de la vista en móvil (C-7). */
   abrirFormulario(): void {
-    this.programando.set(true);
+    this.volverDeBaja(false);
+    this.panel.set('programar');
     afterNextRender(() => this.primerCampo()?.focus(), { injector: this.injector });
   }
 
-  /** Cierra el formulario de programar y devuelve el foco al botón que lo abrió (o al título, si ya no está). */
-  cerrarFormulario(): void {
-    this.programando.set(false);
+  /** Abre el panel de editar o de dar de baja con el foco en su primer campo; abrir otro cierra el anterior. */
+  abrirPanel(panel: Panel): void {
+    this.volverDeBaja(false);
+    this.motivoBaja.reset();
+    this.panel.set(panel);
+    const primero = `#${panel} input, #${panel} mat-select`;
+    afterNextRender(() => document.querySelector<HTMLElement>(primero)?.focus(), { injector: this.injector });
+  }
+
+  /** La edición empieza con lo que la unidad tiene hoy. */
+  abrirEdicion(u: DetalleUnidad): void {
+    this.edicion.reset();
+    this.edicion.patchValue({
+      capacidadToneladas: u.capacidadToneladas ?? null,
+      soat: venceDocumento(u.documentos, 'SOAT'),
+      inspeccion: venceDocumento(u.documentos, 'INSPECCION_TECNICA'),
+      atributos: (u.atributos ?? {}) as Record<string, number>,
+    });
+    ajustarCampos(this.edicion, this.clase());
+    this.abrirPanel('editar');
+  }
+
+  /** Cierra el panel abierto y devuelve el foco al botón que lo abrió (o al título, si ya no está). */
+  cerrarPanel(): void {
+    const boton = `boton-${this.panel()}`;
+    this.volverDeBaja(false);
+    this.panel.set(null);
     afterNextRender(
       () => {
-        const boton = this.botonProgramar();
-        if (boton) boton.focus();
+        const el = document.getElementById(boton);
+        if (el) el.focus();
         else enfocarTitulo();
       },
       { injector: this.injector },
     );
+  }
+
+  async editar(u: DetalleUnidad, raiz: HTMLElement) {
+    const clase = this.clase();
+    if (this.enviando() || !clase || !listoParaEnviar(this.edicion, raiz)) return;
+    const edicion = edicionDesde(clase, this.edicion.getRawValue());
+    if (await this.enviar(() => this.fachada.editar(u.unidadId, edicion), 'Unidad actualizada')) this.cerrarPanel();
+  }
+
+  /** Con el motivo válido, lo bloquea y pide confirmar (E-4, E-6). */
+  pedirBaja(raiz: HTMLElement): void {
+    if (!listoParaEnviar(this.motivoBaja, raiz)) return;
+    this.motivoBaja.disable();
+    this.confirmandoBaja.set(true);
+  }
+
+  /** "No, volver" o una baja fallida: desbloquea el motivo y el foco vuelve a "Dar de baja…". */
+  volverDeBaja(enfocarBoton = true): void {
+    this.motivoBaja.enable();
+    this.confirmandoBaja.set(false);
+    if (enfocarBoton) enfocar('pedir-baja');
+  }
+
+  resumenBaja(placa: string): string {
+    return `${placa} queda inactiva y no vuelve a operar. Motivo: «${this.motivoBaja.getRawValue().trim()}». No se puede deshacer.`;
+  }
+
+  async darDeBaja(unidadId: string) {
+    if (await this.enviar(() => this.fachada.darDeBaja(unidadId, this.motivoBaja.getRawValue().trim()), 'Unidad dada de baja')) {
+      this.volverDeBaja(false);
+      this.panel.set(null);
+      // La unidad queda INACTIVA y sin acciones: el foco va al título.
+      enfocarTitulo();
+    } else this.volverDeBaja();
   }
 
   async programar(unidadId: string, raiz: HTMLElement) {
@@ -361,7 +505,7 @@ export class UnidadPagina {
     const nuevo = { ...v, taller: v.taller.trim(), descripcion: v.descripcion.trim() };
     if (await this.enviar(() => this.fachada.programar(unidadId, nuevo), 'Mantenimiento programado')) {
       this.nuevo.reset();
-      this.cerrarFormulario();
+      this.cerrarPanel();
     }
   }
 

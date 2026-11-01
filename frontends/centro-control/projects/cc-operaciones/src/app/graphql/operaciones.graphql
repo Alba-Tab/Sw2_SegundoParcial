@@ -72,6 +72,8 @@ query Mapa($verRiesgo: Boolean!) {
 query Viaje($id: ID!, $verMonto: Boolean!, $verRiesgo: Boolean!, $verUnidad: Boolean!) {
   viaje(id: $id) {
     ...ViajeFila
+    # Para enlazar la ficha del chofer en Flota.
+    choferId
     monto @include(if: $verMonto)
     riesgo @include(if: $verRiesgo) {
       probabilidad

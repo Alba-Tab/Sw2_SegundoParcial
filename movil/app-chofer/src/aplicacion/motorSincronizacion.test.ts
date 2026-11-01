@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { PuntoGps } from '../dominio/gps';
 import type { Operacion } from '../dominio/operacion';
 import type { Respuesta } from '../dominio/reintento';
-import type { ViajeLocal } from '../dominio/viaje';
+import { estadoVisible, type ViajeLocal } from '../dominio/viaje';
 import type { EvidenciaLocal, Parte } from '../dominio/evidencia';
 import { CasosDeUso } from './casosDeUso';
 import { MotorSincronizacion } from './motorSincronizacion';
@@ -11,6 +11,7 @@ import {
   type ApiEvidencias,
   type Cola,
   type Evidencias,
+  type FatigaSinPosicion,
   type PosicionGuardada,
   type PuntosGps,
   SesionVencida,
@@ -51,10 +52,29 @@ class ViajesEnMemoria implements Viajes {
   v = new Map<string, ViajeLocal>();
   todos = () => [...this.v.values()];
   porId = (id: string) => this.v.get(id) ?? null;
-  guardarDelServidor = (vs: ViajeLocal[]) => vs.forEach((x) => this.v.set(x.viajeId, x));
+  // Como SQLite: el servidor manda en el estado y se conservan las marcas locales.
+  guardarDelServidor = (vs: ViajeLocal[]) =>
+    vs.forEach((x) => {
+      const local = this.v.get(x.viajeId);
+      this.v.set(
+        x.viajeId,
+        local
+          ? {
+              ...x,
+              iniciadoLocal: local.iniciadoLocal,
+              canceladoAlSincronizar: local.canceladoAlSincronizar,
+              entregaLocal: local.entregaLocal,
+            }
+          : x,
+      );
+    });
   marcarIniciado = (id: string) => void (this.v.get(id)!.iniciadoLocal = true);
   marcarCanceladoAlSincronizar = (id: string) => void (this.v.get(id)!.canceladoAlSincronizar = true);
   marcarEntregaLocal = (id: string, t: 'ENTREGA' | 'RECHAZO') => void (this.v.get(id)!.entregaLocal = t);
+  liberarMarca = (id: string, t: 'INICIO' | 'ENTREGA' | 'RECHAZO') => {
+    if (t === 'INICIO') this.v.get(id)!.iniciadoLocal = false;
+    else this.v.get(id)!.entregaLocal = null;
+  };
 }
 
 /** Responde con lo que haya en la cola de respuestas de cada clave (`TIPO:opId` o `GPS`), y registra cada envío. */
@@ -87,7 +107,13 @@ class ApiFalsa implements Api {
     return this.siguiente('GPS');
   };
   estadoDelViaje = async (): Promise<Respuesta> => this.respuestasEstado.shift() ?? { estado: 200, cuerpo: { estado: this.estado } };
-  misViajes = async () => [];
+  /** Lo que devuelve `GET /viajes/mios`. */
+  viajesServidor: ViajeLocal[] = [];
+  misViajesSinRed = false;
+  misViajes = async () => {
+    if (this.misViajesSinRed) throw new TypeError('Network request failed');
+    return this.viajesServidor;
+  };
   cursor = async (_d: string, viajeId: string) => {
     if (this.cursorQueLanza.has(viajeId)) throw new TypeError('Network request failed');
     return this.cursorServidor;
@@ -100,6 +126,12 @@ class PosicionEnMemoria implements PosicionGuardada {
   leer = () => this.p;
   guardar = (p: { lat: number; lng: number }) => void (this.p = p);
   borrar = () => void (this.p = null);
+}
+
+class FatigasEnMemoria {
+  f: FatigaSinPosicion[] = [];
+  leer = () => this.f;
+  guardar = (f: FatigaSinPosicion[]) => void (this.f = f);
 }
 
 class EvidenciasEnMemoria implements Evidencias {
@@ -159,7 +191,7 @@ const viaje = (viajeId: string): ViajeLocal => ({
 describe('motor de sincronización (spec 005, CU-08)', () => {
   let cola: ColaEnMemoria, puntos: PuntosEnMemoria, viajes: ViajesEnMemoria, api: ApiFalsa;
   let ahora: Date, conRed: boolean, sesionVencida: boolean, n: number;
-  let evidencias: EvidenciasEnMemoria, apiEvidencias: ApiEvidenciasFalsa, posicion: PosicionEnMemoria;
+  let evidencias: EvidenciasEnMemoria, apiEvidencias: ApiEvidenciasFalsa, posicion: PosicionEnMemoria, fatigas: FatigasEnMemoria;
   let motor: MotorSincronizacion, casos: CasosDeUso;
   let borrados: string[];
 
@@ -197,7 +229,23 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     const subida = new SubidaEvidencias(evidencias, apiEvidencias, archivos);
     motor = new MotorSincronizacion(cola, puntos, viajes, api, sesion, red, reloj, ids, dispositivo, subida, () => 0.5);
     posicion = new PosicionEnMemoria();
-    casos = new CasosDeUso(cola, puntos, viajes, api, sesion, reloj, ids, dispositivo, evidencias, archivos, posicion);
+    fatigas = new FatigasEnMemoria();
+    const enTransaccion = <T>(fn: () => T) => fn();
+    casos = new CasosDeUso(
+      cola,
+      puntos,
+      viajes,
+      api,
+      sesion,
+      reloj,
+      ids,
+      dispositivo,
+      evidencias,
+      archivos,
+      posicion,
+      enTransaccion,
+      fatigas,
+    );
     viajes.guardarDelServidor([viaje('v1')]);
   });
 
@@ -323,7 +371,6 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
   });
 
   it('T7.7: la alerta de fatiga va a la cola como evento de conducción, sin magnitud', () => {
-    expect(casos.registrarFatiga('v1')).toBeNull();
     casos.registrarLectura('v1', { lat: -17.7, lng: -63.18, velocidadMs: 20, precisionMetros: 5, en: ahora.getTime() });
     const op = casos.registrarFatiga('v1')!;
     const fatiga = cola.ops.find((o) => o.opId === op)!;
@@ -413,6 +460,84 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     expect(cola.ops[0]).toMatchObject({ estado: 'FALLIDA', codigoError: 'CONFLICTO_ESTADO' });
   });
 
+  it('una entrega FALLIDA libera la marca: se registra de nuevo con otra clave y, si el viaje ya no está en ruta, el 409 queda a la vista', async () => {
+    casos.iniciarViaje('v1', null);
+    casos.registrarLectura('v1', { lat: -17.8, lng: -63.2, velocidadMs: 0, precisionMetros: 4, en: ahora.getTime() });
+    const primera = casos.entregar('v1', ['foto1.jpg'], null, null, null);
+    api.responder(`ENTREGA:${primera}`, { estado: 422, codigo: 'VALIDACION' });
+    await motor.sincronizar();
+    expect(cola.ops.find((o) => o.opId === primera)).toMatchObject({ estado: 'FALLIDA', codigoError: 'VALIDACION' });
+    expect(viajes.porId('v1')?.entregaLocal).toBeNull();
+
+    const segunda = casos.entregar('v1', ['foto2.jpg'], null, null, null);
+    expect(segunda).not.toBe(primera);
+    const cuerpos = [primera, segunda].map((id) => cola.ops.find((o) => o.opId === id)!.cuerpo.entregaId);
+    expect(cuerpos[0]).not.toBe(cuerpos[1]);
+    expect(viajes.porId('v1')?.entregaLocal).toBe('ENTREGA');
+    api.responder(`ENTREGA:${segunda}`, { estado: 409, codigo: 'CONFLICTO_ESTADO' });
+    api.estado = 'ENTREGADO';
+    await motor.sincronizar();
+    expect(cola.ops.find((o) => o.opId === segunda)).toMatchObject({ estado: 'FALLIDA', codigoError: 'CONFLICTO_ESTADO' });
+    expect(viajes.porId('v1')?.entregaLocal).toBeNull();
+  });
+
+  it('un rechazo FALLIDA también libera la marca; uno confirmado no', async () => {
+    casos.iniciarViaje('v1', null);
+    casos.registrarLectura('v1', { lat: -17.8, lng: -63.2, velocidadMs: 0, precisionMetros: 4, en: ahora.getTime() });
+    const rechazo = casos.rechazar('v1', 'Carga mojada', ['foto1.jpg']);
+    api.responder(`RECHAZO:${rechazo}`, { estado: 422, codigo: 'VALIDACION' });
+    await motor.sincronizar();
+    expect(viajes.porId('v1')?.entregaLocal).toBeNull();
+    casos.rechazar('v1', 'Carga mojada', ['foto2.jpg']);
+    await motor.sincronizar();
+    expect(viajes.porId('v1')?.entregaLocal).toBe('RECHAZO');
+  });
+
+  it('un inicio FALLIDA libera la marca y el chofer puede iniciar de nuevo', async () => {
+    const inicio = casos.iniciarViaje('v1', null);
+    api.responder(`INICIO:${inicio}`, { estado: 422, codigo: 'VALIDACION' });
+    await motor.sincronizar();
+    expect(viajes.porId('v1')?.iniciadoLocal).toBe(false);
+    const otro = casos.iniciarViaje('v1', null);
+    expect(otro).not.toBe(inicio);
+    expect(viajes.porId('v1')?.iniciadoLocal).toBe(true);
+  });
+
+  it('D106: un inicio con 409 CONFLICTO_ESTADO no libera la marca; se baja el estado del servidor y el viaje sigue en ruta', async () => {
+    const inicio = casos.iniciarViaje('v1', null);
+    api.responder(`INICIO:${inicio}`, { estado: 409, codigo: 'CONFLICTO_ESTADO' });
+    api.estado = 'EN_RUTA';
+    api.viajesServidor = [{ ...viaje('v1'), estado: 'EN_RUTA' }];
+    await motor.sincronizar();
+    expect(cola.ops[0]).toMatchObject({ estado: 'FALLIDA', codigoError: 'CONFLICTO_ESTADO' });
+    expect(viajes.porId('v1')).toMatchObject({ estado: 'EN_RUTA', iniciadoLocal: true });
+    expect(estadoVisible(viajes.porId('v1')!)).toBe('EN_RUTA');
+  });
+
+  it('D106: un inicio con 409 porque el chofer ya tiene otro viaje en ruta (sigue CONFIRMADO) libera la marca', async () => {
+    const inicio = casos.iniciarViaje('v1', null);
+    api.responder(`INICIO:${inicio}`, { estado: 409, codigo: 'CONFLICTO_ESTADO' });
+    api.estado = 'CONFIRMADO';
+    api.viajesServidor = [viaje('v1'), { ...viaje('v2'), estado: 'EN_RUTA' }];
+    await motor.sincronizar();
+    expect(cola.ops[0]).toMatchObject({ estado: 'FALLIDA', codigoError: 'CONFLICTO_ESTADO' });
+    expect(viajes.porId('v1')?.iniciadoLocal).toBe(false);
+    expect(estadoVisible(viajes.porId('v1')!)).toBe('CONFIRMADO');
+  });
+
+  it('D106: sin red para bajar los viajes tras el 409, la marca queda y decide la próxima descarga', async () => {
+    const inicio = casos.iniciarViaje('v1', null);
+    api.responder(`INICIO:${inicio}`, { estado: 409, codigo: 'CONFLICTO_ESTADO' });
+    api.estado = 'CONFIRMADO';
+    api.misViajesSinRed = true;
+    await motor.sincronizar();
+    expect(viajes.porId('v1')?.iniciadoLocal).toBe(true);
+    api.misViajesSinRed = false;
+    api.viajesServidor = [viaje('v1')];
+    await casos.descargarViajes();
+    expect(viajes.porId('v1')?.iniciadoLocal).toBe(false);
+  });
+
   it('un envío que lanza no rompe la tanda: esa operación se reintenta y los otros viajes siguen', async () => {
     viajes.guardarDelServidor([viaje('v2')]);
     const malo = casos.encolar('v1', 'HITO', { tipo: 'PARADA' });
@@ -460,12 +585,79 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     expect(cola.ops.find((o) => o.opId === frenada)?.cuerpo).toMatchObject({ posicion: { lat: -17.75, lng: -63.17 } });
   });
 
+  it('sin ninguna posición conocida, la alerta de fatiga se guarda con su hora y sale con la primera lectura del GPS', () => {
+    const alerta = ahora.toISOString();
+    expect(casos.registrarFatiga('v1')).toBeNull();
+    expect(cola.ops).toHaveLength(0);
+    expect(fatigas.f).toEqual([{ viajeId: 'v1', eventoId: 'id-1', registradoEn: alerta }]);
+
+    ahora = new Date(ahora.getTime() + 60_000);
+    casos.registrarLectura('v1', { lat: -17.7, lng: -63.18, velocidadMs: 20, precisionMetros: 5, en: ahora.getTime() });
+    expect(fatigas.f).toEqual([]);
+    expect(cola.ops).toHaveLength(1);
+    expect(cola.ops[0]).toMatchObject({ viajeId: 'v1', tipo: 'EVENTO_CONDUCCION' });
+    expect(cola.ops[0].cuerpo).toEqual({
+      eventoId: 'id-1',
+      tipo: 'ALERTA_FATIGA',
+      posicion: { lat: -17.7, lng: -63.18 },
+      registradoEn: alerta,
+    });
+
+    casos.registrarLectura('v1', { lat: -17.71, lng: -63.18, velocidadMs: 20, precisionMetros: 5, en: ahora.getTime() + 30_000 });
+    expect(cola.ops).toHaveLength(1);
+  });
+
+  it('E2-1: la velocidad sale del GPS; con -1 se calcula por distancia y tiempo; con la lectura de más de 20 s no se sabe', () => {
+    const t0 = ahora.getTime();
+    const lectura = (en: number, lat: number, velocidadMs: number) => ({ lat, lng: -63.18, velocidadMs, precisionMetros: 5, en: t0 + en });
+    expect(casos.velocidadKmh()).toBeNull();
+    casos.registrarLectura('v1', lectura(0, -17.7, -1));
+    expect(casos.velocidadKmh()).toBeNull();
+    // 0,001° de latitud son 111,2 m; en 10 s, 40 km/h.
+    ahora = new Date(t0 + 10_000);
+    casos.registrarLectura('v1', lectura(10_000, -17.701, -1));
+    expect(casos.velocidadKmh()).toBe(40);
+    casos.registrarLectura('v1', lectura(10_000, -17.701, 2));
+    expect(casos.velocidadKmh()).toBe(7.2);
+    ahora = new Date(t0 + 10_000 + 15_000);
+    expect(casos.velocidadKmh()).toBe(7.2);
+    ahora = new Date(t0 + 10_000 + 25_000);
+    expect(casos.velocidadKmh()).toBeNull();
+  });
+
+  it('E12-1: con su viaje en ruta, la alerta guardada sale solo con una lectura de ese viaje', () => {
+    viajes.guardarDelServidor([viaje('v2')]);
+    casos.iniciarViaje('v1', null);
+    casos.registrarFatiga('v1');
+    casos.registrarLectura('v2', { lat: -17.6, lng: -63.1, velocidadMs: 20, precisionMetros: 5, en: ahora.getTime() });
+    expect(cola.ops.filter((o) => o.tipo === 'EVENTO_CONDUCCION')).toHaveLength(0);
+    expect(fatigas.f.map((f) => f.viajeId)).toEqual(['v1']);
+    casos.registrarLectura('v1', { lat: -17.7, lng: -63.18, velocidadMs: 20, precisionMetros: 5, en: ahora.getTime() });
+    const eventos = cola.ops.filter((o) => o.tipo === 'EVENTO_CONDUCCION');
+    expect(eventos.map((o) => [o.viajeId, o.cuerpo.posicion])).toEqual([['v1', { lat: -17.7, lng: -63.18 }]]);
+    expect(fatigas.f).toEqual([]);
+  });
+
+  it('E2-9: la alerta de un viaje que ya no está en ruta sale con la posición guardada al bajar los viajes', async () => {
+    casos.iniciarViaje('v1', null);
+    casos.registrarFatiga('v1');
+    api.viajesServidor = [{ ...viaje('v1'), estado: 'ENTREGADO' }];
+    await casos.descargarViajes();
+    expect(fatigas.f).toHaveLength(1);
+
+    posicion.p = { lat: -17.75, lng: -63.17 };
+    await casos.descargarViajes();
+    expect(fatigas.f).toEqual([]);
+    const evento = cola.ops.find((o) => o.tipo === 'EVENTO_CONDUCCION')!;
+    expect(evento).toMatchObject({ viajeId: 'v1', cuerpo: { tipo: 'ALERTA_FATIGA', posicion: { lat: -17.75, lng: -63.17 } } });
+  });
+
   it('cada lectura del GPS queda guardada como última posición; olvidar limpia la memoria', () => {
     casos.registrarLectura('v1', { lat: -17.71, lng: -63.18, velocidadMs: 10, precisionMetros: 5, en: ahora.getTime() });
     expect(posicion.p).toEqual({ lat: -17.71, lng: -63.18 });
     casos.olvidar();
     expect(casos.ultimaPosicion()).toBeNull();
-    expect(casos.velocidadKmh()).toBe(0);
+    expect(casos.velocidadKmh()).toBeNull();
   });
 
   it('T7.6: el monto escrito con coma o sin decimales se normaliza como texto; uno inválido no entra a la cola', () => {

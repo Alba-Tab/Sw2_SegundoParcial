@@ -285,6 +285,12 @@ type Mantenimiento {
   observaciones: String
 }
 
+"Una página de mantenimientos; `siguienteCursor` en null si no hay más."
+type MantenimientoPagina {
+  items: [Mantenimiento!]!
+  siguienteCursor: Cursor
+}
+
 type Chofer {
   choferId: ID!
   nombre: String!
@@ -292,6 +298,14 @@ type Chofer {
   licenciaVenceEl: Fecha!
   activo: Boolean!
   disponible: Boolean!
+  "Por qué se inhabilitó desde el Centro de Control (D104); null si está activo."
+  motivoInhabilitacion: String
+}
+
+"Una página de choferes; `siguienteCursor` en null si no hay más."
+type ChoferPagina {
+  items: [Chofer!]!
+  siguienteCursor: Cursor
 }
 
 type CargaCombustible {
@@ -643,8 +657,12 @@ type Query {
 
   unidades(tipo: TipoUnidad, estado: EstadoUnidad, placa: String): [Unidad!] @roles(permitidos: [gerente, despachador, jefe_flota])
   unidad(id: ID!): Unidad @roles(permitidos: [gerente, despachador, jefe_flota])
-  mantenimientos(estado: String, unidadId: ID): [Mantenimiento!] @roles(permitidos: [gerente, despachador, jefe_flota])
-  choferes: [Chofer!] @roles(permitidos: [gerente, despachador, jefe_flota])
+  "Del más reciente al más antiguo. Para la página siguiente, `despuesDe` = el `siguienteCursor` de la anterior."
+  mantenimientos(estado: String, unidadId: ID, limite: Int = 50, despuesDe: Cursor): MantenimientoPagina
+    @roles(permitidos: [gerente, despachador, jefe_flota])
+  "Para la página siguiente, `despuesDe` = el `siguienteCursor` de la anterior."
+  choferes(limite: Int = 50, despuesDe: Cursor): ChoferPagina @roles(permitidos: [gerente, despachador, jefe_flota])
+  chofer(id: ID!): Chofer @roles(permitidos: [gerente, despachador, jefe_flota])
   cargasCombustible(placa: String, limite: Int = 50): [CargaCombustible!] @roles(permitidos: [gerente, despachador, jefe_flota])
   anomaliasCombustible(desde: Fecha!, hasta: Fecha): [AnomaliaCombustible!] @roles(permitidos: [gerente, jefe_flota])
   puntajesConduccion(desde: Fecha, choferId: ID): PuntajesConduccion @roles(permitidos: [gerente, jefe_flota])
@@ -692,6 +710,42 @@ input CierreMantenimientoInput {
   checklist: [ItemChecklistInput!]!
   observaciones: String
   documentosRenovados: [DocumentoInput!]
+  claveIdempotencia: ID!
+}
+
+"Alta de un tracto o remolque (spec 010, D104). Flota valida los atributos de cada tipo (D76)."
+input UnidadNuevaInput {
+  tipoUnidad: TipoUnidad!
+  placa: String!
+  "Solo en remolques: FURGON, PLATAFORMA o CISTERNA."
+  tipoRemolque: String
+  "Obligatoria en remolques; prohibida en tractos."
+  capacidadToneladas: Float
+  "Odómetro, solo en tractos."
+  kilometraje: Float
+  kmDesdeUltimoMantenimiento: Float!
+  "Un SOAT y una INSPECCION_TECNICA."
+  documentos: [DocumentoInput!]!
+  atributos: JSON!
+  claveIdempotencia: ID!
+}
+
+"Edición de una unidad y de sus documentos (spec 010, D104): placa, estado y kilómetros no se editan."
+input UnidadEdicionInput {
+  unidadId: ID!
+  capacidadToneladas: Float
+  documentos: [DocumentoInput!]!
+  atributos: JSON!
+  claveIdempotencia: ID!
+}
+
+"Edición de un chofer (D104). Los choferes no tienen alta: llegan de Keycloak y la semilla."
+input ChoferEdicionInput {
+  choferId: ID!
+  nombre: String!
+  "A, B o C."
+  licenciaCategoria: String!
+  licenciaVenceEl: Fecha!
   claveIdempotencia: ID!
 }
 
@@ -754,7 +808,21 @@ type Mutation {
     @roles(permitidos: [despachador])
   programarMantenimiento(input: MantenimientoInput!): Mantenimiento! @roles(permitidos: [jefe_flota])
   cerrarMantenimiento(input: CierreMantenimientoInput!): Mantenimiento! @roles(permitidos: [jefe_flota])
+  crearUnidad(input: UnidadNuevaInput!): Unidad! @roles(permitidos: [jefe_flota])
+  editarUnidad(input: UnidadEdicionInput!): Unidad! @roles(permitidos: [jefe_flota])
+  "La unidad queda INACTIVA, que es final. Motivo de 3 a 200 caracteres."
+  darDeBajaUnidad(unidadId: ID!, motivo: String!, claveIdempotencia: ID!): Unidad! @roles(permitidos: [jefe_flota])
+  editarChofer(input: ChoferEdicionInput!): Chofer! @roles(permitidos: [jefe_flota])
+  "Motivo obligatorio al inhabilitar; con una reserva activa, CONFLICTO_ESTADO."
+  cambiarHabilitacionChofer(choferId: ID!, activo: Boolean!, motivo: String, claveIdempotencia: ID!): Chofer!
+    @roles(permitidos: [jefe_flota])
   registrarPago(input: PagoInput!): Factura! @roles(permitidos: [administracion])
+  "G6 (spec 012): el límite no baja de reservado + utilizado (409 LIMITE_MENOR_QUE_USADO, con `usado` en extensions)."
+  ajustarLineaCredito(clienteId: ID!, limite: Dinero!, motivo: String!, claveIdempotencia: ID!): LineaCredito!
+    @roles(permitidos: [administracion, gerente])
+  "G6 (spec 012): pedir el estado que ya tiene es 409 CONFLICTO_ESTADO."
+  cambiarEstadoLineaCredito(clienteId: ID!, suspendida: Boolean!, motivo: String!, claveIdempotencia: ID!): LineaCredito!
+    @roles(permitidos: [administracion, gerente])
   atenderAlerta(alertaId: ID!, nota: String, claveIdempotencia: ID!): Alerta!
     @roles(permitidos: [despachador, jefe_flota, administracion])
   dispararMision(claveIdempotencia: ID!): MisionDisparada! @roles(permitidos: [gerente, despachador])

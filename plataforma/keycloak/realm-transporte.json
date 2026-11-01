@@ -80,7 +80,10 @@
         "composites": {
           "realm": [
             "interno"
-          ]
+          ],
+          "client": {
+            "realm-management": []
+          }
         }
       },
       {
@@ -105,6 +108,21 @@
     {
       "name": "registro-portal",
       "path": "/registro-portal"
+    },
+    {
+      "name": "personal-interno",
+      "path": "/personal-interno"
+    },
+    {
+      "name": "administra-usuarios",
+      "path": "/administra-usuarios",
+      "clientRoles": {
+        "realm-management": [
+          "query-users",
+          "query-groups",
+          "view-realm"
+        ]
+      }
     }
   ],
   "defaultGroups": [

@@ -1,16 +1,25 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { firstValueFrom } from 'rxjs';
-import { cargandoDe, completo, PaginasCursor } from 'ui-comun';
+import { cargandoDe, completo, conservarUltimoBueno, Intentos, PaginasCursor } from 'ui-comun';
 import type { LineasCreditoQuery } from '../graphql/generado';
 import { LineasRepositorio } from './data/lineas.repositorio';
 import { conLinea } from './domain/linea';
 
-/** Fachada de las líneas de crédito: la primera página de clientes cada 60 s y las siguientes con «Cargar más» (E5-1). */
+/** La línea de crédito de cada cliente sale de Finanzas: si cae, se conserva la última leída (FB-1). */
+const LINEA_POR_CLIENTE = { 'clientes.items': { clave: 'clienteId', campos: ['lineaCredito'] } };
+
+/**
+ * Fachada de las líneas de crédito: la primera página de clientes cada 60 s, las siguientes con «Cargar más» (E5-1),
+ * y su gestión (G6, spec 012).
+ */
 @Injectable()
 export class LineasFachada {
   private readonly repo = inject(LineasRepositorio);
-  private readonly datos = toSignal(this.repo.observar(60_000));
+  /** Una clave por intento: reintentar tras un corte con los mismos datos no aplica dos veces el cambio. */
+  private readonly intentos = new Intentos();
+  private readonly consulta = this.repo.observar(60_000);
+  private readonly datos = toSignal(this.consulta.valueChanges.pipe(conservarUltimoBueno(undefined, LINEA_POR_CLIENTE)));
   readonly paginas = new PaginasCursor(
     () => completo<LineasCreditoQuery>(this.datos())?.clientes,
     async (despuesDe) => {
@@ -29,4 +38,21 @@ export class LineasFachada {
     const ids = this.paginas.idsConError('clientes.items', 'lineaCredito', this.datos()?.error);
     return this.paginas.items().filter((c) => ids.has(c.clienteId) && !c.lineaCredito).length;
   });
+
+  ajustar(clienteId: string, limite: string, motivo: string) {
+    return this.intentos.enviar(`ajustarLineaCredito:${clienteId}`, { limite, motivo }, (clave) =>
+      this.repo.ajustar(clienteId, limite, motivo, clave),
+    );
+  }
+
+  cambiarEstado(clienteId: string, suspendida: boolean, motivo: string) {
+    return this.intentos.enviar(`cambiarEstadoLineaCredito:${clienteId}`, { suspendida, motivo }, (clave) =>
+      this.repo.cambiarEstado(clienteId, suspendida, motivo, clave),
+    );
+  }
+
+  /** `refetch` del mismo `watch`: al resolver, la primera página ya trae el cambio (V4-1). */
+  recargar(): Promise<unknown> {
+    return this.consulta.refetch();
+  }
 }

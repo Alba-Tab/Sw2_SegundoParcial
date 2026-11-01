@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { conservarUltimoBueno } from 'ui-comun';
 import { MantenimientosGQL } from '../../graphql/generado';
 
@@ -9,5 +10,11 @@ export class MantenimientosRepositorio {
 
   observar(cadaMs: number) {
     return this.gql.watch({ pollInterval: cadaMs }).valueChanges.pipe(conservarUltimoBueno());
+  }
+
+  /** La página que sigue a `despuesDe`, una sola vez y sin caché (la primera la trae el sondeo). */
+  async pagina(despuesDe: string) {
+    const { data } = await firstValueFrom(this.gql.fetch({ variables: { despuesDe }, fetchPolicy: 'network-only' }));
+    return data?.mantenimientos;
   }
 }

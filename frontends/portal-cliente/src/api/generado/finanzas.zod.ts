@@ -163,6 +163,49 @@ export const ObtenerCotizacionResponse = zod.object({
 });
 
 /**
+ * Un cliente sin línea no sale en `items` (no es error). Sin cursor; como máximo 100 ids por llamada.
+ * @summary Las líneas de varios clientes en una llamada (administracion, comercial, gerente). La usa el DataLoader del Gateway.
+ */
+export const listarLineasCreditoQueryClienteIdsMax = 100;
+
+export const ListarLineasCreditoQueryParams = zod.object({
+  clienteIds: zod.array(zod.uuid()).min(1).max(listarLineasCreditoQueryClienteIdsMax).describe('UUIDs separados por coma.'),
+});
+
+export const listarLineasCreditoResponseItemsItemLimiteMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+export const listarLineasCreditoResponseItemsItemReservadoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+export const listarLineasCreditoResponseItemsItemUtilizadoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+export const listarLineasCreditoResponseItemsItemDisponibleMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+
+export const ListarLineasCreditoResponse = zod.object({
+  items: zod.array(
+    zod.object({
+      clienteId: zod.uuid(),
+      limite: zod.object({
+        monto: zod.string().regex(listarLineasCreditoResponseItemsItemLimiteMontoRegExp),
+        moneda: zod.enum(['BOB']),
+      }),
+      reservado: zod.object({
+        monto: zod.string().regex(listarLineasCreditoResponseItemsItemReservadoMontoRegExp),
+        moneda: zod.enum(['BOB']),
+      }),
+      utilizado: zod.object({
+        monto: zod.string().regex(listarLineasCreditoResponseItemsItemUtilizadoMontoRegExp),
+        moneda: zod.enum(['BOB']),
+      }),
+      disponible: zod.object({
+        monto: zod.string().regex(listarLineasCreditoResponseItemsItemDisponibleMontoRegExp),
+        moneda: zod.enum(['BOB']),
+      }),
+      enMora: zod.boolean().describe('Tiene al menos una factura con saldo vencida hace más de 7 días (D04).'),
+      suspendida: zod
+        .boolean()
+        .describe('Suspendida por administración o gerente; el paso 2 de la saga rechaza nuevas reservas (spec 012).'),
+    }),
+  ),
+});
+
+/**
  * @summary Línea de crédito del cliente del token (portal).
  */
 export const obtenerMiLineaCreditoResponseLimiteMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
@@ -189,6 +232,7 @@ export const ObtenerMiLineaCreditoResponse = zod.object({
     moneda: zod.enum(['BOB']),
   }),
   enMora: zod.boolean().describe('Tiene al menos una factura con saldo vencida hace más de 7 días (D04).'),
+  suspendida: zod.boolean().describe('Suspendida por administración o gerente; el paso 2 de la saga rechaza nuevas reservas (spec 012).'),
 });
 
 /**
@@ -222,6 +266,107 @@ export const ObtenerLineaCreditoResponse = zod.object({
     moneda: zod.enum(['BOB']),
   }),
   enMora: zod.boolean().describe('Tiene al menos una factura con saldo vencida hace más de 7 días (D04).'),
+  suspendida: zod.boolean().describe('Suspendida por administración o gerente; el paso 2 de la saga rechaza nuevas reservas (spec 012).'),
+});
+
+/**
+ * La línea se bloquea con FOR UPDATE (000 §9). El límite nuevo no puede quedar por debajo de `reservado + utilizado`:
+ * si pasa, 409 LIMITE_MENOR_QUE_USADO con la extensión `usado` (Monto).
+ * @summary Administración o gerente cambia el límite de la línea (spec 012, G6). Queda en la auditoría.
+ */
+export const AjustarLineaCreditoParams = zod.object({
+  clienteId: zod.uuid(),
+});
+
+export const AjustarLineaCreditoHeader = zod.object({
+  'Idempotency-Key': zod.uuid().describe('UUID generado por el cliente, uno por intento (000 §4.1).'),
+});
+
+export const ajustarLineaCreditoBodyLimiteMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+export const ajustarLineaCreditoBodyMotivoMin = 3;
+export const ajustarLineaCreditoBodyMotivoMax = 300;
+
+export const AjustarLineaCreditoBody = zod.object({
+  limite: zod.object({
+    monto: zod.string().regex(ajustarLineaCreditoBodyLimiteMontoRegExp),
+    moneda: zod.enum(['BOB']),
+  }),
+  motivo: zod.string().min(ajustarLineaCreditoBodyMotivoMin).max(ajustarLineaCreditoBodyMotivoMax),
+});
+
+export const ajustarLineaCreditoResponseLimiteMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+export const ajustarLineaCreditoResponseReservadoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+export const ajustarLineaCreditoResponseUtilizadoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+export const ajustarLineaCreditoResponseDisponibleMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+
+export const AjustarLineaCreditoResponse = zod.object({
+  clienteId: zod.uuid(),
+  limite: zod.object({
+    monto: zod.string().regex(ajustarLineaCreditoResponseLimiteMontoRegExp),
+    moneda: zod.enum(['BOB']),
+  }),
+  reservado: zod.object({
+    monto: zod.string().regex(ajustarLineaCreditoResponseReservadoMontoRegExp),
+    moneda: zod.enum(['BOB']),
+  }),
+  utilizado: zod.object({
+    monto: zod.string().regex(ajustarLineaCreditoResponseUtilizadoMontoRegExp),
+    moneda: zod.enum(['BOB']),
+  }),
+  disponible: zod.object({
+    monto: zod.string().regex(ajustarLineaCreditoResponseDisponibleMontoRegExp),
+    moneda: zod.enum(['BOB']),
+  }),
+  enMora: zod.boolean().describe('Tiene al menos una factura con saldo vencida hace más de 7 días (D04).'),
+  suspendida: zod.boolean().describe('Suspendida por administración o gerente; el paso 2 de la saga rechaza nuevas reservas (spec 012).'),
+});
+
+/**
+ * Con la línea suspendida, el paso 2 de la saga rechaza la reserva con CREDITO_RECHAZADO; lo ya reservado, facturado
+ * y pagado sigue su curso. Pedir el estado que ya tiene es 409 CONFLICTO_ESTADO.
+ * @summary Administración o gerente suspende o reactiva la línea (spec 012, G6). Queda en la auditoría.
+ */
+export const CambiarEstadoLineaCreditoParams = zod.object({
+  clienteId: zod.uuid(),
+});
+
+export const CambiarEstadoLineaCreditoHeader = zod.object({
+  'Idempotency-Key': zod.uuid().describe('UUID generado por el cliente, uno por intento (000 §4.1).'),
+});
+
+export const cambiarEstadoLineaCreditoBodyMotivoMin = 3;
+export const cambiarEstadoLineaCreditoBodyMotivoMax = 300;
+
+export const CambiarEstadoLineaCreditoBody = zod.object({
+  suspendida: zod.boolean(),
+  motivo: zod.string().min(cambiarEstadoLineaCreditoBodyMotivoMin).max(cambiarEstadoLineaCreditoBodyMotivoMax),
+});
+
+export const cambiarEstadoLineaCreditoResponseLimiteMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+export const cambiarEstadoLineaCreditoResponseReservadoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+export const cambiarEstadoLineaCreditoResponseUtilizadoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+export const cambiarEstadoLineaCreditoResponseDisponibleMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+
+export const CambiarEstadoLineaCreditoResponse = zod.object({
+  clienteId: zod.uuid(),
+  limite: zod.object({
+    monto: zod.string().regex(cambiarEstadoLineaCreditoResponseLimiteMontoRegExp),
+    moneda: zod.enum(['BOB']),
+  }),
+  reservado: zod.object({
+    monto: zod.string().regex(cambiarEstadoLineaCreditoResponseReservadoMontoRegExp),
+    moneda: zod.enum(['BOB']),
+  }),
+  utilizado: zod.object({
+    monto: zod.string().regex(cambiarEstadoLineaCreditoResponseUtilizadoMontoRegExp),
+    moneda: zod.enum(['BOB']),
+  }),
+  disponible: zod.object({
+    monto: zod.string().regex(cambiarEstadoLineaCreditoResponseDisponibleMontoRegExp),
+    moneda: zod.enum(['BOB']),
+  }),
+  enMora: zod.boolean().describe('Tiene al menos una factura con saldo vencida hace más de 7 días (D04).'),
+  suspendida: zod.boolean().describe('Suspendida por administración o gerente; el paso 2 de la saga rechaza nuevas reservas (spec 012).'),
 });
 
 /**

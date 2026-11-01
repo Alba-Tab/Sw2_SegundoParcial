@@ -1,5 +1,6 @@
-import { Component, computed, inject } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
@@ -10,6 +11,7 @@ import {
   columnasConEstado,
   controlLista,
   Encabezado,
+  enfocar,
   Estado,
   FiltrosLista,
   mensajeDe,
@@ -18,22 +20,25 @@ import {
 } from 'ui-comun';
 import { estadoLinea, textoLinea } from '../domain/linea';
 import { LineasFachada } from '../lineas.fachada';
+import { GestionLinea } from './gestion-linea';
 
-/** G6: la línea de crédito de cada cliente. El nombre lleva a sus facturas. */
+/** G6: la línea de crédito de cada cliente. El nombre lleva a sus facturas; «Gestionar» ajusta el límite o la suspende. */
 @Component({
   selector: 'app-lineas',
   providers: [LineasFachada],
   imports: [
     Encabezado,
-    MatButtonModule,
     MatTableModule,
     MatSortModule,
+    MatButtonModule,
+    MatIconModule,
     RouterLink,
     BobPipe,
     Estado,
     AvisoServicios,
     FiltrosLista,
     PieLista,
+    GestionLinea,
   ],
   template: `
     <cc-encabezado titulo="Líneas de crédito" />
@@ -53,6 +58,9 @@ import { LineasFachada } from '../lineas.fachada';
       nombre="líneas"
       singular="línea"
     />
+    @if (seleccionado(); as c) {
+      <app-gestion-linea [cliente]="c" (cerrar)="cerrarGestion()" />
+    }
     <div class="tabla-ancha" role="region" tabindex="0" aria-label="Líneas de crédito">
       <table
         mat-table
@@ -90,6 +98,20 @@ import { LineasFachada } from '../lineas.fachada';
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
           <td mat-cell *matCellDef="let c"><cc-estado grupo="EstadoLineaCredito" [valor]="estado(c)" /></td
         ></ng-container>
+        <ng-container matColumnDef="acciones">
+          <th mat-header-cell *matHeaderCellDef><span class="cdk-visually-hidden">Acciones</span></th>
+          <td mat-cell *matCellDef="let c">
+            <button
+              mat-button
+              [id]="'gestionar-' + c.clienteId"
+              (click)="gestionar(c.clienteId)"
+              [attr.aria-expanded]="gestionando() === c.clienteId"
+              aria-controls="gestion-linea"
+            >
+              <mat-icon>credit_card</mat-icon>Gestionar <span class="cdk-visually-hidden">la línea de {{ c.razonSocial }}</span>
+            </button>
+          </td>
+        </ng-container>
         <tr mat-header-row *matHeaderRowDef="columnas()"></tr>
         <tr mat-row *matRowDef="let c; columns: columnas()"></tr>
       </table>
@@ -127,7 +149,10 @@ export class LineasPagina {
   readonly mensaje = mensajeDe;
   /** Una línea caída la cuenta el aviso de la lista: sin banner repetido (V1-11). */
   readonly campos = { clientes: 'Viajes', lineaCredito: '' };
-  readonly columnas = columnasConEstado(['cliente', 'limite', 'reservado', 'utilizado', 'disponible', 'estado']);
+  readonly columnas = columnasConEstado(['cliente', 'limite', 'reservado', 'utilizado', 'disponible', 'estado', 'acciones']);
+  /** El cliente cuya línea se está gestionando; el panel se abre arriba de la tabla (una a la vez). */
+  readonly gestionando = signal<string | null>(null);
+  readonly seleccionado = computed(() => this.lineas().find((c) => c.clienteId === this.gestionando()));
   readonly estado = estadoLinea;
   readonly lista = controlLista({
     filas: this.lineas,
@@ -143,4 +168,17 @@ export class LineasPagina {
     },
     ordenInicial: { orden: 'disponible', dir: 'asc' },
   });
+
+  /** Abre el panel de esa línea (o lo cierra si ya estaba abierto). */
+  gestionar(clienteId: string): void {
+    if (this.gestionando() === clienteId) return this.cerrarGestion();
+    this.gestionando.set(clienteId);
+  }
+
+  /** Cierra el panel y devuelve el foco al «Gestionar» de esa fila. */
+  cerrarGestion(): void {
+    const id = this.gestionando();
+    this.gestionando.set(null);
+    if (id) enfocar(`gestionar-${id}`);
+  }
 }

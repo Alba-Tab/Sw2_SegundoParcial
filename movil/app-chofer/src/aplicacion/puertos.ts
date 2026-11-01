@@ -45,6 +45,8 @@ export interface Viajes {
   marcarCanceladoAlSincronizar(viajeId: string): void;
   /** La entrega o el rechazo ya está en la cola: el viaje deja de estar en ruta en el celular. */
   marcarEntregaLocal(viajeId: string, tipo: 'ENTREGA' | 'RECHAZO'): void;
+  /** El inicio, la entrega o el rechazo quedó FALLIDA: se quita su marca y el chofer puede registrarlo de nuevo. */
+  liberarMarca(viajeId: string, tipo: 'INICIO' | 'ENTREGA' | 'RECHAZO'): void;
 }
 
 export interface Api {
@@ -84,6 +86,17 @@ export interface PosicionGuardada {
   guardar(p: { lat: number; lng: number }): void;
   borrar(): void;
 }
+
+/**
+ * Alertas de fatiga que llegaron sin ninguna posición conocida (decisión del 01-11-2026): se guardan en el celular con
+ * su hora y se encolan con la primera lectura del GPS, porque el contrato exige `posicion`.
+ */
+export interface FatigasSinPosicion {
+  leer(): FatigaSinPosicion[];
+  guardar(fatigas: FatigaSinPosicion[]): void;
+}
+
+export type FatigaSinPosicion = { viajeId: string; eventoId: string; registradoEn: string };
 
 /** El refresh token ya no sirve (`invalid_grant`): hay que iniciar sesión otra vez, sin borrar la cola. */
 export class SesionVencida extends Error {

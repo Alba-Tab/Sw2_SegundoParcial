@@ -1,7 +1,12 @@
 import { filtrar } from 'ui-comun/dominio';
 import {
   checklistCompleto,
+  claseUnidad,
+  edicionDesde,
+  mensajeUnidad,
   motivoBloqueo,
+  nuevaUnidadDesde,
+  PLACA,
   urgenciaUnidad,
   checklistValido,
   cierreInicial,
@@ -116,5 +121,68 @@ describe('JV-1 y NG-4: lo que no puede salir', () => {
     );
     expect(motivoBloqueo({ ...base, estado: 'EN_MANTENIMIENTO' } as never, false, hoy)).toContain('el jefe de flota cierre');
     expect(motivoBloqueo(base as never, false, hoy)).toBeNull();
+  });
+});
+
+describe('alta y edición de unidades (D104)', () => {
+  const campos = {
+    capacidadToneladas: 28,
+    soat: '2027-05-01',
+    inspeccion: '2027-04-01',
+    // Lo que quedó escrito de otra clase no viaja (D76: Flota lo rechaza).
+    atributos: { volumenM3: 85, capacidadTanqueLitros: 600, potenciaHp: null },
+  };
+  const documentos = [
+    { tipo: 'SOAT', venceEl: '2027-05-01' },
+    { tipo: 'INSPECCION_TECNICA', venceEl: '2027-04-01' },
+  ];
+
+  it('el tracto lleva su odómetro y sus atributos; sin capacidad ni tipo de remolque; placa en mayúsculas', () => {
+    const datos = {
+      tipoUnidad: 'TRACTO' as const,
+      tipoRemolque: 'FURGON',
+      placa: ' 4521ktr ',
+      kilometraje: 1200,
+      kmDesdeUltimoMantenimiento: 0,
+    };
+    expect(nuevaUnidadDesde(datos, campos)).toEqual({
+      tipoUnidad: 'TRACTO',
+      placa: '4521KTR',
+      kilometraje: 1200,
+      kmDesdeUltimoMantenimiento: 0,
+      documentos,
+      atributos: { capacidadTanqueLitros: 600 },
+    });
+  });
+
+  it('el remolque lleva su tipo y su capacidad, sin odómetro; la edición manda lo mismo sin placa', () => {
+    const datos = {
+      tipoUnidad: 'REMOLQUE' as const,
+      tipoRemolque: 'FURGON',
+      placa: '3001FUR',
+      kilometraje: 5,
+      kmDesdeUltimoMantenimiento: 10,
+    };
+    expect(nuevaUnidadDesde(datos, campos)).toEqual({
+      tipoUnidad: 'REMOLQUE',
+      placa: '3001FUR',
+      tipoRemolque: 'FURGON',
+      capacidadToneladas: 28,
+      kmDesdeUltimoMantenimiento: 10,
+      documentos,
+      atributos: { volumenM3: 85 },
+    });
+    expect(edicionDesde('FURGON', campos)).toEqual({ capacidadToneladas: 28, documentos, atributos: { volumenM3: 85 } });
+    expect(edicionDesde('TRACTO', campos)).toEqual({ documentos, atributos: { capacidadTanqueLitros: 600 } });
+  });
+
+  it('clase por tipo, placa del contrato y mensajes propios', () => {
+    expect(claseUnidad('TRACTO', 'CISTERNA')).toBe('TRACTO');
+    expect(claseUnidad('REMOLQUE', 'CISTERNA')).toBe('CISTERNA');
+    expect(PLACA.test('4521KTR') && PLACA.test('452KTR') && !PLACA.test('45KTR') && !PLACA.test('4521kt')).toBe(true);
+    expect(mensajeUnidad({ placa: true })).toContain('4521KTR');
+    expect(mensajeUnidad({ entero: true })).toBe('Escribe un número entero.');
+    expect(mensajeUnidad({ mayorQueCero: true })).toBe('Debe ser mayor que 0.');
+    expect(mensajeUnidad({ required: true })).toBe('Este dato es obligatorio.');
   });
 });

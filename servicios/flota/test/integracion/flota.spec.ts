@@ -465,5 +465,106 @@ describe('Flota (Mongo rs0 + RabbitMQ)', () => {
         .findOne({ tipo: 'MantenimientoRequerido', 'sobre.datos.placa': '8003TRA' });
       expect(evento?.sobre).toMatchObject({ correlationId, traceparent });
     });
+
+    it('D104: edita la licencia y habilita o inhabilita con ChoferActualizado; con reserva activa es 409', async () => {
+      const conexion = worker.get<Connection>(getConnectionToken());
+      const [libre, ocupado] = ['0193a000-0000-7000-8000-0000000d0401', '0193a000-0000-7000-8000-0000000d0402'];
+      const chofer = (id: string, disponible: boolean) => ({
+        _id: id as never,
+        nombre: 'Chofer de prueba',
+        usuarioSub: `sub-${id.slice(-2)}`,
+        licenciaCategoria: 'B',
+        licenciaVenceEl: '2027-01-01',
+        activo: true,
+        disponible,
+        versionAgregado: 2,
+      });
+      await conexion.collection('choferes').insertMany([chofer(libre, true), chofer(ocupado, false)]);
+      const [jefe, despachador] = [await firmar('jefe-1', ['jefe_flota']), await firmar('desp-1', ['despachador'])];
+      const pedir = (metodo: 'put' | 'post', ruta: string, token: string, clave: string, cuerpo: object) =>
+        request(apiConToken.getHttpServer())
+          [metodo](`/api/v1/choferes/${ruta}`)
+          .set('Authorization', `Bearer ${token}`)
+          .set('Idempotency-Key', clave)
+          .send(cuerpo);
+      const edicion = { nombre: 'Juan Mamani', licenciaCategoria: 'C', licenciaVenceEl: '2029-03-15' };
+
+      await pedir('put', libre, despachador, '0193a000-0000-7000-8000-0000000d0403', edicion).expect(403);
+      const editado = await pedir('put', libre, jefe, '0193a000-0000-7000-8000-0000000d0404', edicion).expect(200);
+      expect(editado.body).toMatchObject({ choferId: libre, ...edicion, activo: true });
+      expect(editado.body).not.toHaveProperty('versionAgregado');
+      // Reenvío con la misma clave: la misma respuesta, sin otro evento.
+      expect((await pedir('put', libre, jefe, '0193a000-0000-7000-8000-0000000d0404', edicion).expect(200)).body).toEqual(editado.body);
+
+      const sinMotivo = await pedir('post', `${libre}/habilitacion`, jefe, '0193a000-0000-7000-8000-0000000d0405', { activo: false });
+      expect(sinMotivo.status).toBe(400);
+      expect(sinMotivo.body.errores).toEqual([{ campo: 'motivo', mensaje: expect.any(String) }]);
+      const conReserva = await pedir('post', `${ocupado}/habilitacion`, jefe, '0193a000-0000-7000-8000-0000000d0406', {
+        activo: false,
+        motivo: 'Licencia retenida',
+      }).expect(409);
+      expect(conReserva.body.codigo).toBe('CONFLICTO_ESTADO');
+      expect((await conexion.collection('choferes').findOne({ _id: ocupado as never }))?.activo).toBe(true);
+
+      const inhabilitado = await pedir('post', `${libre}/habilitacion`, jefe, '0193a000-0000-7000-8000-0000000d0407', {
+        activo: false,
+        motivo: 'Licencia retenida',
+      }).expect(200);
+      expect(inhabilitado.body).toMatchObject({ activo: false, inhabilitacion: { motivo: 'Licencia retenida' } });
+      const habilitado = await pedir('post', `${libre}/habilitacion`, jefe, '0193a000-0000-7000-8000-0000000d0408', {
+        activo: true,
+      }).expect(200);
+      expect(habilitado.body.activo).toBe(true);
+      expect(habilitado.body).not.toHaveProperty('inhabilitacion');
+      // Ya habilitado: 409 sin versión nueva ni evento (la lista de abajo sigue en 3, 4 y 5).
+      const otraVez = await pedir('post', `${libre}/habilitacion`, jefe, '0193a000-0000-7000-8000-0000000d0409', { activo: true });
+      expect([otraVez.status, otraVez.body.codigo]).toEqual([409, 'CONFLICTO_ESTADO']);
+      // Los bordes no cuentan para el largo (antes "  ab " pasaba y el Outbox respondía 500); el mensaje, en español.
+      const corto = await pedir('put', libre, jefe, '0193a000-0000-7000-8000-0000000d0410', { ...edicion, nombre: '  ab ' });
+      expect(corto.status).toBe(400);
+      expect(corto.body.errores[0].campo).toBe('nombre');
+      expect(corto.body.errores[0].mensaje).toBe('Debe tener al menos 3 caracteres');
+      // Con una reserva activa la licencia no deja de ser C vigente el día de ese viaje (spec 003).
+      const conViaje = await pedir('put', ocupado, jefe, '0193a000-0000-7000-8000-0000000d0411', {
+        ...edicion,
+        licenciaCategoria: 'B',
+      }).expect(409);
+      expect(conViaje.body.codigo).toBe('CONFLICTO_ESTADO');
+      await conexion.collection('reservasUnidad').insertOne({
+        _id: 'r-chofer-ocupado' as never,
+        servicioId: '0193a000-0000-7000-8000-0000000d0412',
+        choferId: ocupado,
+        fechaViaje: '2030-06-01',
+        estado: 'CONFIRMADA',
+        creadaEn: new Date(),
+      });
+      const venceAntes = { ...edicion, licenciaVenceEl: '2030-05-31' };
+      await pedir('put', ocupado, jefe, '0193a000-0000-7000-8000-0000000d0413', venceAntes).expect(409);
+      const venceElDia = { ...edicion, licenciaVenceEl: '2030-06-01' };
+      expect((await pedir('put', ocupado, jefe, '0193a000-0000-7000-8000-0000000d0414', venceElDia).expect(200)).body.licenciaVenceEl).toBe(
+        '2030-06-01',
+      );
+
+      // F2-2: un cursor que no salió de Flota es 400, en choferes y en mantenimientos.
+      for (const ruta of ['/api/v1/choferes', '/api/v1/mantenimientos']) {
+        const r = await request(apiConToken.getHttpServer())
+          .get(ruta)
+          .query({ cursor: 'no-es-un-cursor' })
+          .set('Authorization', `Bearer ${jefe}`);
+        expect([r.status, r.body.codigo, r.body.errores]).toEqual([400, 'VALIDACION', [{ campo: 'cursor', mensaje: 'no es válido' }]]);
+      }
+
+      const eventos = await conexion
+        .collection('outboxEventos')
+        .find({ tipo: 'ChoferActualizado', 'sobre.datos.choferId': libre })
+        .sort({ 'sobre.datos.versionAgregado': 1 })
+        .toArray();
+      expect(eventos.map((e) => [e['sobre'].datos.versionAgregado, e['sobre'].datos.activo])).toEqual([
+        [3, true],
+        [4, false],
+        [5, true],
+      ]);
+      expect(eventos[0]['sobre'].datos).toMatchObject({ nombre: 'Juan Mamani', licenciaCategoria: 'C', licenciaVenceEl: '2029-03-15' });
+    });
   });
 });

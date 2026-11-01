@@ -17,7 +17,9 @@ import {
   type ProgramarMantenimientoResponse,
 } from './contrato/flota.zod';
 import { hashPeticion, type PeticionHttp } from './hash-cuerpo';
-import { claveObligatoria, validar } from './validar';
+import { claveObligatoria, textoRecortado, validar } from './validar';
+
+const Baja = DarDeBajaUnidadBody.extend({ motivo: textoRecortado(3, 200) });
 
 type ConUsuario = { usuario: Usuario };
 
@@ -78,7 +80,7 @@ export class GestionUnidadesController {
     @Headers('idempotency-key') clave: string | undefined,
     @Body() cuerpo: unknown,
   ): Promise<z.infer<typeof DarDeBajaUnidadResponse>> {
-    const e = validar(DarDeBajaUnidadBody, cuerpo);
+    const e = validar(Baja, cuerpo);
     const u = await this.baja.ejecutar(unidadId, {
       usuario: req.usuario,
       clave: claveObligatoria(clave),
