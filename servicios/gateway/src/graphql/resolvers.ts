@@ -23,8 +23,8 @@ const finDeMes = (fecha: string) => {
 
 /**
  * Vencimientos "por vencer" del periodo del tablero, con los periodos de la spec 015 para cuentas por cobrar (hacia
- * adelante, con hoy incluido): HOY, ESTA_SEMANA (7 días) y ESTE_MES (hasta fin de mes). Qué factura entra lo filtra
- * Finanzas con `venceDesde`/`venceHasta`; el Gateway solo traduce el periodo a fechas.
+ * adelante, con hoy incluido): HOY, ESTA_SEMANA (7 días) y ESTE_MES (hasta fin de mes). El Gateway solo traduce el
+ * periodo a fechas; Finanzas cuenta y suma.
  */
 export function ventanaPorVencer(periodo: string, desde = hoy()): { venceDesde: string; venceHasta: string } {
   const venceHasta = periodo === 'HOY' ? desde : periodo === 'ESTA_SEMANA' ? sumarDias(desde, 6) : finDeMes(desde);
@@ -224,22 +224,10 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
         for (const u of await todas(ctx, 'flota', rutaRest`/api/v1/unidades`)) conteo.set(u['estado'], (conteo.get(u['estado']) ?? 0) + 1);
         return [...conteo].map(([estado, cantidad]) => ({ estado, cantidad }));
       },
+      // Finanzas calcula el resumen (saldo, vencidas, por vencer y las 5 próximas); el Gateway solo lo traduce.
       cuentasPorCobrar: async ({ periodo }: Json, __: Args, ctx: Ctx) => {
-        // Finanzas decide qué factura tiene saldo, cuál está vencida y cuál vence en la ventana del periodo.
-        const [conSaldo, porVencer] = await Promise.all([
-          todas(ctx, 'finanzas', rutaRest`/api/v1/facturas`, { conSaldo: true }),
-          todas(ctx, 'finanzas', rutaRest`/api/v1/facturas`, { conSaldo: true, ...ventanaPorVencer(periodo) }),
-        ]);
-        const facturas = conSaldo.map(m.factura);
-        return {
-          saldoTotal: m.sumar(facturas.map((f) => f.saldo)),
-          facturasPorVencer: porVencer.length,
-          facturasVencidas: facturas.filter((f) => f.vencida).length,
-          proximas: porVencer
-            .map(m.factura)
-            .sort((a, b) => String(a['venceEl']).localeCompare(String(b['venceEl'])))
-            .slice(0, 5),
-        };
+        const r = await s.get<Json>(ctx, 'finanzas', rutaRest`/api/v1/facturas/resumen`, { query: ventanaPorVencer(periodo) });
+        return { ...r, saldoTotal: m.dinero(r['saldoTotal']), proximas: (r['proximas'] ?? []).map(m.factura) };
       },
       alertasAbiertas: async (t: { resumenAlertas: () => Promise<Json> }) => (await t.resumenAlertas())['abiertas'],
       datosAl: async (t: { resumenAlertas: () => Promise<Json> }) => (await t.resumenAlertas())['datosAl'],

@@ -86,7 +86,7 @@ GET /api/v1/viajes?limite=50&cursor=<opaco>
 | `401` | Sin token o token inválido |
 | `403` | Token válido, pero sin permiso sobre ese recurso o esa fila |
 | `404` | No existe. Si existe pero es de otro cliente, se responde `403` (sección 6.4 de la propuesta) |
-| `409` | Conflicto de estado (bloqueo semántico, versión optimista) o la misma clave de idempotencia todavía en proceso |
+| `409` | Conflicto de estado (bloqueo semántico) o la misma clave de idempotencia todavía en proceso |
 | `422` | Regla de negocio violada, o misma `Idempotency-Key` con otro cuerpo |
 | `429` | Límite de peticiones |
 | `503` | Dependencia caída; incluir `Retry-After` |
@@ -222,7 +222,7 @@ Claims que usan los servicios:
 - Tablas y columnas en `snake_case`, en español, sin tildes: `linea_credito`, `ultima_posicion`.
 - Colecciones de Mongo en `camelCase` plural: `cargasCombustible`.
 - Migraciones versionadas por servicio: Flyway (Viajes), migraciones de Laravel (Finanzas), Alembic (Analítica). Nunca cambiar una migración ya aplicada.
-- Bloqueo optimista con columna `version` en los agregados que lo necesitan (`LineaCredito`).
+- Bloqueo pesimista (`SELECT … FOR UPDATE`) al leer un agregado que se va a cambiar (`LineaCredito`). Sin columna `version`: con la fila bloqueada nunca podía fallar.
 - Tablas comunes con el mismo nombre en todos los servicios: `operacion_idempotente`, `outbox_eventos`, `inbox_eventos`, `auditoria`.
 
 **Esquema de auditoría** (igual en todos los servicios): `id`, `ocurridoEn`, `actorSub`, `actorRol`, `canal` (`PORTAL`, `TELEFONO`, `CENTRO_CONTROL`, `APP_CHOFER`, `SISTEMA`), `accion`, `entidad`, `entidadId`, `datos` (JSON), `correlationId`.

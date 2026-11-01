@@ -9,8 +9,7 @@ it('reserva, libera y consume dentro de lo reservado', function () {
     expect($l->liberar(Monto::bob('2800'))->reservado->aContrato()['monto'])->toBe('0.00');
     $consumida = $l->consumir(Monto::bob('2800'));
     expect($consumida->reservado->aContrato()['monto'])->toBe('0.00')
-        ->and($consumida->utilizado->aContrato()['monto'])->toBe('2800.00')
-        ->and($consumida->version)->toBe(2);
+        ->and($consumida->utilizado->aContrato()['monto'])->toBe('2800.00');
 });
 
 it('liberar o consumir más de lo reservado rompe la invariante en vez de dejar reservado en 0', function () {

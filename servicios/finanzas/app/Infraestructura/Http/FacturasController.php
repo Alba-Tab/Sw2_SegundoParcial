@@ -40,6 +40,17 @@ final class FacturasController
         ]);
     }
 
+    public function resumen(Request $req): JsonResponse
+    {
+        $r = $this->consultar->resumen(SolicitanteHttp::de($req), $this->hoy(), (string) $req->query('venceDesde'),
+            (string) $req->query('venceHasta'));
+
+        return new JsonResponse([
+            'saldoTotal' => $r['saldo']->aContrato(), 'facturasPorVencer' => $r['porVencer'], 'facturasVencidas' => $r['vencidas'],
+            'proximas' => array_map(fn (Factura $f) => $this->factura($f), $r['proximas']),
+        ]);
+    }
+
     public function obtener(Request $req, string $facturaId): JsonResponse
     {
         [$f, $pagos] = $this->consultar->detalle(SolicitanteHttp::de($req), $facturaId);
@@ -71,8 +82,7 @@ final class FacturasController
      */
     private function factura(Factura $f, ?array $pagos = null): array
     {
-        $hoy = $this->reloj->ahora()->setTimezone(new \DateTimeZone('America/La_Paz'))->format('Y-m-d');
-        $dias = $f->diasVencida($hoy);
+        $dias = $f->diasVencida($this->hoy());
 
         return array_filter([
             'facturaId' => $f->id, 'numero' => $f->numero, 'viajeId' => $f->viajeId, 'servicioId' => $f->servicioId,
@@ -84,6 +94,11 @@ final class FacturasController
             'fechaViaje' => $f->servicio['fechaViaje'],
             'pagos' => $pagos === null ? null : array_map(fn (Pago $p) => self::pago($p), $pagos),
         ], fn ($v) => $v !== null);
+    }
+
+    private function hoy(): string
+    {
+        return $this->reloj->ahora()->setTimezone(new \DateTimeZone('America/La_Paz'))->format('Y-m-d');
     }
 
     /** @return array<string, mixed> */

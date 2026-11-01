@@ -115,8 +115,8 @@ beforeEach(() => {
   rutas.set('GET /viajes/api/v1/servicios/s1', () => ({ json: { servicioId: 's1', monto: { monto: '2800.00', moneda: 'BOB' } } }));
   rutas.set('GET /viajes/api/v1/servicios/s2', () => ({ json: { servicioId: 's2', monto: { monto: '7600.00', moneda: 'BOB' } } }));
   rutas.set('GET /flota/api/v1/unidades', () => ({ json: { items: [{ unidadId: 'u1', placa: '4521KTR', estado: 'EN_VIAJE' }] } }));
-  rutas.set('GET /finanzas/api/v1/facturas', () => ({
-    json: { items: [{ facturaId: 'f1', saldo: { monto: '7600.00' }, vencida: false, venceEl: '2026-01-01' }] },
+  rutas.set('GET /finanzas/api/v1/facturas/resumen', () => ({
+    json: { saldoTotal: { monto: '7600.00', moneda: 'BOB' }, facturasPorVencer: 0, facturasVencidas: 0, proximas: [] },
   }));
   rutas.set('GET /analitica/api/v1/alertas', () => ({
     json: { alertas: [], abiertas: 2, datosAl: '2026-11-03T12:00:00Z', siguienteCursor: null },
@@ -180,7 +180,7 @@ describe('Gateway (spec 016)', () => {
   });
 
   it('FC6: un servicio lento pasa los 3 s y no frena la respuesta', async () => {
-    rutas.set('GET /finanzas/api/v1/facturas', () => ({ demoraMs: 5000, json: { items: [] } }));
+    rutas.set('GET /finanzas/api/v1/facturas/resumen', () => ({ demoraMs: 5000, json: {} }));
     const inicio = Date.now();
     const r = await gql(['gerente'], TABLERO);
     expect(Date.now() - inicio).toBeLessThan(3500);
@@ -449,25 +449,15 @@ describe('revisión del Gateway', () => {
     expect(vencido.body.type).toBe('https://transporte.local/errores/exportacion-vencida');
   });
 
-  it('tablero: saldos y conteos de todas las páginas, con la ventana de vencimientos que filtra Finanzas', async () => {
-    const factura = (id: string, saldo: string, vencida: boolean, venceEl: string) => ({
-      facturaId: id,
-      saldo: { monto: saldo },
-      vencida,
-      venceEl,
-    });
-    rutas.set('GET /finanzas/api/v1/facturas', (_r, _c, url) => {
-      if (url.searchParams.get('venceDesde'))
-        return { json: { items: [factura('f9', '50.00', false, '2026-11-05')], siguienteCursor: null } };
-      return url.searchParams.get('cursor') === 'p2'
-        ? { json: { items: [factura('f3', '0.10', true, '2026-01-01')], siguienteCursor: null } }
-        : {
-            json: {
-              items: [factura('f1', '100.00', false, '2026-12-01'), factura('f2', '200.20', true, '2026-01-01')],
-              siguienteCursor: 'p2',
-            },
-          };
-    });
+  it('tablero: Finanzas resume la cobranza en una llamada y el Gateway solo le pasa la ventana del periodo', async () => {
+    rutas.set('GET /finanzas/api/v1/facturas/resumen', () => ({
+      json: {
+        saldoTotal: { monto: '300.30', moneda: 'BOB' },
+        facturasPorVencer: 1,
+        facturasVencidas: 2,
+        proximas: [{ facturaId: 'f9', saldo: { monto: '50.00', moneda: 'BOB' }, vencida: false, venceEl: '2026-11-05' }],
+      },
+    }));
     rutas.set('GET /flota/api/v1/unidades', (_r, _c, url) =>
       url.searchParams.get('cursor')
         ? { json: { items: [{ unidadId: 'u3', estado: 'DISPONIBLE' }], siguienteCursor: null } }
@@ -495,9 +485,9 @@ describe('revisión del Gateway', () => {
       alertasAbiertas: 2,
       datosAl: '2026-11-03T12:00:00Z',
     });
-    const ventana = new URL(pedidos.find((p) => p.ruta.includes('venceDesde'))!.ruta, base).searchParams;
-    expect(ventana.get('limite')).toBe('100');
-    expect(ventana.get('conSaldo')).toBe('true');
+    const resumenes = pedidos.filter((p) => p.ruta.startsWith('/finanzas/'));
+    expect(resumenes).toHaveLength(1);
+    const ventana = new URL(resumenes[0].ruta, base).searchParams;
     const { ventanaPorVencer } = await import('../src/graphql/resolvers');
     expect(ventana.get('venceDesde')).toBe(ventanaPorVencer('ESTA_SEMANA').venceDesde);
     expect(ventanaPorVencer('ESTA_SEMANA', '2026-11-03')).toEqual({ venceDesde: '2026-11-03', venceHasta: '2026-11-09' });
@@ -609,18 +599,22 @@ describe('revisión 2 del Gateway', () => {
 
     // Cada petición trae su propio presupuesto, y la operación real del tablero con 100 viajes entra sin errores.
     pedidos.length = 0;
-    rutas.set('GET /finanzas/api/v1/facturas', () => ({
+    rutas.set('GET /finanzas/api/v1/facturas/resumen', () => ({
       json: {
-        items: [{ facturaId: 'f1', numero: 'FAC-1', razonSocial: 'A', saldo: { monto: '10.00' }, vencida: false, venceEl: '2026-11-05' }],
-        siguienteCursor: null,
+        saldoTotal: { monto: '10.00', moneda: 'BOB' },
+        facturasPorVencer: 1,
+        facturasVencidas: 0,
+        proximas: [
+          { facturaId: 'f1', numero: 'FAC-1', razonSocial: 'A', saldo: { monto: '10.00' }, vencida: false, venceEl: '2026-11-05' },
+        ],
       },
     }));
     const t = await gql(['gerente'], TABLERO_APP, { periodo: 'ESTA_SEMANA' });
     expect(t.body.errors).toBeUndefined();
     expect(t.body.data.tablero.viajesEnCurso).toHaveLength(100);
     expect(t.body.data.tablero.viajesEnCurso[99].riesgo).toEqual({ probabilidad: 0.4, enRiesgo: false });
-    // 1 de viajes, 100 de riesgo, 1 de unidades, 2 de facturas y 1 de alertas (que aServicios() no cuenta).
-    expect(aServicios()).toHaveLength(104);
+    // 1 de viajes, 100 de riesgo, 1 de unidades, 1 de cobranza y 1 de alertas (que aServicios() no cuenta).
+    expect(aServicios()).toHaveLength(103);
   });
 
   it('un JSON roto o un cuerpo de más de 100 KB en /graphql → Problem Details VALIDACION con un title para personas', async () => {

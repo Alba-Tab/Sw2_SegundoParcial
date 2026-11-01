@@ -2,7 +2,6 @@
 
 namespace App\Infraestructura\Http;
 
-use App\Aplicacion\Puertos\VersionDesactualizada;
 use App\Dominio\Comun\ErrorDeDominio;
 use App\Infraestructura\Persistencia\FallaTransitoria;
 use Illuminate\Auth\AuthenticationException;
@@ -17,7 +16,7 @@ final class Problemas
     /** Estado HTTP de cada código de 000 §5 (los que usa Finanzas). */
     private const ESTADOS = [
         'VALIDACION' => 400, 'NO_AUTENTICADO' => 401, 'SIN_PERMISO' => 403, 'COTIZACION_AJENA' => 403,
-        'NO_ENCONTRADO' => 404, 'CONFLICTO_ESTADO' => 409, 'VERSION_DESACTUALIZADA' => 409,
+        'NO_ENCONTRADO' => 404, 'CONFLICTO_ESTADO' => 409,
         'IDEMPOTENCIA_EN_PROCESO' => 409, 'PAGO_DUPLICADO' => 409, 'IDEMPOTENCIA_CUERPO_DISTINTO' => 422,
         'COTIZACION_VENCIDA' => 422, 'CREDITO_INSUFICIENTE' => 422, 'CREDITO_RECHAZADO' => 422,
         'APROBACION_VENCIDA' => 422, 'PAGO_EXCEDE_SALDO' => 422, 'TONELAJE_EXCEDIDO' => 422,
@@ -70,9 +69,6 @@ final class Problemas
             $e instanceof ValidationException => self::respuesta('VALIDACION', 'Petición inválida', 'Revisa los campos indicados', 400,
                 ['errores' => collect($e->errors())->flatMap(fn ($m, $c) => array_map(fn ($x) => ['campo' => $c, 'mensaje' => $x], $m))->values()->all()]),
             $e instanceof AuthenticationException => self::respuesta('NO_AUTENTICADO', 'No autenticado', $e->getMessage(), 401),
-            // Idempotencia ya repitió la transacción 3 veces (spec 008).
-            $e instanceof VersionDesactualizada => self::respuesta('VERSION_DESACTUALIZADA', 'Versión desactualizada',
-                'Otro cambio modificó los mismos datos; vuelve a intentarlo', 409),
             $e instanceof HttpExceptionInterface => self::http($e),
             // PostgreSQL caído, reiniciándose o en interbloqueo: la petición se puede repetir.
             FallaTransitoria::es($e) => self::respuesta('DEPENDENCIA_NO_DISPONIBLE', 'Dependencia no disponible',

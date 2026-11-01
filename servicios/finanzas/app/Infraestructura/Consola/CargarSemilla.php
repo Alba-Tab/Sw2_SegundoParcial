@@ -62,7 +62,7 @@ final class CargarSemilla extends Command
                 $utilizado = array_reduce(array_filter($facturas, fn ($f) => $f['clienteId'] === $c['clienteId']),
                     fn (string $suma, array $f) => bcadd($suma, $f['saldo'], 2), '0.00');
                 DB::table('linea_credito')->upsert([[
-                    'cliente_id' => $c['clienteId'], 'limite' => $c['limiteCredito'], 'reservado' => '0.00', 'utilizado' => $utilizado, 'version' => 0,
+                    'cliente_id' => $c['clienteId'], 'limite' => $c['limiteCredito'], 'reservado' => '0.00', 'utilizado' => $utilizado,
                 ]], ['cliente_id'], ['limite', 'utilizado']);
             }
         });

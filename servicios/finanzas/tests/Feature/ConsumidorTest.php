@@ -1,7 +1,7 @@
 <?php
 
-use App\Aplicacion\Puertos\VersionDesactualizada;
 use App\Infraestructura\Persistencia\FallaTransitoria;
+use Illuminate\Database\LostConnectionException;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\Context;
 use Illuminate\Support\Facades\DB;
@@ -71,9 +71,9 @@ it('manda a la DLQ lo que no tiene manejador, lo mal formado y las reglas de neg
     expect(DB::table('inbox_eventos')->where('tipo', '<>', 'ClienteActualizado')->where('tipo', '<>', 'RutaActualizada')->count())->toBe(0);
 });
 
-it('una falla pasajera (VersionDesactualizada) vuelve a la cola sin dejar el evento en el Inbox', function () {
+it('una falla pasajera (conexión perdida) vuelve a la cola sin dejar el evento en el Inbox', function () {
     $r = reservaActiva($this);
-    lineaQueChoca(99);
+    lineaQueSeCae(99);
     $e = evento('EntregaRechazada', ['viajeId' => (string) Str::uuid7(), 'servicioId' => $r['servicio'],
         'clienteId' => CLIENTE, 'entregaId' => (string) Str::uuid7(), 'origenRechazo' => 'RECEPTOR', 'motivo' => 'Carga húmeda',
         'rechazadaEn' => '2026-11-03T15:00:00Z', 'kmRecorridos' => 120, 'tractoId' => (string) Str::uuid7(),
@@ -83,13 +83,13 @@ it('una falla pasajera (VersionDesactualizada) vuelve a la cola sin dejar el eve
         ->and(DB::table('reserva_credito')->value('estado'))->toBe('ACTIVA');
 });
 
-it('clasifica como pasajeros la base caída, los interbloqueos y VersionDesactualizada; lo demás no', function () {
+it('clasifica como pasajeros la base caída, los interbloqueos y la conexión perdida; lo demás no', function () {
     $sql = fn (string $estado, string $mensaje = 'error') => new QueryException('pgsql', 'select 1', [],
         tap(new PDOException("SQLSTATE[$estado]: $mensaje"), fn ($p) => $p->errorInfo = [$estado, 7, $mensaje]));
     expect(FallaTransitoria::es($sql('08006', 'connection to server failed')))->toBeTrue()
         ->and(FallaTransitoria::es($sql('40P01', 'deadlock detected')))->toBeTrue()
         ->and(FallaTransitoria::es($sql('57P01', 'terminating connection due to administrator command')))->toBeTrue()
-        ->and(FallaTransitoria::es(new RuntimeException('envuelta', 0, new VersionDesactualizada('x'))))->toBeTrue()
+        ->and(FallaTransitoria::es(new RuntimeException('envuelta', 0, new LostConnectionException('x'))))->toBeTrue()
         ->and(FallaTransitoria::es($sql('23505', 'duplicate key')))->toBeFalse()
         ->and(FallaTransitoria::es($sql('22P02', 'invalid input syntax for type uuid')))->toBeFalse()
         ->and(FallaTransitoria::es(new LogicException('no cumple su contrato')))->toBeFalse();

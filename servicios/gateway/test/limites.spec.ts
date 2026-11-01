@@ -1,7 +1,6 @@
 import { buildSchema, parse, validate } from 'graphql';
 import { configuracion } from '../src/configuracion';
 import { limiteContado, limiteProfundidad } from '../src/graphql/limites';
-import { sumar } from '../src/graphql/mapeos';
 
 describe('límites (D101)', () => {
   const esquema = buildSchema('type Nodo { hijo: Nodo, nombre: String } type Query { raiz: Nodo }');
@@ -40,12 +39,5 @@ describe('configuración', () => {
     expect(configuracion({}).introspeccion).toBe(false);
     expect(configuracion({ GRAPHQL_INTROSPECCION: 'false' }).introspeccion).toBe(false);
     expect(configuracion({ GRAPHQL_INTROSPECCION: 'true' }).introspeccion).toBe(true);
-  });
-});
-
-describe('dinero', () => {
-  it('suma en centavos, sin float', () => {
-    expect(sumar(['7600.00', '2800.00', null, '0.10', '0.20'])).toBe('10400.30');
-    expect(sumar([])).toBe('0.00');
   });
 });

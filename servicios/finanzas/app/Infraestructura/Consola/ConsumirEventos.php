@@ -22,7 +22,7 @@ use PhpAmqpLib\Message\AMQPMessage;
  *
  * Qué pasa con cada mensaje:
  * - Aplicado (o repetido): ack.
- * - Falla pasajera (PostgreSQL caído, interbloqueo, VersionDesactualizada): espera 2 s y vuelve a la cola (nack con
+ * - Falla pasajera (PostgreSQL caído, interbloqueo): espera 2 s y vuelve a la cola (nack con
  *   requeue); la cola quorum lo manda a la DLQ si pasa su x-delivery-limit.
  * - Sin manejador, mal formado, regla de negocio u otro error determinista: a la DLQ (reject sin requeue), no se pierde.
  *

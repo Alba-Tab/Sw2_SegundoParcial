@@ -169,7 +169,6 @@ export const obtenerMiLineaCreditoResponseLimiteMontoRegExp = new RegExp('^(0|[1
 export const obtenerMiLineaCreditoResponseReservadoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
 export const obtenerMiLineaCreditoResponseUtilizadoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
 export const obtenerMiLineaCreditoResponseDisponibleMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
-export const obtenerMiLineaCreditoResponseVersionMin = 0;
 
 export const ObtenerMiLineaCreditoResponse = zod.object({
   clienteId: zod.uuid(),
@@ -190,7 +189,6 @@ export const ObtenerMiLineaCreditoResponse = zod.object({
     moneda: zod.enum(['BOB']),
   }),
   enMora: zod.boolean().describe('Tiene al menos una factura con saldo vencida hace más de 7 días (D04).'),
-  version: zod.int().min(obtenerMiLineaCreditoResponseVersionMin),
 });
 
 /**
@@ -204,7 +202,6 @@ export const obtenerLineaCreditoResponseLimiteMontoRegExp = new RegExp('^(0|[1-9
 export const obtenerLineaCreditoResponseReservadoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
 export const obtenerLineaCreditoResponseUtilizadoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
 export const obtenerLineaCreditoResponseDisponibleMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
-export const obtenerLineaCreditoResponseVersionMin = 0;
 
 export const ObtenerLineaCreditoResponse = zod.object({
   clienteId: zod.uuid(),
@@ -225,7 +222,6 @@ export const ObtenerLineaCreditoResponse = zod.object({
     moneda: zod.enum(['BOB']),
   }),
   enMora: zod.boolean().describe('Tiene al menos una factura con saldo vencida hace más de 7 días (D04).'),
-  version: zod.int().min(obtenerLineaCreditoResponseVersionMin),
 });
 
 /**
@@ -415,6 +411,92 @@ export const ListarFacturasResponse = zod.object({
     }),
   ),
   siguienteCursor: zod.string().nullable(),
+});
+
+/**
+ * Sobre todas las facturas con saldo: el saldo total, cuántas están vencidas (venceEl antes de hoy en America/La_Paz),
+ * cuántas vencen entre `venceDesde` y `venceHasta`, y las 5 primeras de esa ventana por fecha de vencimiento.
+ * @summary Cuentas por cobrar del tablero (spec 016), calculadas por Finanzas. Solo administracion y gerente.
+ */
+export const ResumirCobranzaQueryParams = zod.object({
+  venceDesde: zod.iso.date(),
+  venceHasta: zod.iso.date(),
+});
+
+export const resumirCobranzaResponseSaldoTotalMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+export const resumirCobranzaResponseFacturasPorVencerMin = 0;
+
+export const resumirCobranzaResponseFacturasVencidasMin = 0;
+
+export const resumirCobranzaResponseProximasItemNumeroRegExp = new RegExp('^FAC-[0-9]{6}$');
+export const resumirCobranzaResponseProximasItemMontoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+export const resumirCobranzaResponseProximasItemSaldoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+export const resumirCobranzaResponseProximasItemDiasVencidaMin = 0;
+
+export const resumirCobranzaResponseProximasItemPagosItemMontoMontoRegExp = new RegExp('^(0|[1-9]\\d{0,11})\\.\\d{2}$');
+export const resumirCobranzaResponseProximasItemPagosItemRegistradoPorMax = 64;
+
+export const resumirCobranzaResponseProximasMax = 5;
+
+export const ResumirCobranzaResponse = zod.object({
+  saldoTotal: zod.object({
+    monto: zod.string().regex(resumirCobranzaResponseSaldoTotalMontoRegExp),
+    moneda: zod.enum(['BOB']),
+  }),
+  facturasPorVencer: zod.int().min(resumirCobranzaResponseFacturasPorVencerMin),
+  facturasVencidas: zod.int().min(resumirCobranzaResponseFacturasVencidasMin),
+  proximas: zod
+    .array(
+      zod.object({
+        facturaId: zod.uuid(),
+        numero: zod.string().regex(resumirCobranzaResponseProximasItemNumeroRegExp),
+        viajeId: zod.uuid(),
+        servicioId: zod.uuid(),
+        clienteId: zod.uuid(),
+        razonSocial: zod.string(),
+        monto: zod.object({
+          monto: zod.string().regex(resumirCobranzaResponseProximasItemMontoMontoRegExp),
+          moneda: zod.enum(['BOB']),
+        }),
+        saldo: zod.object({
+          monto: zod.string().regex(resumirCobranzaResponseProximasItemSaldoMontoRegExp),
+          moneda: zod.enum(['BOB']),
+        }),
+        estado: zod.enum(['EMITIDA', 'PAGADA_PARCIAL', 'PAGADA']),
+        emitidaEl: zod.iso.date().describe('Fecha sin hora, en America/La_Paz.'),
+        venceEl: zod.iso.date().describe('Fecha sin hora, en America/La_Paz.'),
+        vencida: zod.boolean().describe('saldo > 0 y hoy > venceEl (se calcula al leer).'),
+        diasVencida: zod.int().min(resumirCobranzaResponseProximasItemDiasVencidaMin),
+        rutaId: zod.uuid().optional(),
+        tipoCarga: zod.enum(['GRANOS', 'INSUMOS', 'INSUMOS_LIQUIDOS', 'CONTENEDOR']).optional(),
+        toneladas: zod.number().optional(),
+        fechaViaje: zod.iso.date().optional().describe('Fecha sin hora, en America/La_Paz.'),
+        pagos: zod
+          .array(
+            zod.object({
+              pagoId: zod.uuid(),
+              facturaId: zod.uuid(),
+              monto: zod.object({
+                monto: zod.string().regex(resumirCobranzaResponseProximasItemPagosItemMontoMontoRegExp),
+                moneda: zod.enum(['BOB']),
+              }),
+              fecha: zod.iso.date().describe('Fecha sin hora, en America/La_Paz.'),
+              medio: zod.enum(['TRANSFERENCIA', 'DEPOSITO', 'EFECTIVO', 'CHEQUE']),
+              referencia: zod.string(),
+              nota: zod.string().optional(),
+              registradoPor: zod
+                .string()
+                .min(1)
+                .max(resumirCobranzaResponseProximasItemPagosItemRegistradoPorMax)
+                .describe('Claim `sub` de Keycloak.'),
+              registradoEn: zod.iso.datetime({ offset: true }).describe('ISO-8601 en UTC con `Z`.'),
+            }),
+          )
+          .optional()
+          .describe('Solo en obtenerFactura y registrarPago.'),
+      }),
+    )
+    .max(resumirCobranzaResponseProximasMax),
 });
 
 /**

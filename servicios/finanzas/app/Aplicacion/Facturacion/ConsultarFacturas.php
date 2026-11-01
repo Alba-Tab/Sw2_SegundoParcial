@@ -6,6 +6,7 @@ use App\Aplicacion\Comun\Solicitante;
 use App\Aplicacion\Puertos\FacturaRepositorio;
 use App\Aplicacion\Puertos\PagoRepositorio;
 use App\Dominio\Comun\ErrorDeDominio;
+use App\Dominio\Comun\Monto;
 use App\Dominio\Facturacion\Factura;
 use App\Dominio\Facturacion\Pago;
 
@@ -36,6 +37,23 @@ final class ConsultarFacturas
         }
 
         return $this->facturas->listar($filtro, $despuesDe, $limite);
+    }
+
+    /**
+     * GET /facturas/resumen (spec 016): las cuentas por cobrar del tablero, de todos los clientes.
+     *
+     * @return array{saldo: Monto, vencidas: int, porVencer: int, proximas: list<Factura>}
+     */
+    public function resumen(Solicitante $quien, string $hoy, string $venceDesde, string $venceHasta): array
+    {
+        if (! $quien->tieneAlguno(self::VEN_TODAS)) {
+            throw new ErrorDeDominio('SIN_PERMISO', 'Solo administración y gerente ven el resumen de cobranza');
+        }
+        if ($venceHasta < $venceDesde) {
+            throw new ErrorDeDominio('VALIDACION', 'venceHasta: no puede ser anterior a venceDesde', ['campo' => 'venceHasta']);
+        }
+
+        return $this->facturas->resumenCobranza($hoy, $venceDesde, $venceHasta);
     }
 
     /** @return array{0: Factura, 1: list<Pago>} */
