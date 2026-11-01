@@ -115,7 +115,7 @@ export class ChoferRepositorioMongo implements ChoferRepositorio {
   }
 
   async tomar(choferId: string): Promise<boolean> {
-    const r = await this.col.updateOne({ _id: choferId, disponible: true }, { $set: { disponible: false } }, opciones());
+    const r = await this.col.updateOne({ _id: choferId, disponible: true, activo: true }, { $set: { disponible: false } }, opciones());
     return r.modifiedCount === 1;
   }
 
@@ -164,6 +164,13 @@ export class ReservaUnidadRepositorioMongo implements ReservaUnidadRepositorio {
 
   async porViaje(viajeId: string): Promise<ReservaUnidad | null> {
     const d = await this.col.findOne({ viajeId }, opciones());
+    if (!d) return null;
+    const { _id, ...resto } = d;
+    return { reservaUnidadId: _id, ...resto };
+  }
+
+  async activaDeChofer(choferId: string): Promise<ReservaUnidad | null> {
+    const d = await this.col.findOne({ estado: { $in: ['PROVISIONAL', 'CONFIRMADA'] }, choferId }, opciones());
     if (!d) return null;
     const { _id, ...resto } = d;
     return { reservaUnidadId: _id, ...resto };

@@ -1,18 +1,43 @@
 import { inject, Injectable } from '@angular/core';
+import { firstValueFrom } from 'rxjs';
 import { conservarUltimoBueno } from 'ui-comun';
-import { ChoferesGQL, ChoferGQL } from '../../graphql/generado';
+import {
+  CambiarHabilitacionChoferGQL,
+  ChoferesGQL,
+  ChoferGQL,
+  EditarChoferGQL,
+  type CambiarHabilitacionChoferMutationVariables,
+  type ChoferEdicionInput,
+} from '../../graphql/generado';
 
-/** Repositorio sobre Apollo de los choferes (G3, solo lectura). */
+/** Repositorio sobre Apollo de los choferes (G3): lectura, edición y habilitación (D104). */
 @Injectable({ providedIn: 'root' })
 export class ChoferesRepositorio {
   private readonly choferesGql = inject(ChoferesGQL);
   private readonly choferGql = inject(ChoferGQL);
+  private readonly editarGql = inject(EditarChoferGQL);
+  private readonly habilitacionGql = inject(CambiarHabilitacionChoferGQL);
 
   observarChoferes(cadaMs: number) {
     return this.choferesGql.watch({ pollInterval: cadaMs }).valueChanges.pipe(conservarUltimoBueno());
   }
 
+  /** La página que sigue a `despuesDe`, una sola vez y sin caché (la primera la trae el sondeo). */
+  async pagina(despuesDe: string) {
+    const { data } = await firstValueFrom(this.choferesGql.fetch({ variables: { despuesDe }, fetchPolicy: 'network-only' }));
+    return data?.choferes;
+  }
+
+  /** El `QueryRef`: `recargar` hace `refetch` sobre él (V4-1). */
   observarChofer(choferId: string) {
-    return this.choferGql.watch({ variables: { choferId } }).valueChanges;
+    return this.choferGql.watch({ variables: { choferId } });
+  }
+
+  editar(input: ChoferEdicionInput) {
+    return this.editarGql.mutate({ variables: { input } });
+  }
+
+  cambiarHabilitacion(variables: CambiarHabilitacionChoferMutationVariables) {
+    return this.habilitacionGql.mutate({ variables });
   }
 }

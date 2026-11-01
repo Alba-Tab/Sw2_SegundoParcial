@@ -7,6 +7,7 @@ import { ESPERA, noDisponible, rutaRest, type ClienteServicios, type Llamada, ty
 import type { Cargadores } from './cargadores';
 import { Cursor, Dinero, Fecha, Instante, JSONEscalar } from './escalares';
 import { mutacionesLineaCredito } from './gestion-finanzas';
+import { resolversGestionFlota } from './gestion-flota';
 import { LIMITE_MAXIMO } from './limites';
 import * as m from './mapeos';
 import { alertasNuevas } from './suscripcion';
@@ -62,6 +63,7 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
   const listarViajes = async (ctx: Ctx, estado: string | undefined, limite: number) =>
     m.items(await s.get<Json>(ctx, 'viajes', rutaRest`/api/v1/viajes`, { query: { estado, limite } })).map(m.viaje);
   const accion = (a: Json) => ({ ...a, evidencia: a['evidencia'] ?? [] });
+  const flota = resolversGestionFlota(s);
 
   /**
    * Todas las páginas de una lista (cursor hasta agotar), para los resúmenes del tablero. El conjunto tarda como máximo
@@ -151,12 +153,20 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
           .items(await s.get<Json>(ctx, 'flota', rutaRest`/api/v1/unidades`, { query: { tipo, estado, placa, limite: LIMITE_MAXIMO } }))
           .map(m.unidad),
       unidad: async (_: unknown, { id }: Args, ctx: Ctx) => m.unidad(await s.get<Json>(ctx, 'flota', rutaRest`/api/v1/unidades/${id}`)),
-      mantenimientos: async (_: unknown, { estado, unidadId }: Args, ctx: Ctx) =>
-        m
-          .items(await s.get<Json>(ctx, 'flota', rutaRest`/api/v1/mantenimientos`, { query: { estado, unidadId, limite: LIMITE_MAXIMO } }))
-          .map(m.mantenimiento),
-      choferes: async (_: unknown, __: Args, ctx: Ctx) =>
-        m.items(await s.get<Json>(ctx, 'flota', rutaRest`/api/v1/choferes`, { query: { limite: LIMITE_MAXIMO } })),
+      // Páginas por cursor (E5-1): el cursor de Flota pasa tal cual en `despuesDe` y `siguienteCursor`.
+      mantenimientos: async (_: unknown, { estado, unidadId, limite, despuesDe }: Args, ctx: Ctx) =>
+        m.pagina(
+          await s.get<Json>(ctx, 'flota', rutaRest`/api/v1/mantenimientos`, {
+            query: { estado, unidadId, limite: limiteValido(limite, 50), cursor: despuesDe },
+          }),
+          m.mantenimiento,
+        ),
+      choferes: async (_: unknown, { limite, despuesDe }: Args, ctx: Ctx) =>
+        m.pagina(
+          await s.get<Json>(ctx, 'flota', rutaRest`/api/v1/choferes`, { query: { limite: limiteValido(limite, 50), cursor: despuesDe } }),
+          (c) => c,
+        ),
+      ...flota.Query,
       cargasCombustible: async (_: unknown, { placa, limite }: Args, ctx: Ctx) => {
         const n = limiteValido(limite, 50);
         const tracto = placa ? await ctx.cargadores.unidadPorPlaca.load(placa) : null;
@@ -249,6 +259,7 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
     Cliente: {
       lineaCredito: (c: Json, __: Args, ctx: Ctx) => ctx.cargadores.lineaCredito.load(c['clienteId']),
     },
+    Chofer: flota.Chofer,
     AccionPropuesta: {
       viaje: (a: Json, __: Args, ctx: Ctx) => ctx.cargadores.viaje.load(a['viajeId']),
     },
@@ -316,6 +327,7 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
         });
         return m.mantenimiento(r);
       },
+      ...flota.Mutation,
       registrarPago: async (_: unknown, { input }: Args, ctx: Ctx) => {
         const { facturaId, claveIdempotencia, monto, ...resto } = input;
         // registrarPago responde 201 con la factura actualizada (contratos/openapi/finanzas.yaml).

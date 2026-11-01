@@ -14,6 +14,8 @@ export interface ReservaUnidad {
   tractoId?: string;
   remolqueId?: string;
   choferId?: string;
+  /** Día del viaje (`YYYY-MM-DD`, de la actividad reservarUnidad); las reservas anteriores a este campo no lo tienen. */
+  fechaViaje?: string;
   estado: EstadoReserva;
   creadaEn: Date;
 }

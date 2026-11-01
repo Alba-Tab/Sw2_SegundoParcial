@@ -1,5 +1,5 @@
 import { filtrar } from 'ui-comun/dominio';
-import { buscarChofer, estadoChofer, textoChofer, vigenciaLicencia, type Chofer } from './chofer';
+import { estadoChofer, puedeInhabilitar, textoChofer, vigenciaLicencia, type Chofer } from './chofer';
 
 describe('choferes (dominio)', () => {
   const lista = [
@@ -18,9 +18,13 @@ describe('choferes (dominio)', () => {
     expect(filtrar(lista, 'inhabilitado', textoChofer).map((c) => c.choferId)).toEqual(['c2']);
   });
 
-  it('la ficha sale de la lista y marca la licencia por vencer', () => {
-    expect(buscarChofer(lista, 'c2')?.nombre).toBe('Ana Rojas');
-    expect(buscarChofer(lista, 'x')).toBeUndefined();
+  it('marca la licencia por vencer', () => {
     expect(vigenciaLicencia(lista[0], '2026-10-31')).toBe('POR_VENCER');
+  });
+
+  it('D104: no se inhabilita a un chofer con una reserva activa ni a uno ya inhabilitado', () => {
+    expect(puedeInhabilitar({ activo: true, disponible: true })).toBe(true);
+    expect(puedeInhabilitar({ activo: true, disponible: false })).toBe(false);
+    expect(puedeInhabilitar({ activo: false, disponible: true })).toBe(false);
   });
 });

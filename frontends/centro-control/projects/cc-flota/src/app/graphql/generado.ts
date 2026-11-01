@@ -5,6 +5,16 @@ export type Incremental<T> = T | { [P in keyof T]?: P extends ' $fragmentName' |
 import { gql } from 'apollo-angular';
 import { Injectable } from '@angular/core';
 import * as Apollo from 'apollo-angular';
+/** Edición de un chofer (D104). Los choferes no tienen alta: llegan de Keycloak y la semilla. */
+export type ChoferEdicionInput = {
+  choferId: string | number;
+  claveIdempotencia: string | number;
+  /** A, B o C. */
+  licenciaCategoria: string;
+  licenciaVenceEl: string;
+  nombre: string;
+};
+
 export type CierreMantenimientoInput = {
   checklist: Array<ItemChecklistInput>;
   claveIdempotencia: string | number;
@@ -41,6 +51,32 @@ export type TipoMantenimiento = 'CORRECTIVO' | 'DOCUMENTOS' | 'PREVENTIVO';
 
 export type TipoUnidad = 'REMOLQUE' | 'TRACTO';
 
+/** Edición de una unidad y de sus documentos (spec 010, D104): placa, estado y kilómetros no se editan. */
+export type UnidadEdicionInput = {
+  atributos: any;
+  capacidadToneladas?: number | null | undefined;
+  claveIdempotencia: string | number;
+  documentos: Array<DocumentoInput>;
+  unidadId: string | number;
+};
+
+/** Alta de un tracto o remolque (spec 010, D104). Flota valida los atributos de cada tipo (D76). */
+export type UnidadNuevaInput = {
+  atributos: any;
+  /** Obligatoria en remolques; prohibida en tractos. */
+  capacidadToneladas?: number | null | undefined;
+  claveIdempotencia: string | number;
+  /** Un SOAT y una INSPECCION_TECNICA. */
+  documentos: Array<DocumentoInput>;
+  /** Odómetro, solo en tractos. */
+  kilometraje?: number | null | undefined;
+  kmDesdeUltimoMantenimiento: number;
+  placa: string;
+  /** Solo en remolques: FURGON, PLATAFORMA o CISTERNA. */
+  tipoRemolque?: string | null | undefined;
+  tipoUnidad: TipoUnidad;
+};
+
 export type UnidadesQueryVariables = Exact<{
   tipo?: TipoUnidad | null | undefined;
   estado?: EstadoUnidad | null | undefined;
@@ -76,47 +112,60 @@ export type UnidadQuery = {
     atributos: any;
     documentos: Array<{ tipo: string; venceEl: string }>;
   } | null;
-  mantenimientos: Array<{
-    mantenimientoId: string;
-    tipo: TipoMantenimiento;
-    estado: string;
-    fechaProgramada: string;
-    taller: string;
-    descripcion: string;
-    programadoEn: string | null;
-    cerradoEn: string | null;
-    observaciones: string | null;
-    checklist: Array<{ item: string; ok: boolean | null; nota: string | null }>;
-  }> | null;
+  mantenimientos: {
+    siguienteCursor: string | null;
+    items: Array<{
+      mantenimientoId: string;
+      tipo: TipoMantenimiento;
+      estado: string;
+      fechaProgramada: string;
+      taller: string;
+      descripcion: string;
+      programadoEn: string | null;
+      cerradoEn: string | null;
+      observaciones: string | null;
+      checklist: Array<{ item: string; ok: boolean | null; nota: string | null }>;
+    }>;
+  } | null;
 };
 
-export type MantenimientosQueryVariables = Exact<{ [key: string]: never }>;
+export type MantenimientosQueryVariables = Exact<{
+  despuesDe?: string | null | undefined;
+}>;
 
 export type MantenimientosQuery = {
-  mantenimientos: Array<{
-    mantenimientoId: string;
-    unidadId: string;
-    placa: string;
-    tipo: TipoMantenimiento;
-    estado: string;
-    fechaProgramada: string;
-    taller: string;
-    descripcion: string;
-    cerradoEn: string | null;
-  }> | null;
+  mantenimientos: {
+    siguienteCursor: string | null;
+    items: Array<{
+      mantenimientoId: string;
+      unidadId: string;
+      placa: string;
+      tipo: TipoMantenimiento;
+      estado: string;
+      fechaProgramada: string;
+      taller: string;
+      descripcion: string;
+      cerradoEn: string | null;
+    }>;
+  } | null;
 };
 
-export type ChoferesQueryVariables = Exact<{ [key: string]: never }>;
+export type ChoferesQueryVariables = Exact<{
+  despuesDe?: string | null | undefined;
+}>;
 
 export type ChoferesQuery = {
-  choferes: Array<{
-    choferId: string;
-    nombre: string;
-    licenciaCategoria: string;
-    licenciaVenceEl: string;
-    activo: boolean;
-    disponible: boolean;
-  }> | null;
+  choferes: {
+    siguienteCursor: string | null;
+    items: Array<{
+      choferId: string;
+      nombre: string;
+      licenciaCategoria: string;
+      licenciaVenceEl: string;
+      activo: boolean;
+      disponible: boolean;
+    }>;
+  } | null;
 };
 
 export type ChoferQueryVariables = Exact<{
@@ -124,14 +173,15 @@ export type ChoferQueryVariables = Exact<{
 }>;
 
 export type ChoferQuery = {
-  choferes: Array<{
+  chofer: {
     choferId: string;
     nombre: string;
     licenciaCategoria: string;
     licenciaVenceEl: string;
     activo: boolean;
     disponible: boolean;
-  }> | null;
+    motivoInhabilitacion: string | null;
+  } | null;
   puntajesConduccion: {
     desde: string;
     hasta: string;
@@ -200,6 +250,126 @@ export type CerrarMantenimientoMutationVariables = Exact<{
 
 export type CerrarMantenimientoMutation = { cerrarMantenimiento: { mantenimientoId: string; estado: string } };
 
+export type UnidadGestionadaFragment = {
+  unidadId: string;
+  estado: EstadoUnidad;
+  capacidadToneladas: number | null;
+  atributos: any;
+  documentos: Array<{ tipo: string; venceEl: string }>;
+};
+
+export type CrearUnidadMutationVariables = Exact<{
+  input: UnidadNuevaInput;
+}>;
+
+export type CrearUnidadMutation = {
+  crearUnidad: {
+    unidadId: string;
+    estado: EstadoUnidad;
+    capacidadToneladas: number | null;
+    atributos: any;
+    documentos: Array<{ tipo: string; venceEl: string }>;
+  };
+};
+
+export type EditarUnidadMutationVariables = Exact<{
+  input: UnidadEdicionInput;
+}>;
+
+export type EditarUnidadMutation = {
+  editarUnidad: {
+    unidadId: string;
+    estado: EstadoUnidad;
+    capacidadToneladas: number | null;
+    atributos: any;
+    documentos: Array<{ tipo: string; venceEl: string }>;
+  };
+};
+
+export type DarDeBajaUnidadMutationVariables = Exact<{
+  unidadId: string | number;
+  motivo: string;
+  claveIdempotencia: string | number;
+}>;
+
+export type DarDeBajaUnidadMutation = {
+  darDeBajaUnidad: {
+    unidadId: string;
+    estado: EstadoUnidad;
+    capacidadToneladas: number | null;
+    atributos: any;
+    documentos: Array<{ tipo: string; venceEl: string }>;
+  };
+};
+
+export type ChoferGestionadoFragment = {
+  choferId: string;
+  nombre: string;
+  licenciaCategoria: string;
+  licenciaVenceEl: string;
+  activo: boolean;
+  disponible: boolean;
+  motivoInhabilitacion: string | null;
+};
+
+export type EditarChoferMutationVariables = Exact<{
+  input: ChoferEdicionInput;
+}>;
+
+export type EditarChoferMutation = {
+  editarChofer: {
+    choferId: string;
+    nombre: string;
+    licenciaCategoria: string;
+    licenciaVenceEl: string;
+    activo: boolean;
+    disponible: boolean;
+    motivoInhabilitacion: string | null;
+  };
+};
+
+export type CambiarHabilitacionChoferMutationVariables = Exact<{
+  choferId: string | number;
+  activo: boolean;
+  motivo?: string | null | undefined;
+  claveIdempotencia: string | number;
+}>;
+
+export type CambiarHabilitacionChoferMutation = {
+  cambiarHabilitacionChofer: {
+    choferId: string;
+    nombre: string;
+    licenciaCategoria: string;
+    licenciaVenceEl: string;
+    activo: boolean;
+    disponible: boolean;
+    motivoInhabilitacion: string | null;
+  };
+};
+
+export const UnidadGestionadaFragmentDoc = gql`
+  fragment UnidadGestionada on Unidad {
+    unidadId
+    estado
+    capacidadToneladas
+    documentos {
+      tipo
+      venceEl
+    }
+    atributos
+  }
+`;
+export const ChoferGestionadoFragmentDoc = gql`
+  fragment ChoferGestionado on Chofer {
+    choferId
+    nombre
+    licenciaCategoria
+    licenciaVenceEl
+    activo
+    disponible
+    motivoInhabilitacion
+  }
+`;
 export const UnidadesDocument = gql`
   query Unidades($tipo: TipoUnidad, $estado: EstadoUnidad) {
     unidades(tipo: $tipo, estado: $estado) {
@@ -245,21 +415,24 @@ export const UnidadDocument = gql`
       }
       atributos
     }
-    mantenimientos(unidadId: $id) {
-      mantenimientoId
-      tipo
-      estado
-      fechaProgramada
-      taller
-      descripcion
-      checklist {
-        item
-        ok
-        nota
+    mantenimientos(unidadId: $id, limite: 50) {
+      items {
+        mantenimientoId
+        tipo
+        estado
+        fechaProgramada
+        taller
+        descripcion
+        checklist {
+          item
+          ok
+          nota
+        }
+        programadoEn
+        cerradoEn
+        observaciones
       }
-      programadoEn
-      cerradoEn
-      observaciones
+      siguienteCursor
     }
   }
 `;
@@ -275,17 +448,20 @@ export class UnidadGQL extends Apollo.Query<UnidadQuery, UnidadQueryVariables> {
   }
 }
 export const MantenimientosDocument = gql`
-  query Mantenimientos {
-    mantenimientos {
-      mantenimientoId
-      unidadId
-      placa
-      tipo
-      estado
-      fechaProgramada
-      taller
-      descripcion
-      cerradoEn
+  query Mantenimientos($despuesDe: Cursor) {
+    mantenimientos(limite: 50, despuesDe: $despuesDe) {
+      items {
+        mantenimientoId
+        unidadId
+        placa
+        tipo
+        estado
+        fechaProgramada
+        taller
+        descripcion
+        cerradoEn
+      }
+      siguienteCursor
     }
   }
 `;
@@ -301,14 +477,17 @@ export class MantenimientosGQL extends Apollo.Query<MantenimientosQuery, Manteni
   }
 }
 export const ChoferesDocument = gql`
-  query Choferes {
-    choferes {
-      choferId
-      nombre
-      licenciaCategoria
-      licenciaVenceEl
-      activo
-      disponible
+  query Choferes($despuesDe: Cursor) {
+    choferes(limite: 50, despuesDe: $despuesDe) {
+      items {
+        choferId
+        nombre
+        licenciaCategoria
+        licenciaVenceEl
+        activo
+        disponible
+      }
+      siguienteCursor
     }
   }
 `;
@@ -325,13 +504,14 @@ export class ChoferesGQL extends Apollo.Query<ChoferesQuery, ChoferesQueryVariab
 }
 export const ChoferDocument = gql`
   query Chofer($choferId: ID!) {
-    choferes {
+    chofer(id: $choferId) {
       choferId
       nombre
       licenciaCategoria
       licenciaVenceEl
       activo
       disponible
+      motivoInhabilitacion
     }
     puntajesConduccion(choferId: $choferId) {
       desde
@@ -471,6 +651,104 @@ export const CerrarMantenimientoDocument = gql`
 })
 export class CerrarMantenimientoGQL extends Apollo.Mutation<CerrarMantenimientoMutation, CerrarMantenimientoMutationVariables> {
   override document = CerrarMantenimientoDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const CrearUnidadDocument = gql`
+  mutation CrearUnidad($input: UnidadNuevaInput!) {
+    crearUnidad(input: $input) {
+      ...UnidadGestionada
+    }
+  }
+  ${UnidadGestionadaFragmentDoc}
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class CrearUnidadGQL extends Apollo.Mutation<CrearUnidadMutation, CrearUnidadMutationVariables> {
+  override document = CrearUnidadDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const EditarUnidadDocument = gql`
+  mutation EditarUnidad($input: UnidadEdicionInput!) {
+    editarUnidad(input: $input) {
+      ...UnidadGestionada
+    }
+  }
+  ${UnidadGestionadaFragmentDoc}
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class EditarUnidadGQL extends Apollo.Mutation<EditarUnidadMutation, EditarUnidadMutationVariables> {
+  override document = EditarUnidadDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const DarDeBajaUnidadDocument = gql`
+  mutation DarDeBajaUnidad($unidadId: ID!, $motivo: String!, $claveIdempotencia: ID!) {
+    darDeBajaUnidad(unidadId: $unidadId, motivo: $motivo, claveIdempotencia: $claveIdempotencia) {
+      ...UnidadGestionada
+    }
+  }
+  ${UnidadGestionadaFragmentDoc}
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class DarDeBajaUnidadGQL extends Apollo.Mutation<DarDeBajaUnidadMutation, DarDeBajaUnidadMutationVariables> {
+  override document = DarDeBajaUnidadDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const EditarChoferDocument = gql`
+  mutation EditarChofer($input: ChoferEdicionInput!) {
+    editarChofer(input: $input) {
+      ...ChoferGestionado
+    }
+  }
+  ${ChoferGestionadoFragmentDoc}
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class EditarChoferGQL extends Apollo.Mutation<EditarChoferMutation, EditarChoferMutationVariables> {
+  override document = EditarChoferDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const CambiarHabilitacionChoferDocument = gql`
+  mutation CambiarHabilitacionChofer($choferId: ID!, $activo: Boolean!, $motivo: String, $claveIdempotencia: ID!) {
+    cambiarHabilitacionChofer(choferId: $choferId, activo: $activo, motivo: $motivo, claveIdempotencia: $claveIdempotencia) {
+      ...ChoferGestionado
+    }
+  }
+  ${ChoferGestionadoFragmentDoc}
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class CambiarHabilitacionChoferGQL extends Apollo.Mutation<
+  CambiarHabilitacionChoferMutation,
+  CambiarHabilitacionChoferMutationVariables
+> {
+  override document = CambiarHabilitacionChoferDocument;
 
   constructor(apollo: Apollo.Apollo) {
     super(apollo);
