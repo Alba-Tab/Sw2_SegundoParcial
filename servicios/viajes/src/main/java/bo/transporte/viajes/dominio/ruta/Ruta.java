@@ -14,6 +14,19 @@ public record Ruta(
         boolean activa,
         int versionAgregado) {
 
+    /** Una ruta nueva o editada, con la versión que le toca (1 al crearla; la anterior + 1 al editarla). */
+    public static Ruta de(UUID rutaId, DatosRuta d, int versionAgregado) {
+        return new Ruta(
+                rutaId,
+                d.nombre(),
+                d.origen(),
+                d.destino(),
+                d.radioMetros(),
+                d.distanciaKm(),
+                d.activa(),
+                versionAgregado);
+    }
+
     public record Coordenadas(double lat, double lng) {}
 
     public record Lugar(String nombre, Coordenadas coordenadas) {}

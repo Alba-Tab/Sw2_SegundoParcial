@@ -165,7 +165,15 @@ paths:
     get:
       tags: [rutas]
       operationId: listarRutas
-      summary: Rutas activas (cualquier usuario autenticado). Spec 002.
+      summary: Rutas activas (cualquier usuario autenticado), por nombre. Spec 002.
+      parameters:
+        - name: incluirInactivas
+          in: query
+          required: false
+          description: También las inactivas, para la gestión de rutas del Centro de Control (G4).
+          schema:
+            type: boolean
+            default: false
       responses:
         '200':
           description: Rutas.
@@ -177,6 +185,42 @@ paths:
                   $ref: '#/components/schemas/Ruta'
         '401':
           $ref: './comun.yaml#/components/responses/NoAutenticado'
+    post:
+      tags: [rutas]
+      operationId: crearRuta
+      summary: Alta de una ruta (gerente, despachador). G4, D104.
+      description: |
+        En una transacción crea la ruta con `versionAgregado = 1`, audita y deja `RutaActualizada` en el Outbox
+        (Finanzas y Analítica crean su copia). La distancia se guarda con un decimal.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+        - $ref: './comun.yaml#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RutaNueva'
+      responses:
+        '201':
+          description: Ruta creada.
+          headers:
+            Location:
+              $ref: './comun.yaml#/components/headers/Location'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ruta'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
   /api/v1/rutas/{rutaId}:
     parameters:
       - name: rutaId
@@ -187,7 +231,7 @@ paths:
     get:
       tags: [rutas]
       operationId: obtenerRuta
-      summary: Una ruta.
+      summary: Una ruta, activa o no.
       responses:
         '200':
           description: Ruta.
@@ -199,6 +243,41 @@ paths:
           $ref: './comun.yaml#/components/responses/NoAutenticado'
         '404':
           $ref: './comun.yaml#/components/responses/NoEncontrado'
+    put:
+      tags: [rutas]
+      operationId: actualizarRuta
+      summary: Edición de una ruta, también para activarla o desactivarla (gerente, despachador). G4, D104.
+      description: |
+        Documento completo. En una transacción, con la fila bloqueada, sube `versionAgregado`, audita y deja
+        `RutaActualizada` en el Outbox. Los viajes ya programados conservan la ruta; una ruta inactiva no se cotiza.
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+        - $ref: './comun.yaml#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RutaNueva'
+      responses:
+        '200':
+          description: Ruta actualizada.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Ruta'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
 
   /api/v1/servicios:
     post:
@@ -1106,6 +1185,52 @@ components:
           type: string
         coordenadas:
           $ref: './comun.yaml#/components/schemas/Coordenadas'
+    LugarNuevo:
+      type: object
+      required: [nombre, coordenadas]
+      additionalProperties: false
+      properties:
+        nombre:
+          type: string
+          minLength: 2
+          maxLength: 80
+        coordenadas:
+          $ref: './comun.yaml#/components/schemas/Coordenadas'
+    RutaNueva:
+      type: object
+      description: Alta o edición de una ruta (G4). Los mismos límites que RutaActualizada.v1.
+      required: [nombre, origen, destino, distanciaKm, activa]
+      additionalProperties: false
+      properties:
+        nombre:
+          type: string
+          minLength: 3
+          maxLength: 80
+        origen:
+          $ref: '#/components/schemas/LugarNuevo'
+        destino:
+          type: object
+          required: [nombre, coordenadas, radioMetros]
+          additionalProperties: false
+          properties:
+            nombre:
+              type: string
+              minLength: 2
+              maxLength: 80
+            coordenadas:
+              $ref: './comun.yaml#/components/schemas/Coordenadas'
+            radioMetros:
+              type: integer
+              minimum: 50
+              maximum: 5000
+              description: Radio de la geocerca (D06).
+        distanciaKm:
+          type: number
+          minimum: 0
+          exclusiveMinimum: true
+          maximum: 5000
+        activa:
+          type: boolean
     Ruta:
       type: object
       required: [rutaId, nombre, origen, destino, distanciaKm, activa]

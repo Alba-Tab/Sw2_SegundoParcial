@@ -3,6 +3,7 @@ package bo.transporte.viajes.adaptadores.salida.persistencia;
 import bo.transporte.viajes.aplicacion.cliente.AltaDeCliente;
 import bo.transporte.viajes.aplicacion.cliente.ClienteVista;
 import bo.transporte.viajes.aplicacion.puerto.salida.RegistroIdempotente;
+import bo.transporte.viajes.aplicacion.ruta.GestionDeRutas;
 import bo.transporte.viajes.aplicacion.servicio.CancelacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ConfirmacionDeServicio;
 import bo.transporte.viajes.aplicacion.servicio.ServicioAceptado;
@@ -12,6 +13,7 @@ import bo.transporte.viajes.aplicacion.viaje.EntregaDeViaje;
 import bo.transporte.viajes.aplicacion.viaje.InicioDeViaje;
 import bo.transporte.viajes.aplicacion.viaje.ResultadoEntrega;
 import bo.transporte.viajes.aplicacion.viaje.ViajeVista;
+import bo.transporte.viajes.dominio.ruta.Ruta;
 import bo.transporte.viajes.dominio.viaje.EventoConduccion;
 import bo.transporte.viajes.dominio.viaje.Hito;
 import java.sql.Timestamp;
@@ -37,6 +39,8 @@ class RegistroIdempotenteJdbc implements RegistroIdempotente {
             Map.entry(EntregaDeViaje.APROBAR, ViajeVista.class),
             Map.entry(EntregaDeViaje.RECHAZAR, ViajeVista.class),
             Map.entry(AltaDeCliente.OPERACION, ClienteVista.class),
+            Map.entry(GestionDeRutas.CREAR, Ruta.class),
+            Map.entry(GestionDeRutas.EDITAR, Ruta.class),
             Map.entry(ConfirmacionDeServicio.OPERACION, ServicioAceptado.class),
             Map.entry(CancelacionDeServicio.OPERACION, ServicioVista.class),
             Map.entry(InicioDeViaje.OPERACION, ViajeVista.class),

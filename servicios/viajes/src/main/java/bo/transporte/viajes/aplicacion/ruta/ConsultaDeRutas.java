@@ -14,8 +14,9 @@ public class ConsultaDeRutas {
         this.rutas = rutas;
     }
 
-    public List<Ruta> activas() {
-        return rutas.activas();
+    /** Las activas; con {@code incluirInactivas}, todas (gestión de rutas, G4). */
+    public List<Ruta> listar(boolean incluirInactivas) {
+        return incluirInactivas ? rutas.todas() : rutas.activas();
     }
 
     public Ruta porId(UUID rutaId) {
