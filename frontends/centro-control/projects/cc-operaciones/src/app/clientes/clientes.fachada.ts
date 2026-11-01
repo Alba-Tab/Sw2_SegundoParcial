@@ -18,7 +18,8 @@ export class ClientesFachada {
   /** Clientes cuya línea no se pudo leer (no es lo mismo que no tener línea; D-1). */
   readonly sinLeerCredito = computed(() => {
     const filas = filasConError(this.datos()?.error, 'clientes', 'lineaCredito');
-    return new Set([...filas].map((i) => this.clientes()[i]?.clienteId));
+    // Las que se repusieron con la última línea leída (FB-1) ya tienen dato: no se cuentan.
+    return new Set([...filas].filter((i) => !this.clientes()[i]?.lineaCredito).map((i) => this.clientes()[i]?.clienteId));
   });
 }
 

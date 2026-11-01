@@ -14,7 +14,11 @@ export class LineasFachada {
   readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
   /** Clientes cuya línea no se pudo leer: no salen en la lista, y se dice (D-1). */
-  readonly incompletas = computed(() => filasConError(this.datos()?.error, 'clientes', 'lineaCredito').size);
+  readonly incompletas = computed(() => {
+    const clientes = completo<LineasCreditoQuery>(this.datos())?.clientes ?? [];
+    // Las que se repusieron con la última línea leída (FB-1) sí salen en la lista: no se cuentan.
+    return [...filasConError(this.datos()?.error, 'clientes', 'lineaCredito')].filter((i) => !clientes[i]?.lineaCredito).length;
+  });
   /** `clientes` trae como máximo 100 (LIMITE_MAXIMO del Gateway, sin cursor): se dice si llegó al tope (D-2). */
   readonly clientesLeidos = computed(() => completo<LineasCreditoQuery>(this.datos())?.clientes?.length ?? 0);
 }
