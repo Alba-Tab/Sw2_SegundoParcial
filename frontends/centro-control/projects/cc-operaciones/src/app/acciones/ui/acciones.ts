@@ -134,6 +134,13 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
                   />
                 }
               </div>
+            } @else if (a.estado === 'PENDIENTE') {
+              <!-- R2F-3: el gerente ve el borrador sin enviar y quién lo decide (spec 014: solo el despachador). -->
+              <h3>Borrador del mensaje</h3>
+              <p>{{ a.mensaje }}</p>
+              <p class="secundario">
+                <mat-icon class="icono-en-linea">lock_person</mat-icon>La aprueba o rechaza el despachador; el correo todavía no sale.
+              </p>
             } @else {
               <p class="mensaje-final">“{{ a.mensaje }}”</p>
               @if (a.decididaPor) {

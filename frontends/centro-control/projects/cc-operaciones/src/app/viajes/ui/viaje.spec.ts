@@ -96,3 +96,17 @@ describe('marcar resuelta una intervención (spec 011; R2F-2)', () => {
     expect(resolverIntervencion).toHaveBeenCalledWith('v1', 'MARCAR_RESUELTO', 'Liberado a mano en Finanzas', expect.any(String));
   });
 });
+
+describe('decisión pendiente vista por quien no decide (R2F-3)', () => {
+  it('al gerente una entrega observada le dice que la decide el despachador, sin el formulario', () => {
+    const texto = montar({ data: { viaje: { ...viaje, estado: 'ENTREGA_OBSERVADA' } } });
+    expect(texto).toContain('La entrega observada la decide el despachador.');
+    expect(texto).not.toContain('Aprobar entrega');
+  });
+
+  it('al gerente una intervención le dice que la resuelve el despachador', () => {
+    expect(montar({ data: { viaje: { ...viaje, estado: 'REQUIERE_INTERVENCION' } } })).toContain(
+      'La intervención la resuelve el despachador.',
+    );
+  });
+});

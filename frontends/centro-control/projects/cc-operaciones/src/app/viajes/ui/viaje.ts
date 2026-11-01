@@ -160,6 +160,18 @@ import { ViajeFachada } from '../viajes.fachada';
         </section>
       }
 
+      @if (!sesion.tiene('despachador') && (v.estado === 'ENTREGA_OBSERVADA' || v.estado === 'REQUIERE_INTERVENCION')) {
+        <!-- R2F-3: la decisión pendiente que este rol no toma dice quién la toma (specs 007 y 011). -->
+        <p class="secundario">
+          <mat-icon class="icono-en-linea">lock_person</mat-icon
+          >{{
+            v.estado === 'ENTREGA_OBSERVADA'
+              ? 'La entrega observada la decide el despachador.'
+              : 'La intervención la resuelve el despachador.'
+          }}
+        </p>
+      }
+
       <dl class="datos">
         <div>
           <dt>Cliente</dt>
