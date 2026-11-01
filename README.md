@@ -11,7 +11,7 @@ Sistema para una empresa de transporte de carga pesada con base en Santa Cruz: e
 
 > La carpeta `docs/` (propuesta, análisis, PlantUML, modelos de EA) no se sube al repositorio: cada integrante la tiene en local.
 
-> **Estado:** preparación. Todavía no hay código; las carpetas de abajo se crean a medida que avanza el orden de trabajo (sección 12 del análisis).
+> **Estado:** todo corre en local (fases F0 a F10 de [specs/plan-desarrollo.md](specs/plan-desarrollo.md)). Falta el despliegue multinube con CI/CD (F11) y el ensayo de fallos en la nube (F12).
 
 ---
 
@@ -47,20 +47,21 @@ frontends/
 movil/
   app-chofer/        Expo
 libs/
-  design-tokens/     variables CSS compartidas
+  design-tokens/     tema compartido (Angular, MUI y la app)
+  intercambio-token/ intercambio de tokens RFC 8693 (Gateway y MCP)
 contratos/
-  openapi/ · graphql/ · eventos/ · temporal/
+  openapi/ · graphql/ · eventos/ · temporal/ · mcp/
 plataforma/
   compose/           docker compose local (perfiles)
-  vm/                compose de la VM, Caddy, certificados
-  keycloak/          realm exportado
+  keycloak/          realm (keycloak-config-cli)
   n8n/               flujos exportados
-  simuladores/       sensor de combustible
-  datos-sinteticos/
-  scripts/           encender-demo, apagar-demo
-specs/               una especificación por flujo
-docs/                propuesta, análisis, PlantUML, documentos ICONIX
-.github/workflows/   un workflow por unidad + pipelines reutilizables
+  simulador-combustible/ · simulador-viaje/
+  datos-sinteticos/  3 meses de hechos para Analítica
+  semilla/           datos iniciales de la demo
+  scripts/           demo/ (un script por escenario) y fallos/
+specs/               una especificación por flujo, decisiones y plan
+docs/                propuesta, análisis, PlantUML, documentos ICONIX (solo local)
+.github/workflows/   ci.yml: CI de PR por carpeta con un check ci-ok
 ```
 
 ## Requisitos (Mac)
@@ -79,24 +80,30 @@ Las versiones exactas de cada librería quedan fijadas en el lockfile de cada ca
 
 ## Arranque local
 
-> Pendiente: se completa cuando exista `plataforma/compose/`.
+Detalle en [plataforma/compose/README.md](plataforma/compose/README.md).
 
-Perfiles previstos de docker compose:
+```bash
+cd plataforma/compose
+cp .env.example .env   # MAC_LOCAL=<scutil --get LocalHostName>.local, igual en OIDC_ISSUER
+docker compose --profile core --profile plataforma --profile ia up -d --wait
+./verificar.sh
+../semilla/cargar.sh
+```
+
+```bash
+ollama pull qwen3:4b-instruct
+```
 
 | Perfil | Qué levanta |
 |---|---|
-| `core` | Servicios de dominio y sus bases |
-| `plataforma` | Temporal, RabbitMQ, Keycloak (con el realm importado) |
-| `ia` | Analítica |
-| `demo` | Toxiproxy, MCP Inspector, Mailpit |
+| `core` | Viajes, Flota (API y worker), Finanzas (API y worker), Gateway y sus bases |
+| `plataforma` | Temporal, RabbitMQ (con MQTT), Keycloak con el realm, n8n, Mailpit |
+| `ia` | Analítica y servidor MCP |
+| `trazas` | OTel collector y Jaeger |
+| `simulador` | Sensor de combustible |
+| `demo` | Toxiproxy para los escenarios de fallo |
 
-```bash
-docker compose -f plataforma/compose/compose.yaml --profile core --profile plataforma up -d
-```
-
-```bash
-ollama pull <modelo-elegido>
-```
+Los frontends y la app se levantan aparte; cada README dice cómo. Los escenarios de la defensa están en [plataforma/scripts/README.md](plataforma/scripts/README.md).
 
 ## Usuarios de prueba
 
@@ -104,7 +111,14 @@ Están en [plataforma/keycloak/README.md](plataforma/keycloak/README.md): uno po
 
 ## Mapa de puertos
 
-> Pendiente: se fija junto con el compose. Cada servicio documenta el suyo en su propio README.
+| Pieza | Puerto |
+|---|---|
+| Viajes · Flota · Finanzas · Analítica · Gateway · MCP | 8101 · 8102 · 8103 · 8104 · 8105 · 8106 |
+| cc-tablero · cc-operaciones · cc-flota · cc-finanzas | 4201 · 4202 · 4203 · 4204 |
+| Portal del cliente | 5173 |
+| Keycloak · Temporal UI · RabbitMQ · n8n · Mailpit | 8080 · 8233 · 15672 · 5678 · 8025 |
+
+El resto (bases, broker, trazas) está en [plataforma/compose/README.md](plataforma/compose/README.md).
 
 ## Pruebas
 
@@ -116,6 +130,11 @@ Cada carpeta tiene sus pruebas y sus reglas de arquitectura:
 | Flota | Jest + Testcontainers | dependency-cruiser |
 | Finanzas | Pest + Larastan | Deptrac |
 | Analítica | pytest | — |
+| Gateway y MCP | Jest | — |
+| Centro de Control | Vitest (`npm run verificar`) | `scripts/capas.mjs` |
+| Portal y app del chofer | Vitest | — |
+
+El CI de PR corre solo las carpetas que cambiaron.
 
 ## Documentación de diseño
 
