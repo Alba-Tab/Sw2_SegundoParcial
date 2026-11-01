@@ -80,6 +80,35 @@ ok "viajes no lee a gerente1" "$(v "$A/users/0193a000-0000-7000-8000-00000000000
 ok "viajes no edita a gerente1" "$(v -X PUT "$A/users/0193a000-0000-7000-8000-000000000001" -d '{"firstName":"x"}')" 403
 TN=$(login prueba-registro | jq -r .access_token)
 ok "token nuevo trae cliente y clienteId" "$(roles "$TN") $(claims "$TN" | jq -r .clienteId)" "cliente 0193a000-0000-7000-8000-0000000c0099"
+
+echo "== D103: el gerente administra al personal interno desde la consola (grupo administra-usuarios y FGAP v2)"
+# La consola entra con security-admin-console (PKCE); aquí, con admin-cli, que la política desde-consola también acepta.
+TG=$(curl -s "$O/token" -d grant_type=password -d client_id=admin-cli -d username=gerente1 --data-urlencode "password=$KC_CLAVE_SEMILLA" | jq -r .access_token)
+g() { curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $TG" -H 'Content-Type: application/json' "$@"; }
+GU=0193a000-0000-7000-8000-000000000001; DE=0193a000-0000-7000-8000-000000000002; JF=0193a000-0000-7000-8000-000000000003
+RM=$(adm "$A/clients?clientId=realm-management" | jq -r '.[0].id')
+RA=$(adm "$A/clients/$RM/roles/realm-admin" | jq -c '{id,name}'); AR=$(adm "$A/roles/administracion" | jq -c '{id,name}'); DR=$(adm "$A/roles/despachador" | jq -c '{id,name}')
+SV=$(adm "$A/clients/$(adm "$A/clients?clientId=viajes" | jq -r '.[0].id')/service-account-user" | jq -r .id)
+raEn() { adm "$A/clients/$(adm "$A/clients?clientId=$1" | jq -r '.[0].id')/evaluate-scopes/generate-example-access-token?scope=openid&userId=$GU" | jq -c '.resource_access // {}'; }
+ok "la consola que enlaza ui-comun responde" "$(curl -s -o /dev/null -w '%{http_code}' "$KC_URL/admin/transporte/console/")" 200
+ok "sin realm-management en el token de cc-tablero, demo-cli ni gateway" "$(raEn cc-tablero) $(raEn demo-cli) $(raEn gateway)" "{} {} {}"
+ok "gerente1 lista solo al personal interno" "$(curl -s -H "Authorization: Bearer $TG" "$A/users?max=100" | jq -r '[.[].username] | sort | join(",")')" \
+  administracion1,chofer1,chofer2,chofer3,chofer4,comercial1,despachador1,jefeflota1
+ok "gerente1 da despachador a un interno" "$(g -X POST "$A/users/$JF/role-mappings/realm" -d "[$DR]")" 204
+ok "gerente1 se lo quita" "$(g -X DELETE "$A/users/$JF/role-mappings/realm" -d "[$DR]")" 204
+ok "gerente1 no se da gerente" "$(g -X POST "$A/users/$GU/role-mappings/realm" -d "[$GR]")" 403
+ok "gerente1 no se da cliente" "$(g -X POST "$A/users/$GU/role-mappings/realm" -d "[$CR]")" 403
+ok "gerente1 no se da administracion" "$(g -X POST "$A/users/$GU/role-mappings/realm" -d "[$AR]")" 403
+ok "gerente1 no da gerente a un interno" "$(g -X POST "$A/users/$DE/role-mappings/realm" -d "[$GR]")" 403
+ok "gerente1 no se escribe clienteId" "$(g -X PUT "$A/users/$GU" -d "$(adm "$A/users/$GU" | jq -c '.attributes.clienteId = ["0193a000-0000-7000-8000-0000000c0002"]')")" 403
+ok "gerente1 no ve un usuario de registro-portal" "$(g "$A/users/$N")" 403
+ok "gerente1 no cambia un usuario de registro-portal" "$(g -X PUT "$A/users/$N" -d "$(adm "$A/users/$N")")" 403
+ok "gerente1 no ve la cuenta de servicio de viajes" "$(g "$A/users/$SV")" 403
+ok "gerente1 no cambia la cuenta de servicio de viajes" "$(g -X PUT "$A/users/$SV" -d "$(adm "$A/users/$SV")")" 403
+ok "gerente1 no se da realm-admin" "$(g -X POST "$A/users/$GU/role-mappings/clients/$RM" -d "[$RA]")" 403
+ok "gerente1 no impersona" "$(g -X POST "$A/users/$DE/impersonation")" 403
+ok "con el token de demo-cli, gerente1 no ve a un interno" "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $T" "$A/users/$DE")" 403
+ok "despachador1 no lista usuarios" "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $(login despachador1 | jq -r .access_token)" "$A/users")" 403
 adm -X DELETE "$A/users/$N" >/dev/null
 
 echo "== D39 y D27"
