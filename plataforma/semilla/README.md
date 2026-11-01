@@ -23,4 +23,4 @@ Datos fijos de los escenarios de la defensa, compartidos por los servicios. Cada
 plataforma/semilla/cargar.sh
 ```
 
-Corre los tres comandos (nunca endpoints): `--semilla.cargar=true` en Viajes, `php artisan semilla:cargar` en Finanzas y `node dist/semilla.js` en Flota. Son idempotentes. Hasta T8.8 la demo se reinicia con `docker compose down -v` y esta carga; `demo:reiniciar` (T8.8) vaciará las tablas y luego llamará a estos mismos cargadores.
+Corre los cuatro comandos (nunca endpoints): `--semilla.cargar=true` en Viajes, `php artisan semilla:cargar` en Finanzas, `node dist/semilla.js` en Flota y `python -m app.demo cargar` en Analítica. Son idempotentes. Hasta T8.8 la demo se reinicia con `docker compose down -v` y esta carga; `demo:reiniciar` (T8.8) vaciará las tablas y luego llamará a estos mismos cargadores.
