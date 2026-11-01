@@ -121,12 +121,12 @@ export function PaginaFacturas() {
 
   return (
     <Stack spacing={3}>
-      <Typography variant="h5" component="h2">
+      <Typography variant="h5" component="h1">
         Facturas y crédito
       </Typography>
       <Credito />
       <Stack direction="row" alignItems="center" justifyContent="space-between">
-        <Typography variant="h6" component="h3">
+        <Typography variant="h6" component="h2">
           Facturas
         </Typography>
         <FormControlLabel control={<Switch checked={conSaldo} onChange={(e) => setConSaldo(e.target.checked)} />} label="Solo con saldo" />

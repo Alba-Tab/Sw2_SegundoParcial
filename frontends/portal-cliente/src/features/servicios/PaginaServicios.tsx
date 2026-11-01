@@ -65,7 +65,7 @@ export function PaginaServicios() {
   if (paginas.isError && !paginas.data) return <Problema error={paginas.error} reintentar={paginas.refetch} />;
   return (
     <Stack spacing={2}>
-      <Typography variant="h5" component="h2">
+      <Typography variant="h5" component="h1">
         Mis servicios
       </Typography>
       <Antiguedad actualizadoEn={paginas.dataUpdatedAt} fallo={paginas.isError} />

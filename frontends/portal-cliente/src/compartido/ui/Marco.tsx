@@ -77,7 +77,7 @@ export function Marco() {
       <Box sx={{ display: { xs: 'contents', md: 'block' }, position: { md: 'sticky' }, top: 0, zIndex: (t) => t.zIndex.appBar }}>
         <AppBar position="static" elevation={0}>
           <Toolbar sx={{ gap: 1, flexWrap: 'wrap' }}>
-            <Typography variant="h6" component="h1" sx={{ mr: 2 }}>
+            <Typography variant="h6" component="span" sx={{ mr: 2 }}>
               Transporte de carga
             </Typography>
             {menu.map((m) => (
@@ -126,7 +126,9 @@ export function Marco() {
           Sin conexión: ves lo último que guardaste en este equipo. Para cotizar o confirmar, vuelve a conectarte.
         </Alert>
       )}
-      <Container sx={{ py: 4 }}>{contenido}</Container>
+      <Container component="main" id="contenido" sx={{ py: 4 }}>
+        {contenido}
+      </Container>
     </>
   );
 }

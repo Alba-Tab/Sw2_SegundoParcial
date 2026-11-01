@@ -12,7 +12,7 @@ describe('ruta desconocida (N4)', () => {
       history: createMemoryHistory({ initialEntries: ['/no/existe'] }),
     });
     render(<RouterProvider router={router} />);
-    expect(await screen.findByRole('heading', { name: 'No encontramos esta página' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { level: 1, name: 'No encontramos esta página' })).toBeTruthy();
     expect(screen.getByRole('link', { name: 'Ir al inicio' }).getAttribute('href')).toBe('/');
     expect(router.state.location.pathname).toBe('/no/existe');
   });

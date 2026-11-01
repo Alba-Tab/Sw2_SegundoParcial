@@ -6,7 +6,7 @@ import { BotonEnlace } from './BotonEnlace';
 export function NoEncontrada() {
   return (
     <Stack spacing={2} sx={{ maxWidth: 520, mx: 'auto', mt: 8, alignItems: 'flex-start' }}>
-      <Typography variant="h5" component="h2">
+      <Typography variant="h5" component="h1">
         No encontramos esta página
       </Typography>
       <Typography>El enlace puede estar incompleto o la página ya no existe.</Typography>

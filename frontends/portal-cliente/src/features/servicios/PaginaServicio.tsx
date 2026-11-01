@@ -52,7 +52,7 @@ export function PaginaServicio() {
     <Paper variant="outlined" sx={{ p: 3, maxWidth: 760 }}>
       <Stack spacing={2}>
         <Stack direction="row" spacing={1.5} alignItems="center">
-          <Typography variant="h5" component="h2">
+          <Typography variant="h5" component="h1">
             {ruta?.nombre ?? 'Servicio'}
           </Typography>
           <EstadoServicio estado={s.estado} etapa={s.etapa} />

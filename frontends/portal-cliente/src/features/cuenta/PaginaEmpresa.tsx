@@ -83,7 +83,7 @@ function DatosDeLaEmpresa({ cliente }: { cliente: Cliente }) {
   ];
   return (
     <Paper variant="outlined" sx={{ p: 3, maxWidth: 560 }}>
-      <Typography variant="h5" component="h2" gutterBottom>
+      <Typography variant="h5" component="h1" gutterBottom>
         Mi empresa
       </Typography>
       <Stack component="dl" spacing={1} sx={{ m: 0 }}>

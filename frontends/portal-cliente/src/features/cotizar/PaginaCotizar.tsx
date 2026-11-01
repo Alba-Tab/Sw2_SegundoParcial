@@ -61,7 +61,7 @@ export function PaginaCotizar() {
     <Paper variant="outlined" sx={{ p: 3, maxWidth: 560 }}>
       <form onSubmit={handleSubmit((datos) => cotizar.mutate({ datos, clave: crypto.randomUUID() }))} noValidate>
         <Stack spacing={2}>
-          <Typography variant="h5" component="h2">
+          <Typography variant="h5" component="h1">
             Cotizar un servicio
           </Typography>
           <CampoTexto control={control} nombre="rutaId" label="Ruta" select required disabled={!rutas.data}>

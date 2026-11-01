@@ -26,7 +26,7 @@ export function Credito() {
     <Paper variant="outlined" sx={{ p: 3 }}>
       <Stack spacing={1.5}>
         <Stack direction="row" spacing={1} alignItems="center">
-          <Typography variant="h6" component="h3">
+          <Typography variant="h6" component="h2">
             Línea de crédito
           </Typography>
           {l.enMora && <Chip icon={<MoneyOff />} label="En mora" color="error" size="small" />}

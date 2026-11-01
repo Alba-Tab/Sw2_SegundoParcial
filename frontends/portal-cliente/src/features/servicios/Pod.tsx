@@ -24,7 +24,7 @@ export function Pod({ viajeId }: { viajeId: string }) {
   const e = entrega.data;
   return (
     <Stack spacing={1.5}>
-      <Typography variant="h6" component="h3">
+      <Typography variant="h6" component="h2">
         {e.tipo === 'ENTREGA' ? 'Prueba de entrega' : 'Rechazo en destino'}
       </Typography>
       <Typography color="text.secondary">

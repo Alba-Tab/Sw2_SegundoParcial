@@ -31,7 +31,7 @@ export function PaginaCotizacion() {
   return conVolver(
     <Paper variant="outlined" sx={{ p: 3, maxWidth: 560 }}>
       <Stack spacing={2}>
-        <Typography variant="h5" component="h2">
+        <Typography variant="h5" component="h1">
           Tu cotización
         </Typography>
         <Typography color="text.secondary">

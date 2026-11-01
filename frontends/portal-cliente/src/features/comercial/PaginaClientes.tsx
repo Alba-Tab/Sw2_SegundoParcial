@@ -41,7 +41,7 @@ export function PaginaClientes() {
   return (
     <Paper variant="outlined" sx={{ p: 3, maxWidth: 640 }}>
       <Stack spacing={2}>
-        <Typography variant="h5" component="h2">
+        <Typography variant="h5" component="h1">
           ¿A qué cliente atiendes?
         </Typography>
         <TextField label="Buscar por razón social o NIT" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />

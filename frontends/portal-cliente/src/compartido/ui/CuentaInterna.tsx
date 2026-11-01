@@ -12,7 +12,7 @@ export function CuentaInterna() {
   const consultas = useQueryClient();
   return (
     <Stack spacing={2} sx={{ maxWidth: 520, mx: 'auto', mt: 8, alignItems: 'flex-start' }}>
-      <Typography variant="h5" component="h2">
+      <Typography variant="h5" component="h1">
         Esta cuenta es del Centro de Control
       </Typography>
       <Typography>
