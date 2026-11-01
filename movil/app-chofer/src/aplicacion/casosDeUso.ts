@@ -66,7 +66,7 @@ export class CasosDeUso {
     this.anterior = this.ultima;
     this.ultima = l;
     this.posicionGuardada?.guardar({ lat: l.lat, lng: l.lng });
-    this.encolarFatigasSinPosicion({ lat: l.lat, lng: l.lng });
+    this.encolarFatigasSinPosicion(viajeId, { lat: l.lat, lng: l.lng });
     const muestreo = this.muestreos.get(viajeId) ?? new MuestreoGps();
     this.muestreos.set(viajeId, muestreo);
     if (!muestreo.aceptar(l)) return false;
@@ -133,20 +133,19 @@ export class CasosDeUso {
     return null;
   }
 
-  /** Las alertas que esperaban una posición salen con esta; `registradoEn` sigue siendo la hora de la alerta. */
-  private encolarFatigasSinPosicion(posicion: { lat: number; lng: number }): void {
+  /**
+   * Las alertas de este viaje que esperaban una posición salen con esta; `registradoEn` sigue siendo la hora de la
+   * alerta. Las de otro viaje esperan una lectura del suyo (una posición de otro viaje no dice dónde ocurrió).
+   */
+  private encolarFatigasSinPosicion(viajeId: string, posicion: { lat: number; lng: number }): void {
     const guardadas = this.fatigasSinPosicion?.leer() ?? [];
-    if (guardadas.length === 0) return;
+    const delViaje = guardadas.filter((f) => f.viajeId === viajeId);
+    if (delViaje.length === 0) return;
     this.enTransaccion(() => {
-      for (const f of guardadas) {
-        this.encolar(f.viajeId, 'EVENTO_CONDUCCION', {
-          eventoId: f.eventoId,
-          tipo: 'ALERTA_FATIGA',
-          posicion,
-          registradoEn: f.registradoEn,
-        });
+      for (const f of delViaje) {
+        this.encolar(viajeId, 'EVENTO_CONDUCCION', { eventoId: f.eventoId, tipo: 'ALERTA_FATIGA', posicion, registradoEn: f.registradoEn });
       }
-      this.fatigasSinPosicion?.guardar([]);
+      this.fatigasSinPosicion?.guardar(guardadas.filter((f) => f.viajeId !== viajeId));
     });
   }
 

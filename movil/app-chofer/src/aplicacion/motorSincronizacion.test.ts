@@ -567,6 +567,17 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     expect(casos.velocidadKmh()).toBeNull();
   });
 
+  it('E12-1: la alerta guardada sale solo con una lectura de su viaje', () => {
+    viajes.guardarDelServidor([viaje('v2')]);
+    casos.registrarFatiga('v1');
+    casos.registrarLectura('v2', { lat: -17.6, lng: -63.1, velocidadMs: 20, precisionMetros: 5, en: ahora.getTime() });
+    expect(cola.ops).toHaveLength(0);
+    expect(fatigas.f.map((f) => f.viajeId)).toEqual(['v1']);
+    casos.registrarLectura('v1', { lat: -17.7, lng: -63.18, velocidadMs: 20, precisionMetros: 5, en: ahora.getTime() });
+    expect(cola.ops.map((o) => [o.viajeId, o.cuerpo.posicion])).toEqual([['v1', { lat: -17.7, lng: -63.18 }]]);
+    expect(fatigas.f).toEqual([]);
+  });
+
   it('cada lectura del GPS queda guardada como última posición; olvidar limpia la memoria', () => {
     casos.registrarLectura('v1', { lat: -17.71, lng: -63.18, velocidadMs: 10, precisionMetros: 5, en: ahora.getTime() });
     expect(posicion.p).toEqual({ lat: -17.71, lng: -63.18 });
