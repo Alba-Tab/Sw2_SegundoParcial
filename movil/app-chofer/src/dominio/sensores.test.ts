@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DetectorFrenadas } from './frenada';
 import { descripcionValida, puedeEscribir } from './hito';
-import { kmh, type Lectura, metros, MuestreoGps } from './muestreo';
+import { agregarLectura, kmh, type Lectura, metros, MuestreoGps, velocidadEstimada } from './muestreo';
 
 const l = (en: number, lat: number, lng = -63.18): Lectura => ({ lat, lng, velocidadMs: 15, precisionMetros: 5, en });
 
@@ -54,5 +54,29 @@ describe('bitácora (D58)', () => {
     expect(descripcionValida('  ok ')).toBe(false);
     expect(descripcionValida('Bloqueo')).toBe(true);
     expect(descripcionValida('x'.repeat(501))).toBe(false);
+  });
+});
+
+describe('velocidad estimada cuando el GPS no la da (E2-3)', () => {
+  // Sin velocidad del GPS (-1) y con 5 m de precisión; 0,001° de latitud son 111,2 m.
+  const sin = (en: number, lat: number, precisionMetros = 5): Lectura => ({ lat, lng: -63.18, velocidadMs: -1, precisionMetros, en });
+  const juntar = (...ls: Lectura[]) => ls.reduce(agregarLectura, [] as Lectura[]);
+
+  it('usa una lectura de 5 s antes o más; con lecturas más juntas no se sabe', () => {
+    expect(velocidadEstimada(juntar(sin(0, -17.7), sin(3000, -17.7003)), 3000)).toBeNull();
+    // 0, 3 y 6 s: la de 6 s se compara con la de 0 s (111,2 m en 6 s).
+    expect(velocidadEstimada(juntar(sin(0, -17.7), sin(3000, -17.7005), sin(6000, -17.701)), 6000)).toBe(66.7);
+  });
+
+  it('solo guarda una lectura anterior a los últimos 5 s', () => {
+    expect(juntar(sin(0, -17.7), sin(2000, -17.7), sin(4000, -17.7), sin(6000, -17.7), sin(7000, -17.7)).map((x) => x.en)).toEqual([
+      2000, 4000, 6000, 7000,
+    ]);
+  });
+
+  it('un desplazamiento menor que la precisión es ruido del camión parado: 0, no 10 km/h', () => {
+    // 27,8 m en 10 s serían 10 km/h; con 30 m de precisión en una de las lecturas no se sabe si se movió.
+    expect(velocidadEstimada(juntar(sin(0, -17.7, 30), sin(10_000, -17.70025, 5)), 10_000)).toBe(0);
+    expect(velocidadEstimada(juntar(sin(0, -17.7, 5), sin(10_000, -17.70025, 5)), 10_000)).toBe(10);
   });
 });

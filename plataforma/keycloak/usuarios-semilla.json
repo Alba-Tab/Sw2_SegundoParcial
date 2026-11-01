@@ -12,7 +12,7 @@
       "realmRoles": [
         "gerente"
       ],
-      "groups": [],
+      "groups": ["/administra-usuarios"],
       "credentials": [
         {
           "type": "password",
@@ -32,7 +32,7 @@
       "realmRoles": [
         "despachador"
       ],
-      "groups": [],
+      "groups": ["/personal-interno"],
       "credentials": [
         {
           "type": "password",
@@ -52,7 +52,7 @@
       "realmRoles": [
         "jefe_flota"
       ],
-      "groups": [],
+      "groups": ["/personal-interno"],
       "credentials": [
         {
           "type": "password",
@@ -72,7 +72,7 @@
       "realmRoles": [
         "administracion"
       ],
-      "groups": [],
+      "groups": ["/personal-interno"],
       "credentials": [
         {
           "type": "password",
@@ -92,7 +92,7 @@
       "realmRoles": [
         "comercial"
       ],
-      "groups": [],
+      "groups": ["/personal-interno"],
       "credentials": [
         {
           "type": "password",
@@ -112,7 +112,7 @@
       "realmRoles": [
         "chofer"
       ],
-      "groups": [],
+      "groups": ["/personal-interno"],
       "credentials": [
         {
           "type": "password",
@@ -132,7 +132,7 @@
       "realmRoles": [
         "chofer"
       ],
-      "groups": [],
+      "groups": ["/personal-interno"],
       "credentials": [
         {
           "type": "password",
@@ -152,7 +152,7 @@
       "realmRoles": [
         "chofer"
       ],
-      "groups": [],
+      "groups": ["/personal-interno"],
       "credentials": [
         {
           "type": "password",
@@ -172,7 +172,7 @@
       "realmRoles": [
         "chofer"
       ],
-      "groups": [],
+      "groups": ["/personal-interno"],
       "credentials": [
         {
           "type": "password",

@@ -71,6 +71,10 @@ export class ClienteServicios {
     return this.llamar<T>(ctx, servicio, 'POST', ruta, { tiempoMs: ESPERA.mutacion, ...llamada });
   }
 
+  put<T>(ctx: Contexto, servicio: Servicio, ruta: RutaRest, llamada: Llamada = {}): Promise<T> {
+    return this.llamar<T>(ctx, servicio, 'PUT', ruta, { tiempoMs: ESPERA.mutacion, ...llamada });
+  }
+
   async llamar<T>(ctx: Contexto, servicio: Servicio, metodo: string, ruta: RutaRest, llamada: Llamada): Promise<T> {
     // Antes de pedir el token: sin presupuesto no sale ninguna llamada (CONSULTA_DEMASIADO_COMPLEJA).
     ctx.presupuesto?.gastar(servicio);
@@ -108,15 +112,16 @@ export class ClienteServicios {
     }
     if (respuesta.status >= 500) throw this.noDisponible(servicio, `respondió ${respuesta.status}`);
     if (!respuesta.ok) {
-      const problema = (await respuesta.json().catch(() => ({}))) as { codigo?: string; detail?: string; errores?: unknown };
+      const cuerpo: unknown = await respuesta.json().catch(() => ({}));
+      const problema = (cuerpo && typeof cuerpo === 'object' && !Array.isArray(cuerpo) ? cuerpo : {}) as Record<string, unknown>;
+      // Las extensiones del Problem Details (`errores`, `pagoId` de PAGO_DUPLICADO, `saldo` de PAGO_EXCEDE_SALDO…) pasan
+      // tal cual; lo que es para personas o del transporte HTTP no, y `codigo`, `status` y `servicio` los pone el Gateway.
+      const { type: _t, title: _ti, detail, instance: _i, codigo, status: _s, servicio: _sv, ...extensiones } = problema;
       throw errorGraphql(
-        problema.codigo ?? codigoPorStatus(respuesta.status),
-        problema.detail ?? `${NOMBRES[servicio]} respondió ${respuesta.status}`,
+        typeof codigo === 'string' ? codigo : codigoPorStatus(respuesta.status),
+        typeof detail === 'string' ? detail : `${NOMBRES[servicio]} respondió ${respuesta.status}`,
         respuesta.status,
-        {
-          servicio,
-          ...(problema.errores ? { errores: problema.errores } : {}),
-        },
+        { ...extensiones, servicio },
       );
     }
     if (llamada.binario) return respuesta as unknown as T;

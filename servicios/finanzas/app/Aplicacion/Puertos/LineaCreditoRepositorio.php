@@ -8,6 +8,14 @@ interface LineaCreditoRepositorio
 {
     public function porCliente(string $clienteId): ?LineaCredito;
 
+    /**
+     * Las líneas que existen de esos clientes, sin bloquear (lectura por lotes del Gateway).
+     *
+     * @param  list<string>  $clienteIds
+     * @return list<LineaCredito>
+     */
+    public function porClientes(array $clienteIds): array;
+
     /** Lee la línea bloqueando su fila hasta el fin de la transacción. */
     public function paraActualizar(string $clienteId): ?LineaCredito;
 

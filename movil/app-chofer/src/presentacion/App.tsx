@@ -109,14 +109,14 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
       setAviso(
         enCola
           ? 'Alerta de fatiga registrada; detente a descansar'
-          : 'Detente a descansar. Sin ubicación todavía: la alerta no quedó registrada',
+          : 'Detente a descansar. La alerta quedó guardada y se envía con la ubicación',
       ),
     [],
   );
   // Lo que no llegó al servidor se borra al salir: antes se avisa y se pide confirmación.
   const pedirSalida = () => {
     const sinEnviar = cierre.sinEnviar();
-    if (sinEnviar.operaciones + sinEnviar.conError + sinEnviar.puntos > 0) setConfirmarSalida(sinEnviar);
+    if (sinEnviar.operaciones + sinEnviar.conError + sinEnviar.puntos + sinEnviar.fatigas > 0) setConfirmarSalida(sinEnviar);
     else salir();
   };
   const sync = useSincronizacion(alCancelarse, alVencerSesion);
@@ -274,6 +274,7 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
                   confirmarSalida.operaciones ? plural(confirmarSalida.operaciones, 'registro', 'registros') : null,
                   confirmarSalida.conError ? plural(confirmarSalida.conError, 'registro con error', 'registros con error') : null,
                   confirmarSalida.puntos ? plural(confirmarSalida.puntos, 'punto GPS', 'puntos GPS') : null,
+                  confirmarSalida.fatigas ? plural(confirmarSalida.fatigas, 'alerta de fatiga', 'alertas de fatiga') : null,
                 ]
                   .filter(Boolean)
                   .join(' y ')}{' '}

@@ -1,5 +1,5 @@
 import { CierreSesion } from '../aplicacion/cierreSesion';
-import { casos, cola, puntos, sesion } from './contenedor';
+import { casos, cola, fatigasSinPosicion, puntos, sesion } from './contenedor';
 import { detenerGps } from './gps';
 import { DatosDelChoferSqlite } from './repositorios';
 import { quitarTareaFondo } from './tareaFondo';
@@ -19,4 +19,5 @@ export const cierre = new CierreSesion(
     },
   },
   casos,
+  fatigasSinPosicion,
 );

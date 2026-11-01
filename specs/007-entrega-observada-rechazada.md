@@ -98,6 +98,7 @@ Dos caminos que se apartan de la spec 006. **Observada:** el chofer entrega fuer
 | Reenvío con la misma clave | La respuesta guardada; no se publica otro evento |
 | FCM no responde | El consumidor del Outbox reintenta (5 intentos con espera exponencial, D69); el estado del viaje no depende del push |
 | Finanzas o Flota caídos | `EntregaRechazada` espera en su cola y se procesa al volver |
+| Rechazo que termina `FALLIDA` en la cola de la app (D106) | El chofer lo registra de nuevo con otro `entregaId` y otra clave; fuera de `EN_RUTA`, `409 CONFLICTO_ESTADO` |
 
 ## Criterios de aceptación
 

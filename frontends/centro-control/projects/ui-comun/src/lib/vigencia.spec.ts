@@ -12,6 +12,8 @@ describe('vigencia y línea de crédito (dominio)', () => {
     expect(estadoLineaCredito({ enMora: true, disponible: '500.00' })).toBe('EN_MORA');
     expect(estadoLineaCredito({ enMora: false, disponible: '0.00' })).toBe('SIN_DISPONIBLE');
     expect(estadoLineaCredito({ enMora: false, disponible: '0.01' })).toBe('AL_DIA');
+    expect(estadoLineaCredito({ enMora: true, disponible: '0.00', suspendida: true })).toBe('SUSPENDIDA');
+    expect(estadoLineaCredito({ enMora: false, disponible: '0.01', suspendida: null })).toBe('AL_DIA');
   });
 
   it('el despachador no ve la línea de crédito', () => {

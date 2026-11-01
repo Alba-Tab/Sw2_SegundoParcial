@@ -121,6 +121,30 @@ export interface LineaCredito {
   disponible: Monto;
   /** Tiene al menos una factura con saldo vencida hace más de 7 días (D04). */
   enMora: boolean;
+  /** Suspendida por administración o gerente; el paso 2 de la saga rechaza nuevas reservas (spec 012). */
+  suspendida: boolean;
+}
+
+export interface ListaLineasCredito {
+  items: LineaCredito[];
+}
+
+export interface AjusteLineaCredito {
+  limite: Monto;
+  /**
+   * @minLength 3
+   * @maxLength 300
+   */
+  motivo: string;
+}
+
+export interface EstadoLineaCreditoNuevo {
+  suspendida: boolean;
+  /**
+   * @minLength 3
+   * @maxLength 300
+   */
+  motivo: string;
 }
 
 export type EstadoSolicitud = (typeof EstadoSolicitud)[keyof typeof EstadoSolicitud];
@@ -343,6 +367,15 @@ export type ListarCotizacionesParams = {
    * @maxLength 500
    */
   cursor?: string;
+};
+
+export type ListarLineasCreditoParams = {
+  /**
+   * UUIDs separados por coma.
+   * @minItems 1
+   * @maxItems 100
+   */
+  clienteIds: Uuid[];
 };
 
 export type ListarSolicitudesAprobacionParams = {
@@ -864,6 +897,115 @@ export function useObtenerCotizacion<TData = Awaited<ReturnType<typeof obtenerCo
   return withQueryKey(query, queryOptions.queryKey);
 }
 
+export const getListarLineasCreditoUrl = (params: ListarLineasCreditoParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/lineas-credito?${stringifiedParams}` : `/api/v1/lineas-credito`;
+};
+
+/**
+ * Un cliente sin línea no sale en `items` (no es error). Sin cursor; como máximo 100 ids por llamada.
+ * @summary Las líneas de varios clientes en una llamada (administracion, comercial, gerente). La usa el DataLoader del Gateway.
+ */
+export const listarLineasCredito = async (
+  params: ListarLineasCreditoParams,
+  options?: Parameters<typeof pedirFinanzas>[1],
+): Promise<ListaLineasCredito> => {
+  return pedirFinanzas<ListaLineasCredito>(getListarLineasCreditoUrl(params), {
+    ...options,
+    method: 'GET',
+  });
+};
+
+export const getListarLineasCreditoQueryKey = (params?: ListarLineasCreditoParams) => {
+  return [`/api/v1/lineas-credito`, ...(params ? [params] : [])] as const;
+};
+
+export const getListarLineasCreditoQueryOptions = <TData = Awaited<ReturnType<typeof listarLineasCredito>>, TError = Problema>(
+  params: ListarLineasCreditoParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarLineasCredito>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListarLineasCreditoQueryKey(params);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listarLineasCredito>>> = ({ signal }) =>
+    listarLineasCredito(params, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<Awaited<ReturnType<typeof listarLineasCredito>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type ListarLineasCreditoQueryResult = NonNullable<Awaited<ReturnType<typeof listarLineasCredito>>>;
+export type ListarLineasCreditoQueryError = Problema;
+
+export function useListarLineasCredito<TData = Awaited<ReturnType<typeof listarLineasCredito>>, TError = Problema>(
+  params: ListarLineasCreditoParams,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarLineasCredito>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<Awaited<ReturnType<typeof listarLineasCredito>>, TError, Awaited<ReturnType<typeof listarLineasCredito>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListarLineasCredito<TData = Awaited<ReturnType<typeof listarLineasCredito>>, TError = Problema>(
+  params: ListarLineasCreditoParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarLineasCredito>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof listarLineasCredito>>,
+          TError,
+          Awaited<ReturnType<typeof listarLineasCredito>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useListarLineasCredito<TData = Awaited<ReturnType<typeof listarLineasCredito>>, TError = Problema>(
+  params: ListarLineasCreditoParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarLineasCredito>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Las líneas de varios clientes en una llamada (administracion, comercial, gerente). La usa el DataLoader del Gateway.
+ */
+
+export function useListarLineasCredito<TData = Awaited<ReturnType<typeof listarLineasCredito>>, TError = Problema>(
+  params: ListarLineasCreditoParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarLineasCredito>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getListarLineasCreditoQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
 export const getObtenerMiLineaCreditoUrl = () => {
   return `/api/v1/lineas-credito/mia`;
 };
@@ -1050,6 +1192,254 @@ export function useObtenerLineaCredito<TData = Awaited<ReturnType<typeof obtener
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getObtenerLineaCreditoQueryOptions(clienteId, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getAjustarLineaCreditoUrl = (clienteId: Uuid) => {
+  return `/api/v1/lineas-credito/${clienteId}`;
+};
+
+/**
+ * La línea se bloquea con FOR UPDATE (000 §9). El límite nuevo no puede quedar por debajo de `reservado + utilizado`:
+ * si pasa, 409 LIMITE_MENOR_QUE_USADO con la extensión `usado` (Monto).
+ * @summary Administración o gerente cambia el límite de la línea (spec 012, G6). Queda en la auditoría.
+ */
+export const ajustarLineaCredito = async (
+  clienteId: Uuid,
+  ajusteLineaCredito: AjusteLineaCredito,
+  options?: Parameters<typeof pedirFinanzas>[1],
+): Promise<LineaCredito> => {
+  const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]));
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return pedirFinanzas<LineaCredito>(getAjustarLineaCreditoUrl(clienteId), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(ajusteLineaCredito),
+  });
+};
+
+export const getAjustarLineaCreditoQueryKey = (clienteId: Uuid, ajusteLineaCredito?: AjusteLineaCredito) => {
+  return ['PUT', `/api/v1/lineas-credito/${clienteId}`, ajusteLineaCredito] as const;
+};
+
+export const getAjustarLineaCreditoQueryOptions = <TData = Awaited<ReturnType<typeof ajustarLineaCredito>>, TError = Problema>(
+  clienteId: Uuid,
+  ajusteLineaCredito: AjusteLineaCredito,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof ajustarLineaCredito>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getAjustarLineaCreditoQueryKey(clienteId, ajusteLineaCredito);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof ajustarLineaCredito>>> = ({ signal }) =>
+    ajustarLineaCredito(clienteId, ajusteLineaCredito, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, enabled: clienteId !== null && clienteId !== undefined, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof ajustarLineaCredito>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type AjustarLineaCreditoQueryResult = NonNullable<Awaited<ReturnType<typeof ajustarLineaCredito>>>;
+export type AjustarLineaCreditoQueryError = Problema;
+
+export function useAjustarLineaCredito<TData = Awaited<ReturnType<typeof ajustarLineaCredito>>, TError = Problema>(
+  clienteId: Uuid,
+  ajusteLineaCredito: AjusteLineaCredito,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof ajustarLineaCredito>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<Awaited<ReturnType<typeof ajustarLineaCredito>>, TError, Awaited<ReturnType<typeof ajustarLineaCredito>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useAjustarLineaCredito<TData = Awaited<ReturnType<typeof ajustarLineaCredito>>, TError = Problema>(
+  clienteId: Uuid,
+  ajusteLineaCredito: AjusteLineaCredito,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof ajustarLineaCredito>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof ajustarLineaCredito>>,
+          TError,
+          Awaited<ReturnType<typeof ajustarLineaCredito>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useAjustarLineaCredito<TData = Awaited<ReturnType<typeof ajustarLineaCredito>>, TError = Problema>(
+  clienteId: Uuid,
+  ajusteLineaCredito: AjusteLineaCredito,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof ajustarLineaCredito>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Administración o gerente cambia el límite de la línea (spec 012, G6). Queda en la auditoría.
+ */
+
+export function useAjustarLineaCredito<TData = Awaited<ReturnType<typeof ajustarLineaCredito>>, TError = Problema>(
+  clienteId: Uuid,
+  ajusteLineaCredito: AjusteLineaCredito,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof ajustarLineaCredito>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getAjustarLineaCreditoQueryOptions(clienteId, ajusteLineaCredito, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getCambiarEstadoLineaCreditoUrl = (clienteId: Uuid) => {
+  return `/api/v1/lineas-credito/${clienteId}/estado`;
+};
+
+/**
+ * Con la línea suspendida, el paso 2 de la saga rechaza la reserva con CREDITO_RECHAZADO; lo ya reservado, facturado
+ * y pagado sigue su curso. Pedir el estado que ya tiene es 409 CONFLICTO_ESTADO.
+ * @summary Administración o gerente suspende o reactiva la línea (spec 012, G6). Queda en la auditoría.
+ */
+export const cambiarEstadoLineaCredito = async (
+  clienteId: Uuid,
+  estadoLineaCreditoNuevo: EstadoLineaCreditoNuevo,
+  options?: Parameters<typeof pedirFinanzas>[1],
+): Promise<LineaCredito> => {
+  const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]));
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return pedirFinanzas<LineaCredito>(getCambiarEstadoLineaCreditoUrl(clienteId), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(estadoLineaCreditoNuevo),
+  });
+};
+
+export const getCambiarEstadoLineaCreditoQueryKey = (clienteId: Uuid, estadoLineaCreditoNuevo?: EstadoLineaCreditoNuevo) => {
+  return ['POST', `/api/v1/lineas-credito/${clienteId}/estado`, estadoLineaCreditoNuevo] as const;
+};
+
+export const getCambiarEstadoLineaCreditoQueryOptions = <TData = Awaited<ReturnType<typeof cambiarEstadoLineaCredito>>, TError = Problema>(
+  clienteId: Uuid,
+  estadoLineaCreditoNuevo: EstadoLineaCreditoNuevo,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof cambiarEstadoLineaCredito>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getCambiarEstadoLineaCreditoQueryKey(clienteId, estadoLineaCreditoNuevo);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof cambiarEstadoLineaCredito>>> = ({ signal }) =>
+    cambiarEstadoLineaCredito(clienteId, estadoLineaCreditoNuevo, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, enabled: clienteId !== null && clienteId !== undefined, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof cambiarEstadoLineaCredito>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type CambiarEstadoLineaCreditoQueryResult = NonNullable<Awaited<ReturnType<typeof cambiarEstadoLineaCredito>>>;
+export type CambiarEstadoLineaCreditoQueryError = Problema;
+
+export function useCambiarEstadoLineaCredito<TData = Awaited<ReturnType<typeof cambiarEstadoLineaCredito>>, TError = Problema>(
+  clienteId: Uuid,
+  estadoLineaCreditoNuevo: EstadoLineaCreditoNuevo,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof cambiarEstadoLineaCredito>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<
+          Awaited<ReturnType<typeof cambiarEstadoLineaCredito>>,
+          TError,
+          Awaited<ReturnType<typeof cambiarEstadoLineaCredito>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useCambiarEstadoLineaCredito<TData = Awaited<ReturnType<typeof cambiarEstadoLineaCredito>>, TError = Problema>(
+  clienteId: Uuid,
+  estadoLineaCreditoNuevo: EstadoLineaCreditoNuevo,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof cambiarEstadoLineaCredito>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<
+          Awaited<ReturnType<typeof cambiarEstadoLineaCredito>>,
+          TError,
+          Awaited<ReturnType<typeof cambiarEstadoLineaCredito>>
+        >,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useCambiarEstadoLineaCredito<TData = Awaited<ReturnType<typeof cambiarEstadoLineaCredito>>, TError = Problema>(
+  clienteId: Uuid,
+  estadoLineaCreditoNuevo: EstadoLineaCreditoNuevo,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof cambiarEstadoLineaCredito>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Administración o gerente suspende o reactiva la línea (spec 012, G6). Queda en la auditoría.
+ */
+
+export function useCambiarEstadoLineaCredito<TData = Awaited<ReturnType<typeof cambiarEstadoLineaCredito>>, TError = Problema>(
+  clienteId: Uuid,
+  estadoLineaCreditoNuevo: EstadoLineaCreditoNuevo,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof cambiarEstadoLineaCredito>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirFinanzas>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getCambiarEstadoLineaCreditoQueryOptions(clienteId, estadoLineaCreditoNuevo, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 

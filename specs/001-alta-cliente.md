@@ -47,6 +47,7 @@ Un cliente nuevo se registra en el portal y completa los datos de su empresa; at
 | Auditoría | `creadoPor` y `canal` (`PORTAL` o `TELEFONO`) en la tabla `auditoria` de Viajes |
 | Línea por defecto | 30.000,00 BOB, creada por Finanzas solo con el primer `ClienteActualizado` (los siguientes actualizan la copia, no la línea) |
 | Orden de copias | Finanzas y Analítica descartan un `ClienteActualizado` con `versionAgregado` menor o igual al que ya tienen |
+| Edición desde el Centro de Control (D104) | `PUT /api/v1/clientes/{clienteId}` (comercial, gerente) cambia razón social, NIT y correo con las validaciones del alta y publica `ClienteActualizado`. El correo de la cuenta en Keycloak no cambia: sin llamadas a la Admin API (D103) |
 
 ## Estados que cambia
 

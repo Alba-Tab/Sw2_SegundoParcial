@@ -1,16 +1,23 @@
 import { inject, Injectable } from '@angular/core';
-import { conservarUltimoBueno } from 'ui-comun';
+import { AjustarLineaCreditoGQL, CambiarEstadoLineaCreditoGQL, LineasCreditoGQL } from '../../graphql/generado';
 
-/** La línea de crédito de cada cliente sale de Finanzas: si cae, se conserva la última leída (FB-1). */
-const LINEA_POR_CLIENTE = { clientes: { clave: 'clienteId', campos: ['lineaCredito'] } };
-import { LineasCreditoGQL } from '../../graphql/generado';
-
-/** Repositorio sobre Apollo de las líneas de crédito de todos los clientes (G6). */
+/** Repositorio sobre Apollo de las líneas de crédito de todos los clientes y su gestión (G6, spec 012). */
 @Injectable({ providedIn: 'root' })
 export class LineasRepositorio {
   private readonly gql = inject(LineasCreditoGQL);
+  private readonly ajustarGql = inject(AjustarLineaCreditoGQL);
+  private readonly estadoGql = inject(CambiarEstadoLineaCreditoGQL);
 
+  /** Devuelve el `QueryRef`: `recargar` hace `refetch` sobre él (V4-1). */
   observar(cadaMs: number) {
-    return this.gql.watch({ pollInterval: cadaMs }).valueChanges.pipe(conservarUltimoBueno(undefined, LINEA_POR_CLIENTE));
+    return this.gql.watch({ pollInterval: cadaMs });
+  }
+
+  ajustar(clienteId: string, limite: string, motivo: string, clave: string) {
+    return this.ajustarGql.mutate({ variables: { clienteId, limite, motivo, clave } });
+  }
+
+  cambiarEstado(clienteId: string, suspendida: boolean, motivo: string, clave: string) {
+    return this.estadoGql.mutate({ variables: { clienteId, suspendida, motivo, clave } });
   }
 }

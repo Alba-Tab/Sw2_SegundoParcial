@@ -56,7 +56,7 @@ El workflow termina con `{resultado: "CONFIRMADO", servicioId, viajeId}`.
 
 | Regla | Valor |
 |---|---|
-| Orden de validación del paso 2 | (1) cotización existe, es del cliente y está `VIGENTE` (si no: `COTIZACION_AJENA` o `COTIZACION_VENCIDA`); (2) `disponible = limite − reservado − utilizado ≥ monto` (si no: `CREDITO_INSUFICIENTE`); (3) mora o monto alto → `REQUIERE_APROBACION` |
+| Orden de validación del paso 2 | (1) cotización existe, es del cliente y está `VIGENTE` (si no: `COTIZACION_AJENA` o `COTIZACION_VENCIDA`); (2) la línea no está suspendida (si no: `CREDITO_RECHAZADO`, spec 012) y `disponible = limite − reservado − utilizado ≥ monto` (si no: `CREDITO_INSUFICIENTE`); (3) mora o monto alto → `REQUIERE_APROBACION` |
 | Mora | El cliente tiene al menos una factura con saldo > 0 vencida hace más de 7 días (D04) |
 | Monto alto | Más de 15.000,00 BOB (D05) |
 | Cliente sin copia en Finanzas | `CLIENTE_NO_REPLICADO`, **reintentable** dentro del `ScheduleToClose` de 30 min (D02) |

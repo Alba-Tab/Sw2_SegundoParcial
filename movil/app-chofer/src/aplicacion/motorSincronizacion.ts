@@ -1,6 +1,7 @@
 import { PUNTOS_POR_LOTE } from '../dominio/gps';
 import { inicioConfirmado, type Operacion, RETENCION_DESCARTADAS_MS, siguiente } from '../dominio/operacion';
 import { decidir, type Respuesta } from '../dominio/reintento';
+import { guardarViajesDelServidor } from './casosDeUso';
 import type { SubidaEvidencias } from './subidaEvidencias';
 import {
   type Api,
@@ -121,6 +122,20 @@ export class MotorSincronizacion {
         return;
       }
       this.cerrar(op, 'FALLIDA', 'CONFLICTO_ESTADO');
+      await this.descargarViajes(token);
+    }
+  }
+
+  /**
+   * Tras un 409 que no es una cancelación, el estado del servidor manda: se bajan los viajes como al abrir. Un inicio
+   * rechazado con el viaje ya en ruta sigue en ruta (y el GPS también); con el viaje todavía CONFIRMADO (otro viaje en
+   * ruta) se libera la marca y vuelve «Iniciar». Sin red queda como está: decide la próxima descarga.
+   */
+  private async descargarViajes(token: string): Promise<void> {
+    try {
+      guardarViajesDelServidor(this.viajes, this.cola, await this.api.misViajes(token));
+    } catch {
+      // se reintenta con la próxima descarga
     }
   }
 
@@ -166,11 +181,20 @@ export class MotorSincronizacion {
     }
   }
 
+  /**
+   * Un inicio, entrega o rechazo FALLIDA libera su marca local (D106): vuelve el botón y el chofer lo registra de nuevo
+   * con otra clave. Si el viaje ya no está en ruta, Viajes responde 409 otra vez y se muestra. Un inicio con 409
+   * CONFLICTO_ESTADO no la libera aquí: lo decide la descarga que sigue, según el estado del servidor.
+   */
   private cerrar(op: Operacion, estado: 'CONFIRMADA' | 'FALLIDA', codigo: string | null) {
     op.estado = estado;
     op.codigoError = codigo;
     op.cerradaEn = this.reloj.ahora().toISOString();
     this.cola.actualizar(op);
+    const conflictoDelInicio = op.tipo === 'INICIO' && codigo === 'CONFLICTO_ESTADO';
+    if (estado === 'FALLIDA' && !conflictoDelInicio && (op.tipo === 'INICIO' || op.tipo === 'ENTREGA' || op.tipo === 'RECHAZO')) {
+      this.viajes.liberarMarca(op.viajeId, op.tipo);
+    }
   }
 
   /**
