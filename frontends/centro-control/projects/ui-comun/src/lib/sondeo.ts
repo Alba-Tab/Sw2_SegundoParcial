@@ -1,5 +1,6 @@
 import { defer, map, type OperatorFunction } from 'rxjs';
-import { filasConError } from './errores';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { filasConError, servicioCaido } from './errores';
 
 /**
  * Campos de las filas de una lista raíz que otro servicio llena (`clientes[i].lineaCredito` sale de Finanzas): si ese
@@ -36,7 +37,8 @@ export type ConDatosAl<R> = R & { datosAl?: string };
 /**
  * Datos ya mostrados no desaparecen por un fallo (FB-1). Con `errorPolicy: 'all'`, un sondeo que falla (red, Gateway o
  * un servicio caído) emite el campo en `null` o sin `data`, y la tabla que ya tenía filas quedaba vacía. Este operador
- * repone cada campo raíz que llegó vacío con error desde la última respuesta sin errores y dice de cuándo es
+ * repone cada campo raíz que llegó vacío por uno de esos fallos (no por `NO_ENCONTRADO` ni `SIN_PERMISO`) desde la
+ * última respuesta sin errores y dice de cuándo es
  * (`datosAl`), para que `cc-aviso-servicios` lo muestre junto a «Reintentar». Una respuesta sin errores manda siempre.
  */
 export function conservarUltimoBueno<R extends { data?: unknown; error?: unknown }>(
@@ -57,8 +59,12 @@ export function conservarUltimoBueno<R extends { data?: unknown; error?: unknown
           if (!bueno) return r;
           const mezcla: Record<string, unknown> = { ...data };
           let repuesto = false;
+          // R1F-6: solo un fallo de red o del Gateway, o el servicio del campo caído. Con NO_ENCONTRADO o SIN_PERMISO
+          // el dato viejo ya no vale y no se muestra como si solo hubiera fallado la red.
+          const deRed = !CombinedGraphQLErrors.is(r.error);
           for (const [campo, valor] of Object.entries(bueno)) {
             if (mezcla[campo] !== null && mezcla[campo] !== undefined) continue;
+            if (!deRed && !servicioCaido(r.error, campo)) continue;
             mezcla[campo] = valor;
             repuesto = true;
           }

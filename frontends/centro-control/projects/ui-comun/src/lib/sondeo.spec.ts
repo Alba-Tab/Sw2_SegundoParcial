@@ -62,6 +62,21 @@ describe('conservarUltimoBueno (FB-1)', () => {
     expect(segundo.datosAl).toBe('2026-11-01T14:20:00Z');
   });
 
+  it('R1F-6: repone con el servicio del campo caído, pero no con NO_ENCONTRADO ni SIN_PERMISO', async () => {
+    const graphql = (codigo: string) =>
+      new CombinedGraphQLErrors({ errors: [{ message: codigo, path: ['viajes'], extensions: { codigo } }] });
+    const [, caido, borrado, sinPermiso] = await emitir(
+      { data: { viajes: ['A'] } },
+      { data: { viajes: null }, error: graphql('DEPENDENCIA_NO_DISPONIBLE') },
+      { data: { viajes: null }, error: graphql('NO_ENCONTRADO') },
+      { data: { viajes: null }, error: graphql('SIN_PERMISO') },
+    );
+    expect(caido.data?.viajes).toEqual(['A']);
+    expect(borrado.data?.viajes).toBeNull();
+    expect(borrado.datosAl).toBeUndefined();
+    expect(sinPermiso.data?.viajes).toBeNull();
+  });
+
   it('una respuesta sin errores manda, aunque traiga menos filas; sin datos previos, el fallo pasa tal cual', async () => {
     const [primero, , bueno] = await emitir({ error: 'caído' }, { data: { viajes: ['A'] } }, { data: { viajes: [] } });
     expect(primero).toEqual({ error: 'caído' });
