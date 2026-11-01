@@ -18,8 +18,16 @@ export interface NuevoMantenimiento {
   checklist: string;
 }
 
-/** D11: el aviso de mantenimiento es a los 10.000 km; aquí se marca desde los 9.000. */
+/** Regla C, D07 (spec 010): Flota pide mantenimiento a los 10.000 km desde el último o con el SOAT o la inspección
+ * técnica a 15 días o menos de vencer. */
+export const KM_MANTENIMIENTO = 10_000;
+export const DIAS_AVISO_MANTENIMIENTO = 15;
+
+/** Solo para marcar «cerca del mantenimiento» en la lista y la ficha: desde los 9.000 km. */
 export const AVISO_KM = 9000;
+
+/** Los documentos que cuenta la regla C, como se nombran dentro de una frase. */
+const DOCUMENTO_EN_FRASE: Record<string, string> = { SOAT: 'el SOAT', INSPECCION_TECNICA: 'la inspección técnica' };
 
 export const CHECKLIST_POR_DEFECTO = 'Aceite y filtros\nFrenos\nNeumáticos\nLuces';
 
@@ -69,8 +77,9 @@ export function urgenciaUnidad(u: Pick<Unidad, 'estado' | 'placa' | 'kmDesdeUlti
 }
 
 /**
- * NG-4: por qué la unidad no puede salir y quién lo resuelve, solo con lo que trae Flota (km frente a AVISO_KM y
- * documentos vencidos); sin ese dato, una frase genérica. null si la unidad no está detenida por mantenimiento.
+ * NG-4: por qué la unidad no puede salir y quién lo resuelve, con la misma regla C que aplica Flota (D07): km desde el
+ * último mantenimiento ≥ 10.000 y el SOAT o la inspección técnica que vencen en 15 días o menos. Nombra todas las causas
+ * que se cumplen; sin ninguna, una frase genérica. null si la unidad no está detenida por mantenimiento.
  */
 export function motivoBloqueo(
   u: Pick<DetalleUnidad, 'estado' | 'kmDesdeUltimoMantenimiento' | 'documentos'>,
@@ -82,10 +91,14 @@ export function motivoBloqueo(
   }
   if (u.estado !== 'MANTENIMIENTO_PENDIENTE') return null;
   const razones: string[] = [];
-  if (u.kmDesdeUltimoMantenimiento >= AVISO_KM)
+  if (u.kmDesdeUltimoMantenimiento >= KM_MANTENIMIENTO)
     razones.push(`lleva ${numero(u.kmDesdeUltimoMantenimiento)} km desde el último mantenimiento`);
-  const vencidos = u.documentos.filter((d) => vigencia(d.venceEl, hoy) === 'VENCIDO').map((d) => etiqueta('TipoDocumento', d.tipo).texto);
-  if (vencidos.length) razones.push(`${vencidos.length === 1 ? 'documento vencido' : 'documentos vencidos'}: ${vencidos.join(', ')}`);
+  for (const d of u.documentos) {
+    const v = vigencia(d.venceEl, hoy, DIAS_AVISO_MANTENIMIENTO);
+    if (!(d.tipo in DOCUMENTO_EN_FRASE) || v === 'VIGENTE') continue;
+    const [a, m, dia] = d.venceEl.split('-');
+    razones.push(`${DOCUMENTO_EN_FRASE[d.tipo]} ${v === 'VENCIDO' ? 'venció' : 'vence'} el ${dia}/${m}/${a}`);
+  }
   const porque = razones.length ? razones.join('; ') : 'tiene un mantenimiento pendiente';
   const quien = esJefeFlota ? 'Prográmalo con «Programar mantenimiento».' : 'Lo programa el jefe de flota.';
   return `No puede salir: ${porque}. ${quien}`;

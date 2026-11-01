@@ -88,7 +88,28 @@ describe('JV-1 y NG-4: lo que no puede salir', () => {
     );
     expect(motivoBloqueo(pendiente, true, hoy)).toContain('Prográmalo con «Programar mantenimiento».');
     const vencido = { ...base, estado: 'MANTENIMIENTO_PENDIENTE', documentos: [{ tipo: 'SOAT', venceEl: '2026-10-01' }] } as never;
-    expect(motivoBloqueo(vencido, false, hoy)).toBe('No puede salir: documento vencido: SOAT. Lo programa el jefe de flota.');
+    expect(motivoBloqueo(vencido, false, hoy)).toBe('No puede salir: el SOAT venció el 01/10/2026. Lo programa el jefe de flota.');
+    // R1F-1: regla C (D07). 9.500 km no basta; el SOAT a 10 días sí, y es lo que se nombra.
+    const soatCerca = {
+      ...base,
+      estado: 'MANTENIMIENTO_PENDIENTE',
+      kmDesdeUltimoMantenimiento: 9500,
+      documentos: [{ tipo: 'SOAT', venceEl: '2026-11-11' }],
+    } as never;
+    expect(motivoBloqueo(soatCerca, false, hoy)).toBe('No puede salir: el SOAT vence el 11/11/2026. Lo programa el jefe de flota.');
+    // Todas las causas que se cumplen; un documento a 20 días no cuenta.
+    const varias = {
+      ...base,
+      estado: 'MANTENIMIENTO_PENDIENTE',
+      kmDesdeUltimoMantenimiento: 10000,
+      documentos: [
+        { tipo: 'SOAT', venceEl: '2026-11-21' },
+        { tipo: 'INSPECCION_TECNICA', venceEl: '2026-10-20' },
+      ],
+    } as never;
+    expect(motivoBloqueo(varias, false, hoy)).toBe(
+      'No puede salir: lleva 10.000 km desde el último mantenimiento; la inspección técnica venció el 20/10/2026. Lo programa el jefe de flota.',
+    );
     // Sin km ni documentos que lo expliquen, no se inventa el motivo.
     expect(motivoBloqueo({ ...base, estado: 'MANTENIMIENTO_PENDIENTE' } as never, false, hoy)).toBe(
       'No puede salir: tiene un mantenimiento pendiente. Lo programa el jefe de flota.',
