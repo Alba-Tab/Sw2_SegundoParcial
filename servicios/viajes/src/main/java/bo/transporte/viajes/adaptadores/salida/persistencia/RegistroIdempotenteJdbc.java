@@ -14,6 +14,9 @@ import bo.transporte.viajes.aplicacion.viaje.ResultadoEntrega;
 import bo.transporte.viajes.aplicacion.viaje.ViajeVista;
 import bo.transporte.viajes.dominio.viaje.EventoConduccion;
 import bo.transporte.viajes.dominio.viaje.Hito;
+import java.sql.Timestamp;
+import java.time.Instant;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
@@ -113,5 +116,18 @@ class RegistroIdempotenteJdbc implements RegistroIdempotente {
         jdbc.sql("UPDATE operacion_idempotente SET estado = 'COMPLETADA', actualizada_en = now() WHERE clave = :clave")
                 .param("clave", clave)
                 .update();
+    }
+
+    @Override
+    public List<UUID> enProcesoAntesDe(String tipo, Instant limite, int maximo) {
+        return jdbc.sql("""
+                        SELECT clave FROM operacion_idempotente
+                        WHERE estado = 'EN_PROCESO' AND tipo_operacion = :tipo AND creada_en < :limite
+                        ORDER BY creada_en LIMIT :maximo""")
+                .param("tipo", tipo)
+                .param("limite", Timestamp.from(limite))
+                .param("maximo", maximo)
+                .query(UUID.class)
+                .list();
     }
 }

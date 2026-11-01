@@ -1,5 +1,7 @@
 package bo.transporte.viajes.aplicacion.puerto.salida;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,6 +26,9 @@ public interface RegistroIdempotente {
     void guardarEnProceso(UUID clave, String tipo, String hashCuerpo, int codigoHttp, Object respuesta);
 
     void completar(UUID clave);
+
+    /** Claves de {@code tipo} que siguen EN_PROCESO desde antes de {@code limite}, como mucho {@code maximo}. */
+    List<UUID> enProcesoAntesDe(String tipo, Instant limite, int maximo);
 
     class ClaveRepetida extends RuntimeException {
         public ClaveRepetida(UUID clave) {
