@@ -76,6 +76,20 @@ export type Cliente = ClienteNuevo & {
   creadoEn: Instante;
 };
 
+/**
+ * Lo que se edita desde el Centro de Control (G7); mismas reglas que en ClienteNuevo.
+ */
+export interface ClienteEdicion {
+  /**
+   * @minLength 3
+   * @maxLength 120
+   */
+  razonSocial: string;
+  /** @pattern ^[0-9]{5,20}$ */
+  nit: string;
+  correo: string;
+}
+
 export interface PaginaClientes {
   items: Cliente[];
   /** @nullable */
@@ -98,6 +112,49 @@ export interface Coordenadas {
 export interface Lugar {
   nombre: string;
   coordenadas: Coordenadas;
+}
+
+export interface LugarNuevo {
+  /**
+   * @minLength 2
+   * @maxLength 80
+   */
+  nombre: string;
+  coordenadas: Coordenadas;
+}
+
+export type RutaNuevaDestino = {
+  /**
+   * @minLength 2
+   * @maxLength 80
+   */
+  nombre: string;
+  coordenadas: Coordenadas;
+  /**
+   * Radio de la geocerca (D06).
+   * @minimum 50
+   * @maximum 5000
+   */
+  radioMetros: number;
+};
+
+/**
+ * Alta o edición de una ruta (G4). Los mismos límites que RutaActualizada.v1.
+ */
+export interface RutaNueva {
+  /**
+   * @minLength 3
+   * @maxLength 80
+   */
+  nombre: string;
+  origen: LugarNuevo;
+  destino: RutaNuevaDestino;
+  /**
+   * @maximum 5000
+   * @exclusiveMinimum 0
+   */
+  distanciaKm: number;
+  activa: boolean;
 }
 
 export type RutaDestino = Lugar & {
@@ -767,6 +824,13 @@ export type ListarClientesParams = {
    * @maxLength 500
    */
   cursor?: string;
+};
+
+export type ListarRutasParams = {
+  /**
+   * También las inactivas, para la gestión de rutas del Centro de Control (G4).
+   */
+  incluirInactivas?: boolean;
 };
 
 export type ListarServiciosParams = {
@@ -1475,33 +1539,166 @@ export function useObtenerCliente<TData = Awaited<ReturnType<typeof obtenerClien
   return withQueryKey(query, queryOptions.queryKey);
 }
 
-export const getListarRutasUrl = () => {
-  return `/api/v1/rutas`;
+export const getActualizarClienteUrl = (clienteId: string) => {
+  return `/api/v1/clientes/${clienteId}`;
 };
 
 /**
- * @summary Rutas activas (cualquier usuario autenticado). Spec 002.
+ * Mismas validaciones que el alta (spec 001); un NIT de otro cliente activo responde 409 `CONFLICTO_ESTADO`.
+ * Teléfono, dirección, canal y cuenta no cambian. En una transacción sube `versionAgregado`, audita y deja
+ * `ClienteActualizado` en el Outbox (Finanzas y Analítica actualizan su copia).
+ * @summary Edita razón social, NIT y correo desde el Centro de Control (comercial, gerente). G7, D104.
  */
-export const listarRutas = async (options?: Parameters<typeof pedirViajes>[1]): Promise<Ruta[]> => {
-  return pedirViajes<Ruta[]>(getListarRutasUrl(), {
+export const actualizarCliente = async (
+  clienteId: string,
+  clienteEdicion: ClienteEdicion,
+  options?: Parameters<typeof pedirViajes>[1],
+): Promise<Cliente> => {
+  const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]));
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return pedirViajes<Cliente>(getActualizarClienteUrl(clienteId), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(clienteEdicion),
+  });
+};
+
+export const getActualizarClienteQueryKey = (clienteId: string, clienteEdicion?: ClienteEdicion) => {
+  return ['PUT', `/api/v1/clientes/${clienteId}`, clienteEdicion] as const;
+};
+
+export const getActualizarClienteQueryOptions = <TData = Awaited<ReturnType<typeof actualizarCliente>>, TError = Problema>(
+  clienteId: string,
+  clienteEdicion: ClienteEdicion,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof actualizarCliente>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getActualizarClienteQueryKey(clienteId, clienteEdicion);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof actualizarCliente>>> = ({ signal }) =>
+    actualizarCliente(clienteId, clienteEdicion, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, enabled: clienteId !== null && clienteId !== undefined, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof actualizarCliente>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ActualizarClienteQueryResult = NonNullable<Awaited<ReturnType<typeof actualizarCliente>>>;
+export type ActualizarClienteQueryError = Problema;
+
+export function useActualizarCliente<TData = Awaited<ReturnType<typeof actualizarCliente>>, TError = Problema>(
+  clienteId: string,
+  clienteEdicion: ClienteEdicion,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof actualizarCliente>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<Awaited<ReturnType<typeof actualizarCliente>>, TError, Awaited<ReturnType<typeof actualizarCliente>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useActualizarCliente<TData = Awaited<ReturnType<typeof actualizarCliente>>, TError = Problema>(
+  clienteId: string,
+  clienteEdicion: ClienteEdicion,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof actualizarCliente>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<Awaited<ReturnType<typeof actualizarCliente>>, TError, Awaited<ReturnType<typeof actualizarCliente>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useActualizarCliente<TData = Awaited<ReturnType<typeof actualizarCliente>>, TError = Problema>(
+  clienteId: string,
+  clienteEdicion: ClienteEdicion,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof actualizarCliente>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Edita razón social, NIT y correo desde el Centro de Control (comercial, gerente). G7, D104.
+ */
+
+export function useActualizarCliente<TData = Awaited<ReturnType<typeof actualizarCliente>>, TError = Problema>(
+  clienteId: string,
+  clienteEdicion: ClienteEdicion,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof actualizarCliente>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getActualizarClienteQueryOptions(clienteId, clienteEdicion, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getListarRutasUrl = (params?: ListarRutasParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value));
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/api/v1/rutas?${stringifiedParams}` : `/api/v1/rutas`;
+};
+
+/**
+ * @summary Rutas activas (cualquier usuario autenticado), por nombre. Spec 002.
+ */
+export const listarRutas = async (params?: ListarRutasParams, options?: Parameters<typeof pedirViajes>[1]): Promise<Ruta[]> => {
+  return pedirViajes<Ruta[]>(getListarRutasUrl(params), {
     ...options,
     method: 'GET',
   });
 };
 
-export const getListarRutasQueryKey = () => {
-  return [`/api/v1/rutas`] as const;
+export const getListarRutasQueryKey = (params?: ListarRutasParams) => {
+  return [`/api/v1/rutas`, ...(params ? [params] : [])] as const;
 };
 
-export const getListarRutasQueryOptions = <TData = Awaited<ReturnType<typeof listarRutas>>, TError = Problema>(options?: {
-  query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarRutas>>, TError, TData>>;
-  request?: SecondParameter<typeof pedirViajes>;
-}) => {
+export const getListarRutasQueryOptions = <TData = Awaited<ReturnType<typeof listarRutas>>, TError = Problema>(
+  params?: ListarRutasParams,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarRutas>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getListarRutasQueryKey();
+  const queryKey = queryOptions?.queryKey ?? getListarRutasQueryKey(params);
 
-  const queryFn: QueryFunction<Awaited<ReturnType<typeof listarRutas>>> = ({ signal }) => listarRutas({ signal, ...requestOptions });
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof listarRutas>>> = ({ signal }) =>
+    listarRutas(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<Awaited<ReturnType<typeof listarRutas>>, TError, TData> & {
     queryKey: DataTag<QueryKey, TData, TError>;
@@ -1512,6 +1709,7 @@ export type ListarRutasQueryResult = NonNullable<Awaited<ReturnType<typeof lista
 export type ListarRutasQueryError = Problema;
 
 export function useListarRutas<TData = Awaited<ReturnType<typeof listarRutas>>, TError = Problema>(
+  params: undefined | ListarRutasParams,
   options: {
     query: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarRutas>>, TError, TData>> &
       Pick<
@@ -1523,6 +1721,7 @@ export function useListarRutas<TData = Awaited<ReturnType<typeof listarRutas>>, 
   queryClient?: QueryClient,
 ): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 export function useListarRutas<TData = Awaited<ReturnType<typeof listarRutas>>, TError = Problema>(
+  params?: ListarRutasParams,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarRutas>>, TError, TData>> &
       Pick<
@@ -1534,6 +1733,7 @@ export function useListarRutas<TData = Awaited<ReturnType<typeof listarRutas>>, 
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 export function useListarRutas<TData = Awaited<ReturnType<typeof listarRutas>>, TError = Problema>(
+  params?: ListarRutasParams,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarRutas>>, TError, TData>>;
     request?: SecondParameter<typeof pedirViajes>;
@@ -1541,17 +1741,121 @@ export function useListarRutas<TData = Awaited<ReturnType<typeof listarRutas>>, 
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 /**
- * @summary Rutas activas (cualquier usuario autenticado). Spec 002.
+ * @summary Rutas activas (cualquier usuario autenticado), por nombre. Spec 002.
  */
 
 export function useListarRutas<TData = Awaited<ReturnType<typeof listarRutas>>, TError = Problema>(
+  params?: ListarRutasParams,
   options?: {
     query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof listarRutas>>, TError, TData>>;
     request?: SecondParameter<typeof pedirViajes>;
   },
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
-  const queryOptions = getListarRutasQueryOptions(options);
+  const queryOptions = getListarRutasQueryOptions(params, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getCrearRutaUrl = () => {
+  return `/api/v1/rutas`;
+};
+
+/**
+ * En una transacción crea la ruta con `versionAgregado = 1`, audita y deja `RutaActualizada` en el Outbox
+ * (Finanzas y Analítica crean su copia). La distancia se guarda con un decimal.
+ * @summary Alta de una ruta (gerente, despachador). G4, D104.
+ */
+export const crearRuta = async (rutaNueva: RutaNueva, options?: Parameters<typeof pedirViajes>[1]): Promise<Ruta> => {
+  const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]));
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return pedirViajes<Ruta>(getCrearRutaUrl(), {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(rutaNueva),
+  });
+};
+
+export const getCrearRutaQueryKey = (rutaNueva?: RutaNueva) => {
+  return ['POST', `/api/v1/rutas`, rutaNueva] as const;
+};
+
+export const getCrearRutaQueryOptions = <TData = Awaited<ReturnType<typeof crearRuta>>, TError = Problema>(
+  rutaNueva: RutaNueva,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof crearRuta>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getCrearRutaQueryKey(rutaNueva);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof crearRuta>>> = ({ signal }) => crearRuta(rutaNueva, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<Awaited<ReturnType<typeof crearRuta>>, TError, TData> & {
+    queryKey: DataTag<QueryKey, TData, TError>;
+  };
+};
+
+export type CrearRutaQueryResult = NonNullable<Awaited<ReturnType<typeof crearRuta>>>;
+export type CrearRutaQueryError = Problema;
+
+export function useCrearRuta<TData = Awaited<ReturnType<typeof crearRuta>>, TError = Problema>(
+  rutaNueva: RutaNueva,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof crearRuta>>, TError, TData>> &
+      Pick<DefinedInitialDataOptions<Awaited<ReturnType<typeof crearRuta>>, TError, Awaited<ReturnType<typeof crearRuta>>>, 'initialData'>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useCrearRuta<TData = Awaited<ReturnType<typeof crearRuta>>, TError = Problema>(
+  rutaNueva: RutaNueva,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof crearRuta>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<Awaited<ReturnType<typeof crearRuta>>, TError, Awaited<ReturnType<typeof crearRuta>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useCrearRuta<TData = Awaited<ReturnType<typeof crearRuta>>, TError = Problema>(
+  rutaNueva: RutaNueva,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof crearRuta>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Alta de una ruta (gerente, despachador). G4, D104.
+ */
+
+export function useCrearRuta<TData = Awaited<ReturnType<typeof crearRuta>>, TError = Problema>(
+  rutaNueva: RutaNueva,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof crearRuta>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getCrearRutaQueryOptions(rutaNueva, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -1563,7 +1867,7 @@ export const getObtenerRutaUrl = (rutaId: Uuid) => {
 };
 
 /**
- * @summary Una ruta.
+ * @summary Una ruta, activa o no.
  */
 export const obtenerRuta = async (rutaId: Uuid, options?: Parameters<typeof pedirViajes>[1]): Promise<Ruta> => {
   return pedirViajes<Ruta>(getObtenerRutaUrl(rutaId), {
@@ -1633,7 +1937,7 @@ export function useObtenerRuta<TData = Awaited<ReturnType<typeof obtenerRuta>>, 
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 /**
- * @summary Una ruta.
+ * @summary Una ruta, activa o no.
  */
 
 export function useObtenerRuta<TData = Awaited<ReturnType<typeof obtenerRuta>>, TError = Problema>(
@@ -1645,6 +1949,120 @@ export function useObtenerRuta<TData = Awaited<ReturnType<typeof obtenerRuta>>, 
   queryClient?: QueryClient,
 ): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
   const queryOptions = getObtenerRutaQueryOptions(rutaId, options);
+
+  const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+
+  return withQueryKey(query, queryOptions.queryKey);
+}
+
+export const getActualizarRutaUrl = (rutaId: Uuid) => {
+  return `/api/v1/rutas/${rutaId}`;
+};
+
+/**
+ * Documento completo. En una transacción, con la fila bloqueada, sube `versionAgregado`, audita y deja
+ * `RutaActualizada` en el Outbox. Los viajes ya programados conservan la ruta; una ruta inactiva no se cotiza.
+ * @summary Edición de una ruta, también para activarla o desactivarla (gerente, despachador). G4, D104.
+ */
+export const actualizarRuta = async (rutaId: Uuid, rutaNueva: RutaNueva, options?: Parameters<typeof pedirViajes>[1]): Promise<Ruta> => {
+  const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]));
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+  return pedirViajes<Ruta>(getActualizarRutaUrl(rutaId), {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(rutaNueva),
+  });
+};
+
+export const getActualizarRutaQueryKey = (rutaId: Uuid, rutaNueva?: RutaNueva) => {
+  return ['PUT', `/api/v1/rutas/${rutaId}`, rutaNueva] as const;
+};
+
+export const getActualizarRutaQueryOptions = <TData = Awaited<ReturnType<typeof actualizarRuta>>, TError = Problema>(
+  rutaId: Uuid,
+  rutaNueva: RutaNueva,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof actualizarRuta>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getActualizarRutaQueryKey(rutaId, rutaNueva);
+
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof actualizarRuta>>> = ({ signal }) =>
+    actualizarRuta(rutaId, rutaNueva, { signal, ...requestOptions });
+
+  return { queryKey, queryFn, enabled: rutaId !== null && rutaId !== undefined, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof actualizarRuta>>,
+    TError,
+    TData
+  > & { queryKey: DataTag<QueryKey, TData, TError> };
+};
+
+export type ActualizarRutaQueryResult = NonNullable<Awaited<ReturnType<typeof actualizarRuta>>>;
+export type ActualizarRutaQueryError = Problema;
+
+export function useActualizarRuta<TData = Awaited<ReturnType<typeof actualizarRuta>>, TError = Problema>(
+  rutaId: Uuid,
+  rutaNueva: RutaNueva,
+  options: {
+    query: Partial<UseQueryOptions<Awaited<ReturnType<typeof actualizarRuta>>, TError, TData>> &
+      Pick<
+        DefinedInitialDataOptions<Awaited<ReturnType<typeof actualizarRuta>>, TError, Awaited<ReturnType<typeof actualizarRuta>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): DefinedUseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useActualizarRuta<TData = Awaited<ReturnType<typeof actualizarRuta>>, TError = Problema>(
+  rutaId: Uuid,
+  rutaNueva: RutaNueva,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof actualizarRuta>>, TError, TData>> &
+      Pick<
+        UndefinedInitialDataOptions<Awaited<ReturnType<typeof actualizarRuta>>, TError, Awaited<ReturnType<typeof actualizarRuta>>>,
+        'initialData'
+      >;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+export function useActualizarRuta<TData = Awaited<ReturnType<typeof actualizarRuta>>, TError = Problema>(
+  rutaId: Uuid,
+  rutaNueva: RutaNueva,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof actualizarRuta>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
+/**
+ * @summary Edición de una ruta, también para activarla o desactivarla (gerente, despachador). G4, D104.
+ */
+
+export function useActualizarRuta<TData = Awaited<ReturnType<typeof actualizarRuta>>, TError = Problema>(
+  rutaId: Uuid,
+  rutaNueva: RutaNueva,
+  options?: {
+    query?: Partial<UseQueryOptions<Awaited<ReturnType<typeof actualizarRuta>>, TError, TData>>;
+    request?: SecondParameter<typeof pedirViajes>;
+  },
+  queryClient?: QueryClient,
+): UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> } {
+  const queryOptions = getActualizarRutaQueryOptions(rutaId, rutaNueva, options);
 
   const query = useQuery(queryOptions, queryClient) as UseQueryResult<TData, TError> & { queryKey: DataTag<QueryKey, TData, TError> };
 
@@ -2213,6 +2631,7 @@ export const getListarViajesUrl = (params?: ListarViajesParams) => {
 };
 
 /**
+ * Del más reciente al más viejo (por `viajeId`, UUIDv7); el cursor sigue hacia los más viejos.
  * @summary Viajes con su última posición para el mapa en vivo (despachador, comercial, gerente, jefe_flota, agente_lectura). Spec 005.
  */
 export const listarViajes = async (params?: ListarViajesParams, options?: Parameters<typeof pedirViajes>[1]): Promise<PaginaViajes> => {
