@@ -55,3 +55,44 @@ describe('riesgo de retraso en el detalle del viaje (W3, B-1)', () => {
     expect(montar({ data: { viaje: { ...viaje, riesgo } } })).toContain('Riesgo de retraso: 80');
   });
 });
+
+describe('marcar resuelta una intervención (spec 011; R2F-2)', () => {
+  it('pide confirmar con un resumen antes de cancelar el viaje y solo envía al confirmar', async () => {
+    const resolverIntervencion = vi.fn(() => of({ data: {} }));
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        { provide: CONFIG_CENTRO, useValue: { app: 'cc-operaciones', urls: {} } as unknown as ConfigCentro },
+        { provide: Sesion, useValue: { roles: signal(['despachador']), tiene: (...r: string[]) => r.includes('despachador') } },
+        {
+          provide: ViajesRepositorio,
+          useValue: {
+            observarViaje: () => ({
+              valueChanges: of({ loading: false, data: { viaje: { ...viaje, estado: 'REQUIERE_INTERVENCION' } } }),
+              refetch: () => Promise.resolve(),
+            }),
+            resolverIntervencion,
+          },
+        },
+      ],
+    });
+    const f = TestBed.createComponent(ViajePagina);
+    f.componentRef.setInput('id', 'v1');
+    f.detectChanges();
+    TestBed.tick();
+    f.detectChanges();
+    const el = f.nativeElement as HTMLElement;
+    const boton = (texto: string) => [...el.querySelectorAll('button')].find((b) => b.textContent?.includes(texto))!;
+    f.componentInstance.texto.setValue('Liberado a mano en Finanzas');
+    boton('Marcar resuelto').click();
+    f.detectChanges();
+    expect(resolverIntervencion).not.toHaveBeenCalled();
+    expect(el.textContent).toContain(
+      'Se marca resuelto el viaje 4521KTR con la nota «Liberado a mano en Finanzas»: el viaje queda cancelado y las reservas se liberan solas cuando vuelva su servicio. No se puede deshacer.',
+    );
+    expect(f.componentInstance.texto.disabled).toBe(true);
+    boton('Sí, marcar resuelto').click();
+    await f.whenStable();
+    expect(resolverIntervencion).toHaveBeenCalledWith('v1', 'MARCAR_RESUELTO', 'Liberado a mano en Finanzas', expect.any(String));
+  });
+});

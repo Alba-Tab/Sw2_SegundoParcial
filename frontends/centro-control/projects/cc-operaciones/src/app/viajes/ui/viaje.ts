@@ -30,7 +30,6 @@ import {
   urlEnApp,
 } from 'ui-comun';
 import { RouterLink } from '@angular/router';
-import type { OpcionIntervencion } from '../../graphql/generado';
 import { colaDeOrigen } from '../domain/viaje';
 import { ViajeFachada } from '../viajes.fachada';
 
@@ -92,7 +91,7 @@ import { ViajeFachada } from '../viajes.fachada';
               <mat-hint>Opcional al aprobar; para rechazar, obligatorio. De 3 a 300 caracteres</mat-hint>
               <mat-error>{{ textoError(texto) }}</mat-error>
             </mat-form-field>
-            @if (!rechazando()) {
+            @if (!confirmando()) {
               <button mat-flat-button (click)="aprobar(id(), zonaEntrega)" [disabled]="enviando()" disabledInteractive>
                 <mat-icon>thumb_up</mat-icon>Aprobar entrega
               </button>
@@ -101,11 +100,11 @@ import { ViajeFachada } from '../viajes.fachada';
               </button>
             }
           </div>
-          @if (rechazando()) {
+          @if (confirmando() === 'rechazo') {
             <cc-confirmacion
               [resumen]="
-                'Se rechaza la entrega del viaje ' +
-                (v.placa ?? '') +
+                'Se rechaza la entrega del viaje' +
+                (v.placa ? ' ' + v.placa : '') +
                 ' con el motivo «' +
                 texto.value.trim() +
                 '»: no se factura al cliente. No se puede deshacer.'
@@ -132,23 +131,32 @@ import { ViajeFachada } from '../viajes.fachada';
               <mat-hint>Para marcar resuelto, obligatoria (3 a 500 caracteres); para reintentar, opcional</mat-hint>
               <mat-error>{{ textoError(texto) }}</mat-error>
             </mat-form-field>
-            <button
-              mat-flat-button
-              (click)="resolver(id(), 'REINTENTAR_COMPENSACION', zonaIntervencion)"
-              [disabled]="enviando()"
-              disabledInteractive
-            >
-              <mat-icon>replay</mat-icon>Reintentar la liberación
-            </button>
-            <button
-              mat-stroked-button
-              (click)="resolver(id(), 'MARCAR_RESUELTO', zonaIntervencion)"
-              [disabled]="enviando()"
-              disabledInteractive
-            >
-              <mat-icon>task_alt</mat-icon>Marcar resuelto
-            </button>
+            @if (!confirmando()) {
+              <button mat-flat-button (click)="reintentar(id(), zonaIntervencion)" [disabled]="enviando()" disabledInteractive>
+                <mat-icon>replay</mat-icon>Reintentar la liberación
+              </button>
+              <button mat-stroked-button id="pedir-resolucion" (click)="pedirResolucion(zonaIntervencion)" [disabled]="enviando()">
+                <mat-icon>task_alt</mat-icon>Marcar resuelto
+              </button>
+            }
           </div>
+          @if (confirmando() === 'resolucion') {
+            <!-- Spec 011, paso 6: marcar resuelto cancela el viaje (RESUELTO_MANUALMENTE); no se deshace (R2F-2). -->
+            <cc-confirmacion
+              [resumen]="
+                'Se marca resuelto el viaje' +
+                (v.placa ? ' ' + v.placa : '') +
+                ' con la nota «' +
+                texto.value.trim() +
+                '»: el viaje queda cancelado y las reservas se liberan solas cuando vuelva su servicio. No se puede deshacer.'
+              "
+              accion="Sí, marcar resuelto"
+              icono="task_alt"
+              [enviando]="enviando()"
+              (confirmar)="marcarResuelto(id(), zonaIntervencion)"
+              (volver)="volver()"
+            />
+          }
         </section>
       }
 
@@ -325,8 +333,11 @@ export class ViajePagina {
   readonly campos = { viaje: 'Viajes', unidad: { servicio: 'Flota', que: 'los datos de la unidad' }, riesgo: '' };
   readonly cargandoDe = cargandoDe;
   readonly textoError = textoError;
-  /** Rechazar la entrega no se deshace: se confirma con un resumen. */
-  readonly rechazando = signal(false);
+  /**
+   * Rechazar la entrega y marcar resuelta la intervención no se deshacen: se confirman con un resumen (R2F-2). Aprobar
+   * la entrega no se confirma, igual que las demás aprobaciones: es el desenlace esperado de la revisión.
+   */
+  readonly confirmando = signal<'rechazo' | 'resolucion' | null>(null);
   readonly texto = new FormControl('', { nonNullable: true, validators: [largoEntre(0, 500)] });
   readonly recargar = () => this.fachada.recargar();
 
@@ -348,30 +359,49 @@ export class ViajePagina {
     const nota = this.texto.value.trim() || undefined;
     return this.enviar(() => this.fachada.aprobarEntrega(viajeId, nota), 'Entrega aprobada: se factura');
   }
-  /** Con el motivo válido, pide confirmar con el campo bloqueado: no se puede borrar después (E-4). */
+  /** Con el texto válido, pide confirmar con el campo bloqueado: no se puede borrar después (E-4). */
   pedirRechazo(zona: HTMLElement): void {
-    if (!this.valida(true, zona)) return;
-    this.texto.disable();
-    this.rechazando.set(true);
+    this.pedir('rechazo', zona);
   }
-  /** "No, volver" o un envío fallido: el campo se desbloquea y el foco vuelve a "Rechazar" (E-3). */
+  pedirResolucion(zona: HTMLElement): void {
+    this.pedir('resolucion', zona);
+  }
+  private pedir(tipo: 'rechazo' | 'resolucion', zona: HTMLElement): void {
+    if (!this.valida(true, zona, tipo === 'resolucion' ? 500 : 300)) return;
+    this.texto.disable();
+    this.confirmando.set(tipo);
+  }
+  /** "No, volver" o un envío fallido: el campo se desbloquea y el foco vuelve al botón que pidió confirmar (E-3). */
   volver(): void {
+    const tipo = this.confirmando();
     this.texto.enable();
-    this.rechazando.set(false);
-    enfocar('pedir-rechazo');
+    this.confirmando.set(null);
+    enfocar(tipo === 'resolucion' ? 'pedir-resolucion' : 'pedir-rechazo');
+  }
+  /** El texto confirmado, revalidado con el campo habilitado; si ya no vale, vuelve al formulario. */
+  private confirmado(zona: HTMLElement, max: number): string | null {
+    this.texto.enable();
+    if (!this.valida(true, zona, max)) {
+      this.volver();
+      return null;
+    }
+    this.texto.disable();
+    return this.texto.value.trim();
   }
   rechazar(viajeId: string, zona: HTMLElement) {
-    this.texto.enable();
-    if (!this.valida(true, zona)) return this.volver();
-    const motivo = this.texto.value.trim();
-    this.texto.disable();
+    const motivo = this.confirmado(zona, 300);
+    if (motivo === null) return;
     return this.enviar(() => this.fachada.rechazarEntrega(viajeId, motivo), 'Entrega rechazada');
   }
-  resolver(viajeId: string, opcion: OpcionIntervencion, zona: HTMLElement) {
-    if (this.enviando()) return;
-    if (!this.valida(opcion === 'MARCAR_RESUELTO', zona, opcion === 'MARCAR_RESUELTO' ? 500 : 300)) return;
+  reintentar(viajeId: string, zona: HTMLElement) {
+    if (this.enviando() || !this.valida(false, zona)) return;
     const nota = this.texto.value.trim() || undefined;
-    return this.enviar(() => this.fachada.resolverIntervencion(viajeId, opcion, nota), 'Intervención enviada');
+    return this.enviar(() => this.fachada.resolverIntervencion(viajeId, 'REINTENTAR_COMPENSACION', nota), 'Intervención enviada');
+  }
+  marcarResuelto(viajeId: string, zona: HTMLElement) {
+    const nota = this.confirmado(zona, 500);
+    if (nota === null) return;
+    return this.enviar(() => this.fachada.resolverIntervencion(viajeId, 'MARCAR_RESUELTO', nota), 'Viaje marcado resuelto');
   }
 
   private async enviar(accion: () => Promise<unknown>, ok: string): Promise<void> {
@@ -382,13 +412,13 @@ export class ViajePagina {
       await accion();
       this.texto.enable();
       this.texto.reset();
-      this.rechazando.set(false);
+      this.confirmando.set(null);
       this.avisos.open(ok, undefined, { duration: 4000 });
       await this.fachada.recargar();
       // La decisión cambia el estado y su sección desaparece con el botón: el foco va al título del viaje (E-3).
       enfocarTitulo();
     } catch (e) {
-      if (this.rechazando()) this.volver();
+      if (this.confirmando()) this.volver();
       this.avisos.open(mensajeDe(e), 'Cerrar');
     } finally {
       this.enviando.set(false);
