@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
@@ -8,6 +9,7 @@ import {
   AvisoServicios,
   BobPipe,
   columnasConEstado,
+  CONFIG_CENTRO,
   controlLista,
   Encabezado,
   Estado,
@@ -18,6 +20,8 @@ import {
   LIMITE_GATEWAY,
   PieLista,
   posicionEstado,
+  Sesion,
+  urlEnApp,
 } from 'ui-comun';
 import { ClientesFachada } from '../clientes.fachada';
 import { textoCliente, type FilaCliente } from '../domain/cliente';
@@ -28,6 +32,7 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
   providers: [ClientesFachada],
   imports: [
     Encabezado,
+    MatButtonModule,
     MatIconModule,
     MatTableModule,
     MatSortModule,
@@ -40,7 +45,12 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
     PieLista,
   ],
   template: `
-    <cc-encabezado titulo="Clientes" />
+    <cc-encabezado titulo="Clientes">
+      <!-- FL-2: el crédito se administra en Finanzas; aquí solo se resume. -->
+      @if (verCredito && urlLineas; as url) {
+        <a mat-button [href]="url"><mat-icon>open_in_new</mat-icon>Líneas de crédito en Finanzas</a>
+      }
+    </cc-encabezado>
     <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!clientes().length" />
     @if (verCredito) {
       <cc-filtros-lista
@@ -132,6 +142,7 @@ export class ClientesPagina {
   readonly campos = { clientes: 'Viajes', lineaCredito: 'Finanzas' };
   readonly columnas = columnasConEstado(['razonSocial', 'nit', 'correo', 'canal', ...(this.verCredito ? ['disponible', 'estado'] : [])]);
   readonly estadoLinea = estadoLineaCredito;
+  readonly urlLineas = urlEnApp(inject(CONFIG_CENTRO), inject(Sesion).roles(), 'cc-finanzas', '/lineas-credito');
   readonly lista = controlLista<FilaCliente>({
     filas: this.clientes,
     texto: textoCliente,

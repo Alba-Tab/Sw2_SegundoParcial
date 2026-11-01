@@ -15,6 +15,7 @@ import {
   FechaPipe,
   LIMITE_GATEWAY,
   Sesion,
+  urlEnApp,
 } from 'ui-comun';
 import { ClienteFachada } from '../clientes.fachada';
 import { nombreRuta } from '../domain/cliente';
@@ -72,28 +73,24 @@ import { nombreRuta } from '../domain/cliente';
       @if (verCredito) {
         <h2>Línea de crédito</h2>
         @if (linea(); as l) {
+          <!-- FL-2: la línea es de Finanzas; aquí se resume y se enlaza a la dueña del dato. -->
           <dl class="datos">
             <div>
               <dt>Estado</dt>
               <dd><cc-estado grupo="EstadoLineaCredito" [valor]="estadoLinea(l)" /></dd>
             </div>
             <div>
-              <dt>Límite</dt>
-              <dd>{{ l.limite | bob }}</dd>
-            </div>
-            <div>
-              <dt>Reservado</dt>
-              <dd>{{ l.reservado | bob }}</dd>
-            </div>
-            <div>
-              <dt>Utilizado</dt>
-              <dd>{{ l.utilizado | bob }}</dd>
-            </div>
-            <div>
               <dt>Disponible</dt>
-              <dd>{{ l.disponible | bob }}</dd>
+              <dd>
+                {{ l.disponible | bob }} <span class="secundario">de {{ l.limite | bob }}</span>
+              </dd>
             </div>
           </dl>
+          @if (urlLinea(c); as url) {
+            <a mat-button [href]="url"><mat-icon>open_in_new</mat-icon>Ver la línea en Finanzas</a>
+          } @else {
+            <p class="secundario">El detalle de la línea (reservado y utilizado) lo lleva Finanzas.</p>
+          }
         } @else if (!error()) {
           <p class="secundario">El cliente no tiene línea de crédito.</p>
         }
@@ -178,6 +175,12 @@ export class ClientePagina {
   };
   readonly columnas = ['fecha', 'estado', 'carga', 'placa', ...(this.fachada.verMonto ? ['monto'] : [])];
   readonly estadoLinea = estadoLineaCredito;
+
+  /** La línea en Finanzas, buscada por NIT (o razón social), si el rol abre Finanzas (FL-2). */
+  urlLinea(c: { nit?: string | null; razonSocial: string }): string | null {
+    const q = encodeURIComponent(c.nit ?? c.razonSocial);
+    return urlEnApp(this.config, this.sesion.roles(), 'cc-finanzas', `/lineas-credito?q=${q}`);
+  }
 
   constructor() {
     effect(() => this.fachada.id.set(this.id()));
