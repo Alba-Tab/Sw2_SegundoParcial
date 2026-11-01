@@ -200,3 +200,14 @@ Revisado y aprobado con cambios por un agente revisor el 01-11-2026. **Ningún c
 - No se vio con sesión de despachador, jefe de flota, administración ni cliente; FB-3 no se pudo ver en pantalla (el panel del navegador estaba oculto), solo que el HTML servido lo trae.
 - JV-4 (pestañas estiradas) sigue para la vuelta C: a 1280 px las 6 pestañas de Operaciones se ven anchas.
 - ICONIX (anotar): pestañas de Operaciones reagrupadas (Viajes con su vista de mapa y Decisiones).
+
+## 9. Para ICONIX
+
+Lo que cambió en la estructura y hay que anotar en la documentación ICONIX. No se editan los `.docx` ni los `.eap`: esta lista es para quien la actualice.
+
+| Qué | Dónde en ICONIX | Qué anotar |
+|---|---|---|
+| Rol `interno` (PB-1) | Modelo de seguridad y diagrama de actores | Rol de realm sin permisos propios, hijo compuesto de `gerente`, `despachador`, `jefe_flota`, `administracion` y `chofer`. El cliente `portal-cliente` solo lo pone en el token (`scopeMappings`), nunca los roles internos. Un usuario interno que abre el portal no es el actor Cliente: ve «Cuenta interna» y Viajes rechaza su alta de cliente (`SIN_ALTA`, 403 `SIN_PERMISO`). Se anota cuando PB-1 llegue a `develop` (rama `fix/plataforma/rol-interno-portal`); en el portal ya está en `ROLES_INTERNOS` |
+| Pestañas de Operaciones (FL-3) | Prototipos de pantalla y diagramas de robustez de Operaciones | Seis pestañas: Viajes (con las vistas Lista y Mapa en vivo, `/viajes/mapa`), Decisiones (Entregas observadas e Intervenciones, `/decisiones/...`), Servicios, Clientes, Rutas y Acciones del agente. Las rutas viejas (`/mapa`, `/entregas-observadas`, `/intervenciones`) redirigen; `/viajes/{id}` y `/acciones/{id}` no cambian. Regla: seis pestañas como máximo por app (DESIGN.md) |
+| Los tres estados de error | Cursos alternos de los casos de uso que leen datos (fichas y listas) y el objeto frontera `cc-aviso-servicios` | Servicio caído: dice qué no se pudo cargar, conserva lo ya mostrado con «Datos al …» y ofrece «Reintentar». No encontrado (`NO_ENCONTRADO` o id fuera de la lista): «No encontramos …» y solo «Volver». Sin permiso (`SIN_PERMISO` o ruta que el rol no abre): qué no puede hacer y quién sí. Además, «Datos al …» de Analítica pasa a aviso con más de 30 minutos sin datos nuevos |
+| Enlaces entre fichas (FL-1, FL-2) | Diagramas de robustez: navegación entre objetos frontera de distintas apps | La ficha del viaje enlaza cliente y ruta (Operaciones) y unidad (Flota); la factura del reporte de cobranza y la línea de crédito del cliente llevan a Finanzas; la placa de una anomalía de combustible, a Unidades. Entre apps solo por URL con `?desde=<app>`, y el destino ofrece «Volver a …». La línea de crédito y la cobranza tienen una sola dueña (Finanzas); Operaciones resume y enlaza. Pendiente de contrato: chofer del viaje y unidad de la anomalía (`pendientes-frontend-web.md` §5) |
