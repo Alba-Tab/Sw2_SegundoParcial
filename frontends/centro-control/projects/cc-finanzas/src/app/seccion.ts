@@ -27,7 +27,7 @@ import type { Icono } from 'ui-comun/dominio';
   `,
 })
 export class Seccion {
-  // TODO(G5): pestaña "Tarifas" cuando Finanzas y el Gateway la expongan; ver specs/pendientes-frontend-web.md, sección 5.
+  // TODO(G5): pestaña "Tarifas" cuando Finanzas y el Gateway la expongan; ver specs/pendientes.md, sección 1.
   readonly enlaces: { ruta: string; titulo: string; icono: Icono }[] = [
     { ruta: 'facturas', titulo: 'Facturas', icono: 'receipt_long' },
     { ruta: 'cobranza', titulo: 'Cuentas por cobrar', icono: 'account_balance_wallet' },
