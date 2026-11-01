@@ -120,8 +120,10 @@ class ViajeRepositorioJdbc implements ViajeRepositorio {
     public List<Viaje> listar(EstadoViaje estado, UUID despuesDe, int limite) {
         String sql = "SELECT " + COLUMNAS + " FROM viaje v WHERE v.placa IS NOT NULL"
                 + (estado == null ? "" : " AND v.estado = :estado")
-                + (despuesDe == null ? "" : " AND v.viaje_id > :despues")
-                + " ORDER BY v.viaje_id LIMIT :limite";
+                // Los más recientes primero (UUIDv7: por fecha de alta); el cursor es el último id, el más viejo de la
+                // página.
+                + (despuesDe == null ? "" : " AND v.viaje_id < :despues")
+                + " ORDER BY v.viaje_id DESC LIMIT :limite";
         var consulta = jdbc.sql(sql).param("limite", limite);
         if (estado != null) consulta = consulta.param("estado", estado.name());
         if (despuesDe != null) consulta = consulta.param("despues", despuesDe);

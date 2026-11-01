@@ -360,6 +360,7 @@ paths:
       tags: [viajes]
       operationId: listarViajes
       summary: Viajes con su última posición para el mapa en vivo (despachador, comercial, gerente, jefe_flota, agente_lectura). Spec 005.
+      description: Del más reciente al más viejo (por `viajeId`, UUIDv7); el cursor sigue hacia los más viejos.
       parameters:
         - name: estado
           in: query
