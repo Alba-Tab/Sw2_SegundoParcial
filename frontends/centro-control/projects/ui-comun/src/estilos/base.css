@@ -67,6 +67,10 @@ li {
 .no-disponible {
   color: var(--mat-sys-error);
 }
+/* En una fila flex con texto largo, el ícono no se encoge hasta quedar en un trazo (R1F-2). */
+.mat-icon {
+  flex-shrink: 0;
+}
 /* Ícono dentro de una línea de texto o de una celda (un número que pide mirarlo): del alto del texto. */
 .icono-en-linea {
   font-size: 18px;
