@@ -33,7 +33,7 @@ export function PaginaEmpresa() {
       />
     );
   }
-  if (mio.error) return <Problema error={mio.error} />;
+  if (mio.error) return <Problema error={mio.error} reintentar={mio.refetch} />;
   if (!mio.data.vinculado) return <Vinculacion />;
   if (sesion.necesitaEmpresa) return <Renovando />;
   return <DatosDeLaEmpresa cliente={mio.data} />;
@@ -83,7 +83,7 @@ function DatosDeLaEmpresa({ cliente }: { cliente: Cliente }) {
   ];
   return (
     <Paper variant="outlined" sx={{ p: 3, maxWidth: 560 }}>
-      <Typography variant="h5" component="h2" gutterBottom>
+      <Typography variant="h5" component="h1" gutterBottom>
         Mi empresa
       </Typography>
       <Stack component="dl" spacing={1} sx={{ m: 0 }}>

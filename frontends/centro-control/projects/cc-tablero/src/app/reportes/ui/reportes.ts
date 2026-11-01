@@ -1,63 +1,99 @@
-import { Component, computed, inject, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
-import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { AvisoServicios, mensajeDe, Sesion, TablaReporte, type Resultado } from 'ui-comun';
+import {
+  AvisoServicios,
+  Campo,
+  Encabezado,
+  errorPeriodo,
+  Esqueleto,
+  listoParaEnviar,
+  mensajeDe,
+  Sesion,
+  TablaReporte,
+  textoError,
+  type Resultado,
+} from 'ui-comun';
 import type { ReporteId, ReporteParams } from '../../graphql/generado';
 import { paramsLimpios, paramsPorDefecto, usaParametro } from '../domain/reporte';
 import { ReportesFachada } from '../reportes.fachada';
 
 /**
  * Los 5 reportes del catálogo con botones (spec 015): sin LLM ni MCP, `reporte(id, params)` va directo a Analítica.
- * "Exportar a Excel" pide un enlace HMAC al Gateway (D21) con una clave nueva por clic.
+ * "Exportar a Excel" pide un enlace HMAC al Gateway (D21) con una clave nueva por clic. La página abre con el primer
+ * reporte que el rol puede ver (el catálogo pone primero lo que pide acción: cobranza, riesgo), no con un lienzo vacío (JV-5).
  */
 @Component({
   selector: 'app-reportes',
   providers: [ReportesFachada],
   imports: [
-    FormsModule,
+    Encabezado,
+    ReactiveFormsModule,
+    Campo,
+    Esqueleto,
     MatCardModule,
     MatButtonModule,
     MatIconModule,
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
-    MatProgressBarModule,
     TablaReporte,
     AvisoServicios,
   ],
   template: `
-    <h1>Reportes</h1>
+    <cc-encabezado titulo="Reportes" />
     @if (cargandoCatalogo()) {
-      <mat-progress-bar mode="indeterminate" />
+      <cc-esqueleto [filas]="2" />
     }
-    <cc-aviso-servicios [error]="errorCatalogo()" [campos]="campos" [sinDatos]="!catalogo()?.catalogoReportes" />
+    <cc-aviso-servicios
+      [error]="errorCatalogo()"
+      [campos]="campos"
+      [sinDatos]="!catalogo()?.catalogoReportes"
+      [reintentar]="recargarCatalogo"
+    />
     <div class="catalogo">
       @for (r of permitidos(); track r.reporteId) {
-        <button mat-stroked-button [class.elegido]="r.reporteId === elegido()" (click)="elegir(r.reporteId)" [title]="r.descripcion">
+        <button
+          mat-stroked-button
+          [class.elegido]="r.reporteId === elegido()"
+          [attr.aria-pressed]="r.reporteId === elegido()"
+          (click)="elegir(r.reporteId)"
+          [title]="r.descripcion"
+        >
           {{ r.titulo }}
         </button>
       }
     </div>
+    @if (definicion(); as d) {
+      <p class="secundario">{{ d.descripcion }}</p>
+    }
     @if (elegido(); as id) {
       <mat-card class="parametros">
         <mat-card-content>
-          <div class="fila-acciones">
+          <form class="fila-acciones" [formGroup]="params" (ngSubmit)="ver(formParams)" #formParams novalidate>
             @if (definicion()?.maxDias) {
-              <mat-form-field><mat-label>Desde</mat-label><input matInput type="date" [(ngModel)]="params.desde" /></mat-form-field>
-              <mat-form-field><mat-label>Hasta</mat-label><input matInput type="date" [(ngModel)]="params.hasta" /></mat-form-field>
+              <mat-form-field>
+                <mat-label>Desde</mat-label>
+                <input matInput type="date" formControlName="desde" />
+                <mat-error>{{ textoError(params.controls.desde) }}</mat-error>
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Hasta</mat-label>
+                <input matInput type="date" formControlName="hasta" />
+                <mat-error>{{ textoError(params.controls.hasta) }}</mat-error>
+              </mat-form-field>
             }
             @if (usa('clienteId')) {
               <mat-form-field>
                 <mat-label>Cliente</mat-label>
-                <mat-select [(ngModel)]="params.clienteId">
-                  <mat-option [value]="undefined">Todos</mat-option>
+                <mat-select formControlName="clienteId">
+                  <mat-option [value]="null">Todos</mat-option>
                   @for (c of catalogo()?.clientes ?? []; track c.clienteId) {
                     <mat-option [value]="c.clienteId">{{ c.razonSocial }}</mat-option>
                   }
@@ -67,8 +103,8 @@ import { ReportesFachada } from '../reportes.fachada';
             @if (usa('rutaId')) {
               <mat-form-field>
                 <mat-label>Ruta</mat-label>
-                <mat-select [(ngModel)]="params.rutaId">
-                  <mat-option [value]="undefined">Todas</mat-option>
+                <mat-select formControlName="rutaId">
+                  <mat-option [value]="null">Todas</mat-option>
                   @for (r of catalogo()?.rutas ?? []; track r.rutaId) {
                     <mat-option [value]="r.rutaId">{{ r.nombre }}</mat-option>
                   }
@@ -76,36 +112,43 @@ import { ReportesFachada } from '../reportes.fachada';
               </mat-form-field>
             }
             @if (usa('placa')) {
-              <mat-form-field
-                ><mat-label>Placa</mat-label><input matInput [(ngModel)]="params.placa" placeholder="4521KTR"
-              /></mat-form-field>
+              <mat-form-field>
+                <mat-label>Placa</mat-label>
+                <input matInput formControlName="placa" placeholder="4521KTR" />
+              </mat-form-field>
             }
             @if (usa('umbral')) {
-              <mat-form-field
-                ><mat-label>Umbral</mat-label><input matInput type="number" min="0.5" max="0.95" step="0.05" [(ngModel)]="params.umbral"
-              /></mat-form-field>
+              <mat-form-field>
+                <mat-label>Umbral</mat-label>
+                <input matInput type="number" min="0.5" max="0.95" step="0.05" formControlName="umbral" />
+                <mat-hint>De 0,5 a 0,95</mat-hint>
+                <mat-error>{{ textoError(params.controls.umbral) }}</mat-error>
+              </mat-form-field>
             }
             @if (usa('agrupar')) {
               <mat-form-field>
                 <mat-label>Agrupar</mat-label>
-                <mat-select [(ngModel)]="params.agrupar"
+                <mat-select formControlName="agrupar"
                   ><mat-option value="VIAJE">Por viaje</mat-option><mat-option value="RUTA">Por ruta</mat-option></mat-select
                 >
               </mat-form-field>
             }
-            <button mat-flat-button (click)="ver()">Ver</button>
-            <button mat-stroked-button (click)="exportar()" [disabled]="!mostrado || exportando()">
-              <mat-icon>download</mat-icon> Exportar a Excel
-            </button>
-          </div>
+            <button mat-flat-button type="submit">Ver</button>
+            @if (mostrado) {
+              <button mat-stroked-button type="button" (click)="exportar()" [disabled]="exportando()">
+                <mat-icon>download</mat-icon>Exportar a Excel
+              </button>
+            }
+          </form>
         </mat-card-content>
       </mat-card>
     }
     @if (cargando()) {
-      <mat-progress-bar mode="indeterminate" />
+      <cc-esqueleto [filas]="6" />
     }
-    @if (error()) {
-      <p class="no-disponible">{{ error() }}</p>
+    @if (error(); as e) {
+      <p class="no-disponible" role="alert">{{ e }}</p>
+      <button mat-stroked-button (click)="ver()"><mat-icon>replay</mat-icon>Reintentar</button>
     }
     @if (resultado(); as r) {
       <h2>{{ r.titulo }}</h2>
@@ -133,6 +176,7 @@ export class ReportesPagina {
   private readonly sesion = inject(Sesion);
 
   readonly catalogo = this.fachada.catalogo;
+  readonly recargarCatalogo = () => this.fachada.recargarCatalogo();
   readonly errorCatalogo = this.fachada.errorCatalogo;
   readonly cargandoCatalogo = this.fachada.cargandoCatalogo;
   /** Quién responde cada campo del catálogo: los clientes y rutas vienen de Viajes. */
@@ -146,9 +190,30 @@ export class ReportesPagina {
   readonly cargando = signal(false);
   readonly exportando = signal(false);
   readonly error = signal<string | null>(null);
-  params: ReporteParams = {};
+  readonly textoError = textoError;
+  readonly params = new FormGroup({
+    desde: new FormControl<string | null>(null),
+    hasta: new FormControl<string | null>(
+      null,
+      (c) => errorPeriodo(c.parent?.get('desde')?.value, c.value, this.definicion()?.maxDias) ?? null,
+    ),
+    clienteId: new FormControl<string | null>(null),
+    rutaId: new FormControl<string | null>(null),
+    placa: new FormControl<string | null>(null),
+    umbral: new FormControl<number | null>(null, [Validators.min(0.5), Validators.max(0.95)]),
+    agrupar: new FormControl<string | null>(null),
+    /** Sin campo en pantalla: cuentas por cobrar siempre incluye lo vencido (NG-2), aunque se cambien las fechas. */
+    incluirVencidas: new FormControl<boolean | null>(null),
+  });
   /** El reporte y los parámetros del resultado que se ve: "Exportar" usa estos, no lo que se editó después sin "Ver". */
   mostrado: { id: ReporteId; params: ReporteParams } | null = null;
+
+  constructor() {
+    effect(() => {
+      const primero = this.permitidos()[0]?.reporteId;
+      if (primero && !untracked(this.elegido)) untracked(() => this.elegir(primero));
+    });
+  }
 
   usa(campo: string): boolean {
     return usaParametro(this.definicion()?.parametros, campo);
@@ -158,17 +223,26 @@ export class ReportesPagina {
     this.elegido.set(id);
     this.resultado.set(null);
     this.mostrado = null;
-    this.params = paramsPorDefecto(id);
+    const p = paramsPorDefecto(id);
+    this.params.reset({
+      desde: p.desde ?? null,
+      hasta: p.hasta ?? null,
+      umbral: p.umbral ?? null,
+      agrupar: p.agrupar ?? null,
+      incluirVencidas: p.incluirVencidas ?? null,
+    });
     void this.ver();
   }
 
-  async ver(): Promise<void> {
+  /** Con `raiz` (el formulario), un error marca los campos y enfoca el primero; sin ella, solo no consulta. */
+  async ver(raiz?: HTMLElement): Promise<void> {
     const id = this.elegido();
-    if (!id) return;
+    this.params.controls.hasta.updateValueAndValidity();
+    if (!id || (raiz ? !listoParaEnviar(this.params, raiz) : this.params.invalid)) return;
     this.cargando.set(true);
     this.error.set(null);
     try {
-      const params = paramsLimpios(this.params);
+      const params = paramsLimpios(this.params.getRawValue() as ReporteParams);
       const resultado = await this.fachada.consultar(id, params);
       this.resultado.set(resultado);
       this.mostrado = resultado ? { id, params } : null;
@@ -189,7 +263,7 @@ export class ReportesPagina {
       const url = await this.fachada.exportar(id, params);
       if (url) window.location.assign(url);
     } catch (e) {
-      this.avisos.open(mensajeDe(e), 'Cerrar', { duration: 6000 });
+      this.avisos.open(mensajeDe(e), 'Cerrar');
     } finally {
       this.exportando.set(false);
     }

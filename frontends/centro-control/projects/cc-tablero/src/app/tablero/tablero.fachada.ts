@@ -4,7 +4,7 @@ import { switchMap } from 'rxjs';
 import { servicioCaido, Sesion, sinPermiso } from 'ui-comun';
 import type { Periodo } from '../graphql/generado';
 import { TableroRepositorio } from './data/tablero.repositorio';
-import { bloquesVisibles, puedeAbrir, type EstadoTarjeta, type Pagina } from './domain/tablero';
+import { bloquesVisibles, type EstadoTarjeta } from './domain/tablero';
 
 /**
  * Fachada del tablero: el periodo es una señal y cada bloque se pide solo al rol que lo puede ver. Si un servicio cae,
@@ -26,9 +26,5 @@ export class TableroFachada {
     const error = this.datos()?.error;
     if (servicioCaido(error, campo)) return 'no-disponible';
     return sinPermiso(error, campo) ? 'sin-acceso' : null;
-  }
-
-  puedeAbrir(pagina: Pagina): boolean {
-    return puedeAbrir(this.sesion.roles(), pagina);
   }
 }

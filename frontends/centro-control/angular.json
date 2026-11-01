@@ -57,9 +57,7 @@
             "styles": [
               "@angular/material/prebuilt-themes/azure-blue.css",
               "node_modules/@transporte/design-tokens/generado/angular-material.css",
-              "node_modules/material-icons/iconfont/filled.css",
-              "projects/ui-comun/src/estilos/fuentes.css",
-              "projects/cc-tablero/src/styles.css"
+              "projects/ui-comun/src/estilos/base.css"
             ],
             "allowedCommonJsDependencies": [
               "leaflet"
@@ -159,10 +157,8 @@
             "styles": [
               "@angular/material/prebuilt-themes/azure-blue.css",
               "node_modules/@transporte/design-tokens/generado/angular-material.css",
-              "node_modules/material-icons/iconfont/filled.css",
-              "projects/ui-comun/src/estilos/fuentes.css",
               "node_modules/leaflet/dist/leaflet.css",
-              "projects/cc-operaciones/src/styles.css"
+              "projects/ui-comun/src/estilos/base.css"
             ],
             "allowedCommonJsDependencies": [
               "leaflet"
@@ -261,9 +257,7 @@
             "styles": [
               "@angular/material/prebuilt-themes/azure-blue.css",
               "node_modules/@transporte/design-tokens/generado/angular-material.css",
-              "node_modules/material-icons/iconfont/filled.css",
-              "projects/ui-comun/src/estilos/fuentes.css",
-              "projects/cc-flota/src/styles.css"
+              "projects/ui-comun/src/estilos/base.css"
             ],
             "allowedCommonJsDependencies": [
               "leaflet"
@@ -372,9 +366,7 @@
             "styles": [
               "@angular/material/prebuilt-themes/azure-blue.css",
               "node_modules/@transporte/design-tokens/generado/angular-material.css",
-              "node_modules/material-icons/iconfont/filled.css",
-              "projects/ui-comun/src/estilos/fuentes.css",
-              "projects/cc-finanzas/src/styles.css"
+              "projects/ui-comun/src/estilos/base.css"
             ],
             "allowedCommonJsDependencies": [
               "leaflet",

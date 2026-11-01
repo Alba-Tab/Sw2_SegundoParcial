@@ -1,6 +1,6 @@
-import { computed, inject, Injectable } from '@angular/core';
+import { computed, inject, Injectable, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { catchError, firstValueFrom, of } from 'rxjs';
+import { BehaviorSubject, catchError, firstValueFrom, of, Subject, switchMap, tap } from 'rxjs';
 import { completo, Intentos, Sesion, type Resultado } from 'ui-comun';
 import { puedeVer } from 'ui-comun/dominio';
 import type { CatalogoQuery, ReporteId } from '../graphql/generado';
@@ -33,16 +33,36 @@ export class ConsultaReportes {
  */
 @Injectable()
 export class ReportesFachada extends ConsultaReportes {
+  private readonly repoCatalogo = inject(ReportesRepositorio);
+  private readonly verClientes = puedeVer(inject(Sesion).roles(), 'clientes');
+  /** Cada "Reintentar" vuelve a pedir el catálogo (V2-9). */
+  private readonly intento = new BehaviorSubject<void>(undefined);
+  /** Avisa cada respuesta: `recargarCatalogo` resuelve con la próxima (V4-3). */
+  private readonly llegada = new Subject<void>();
+  /** Mientras se reintenta se muestra que carga, sin quitar el aviso anterior: su botón conserva el foco (V4-3). */
+  private readonly recargando = signal(false);
   private readonly respuesta = toSignal(
-    inject(ReportesRepositorio)
-      .catalogo(puedeVer(inject(Sesion).roles(), 'clientes'))
-      .pipe(catchError((error: unknown) => of({ data: undefined, error }))),
+    this.intento.pipe(
+      switchMap(() => this.repoCatalogo.catalogo(this.verClientes).pipe(catchError((error: unknown) => of({ data: undefined, error })))),
+      tap(() => {
+        this.recargando.set(false);
+        this.llegada.next();
+      }),
+    ),
   );
   readonly catalogo = computed(() => completo<CatalogoQuery>(this.respuesta()));
   readonly errorCatalogo = computed(() => this.respuesta()?.error);
-  readonly cargandoCatalogo = computed(() => this.respuesta() === undefined);
+  readonly cargandoCatalogo = computed(() => this.respuesta() === undefined || this.recargando());
 
   constructor() {
     super(inject(ReportesRepositorio));
+  }
+
+  /** Resuelve cuando llega la respuesta nueva: «Reintentar» se ve y se anuncia mientras tanto (V4-3). */
+  recargarCatalogo(): Promise<void> {
+    const proxima = firstValueFrom(this.llegada);
+    this.recargando.set(true);
+    this.intento.next();
+    return proxima;
   }
 }

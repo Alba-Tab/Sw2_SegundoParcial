@@ -7,12 +7,9 @@ export class CreditoRepositorio {
   private readonly solicitudesGql = inject(SolicitudesGQL);
   private readonly decidirGql = inject(AprobarCreditoGQL);
 
+  /** Devuelve el `QueryRef`: `recargar` hace `refetch` sobre él (V4-1). */
   observarSolicitudes(cadaMs: number) {
-    return this.solicitudesGql.watch({ pollInterval: cadaMs }).valueChanges;
-  }
-
-  recargarSolicitudes() {
-    return this.solicitudesGql.fetch();
+    return this.solicitudesGql.watch({ pollInterval: cadaMs });
   }
 
   decidir(servicioId: string, aprobado: boolean, motivo: string | undefined, clave: string) {

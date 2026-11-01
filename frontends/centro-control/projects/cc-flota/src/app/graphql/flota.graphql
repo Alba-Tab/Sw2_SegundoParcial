@@ -48,6 +48,62 @@ query Unidad($id: ID!) {
   }
 }
 
+# Todos los mantenimientos (G9): la lista filtra y ordena en el navegador.
+query Mantenimientos {
+  mantenimientos {
+    mantenimientoId
+    unidadId
+    placa
+    tipo
+    estado
+    fechaProgramada
+    taller
+    descripcion
+    cerradoEn
+  }
+}
+
+query Choferes {
+  choferes {
+    choferId
+    nombre
+    licenciaCategoria
+    licenciaVenceEl
+    activo
+    disponible
+  }
+}
+
+# No hay `chofer(id)` en el esquema: la ficha sale de la lista, con su puntaje de conducción y sus viajes.
+query Chofer($choferId: ID!) {
+  choferes {
+    choferId
+    nombre
+    licenciaCategoria
+    licenciaVenceEl
+    activo
+    disponible
+  }
+  puntajesConduccion(choferId: $choferId) {
+    desde
+    hasta
+    choferes {
+      choferId
+      frenadas
+      fatigas
+      km
+      puntaje
+    }
+    viajes {
+      viajeId
+      frenadas
+      fatigas
+      km
+      puntaje
+    }
+  }
+}
+
 query Combustible($desde: Fecha!) {
   anomaliasCombustible(desde: $desde) {
     cargaId
@@ -66,6 +122,10 @@ query Combustible($desde: Fecha!) {
     monto
     kilometraje
     registradaEn
+  } # 5b: la placa es única y no cambia (spec 010), así que basta para llegar a la ficha sin pedir unidadId a Analítica.
+  unidades {
+    unidadId
+    placa
   }
 }
 

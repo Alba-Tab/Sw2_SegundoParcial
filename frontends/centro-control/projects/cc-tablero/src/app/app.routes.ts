@@ -1,12 +1,14 @@
 import type { Routes } from '@angular/router';
-import { SinAcceso, soloInternos, soloRoles } from 'ui-comun';
+import { NoEncontrada, SinAcceso, soloInternos, soloRoles } from 'ui-comun';
 import { entrada } from './entrada';
+import { Seccion } from './seccion';
 import { ROLES_PAGINA } from './tablero/domain/tablero';
 
 export const rutas: Routes = [
-  { path: 'sin-acceso', component: SinAcceso },
+  { path: 'sin-acceso', component: SinAcceso, title: 'Sin acceso' },
   {
     path: '',
+    component: Seccion,
     canActivate: [soloInternos, entrada],
     children: [
       { path: '', loadComponent: () => import('./tablero/ui/tablero').then((m) => m.TableroPagina), title: 'Tablero' },
@@ -27,9 +29,9 @@ export const rutas: Routes = [
         path: 'agente',
         canActivate: [soloRoles(...ROLES_PAGINA.agente)],
         loadComponent: () => import('./agente/ui/agente').then((m) => m.AgentePagina),
-        title: 'Agente',
+        title: 'Agente «vigilar viajes»',
       },
     ],
   },
-  { path: '**', redirectTo: '' },
+  { path: '**', component: NoEncontrada, title: 'Página no encontrada' },
 ];

@@ -45,7 +45,7 @@ export function FormularioEmpresa({
     <Paper variant="outlined" sx={{ p: 3, maxWidth: 560 }}>
       <form onSubmit={handleSubmit((d) => enviar.mutate(d))} noValidate>
         <Stack spacing={2}>
-          <Typography variant="h5" component="h2">
+          <Typography variant="h5" component="h1">
             {titulo}
           </Typography>
           <Typography color="text.secondary">Con estos datos se emiten las facturas y se envían los avisos por correo.</Typography>

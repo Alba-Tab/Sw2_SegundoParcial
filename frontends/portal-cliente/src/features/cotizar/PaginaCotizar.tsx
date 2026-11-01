@@ -13,7 +13,7 @@ import { crearCotizacion, getObtenerCotizacionQueryKey } from '../../api/generad
 import { CrearCotizacionBody } from '../../api/generado/finanzas.zod';
 import { useListarRutas } from '../../api/generado/viajes';
 import { marcarCampos } from '../../compartido/formato/errores';
-import { diaDesdeHoy, TIPOS_CARGA } from '../../compartido/formato/formato';
+import { diaDesdeHoy, numero, TIPOS_CARGA } from '../../compartido/formato/formato';
 import { useClienteActivo } from '../../compartido/sesion/ClienteActivo';
 import { CampoTexto } from '../../compartido/ui/CampoTexto';
 import { Problema } from '../../compartido/ui/Problema';
@@ -61,17 +61,17 @@ export function PaginaCotizar() {
     <Paper variant="outlined" sx={{ p: 3, maxWidth: 560 }}>
       <form onSubmit={handleSubmit((datos) => cotizar.mutate({ datos, clave: crypto.randomUUID() }))} noValidate>
         <Stack spacing={2}>
-          <Typography variant="h5" component="h2">
+          <Typography variant="h5" component="h1">
             Cotizar un servicio
           </Typography>
           <CampoTexto control={control} nombre="rutaId" label="Ruta" select required disabled={!rutas.data}>
             {(rutas.data ?? []).map((r) => (
               <MenuItem key={r.rutaId} value={r.rutaId}>
-                {r.nombre} · {r.distanciaKm} km
+                {r.nombre} · {numero(r.distanciaKm, 0)} km
               </MenuItem>
             ))}
           </CampoTexto>
-          {rutas.isError && <Problema error={rutas.error} />}
+          {rutas.isError && <Problema error={rutas.error} reintentar={rutas.refetch} />}
           <CampoTexto control={control} nombre="tipoCarga" label="Tipo de carga" select required>
             {Object.entries(TIPOS_CARGA).map(([valor, texto]) => (
               <MenuItem key={valor} value={valor}>

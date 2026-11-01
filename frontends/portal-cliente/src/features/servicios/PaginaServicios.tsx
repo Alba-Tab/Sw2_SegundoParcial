@@ -1,5 +1,4 @@
 import Button from '@mui/material/Button';
-import CircularProgress from '@mui/material/CircularProgress';
 import Paper from '@mui/material/Paper';
 import Stack from '@mui/material/Stack';
 import Table from '@mui/material/Table';
@@ -13,12 +12,14 @@ import { useNavigate } from '@tanstack/react-router';
 import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
 import { useMemo } from 'react';
 import { getListarServiciosQueryKey, listarServicios, type Servicio, useListarRutas } from '../../api/generado/viajes';
-import { dinero, fecha, TIPOS_CARGA } from '../../compartido/formato/formato';
+import { dinero, fecha, numero, TIPOS_CARGA } from '../../compartido/formato/formato';
 import { Antiguedad } from '../../compartido/offline/Antiguedad';
 import { useClienteActivo } from '../../compartido/sesion/ClienteActivo';
 import { BotonEnlace } from '../../compartido/ui/BotonEnlace';
 import { EstadoServicio } from '../../compartido/ui/EstadoServicio';
+import { desdeEnlace, Enlace } from '../../compartido/ui/Enlace';
 import { Problema } from '../../compartido/ui/Problema';
+import { Cargando } from '../../compartido/ui/Cargando';
 
 const col = createColumnHelper<Servicio>();
 
@@ -38,11 +39,19 @@ export function PaginaServicios() {
   const nombreRuta = useMemo(() => new Map((rutas.data ?? []).map((r) => [r.rutaId, r.nombre])), [rutas.data]);
   const columnas = useMemo(
     () => [
-      col.accessor('creadoEn', { header: 'Pedido', cell: (c) => fecha(c.getValue().slice(0, 10)) }),
-      col.accessor('rutaId', { header: 'Ruta', cell: (c) => nombreRuta.get(c.getValue() ?? '') ?? '—' }),
-      col.accessor('tipoCarga', { header: 'Carga', cell: (c) => (c.getValue() ? TIPOS_CARGA[c.getValue()!] : '—') }),
-      col.accessor('toneladas', { header: 'Toneladas', cell: (c) => c.getValue() ?? '—' }),
-      col.accessor('monto', { header: 'Monto', cell: (c) => (c.getValue() ? dinero(c.getValue()!) : '—') }),
+      // La celda principal es el enlace al detalle: la fila clicable es solo un atajo del mouse (V3-1).
+      col.accessor('creadoEn', {
+        header: 'Pedido',
+        cell: (c) => (
+          <Enlace to="/servicios/$servicioId" params={{ servicioId: c.row.original.servicioId }}>
+            {fecha(c.getValue().slice(0, 10))}
+          </Enlace>
+        ),
+      }),
+      col.accessor('rutaId', { header: 'Ruta', cell: (c) => nombreRuta.get(c.getValue() ?? '') ?? 'Sin dato' }),
+      col.accessor('tipoCarga', { header: 'Carga', cell: (c) => (c.getValue() ? TIPOS_CARGA[c.getValue()!] : 'Sin dato') }),
+      col.accessor('toneladas', { header: 'Toneladas', cell: (c) => numero(c.getValue()) }),
+      col.accessor('monto', { header: 'Monto', cell: (c) => (c.getValue() ? dinero(c.getValue()!) : 'Sin dato') }),
       col.accessor('estado', { header: 'Estado', cell: (c) => <EstadoServicio estado={c.getValue()} etapa={c.row.original.etapa} /> }),
     ],
     [nombreRuta],
@@ -52,11 +61,11 @@ export function PaginaServicios() {
   // eslint-disable-next-line react-hooks/incompatible-library
   const tabla = useReactTable({ data: datos, columns: columnas, getCoreRowModel: getCoreRowModel() });
 
-  if (paginas.isPending) return paginas.fetchStatus === 'fetching' ? <CircularProgress aria-label="Cargando" /> : null;
-  if (paginas.isError && !paginas.data) return <Problema error={paginas.error} />;
+  if (paginas.isPending) return paginas.fetchStatus === 'fetching' ? <Cargando /> : null;
+  if (paginas.isError && !paginas.data) return <Problema error={paginas.error} reintentar={paginas.refetch} />;
   return (
     <Stack spacing={2}>
-      <Typography variant="h5" component="h2">
+      <Typography variant="h5" component="h1">
         Mis servicios
       </Typography>
       <Antiguedad actualizadoEn={paginas.dataUpdatedAt} fallo={paginas.isError} />
@@ -85,7 +94,9 @@ export function PaginaServicios() {
                   key={f.id}
                   hover
                   sx={{ cursor: 'pointer' }}
-                  onClick={() => void navegar({ to: '/servicios/$servicioId', params: { servicioId: f.original.servicioId } })}
+                  onClick={(e) => {
+                    if (!desdeEnlace(e)) void navegar({ to: '/servicios/$servicioId', params: { servicioId: f.original.servicioId } });
+                  }}
                 >
                   {f.getVisibleCells().map((c) => (
                     <TableCell key={c.id}>{flexRender(c.column.columnDef.cell, c.getContext())}</TableCell>

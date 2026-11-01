@@ -2,6 +2,7 @@ import CssBaseline from '@mui/material/CssBaseline';
 import { ThemeProvider, useColorScheme } from '@mui/material/styles';
 import type { Decorator, Preview } from '@storybook/react-vite';
 import { useEffect } from 'react';
+import '../src/compartido/tema/global.css';
 import { tema } from '../src/compartido/tema/tema';
 
 function Esquema({ modo, children }: { modo: 'light' | 'dark'; children: React.ReactNode }) {

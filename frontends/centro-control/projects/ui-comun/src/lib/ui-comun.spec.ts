@@ -1,10 +1,10 @@
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { avisosServicio } from './aviso-servicios';
 import { esperaReconexion } from './conexion';
-import { APPS_POR_ROL, DESTINO_POR_ROL } from './configuracion';
+import { APPS_POR_ROL, appsDeRoles, DESTINO_POR_ROL, urlEnApp } from './configuracion';
 import { codigoDe, mensajeDe, servicioCaido, sinPermiso } from './errores';
-import { aCentavos, fechaLaPaz, pct, puedeVer, sumarMontos } from 'ui-comun/dominio';
-import { BobPipe, FechaPipe } from './formato';
+import { aCentavos, datosViejos, fechaLaPaz, pct, puedeVer, quienesVen, sumarMontos } from 'ui-comun/dominio';
+import { BobPipe, FechaPipe, NumeroPipe } from './formato';
 import { reclamos } from './sesion';
 
 const jwt = (datos: object) => `x.${btoa(JSON.stringify(datos)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')}.y`;
@@ -32,6 +32,23 @@ describe('ui-comun', () => {
     expect(APPS_POR_ROL['cliente']).toBeUndefined();
   });
 
+  it('FL-1: enlaza la ficha de otra app con ?desde= solo si el rol abre esa app', () => {
+    const config = { app: 'cc-operaciones', urls: { 'cc-flota': 'http://f' } } as never;
+    expect(urlEnApp(config, ['gerente'], 'cc-flota', '/unidades/u1')).toBe('http://f/unidades/u1?desde=cc-operaciones');
+    expect(urlEnApp(config, ['despachador'], 'cc-flota', '/unidades/u1')).toBeNull();
+  });
+
+  it('R1F-4: /sin-acceso lleva a las apps que el rol sí abre, en el orden de la barra', () => {
+    expect(appsDeRoles(['jefe_flota'])).toEqual(['cc-tablero', 'cc-flota']);
+    expect(appsDeRoles(['comercial', 'administracion'])).toEqual(['cc-tablero', 'cc-operaciones', 'cc-finanzas']);
+    expect(appsDeRoles(['cliente'])).toEqual([]);
+  });
+
+  it('5a: quién ve un campo sale de ROLES_CAMPO, con nombres para personas', () => {
+    expect(quienesVen('cuentasPorCobrar')).toBe('gerencia y administración');
+    expect(quienesVen('unidadesPorEstado')).toBe('gerencia, despacho y jefatura de flota');
+  });
+
   it('respuesta parcial: detecta el campo del servicio caído y el código de un error', () => {
     const error = new CombinedGraphQLErrors({
       errors: [
@@ -42,7 +59,7 @@ describe('ui-comun', () => {
     expect(servicioCaido(error, 'unidadesPorEstado')).toBe(false);
     expect(sinPermiso(error, 'cuentasPorCobrar')).toBe(false);
     expect(codigoDe(error)).toBe('DEPENDENCIA_NO_DISPONIBLE');
-    expect(mensajeDe(error)).toBe('Finanzas no disponible');
+    expect(mensajeDe(error)).toBe('Un servicio no responde. Intenta de nuevo en unos segundos.');
   });
 
   it('un SIN_PERMISO del campo (rol sin acceso) no se confunde con un servicio caído', () => {
@@ -67,9 +84,17 @@ describe('ui-comun', () => {
   });
 
   it('formatea dinero como texto (nunca float en cálculos), fechas y porcentajes', () => {
-    expect(new BobPipe().transform('2800.00')).toBe('2.800,00 BOB');
-    expect(new BobPipe().transform(null)).toBe('—');
+    expect(new BobPipe().transform('2800.00')).toBe('2.800,00\u00a0BOB');
+    expect(new BobPipe().transform(null)).toBe('Sin dato');
     expect(new FechaPipe().transform('2026-11-03')).toBe('03/11/2026');
+    // Un instante sale en La Paz (UTC−4), en 24 h y sin "a. m.".
+    const ahora = new Date('2026-11-01T12:00:00Z');
+    expect(new FechaPipe().transform('2026-11-01T14:20:00Z', true, ahora)).toBe('01/11 10:20');
+    expect(new FechaPipe().transform('2026-11-01T02:05:00Z', true, ahora)).toBe('31/10 22:05');
+    // R1F-8: con hora y de otro año (en La Paz), lleva el año.
+    expect(new FechaPipe().transform('2025-12-31T14:20:00Z', true, ahora)).toBe('31/12/2025 10:20');
+    expect(new FechaPipe().transform('2026-01-01T02:00:00Z', true, ahora)).toBe('31/12/2025 22:00');
+    expect(new FechaPipe().transform('2026-11-01T02:05:00Z')).toBe('31/10/2026');
     expect(pct(0.857)).toBe('86 %');
   });
 
@@ -95,15 +120,51 @@ describe('ui-comun', () => {
       errors: [{ message: 'Tu rol no tiene acceso a este dato', path: ['viaje', 'monto'], extensions: { codigo: 'SIN_PERMISO' } }],
     });
     expect(avisosServicio(soloPermiso, campos)).toEqual([]);
-    expect(avisosServicio(new TypeError('Failed to fetch'), campos, true)).toEqual(['Failed to fetch']);
+    expect(avisosServicio(new TypeError('Failed to fetch'), campos, true)).toEqual([
+      'No se pudo hablar con el servidor. Revisa la conexión e intenta de nuevo.',
+    ]);
     expect(avisosServicio(undefined, campos, true)).toEqual([]);
+    // Un campo con nombre vacío lo explica su sección: ni su servicio ni "Viajes" (el padre del path) en el banner (V1-10).
+    const riesgo = new CombinedGraphQLErrors({
+      errors: [{ message: 'Analítica no disponible', path: ['viaje', 'riesgo'], extensions: { codigo: 'DEPENDENCIA_NO_DISPONIBLE' } }],
+    });
+    expect(avisosServicio(riesgo, { ...campos, riesgo: '' })).toEqual([]);
+    // FB-6: en una ficha se dice qué se buscaba, y qué servicio no responde.
+    expect(avisosServicio(parcial, { ...campos, unidad: { servicio: 'Flota', que: 'la unidad del viaje' } })).toEqual([
+      'No se pudieron cargar la unidad del viaje: Flota no responde.',
+    ]);
+  });
+
+  it('FB-7: «Datos al …» se marca con más de 30 minutos sin datos nuevos', () => {
+    const ahora = new Date('2026-11-01T14:30:00Z');
+    expect(datosViejos('2026-11-01T14:00:00Z', ahora)).toBe(false);
+    expect(datosViejos('2026-11-01T13:59:00Z', ahora)).toBe(true);
+    expect(datosViejos('2026-10-31T22:01:00Z', ahora)).toBe(true);
+    expect(datosViejos('2026-11-01T14:20:00Z', ahora, 5)).toBe(true);
+    expect(datosViejos(null, ahora)).toBe(false);
+    expect(datosViejos('no es fecha', ahora)).toBe(false);
+  });
+
+  it('NG-1: los números van con miles en punto y decimales en coma (es-BO), nunca "1,300"', () => {
+    const p = new NumeroPipe();
+    expect(p.transform(1300)).toBe('1.300');
+    expect(p.transform(1234567.891)).toBe('1.234.567,89');
+    expect(p.transform(12.34, 1)).toBe('12,3');
+    expect(p.transform(0.6, 2, 2)).toBe('0,60');
+    expect(p.transform('850')).toBe('850');
+    expect(p.transform(null)).toBe('Sin dato');
+    expect(p.transform('abc')).toBe('abc');
+    // R1F-5: solo espacios no es un cero, y un negativo que se redondea a cero no lleva signo.
+    expect(p.transform('  ')).toBe('Sin dato');
+    expect(p.transform(-0.001)).toBe('0');
+    expect(p.transform(-1.5)).toBe('-1,5');
   });
 
   it('dinero sin float: BobPipe no pasa por Number y las sumas van en centavos enteros', () => {
     // 2^53 + 1 centavos: con Number se perdería el último dígito.
-    expect(new BobPipe().transform('90071992547409.93')).toBe('90.071.992.547.409,93 BOB');
+    expect(new BobPipe().transform('90071992547409.93')).toBe('90.071.992.547.409,93\u00a0BOB');
     expect(new BobPipe().transform('-1250.5', false)).toBe('-1.250,50');
-    expect(new BobPipe().transform('0.00')).toBe('0,00 BOB');
+    expect(new BobPipe().transform('0.00')).toBe('0,00\u00a0BOB');
     expect(new BobPipe().transform('abc')).toBe('abc');
     expect(aCentavos('2800.005')).toBe(280001n); // HALF_UP al final
     expect(sumarMontos(['0.10', '0.20', null, 'x'])).toBe('0.30');

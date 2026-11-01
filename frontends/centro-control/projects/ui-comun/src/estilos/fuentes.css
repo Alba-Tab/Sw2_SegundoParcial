@@ -1,7 +1,7 @@
 /*
  * Roboto (variable, 100 a 900) servida desde el hosting de cada app, no desde Google Fonts: el tema de Material la pide
- * como "Roboto". Solo latín y latín extendido, que cubren el español. Los íconos salen de material-icons
- * (iconfont/filled.css en angular.json). El build copia los .woff2 a media/.
+ * como "Roboto". Solo latín y latín extendido, que cubren el español. Los íconos (Material Symbols) los importa base.css.
+ * El build copia los .woff2 a media/.
  */
 @font-face {
   font-family: Roboto;

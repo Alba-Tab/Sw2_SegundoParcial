@@ -1,7 +1,8 @@
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { type CanActivateFn, Router } from '@angular/router';
-import { CONFIG_CENTRO } from './configuracion';
+import { appsDeRoles, CONFIG_CENTRO, NOMBRES_APPS } from './configuracion';
 import { Sesion } from './sesion';
 
 /** Solo roles internos entran al Centro de Control (spec 016): cliente y chofer ven "Sin acceso" (FK1). */
@@ -18,13 +19,26 @@ export const soloRoles =
 
 @Component({
   selector: 'cc-sin-acceso',
-  imports: [MatButtonModule],
+  imports: [MatButtonModule, MatIconModule],
   template: `
     <section class="sin-acceso">
+      <!-- R2F-6: el ícono de «Sin permiso» de DESIGN.md (tabla de errores). -->
+      <mat-icon class="icono">lock_person</mat-icon>
       @if (sesion.tiene('cliente')) {
         <h1>Esta es el área interna de la empresa</h1>
         <p>Tus servicios, facturas y cotizaciones están en el portal del cliente.</p>
         <a mat-flat-button [href]="config.urls['portal-cliente']">Ir al portal</a>
+      } @else if (apps().length) {
+        <!-- R1F-4: sin permiso no es un callejón: lleva a las apps que el rol sí abre. -->
+        <h1>{{ apps().includes(config.app) ? 'Tu rol no abre esta página' : 'Tu rol no abre esta app' }}</h1>
+        <p>Puedes ir a:</p>
+        <ul class="apps">
+          @for (a of apps(); track a) {
+            <li>
+              <a [href]="config.urls[a]">{{ nombres[a] }}</a>
+            </li>
+          }
+        </ul>
       } @else {
         <h1>Tu cuenta no tiene acceso</h1>
         <p>Si crees que es un error, pide al administrador que revise tu rol.</p>
@@ -41,9 +55,23 @@ export const soloRoles =
       gap: 12px;
       align-items: flex-start;
     }
+    .icono {
+      color: var(--mat-sys-on-surface-variant);
+    }
+    .apps {
+      margin: 0;
+      padding-left: 20px;
+    }
+    .apps a {
+      display: inline-block;
+      min-height: 44px;
+      line-height: 44px;
+    }
   `,
 })
 export class SinAcceso {
   readonly sesion = inject(Sesion);
   readonly config = inject(CONFIG_CENTRO);
+  readonly nombres = NOMBRES_APPS;
+  readonly apps = computed(() => appsDeRoles(this.sesion.roles()));
 }

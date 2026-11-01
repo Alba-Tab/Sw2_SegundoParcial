@@ -190,6 +190,7 @@ export type ServiciosQuery = {
   servicios: Array<{
     servicioId: string;
     clienteId: string;
+    estado: EstadoServicio;
     tipoCarga: TipoCarga | null;
     toneladas: number | null;
     fechaViaje: string | null;
@@ -200,6 +201,49 @@ export type ServiciosQuery = {
   }> | null;
   clientes: Array<{ clienteId: string; razonSocial: string }> | null;
 };
+
+export type ClientesQueryVariables = Exact<{
+  verCredito: boolean;
+}>;
+
+export type ClientesQuery = {
+  clientes: Array<{
+    clienteId: string;
+    razonSocial: string;
+    nit: string | null;
+    correo: string | null;
+    canal: string | null;
+    lineaCredito?: { limite: string; disponible: string; enMora: boolean } | null;
+  }> | null;
+};
+
+export type ClienteQueryVariables = Exact<{
+  clienteId: string | number;
+  verCredito: boolean;
+  verMonto: boolean;
+}>;
+
+export type ClienteQuery = {
+  clientes: Array<{ clienteId: string; razonSocial: string; nit: string | null; correo: string | null; canal: string | null }> | null;
+  lineaCredito?: { limite: string; reservado: string; utilizado: string; disponible: string; enMora: boolean } | null;
+  servicios: Array<{
+    servicioId: string;
+    viajeId: string | null;
+    estado: EstadoServicio;
+    rutaId: string | null;
+    tipoCarga: TipoCarga | null;
+    toneladas: number | null;
+    fechaViaje: string | null;
+    monto?: string | null;
+    placa: string | null;
+    creadoEn: string | null;
+  }> | null;
+  rutas: Array<{ rutaId: string; nombre: string }> | null;
+};
+
+export type RutasQueryVariables = Exact<{ [key: string]: never }>;
+
+export type RutasQuery = { rutas: Array<{ rutaId: string; nombre: string; origen: string; destino: string; distanciaKm: number }> | null };
 
 export type AccionesQueryVariables = Exact<{
   estado?: EstadoAccion | null | undefined;
@@ -467,6 +511,7 @@ export const ServiciosDocument = gql`
     servicios(estado: $estado, limite: 80) {
       servicioId
       clienteId
+      estado
       tipoCarga
       toneladas
       fechaViaje
@@ -487,6 +532,100 @@ export const ServiciosDocument = gql`
 })
 export class ServiciosGQL extends Apollo.Query<ServiciosQuery, ServiciosQueryVariables> {
   override document = ServiciosDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const ClientesDocument = gql`
+  query Clientes($verCredito: Boolean!) {
+    clientes {
+      clienteId
+      razonSocial
+      nit
+      correo
+      canal
+      lineaCredito @include(if: $verCredito) {
+        limite
+        disponible
+        enMora
+      }
+    }
+  }
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class ClientesGQL extends Apollo.Query<ClientesQuery, ClientesQueryVariables> {
+  override document = ClientesDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const ClienteDocument = gql`
+  query Cliente($clienteId: ID!, $verCredito: Boolean!, $verMonto: Boolean!) {
+    clientes {
+      clienteId
+      razonSocial
+      nit
+      correo
+      canal
+    }
+    lineaCredito(clienteId: $clienteId) @include(if: $verCredito) {
+      limite
+      reservado
+      utilizado
+      disponible
+      enMora
+    }
+    servicios(clienteId: $clienteId, limite: 50) {
+      servicioId
+      viajeId
+      estado
+      rutaId
+      tipoCarga
+      toneladas
+      fechaViaje
+      monto @include(if: $verMonto)
+      placa
+      creadoEn
+    }
+    rutas {
+      rutaId
+      nombre
+    }
+  }
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class ClienteGQL extends Apollo.Query<ClienteQuery, ClienteQueryVariables> {
+  override document = ClienteDocument;
+
+  constructor(apollo: Apollo.Apollo) {
+    super(apollo);
+  }
+}
+export const RutasDocument = gql`
+  query Rutas {
+    rutas {
+      rutaId
+      nombre
+      origen
+      destino
+      distanciaKm
+    }
+  }
+`;
+
+@Injectable({
+  providedIn: 'root',
+})
+export class RutasGQL extends Apollo.Query<RutasQuery, RutasQueryVariables> {
+  override document = RutasDocument;
 
   constructor(apollo: Apollo.Apollo) {
     super(apollo);

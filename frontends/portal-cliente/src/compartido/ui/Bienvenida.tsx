@@ -15,7 +15,7 @@ export function Bienvenida({ sinConexion = false }: { sinConexion?: boolean }) {
   return (
     <Paper variant="outlined" sx={{ p: 4, maxWidth: 520, mx: 'auto', mt: 6 }}>
       <Stack spacing={2}>
-        <Typography variant="h5" component="h2">
+        <Typography variant="h5" component="h1">
           Transporte de carga por carretera
         </Typography>
         <Typography color="text.secondary">Cotiza, confirma y sigue tus servicios; revisa tus facturas y tu crédito.</Typography>

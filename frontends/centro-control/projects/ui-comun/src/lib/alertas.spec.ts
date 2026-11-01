@@ -57,6 +57,14 @@ describe('Alertas (campana)', () => {
 
   afterEach(() => vi.useRealTimers());
 
+  it('el enlace de una alerta abre la app de destino con ?desde= la app actual (B-5)', () => {
+    TestBed.overrideProvider(CONFIG_CENTRO, {
+      useValue: { app: 'cc-tablero', urls: { 'cc-operaciones': 'http://ops' } } as unknown as ConfigCentro,
+    });
+    const alertas = TestBed.inject(Alertas);
+    expect(alertas.url({ enlace: '/cc-operaciones/viajes/v1' } as AlertaCamposFragment)).toBe('http://ops/viajes/v1?desde=cc-tablero');
+  });
+
   it('lee el código de cierre que Apollo deja en el mensaje', () => {
     expect(codigoCierre(new Error('Socket closed with event 4401 Token vencido'))).toBe(4401);
     expect(codigoCierre(new Error('otra cosa'))).toBeUndefined();

@@ -12,27 +12,31 @@ function montar(roles: string[], respuesta: { data?: unknown; error?: unknown })
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
-      { provide: CONFIG_CENTRO, useValue: { app: 'cc-tablero', urls: { 'cc-operaciones': 'http://o' } } as unknown as ConfigCentro },
-      { provide: Sesion, useValue: { roles: signal(roles) } },
+      {
+        provide: CONFIG_CENTRO,
+        useValue: {
+          app: 'cc-tablero',
+          urls: { 'cc-operaciones': 'http://o', 'cc-flota': 'http://f', 'cc-finanzas': 'http://fi' },
+        } as unknown as ConfigCentro,
+      },
+      { provide: Sesion, useValue: { roles: signal(roles), tiene: (...r: string[]) => roles.some((x) => r.includes(x)) } },
       { provide: TableroRepositorio, useValue: { observar } },
     ],
   });
   const f = TestBed.createComponent(TableroPagina);
   f.detectChanges();
-  const texto = (f.nativeElement as HTMLElement).textContent ?? '';
-  const enlaces = [...(f.nativeElement as HTMLElement).querySelectorAll('nav a')].map((a) => a.textContent?.trim());
-  return { observar, texto, enlaces };
+  const el = f.nativeElement as HTMLElement;
+  return { observar, texto: el.textContent ?? '', el };
 }
 
 describe('Tablero por rol (spec 016, paso 10)', () => {
-  it('el jefe de flota no ve ni pide cuentas por cobrar ni el riesgo, y no tiene el enlace al agente', () => {
-    const { observar, texto, enlaces } = montar(['jefe_flota'], {
+  it('el jefe de flota no ve ni pide cuentas por cobrar ni el riesgo', () => {
+    const { observar, texto } = montar(['jefe_flota'], {
       data: { tablero: { periodo: 'ESTA_SEMANA', viajesEnCurso: [], unidadesPorEstado: [], alertasAbiertas: 2, datosAl: null } },
     });
     expect(observar).toHaveBeenCalledWith(expect.objectContaining({ verCobranza: false, verRiesgo: false, verUnidades: true }), 30_000);
     expect(texto).not.toContain('Cuentas por cobrar');
     expect(texto).toContain('Unidades por estado');
-    expect(enlaces).toEqual(['Reportes', 'Pregunta por voz']);
   });
 
   it('administracion no tiene tarjetas en blanco de viajes ni de unidades', () => {
@@ -44,11 +48,26 @@ describe('Tablero por rol (spec 016, paso 10)', () => {
     expect(texto).toContain('Cuentas por cobrar');
   });
 
-  it('comercial no tiene enlaces a reportes, voz ni agente', () => {
-    const { enlaces, texto } = montar(['comercial'], { data: { tablero: { periodo: 'ESTA_SEMANA', viajesEnCurso: [] } } });
-    expect(enlaces).toEqual([]);
+  it('FB-7: «Datos al …» viejo dice que las cifras pueden no estar al día; reciente, solo la hora', () => {
+    const viejo = montar(['gerente'], {
+      data: { tablero: { periodo: 'ESTA_SEMANA', alertasAbiertas: 0, datosAl: '2026-10-31T22:01:00Z' } },
+    });
+    expect(viejo.texto).toContain('Datos al 31/10 18:01');
+    expect(viejo.texto).toContain('las cifras pueden no estar al día');
+    expect(viejo.el.querySelector('.datos-al.viejo mat-icon')?.textContent).toBe('warning');
+    TestBed.resetTestingModule();
+    const reciente = montar(['gerente'], {
+      data: { tablero: { periodo: 'ESTA_SEMANA', alertasAbiertas: 0, datosAl: new Date().toISOString() } },
+    });
+    expect(reciente.texto).toContain('Datos al');
+    expect(reciente.texto).not.toContain('no estar al día');
+  });
+
+  it('comercial no ve alertas ni la fecha de los datos', () => {
+    const { texto } = montar(['comercial'], { data: { tablero: { periodo: 'ESTA_SEMANA', viajesEnCurso: [] } } });
     expect(texto).not.toContain('Alertas abiertas');
     expect(texto).not.toContain('Datos al');
+    expect(texto).not.toContain('Nada pide acción');
   });
 
   it('un SIN_PERMISO inesperado se ve como "Sin acceso" y un servicio caído como "no disponible"', () => {
@@ -62,7 +81,85 @@ describe('Tablero por rol (spec 016, paso 10)', () => {
       data: { tablero: { periodo: 'ESTA_SEMANA', viajesEnCurso: [], unidadesPorEstado: null, alertasAbiertas: null } },
       error,
     });
-    expect(texto).toContain('Sin acceso');
+    // 5a: dice quién lo ve (ROLES_CAMPO), con el ícono de sin permiso y no el de servicio caído.
+    expect(texto).toContain('Sin acceso a unidades con mantenimiento pendiente: las ven gerencia, despacho y jefatura de flota.');
+    expect(texto).toContain('lock_person');
     expect(texto).toContain('Analítica no disponible');
+  });
+
+  it('lo que pide acción va primero y enlaza a la app que lo resuelve con ?desde=cc-tablero (U7, N3)', () => {
+    const { el } = montar(['gerente'], {
+      data: {
+        tablero: {
+          periodo: 'ESTA_SEMANA',
+          viajesEnCurso: [{ viajeId: 'v1', placa: 'AAA-1', riesgo: { enRiesgo: true, probabilidad: 0.7 } }],
+          unidadesPorEstado: [{ estado: 'MANTENIMIENTO_PENDIENTE', cantidad: 2 }],
+          cuentasPorCobrar: { saldoTotal: '100.00', facturasPorVencer: 0, facturasVencidas: 1, proximas: [] },
+          alertasAbiertas: 0,
+          datosAl: null,
+        },
+      },
+    });
+    const h2 = [...el.querySelectorAll('h2')].map((h) => h.textContent?.trim());
+    expect(h2.indexOf('Pide acción')).toBeLessThan(h2.indexOf('Cifras del periodo'));
+    const enlaces = [...el.querySelectorAll('.pendientes a')].map((a) => a.getAttribute('href'));
+    expect(enlaces).toEqual([
+      'http://o/viajes/v1?desde=cc-tablero',
+      'http://fi/cobranza?desde=cc-tablero',
+      'http://f/unidades?estado=MANTENIMIENTO_PENDIENTE&desde=cc-tablero',
+    ]);
+  });
+
+  it('R2F-1: el despachador no recibe un enlace a Flota; la línea dice quién programa el mantenimiento', () => {
+    const { el, texto } = montar(['despachador'], {
+      data: {
+        tablero: {
+          periodo: 'ESTA_SEMANA',
+          viajesEnCurso: [{ viajeId: 'v1', placa: 'AAA-1', riesgo: { enRiesgo: true, probabilidad: 0.7 } }],
+          unidadesPorEstado: [{ estado: 'MANTENIMIENTO_PENDIENTE', cantidad: 2 }],
+          alertasAbiertas: 0,
+          datosAl: null,
+        },
+      },
+    });
+    const enlaces = [...el.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    expect(enlaces).toContain('http://o/viajes/v1?desde=cc-tablero');
+    expect(enlaces.some((h) => h?.startsWith('http://f'))).toBe(false);
+    expect(texto).toContain('2 unidades con mantenimiento pendiente');
+    expect(texto).toContain('Lo programa el jefe de flota.');
+  });
+
+  it('R2F-1: el jefe de flota ve las placas de los viajes en curso sin enlace a Operaciones', () => {
+    const { el, texto } = montar(['jefe_flota'], {
+      data: {
+        tablero: {
+          periodo: 'ESTA_SEMANA',
+          viajesEnCurso: [{ viajeId: 'v1', placa: 'AAA-1' }],
+          unidadesPorEstado: [{ estado: 'MANTENIMIENTO_PENDIENTE', cantidad: 1 }],
+          alertasAbiertas: 0,
+          datosAl: null,
+        },
+      },
+    });
+    const enlaces = [...el.querySelectorAll('a')].map((a) => a.getAttribute('href'));
+    expect(enlaces).toEqual(['http://f/unidades?estado=MANTENIMIENTO_PENDIENTE&desde=cc-tablero']);
+    expect(texto).toContain('AAA-1');
+    expect(texto).not.toContain('Lo programa el jefe de flota.');
+    // R2F-5: sin cliente ni ruta, la línea no queda con «· ·».
+    expect(texto).not.toMatch(/·\s*·/);
+  });
+
+  it('sin pendientes lo dice, en vez de dejar la sección vacía', () => {
+    const { texto } = montar(['administracion'], {
+      data: {
+        tablero: {
+          periodo: 'ESTA_SEMANA',
+          cuentasPorCobrar: { saldoTotal: '0.00', facturasPorVencer: 0, facturasVencidas: 0, proximas: [] },
+          alertasAbiertas: 0,
+          datosAl: null,
+        },
+      },
+    });
+    expect(texto).toContain('Nada pide acción ahora.');
   });
 });

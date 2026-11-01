@@ -1,6 +1,11 @@
-import { Component, computed, input } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
+import { MatSortModule, type Sort } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
-import { aCentavos, pct, sumarMontos } from 'ui-comun/dominio';
+import { RouterLink } from '@angular/router';
+import { aCentavos, conDesde, type Direccion, numero, ordenar, pct, SIN_DATO, sumarMontos } from 'ui-comun/dominio';
+import { CONFIG_CENTRO } from './configuracion';
+import { DatosAl } from './datos-al';
+import { Estado } from './estado';
 import { BobPipe, FechaPipe } from './formato';
 
 export interface Columna {
@@ -17,16 +22,29 @@ export interface Resultado {
   datosAl?: string | null;
 }
 
+/** El valor de una celda para ordenar: los montos en centavos (sin float), los números como número y lo demás como texto. */
+export function valorParaOrden(valor: unknown, tipo: string): string | number | bigint | null {
+  if (valor === null || valor === undefined || valor === '') return null;
+  if (tipo === 'MONTO') return aCentavos(String(valor));
+  if (tipo === 'NUMERO' || tipo === 'PORCENTAJE') return Number(valor);
+  return String(valor);
+}
+
+/** Las filas de un reporte ordenadas por una columna; los totales no cambian (son de todas las filas). */
+export function ordenarFilas(filas: readonly Record<string, unknown>[], columna: Columna | undefined, dir: Direccion) {
+  return ordenar(filas, columna ? (f) => valorParaOrden(f[columna.clave], columna.tipo) : undefined, dir);
+}
+
 /**
  * Tabla y gráfico de un reporte (spec 015): los números vienen calculados de Analítica; aquí solo se dibujan. Barras en
  * SVG con los colores del tema (sin otra librería).
  */
 @Component({
   selector: 'cc-tabla-reporte',
-  imports: [MatTableModule, FechaPipe],
+  imports: [MatTableModule, MatSortModule, RouterLink, Estado, DatosAl],
   template: `
     @let r = resultado();
-    <p class="datos-al">Datos al {{ r.datosAl ? (r.datosAl | fecha: true) : '—' }}</p>
+    <cc-datos-al [al]="r.datosAl" />
     @if (barras().length) {
       <svg class="grafico" [attr.viewBox]="'0 0 ' + ancho + ' ' + (barras().length * 28 + 8)" role="img" [attr.aria-label]="r.titulo">
         @for (b of barras(); track b.etiqueta; let i = $index) {
@@ -40,12 +58,35 @@ export interface Resultado {
         }
       </svg>
     }
-    <div class="tabla">
-      <table mat-table [dataSource]="r.filas">
+    <div class="tabla" role="region" tabindex="0" [attr.aria-label]="r.titulo">
+      <!-- Ordenar es local y no toca los totales: siguen siendo los de todas las filas. -->
+      <table mat-table [dataSource]="filas()" matSort (matSortChange)="orden.set($event)">
         @for (c of r.columnas; track c.clave) {
           <ng-container [matColumnDef]="c.clave">
-            <th mat-header-cell *matHeaderCellDef [class.numero]="numerica(c)">{{ c.titulo }}</th>
-            <td mat-cell *matCellDef="let f" [class.numero]="numerica(c)">{{ celda(f[c.clave], c) }}</td>
+            <!-- Los montos van sin «BOB» en cada celda: la moneda la dice el encabezado (NG-2). -->
+            <th mat-header-cell *matHeaderCellDef mat-sort-header [class.numero]="numerica(c)">
+              {{ c.titulo }}{{ c.tipo === 'MONTO' ? ' (BOB)' : '' }}
+            </th>
+            <td mat-cell *matCellDef="let f" [class.numero]="numerica(c)">
+              @if (c.clave === 'factura' && f['facturaId']) {
+                @if (config?.app === 'cc-finanzas') {
+                  <a class="sin-corte" [routerLink]="['/facturas', f['facturaId']]">{{ celda(f[c.clave], c) }}</a>
+                } @else if (config) {
+                  <a class="sin-corte" [href]="urlFactura(f['facturaId'])">{{ celda(f[c.clave], c) }}</a>
+                } @else {
+                  {{ celda(f[c.clave], c) }}
+                }
+              } @else if (c.clave === 'vencida' && c.tipo === 'BOOLEANO') {
+                <!-- Vencida y por vencer se separan con texto, ícono y tono, no con «Sí»/«No» (NG-2). -->
+                <cc-estado
+                  grupo="Vigencia"
+                  [valor]="f[c.clave] ? 'VENCIDO' : 'POR_VENCER'"
+                  [texto]="f[c.clave] ? 'Vencida' : 'Por vencer'"
+                />
+              } @else {
+                {{ celda(f[c.clave], c) }}
+              }
+            </td>
             <td mat-footer-cell *matFooterCellDef [class.numero]="numerica(c)">
               {{ $first ? 'Total' : r.totales[c.clave] !== undefined ? celda(r.totales[c.clave], c) : '' }}
             </td>
@@ -56,16 +97,11 @@ export interface Resultado {
         <tr mat-footer-row *matFooterRowDef="claves()"></tr>
       </table>
       @if (!r.filas.length) {
-        <p class="vacio">Sin datos para estos parámetros.</p>
+        <p class="vacio">{{ vacio() }}</p>
       }
     </div>
   `,
   styles: `
-    .datos-al {
-      color: var(--mat-sys-on-surface-variant);
-      font-size: 13px;
-      margin: 0 0 8px;
-    }
     .grafico {
       width: 100%;
       max-height: 360px;
@@ -73,7 +109,7 @@ export interface Resultado {
     }
     .etiqueta,
     .valor {
-      font-size: 12px;
+      font: var(--mat-sys-body-small);
       fill: var(--mat-sys-on-surface);
     }
     .serie-0 {
@@ -96,8 +132,26 @@ export interface Resultado {
 })
 export class TablaReporte {
   readonly resultado = input.required<Resultado>();
+  /** El texto sin filas (una búsqueda sin coincidencias dice otra cosa que un reporte vacío). */
+  readonly vacio = input('Sin datos para estos parámetros.');
+  readonly orden = signal<Sort>({ active: '', direction: '' });
+  readonly filas = computed(() => {
+    const { filas, columnas } = this.resultado();
+    const { active, direction } = this.orden();
+    return ordenarFilas(
+      filas,
+      columnas.find((c) => c.clave === active),
+      direction,
+    );
+  });
   readonly ancho = 720;
+  readonly config = inject(CONFIG_CENTRO, { optional: true });
   private readonly bob = new BobPipe();
+
+  /** La factura de una fila de cuentas por cobrar se abre en Finanzas, con «Volver» a la app de origen. */
+  urlFactura(facturaId: unknown): string {
+    return conDesde(`${this.config!.urls['cc-finanzas']}/facturas/${String(facturaId)}`, this.config!.app);
+  }
   private readonly fecha = new FechaPipe();
 
   readonly claves = computed(() => this.resultado().columnas.map((c) => c.clave));
@@ -143,7 +197,7 @@ export class TablaReporte {
   }
 
   celda(valor: unknown, c: Columna): string {
-    if (valor === null || valor === undefined || valor === '') return '—';
+    if (valor === null || valor === undefined || valor === '') return SIN_DATO;
     switch (c.tipo) {
       case 'MONTO':
         return this.bob.transform(String(valor), false);
@@ -156,7 +210,7 @@ export class TablaReporte {
       case 'BOOLEANO':
         return valor ? 'Sí' : 'No';
       case 'NUMERO':
-        return Number(valor).toLocaleString('es-BO', { maximumFractionDigits: 2 });
+        return numero(valor as number | string);
       default:
         return String(valor);
     }

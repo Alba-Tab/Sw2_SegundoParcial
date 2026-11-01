@@ -1,4 +1,5 @@
 import { InjectionToken } from '@angular/core';
+import { conDesde } from 'ui-comun/dominio';
 
 export type App = 'cc-tablero' | 'cc-operaciones' | 'cc-flota' | 'cc-finanzas';
 
@@ -35,6 +36,10 @@ export const APPS_POR_ROL: Record<string, App[]> = {
   comercial: ['cc-tablero', 'cc-operaciones'],
 };
 
+/** Las apps que abren los roles del token, en el orden de la barra. */
+export const appsDeRoles = (roles: readonly string[]): App[] =>
+  (Object.keys(NOMBRES_APPS) as App[]).filter((a) => roles.some((r) => APPS_POR_ROL[r]?.includes(a)));
+
 /** Destino después del login en cc-tablero (spec 016, paso 2). */
 export const DESTINO_POR_ROL: [string, App][] = [
   ['gerente', 'cc-tablero'],
@@ -48,4 +53,18 @@ export async function cargarConfiguracion(): Promise<ConfigCentro> {
   const r = await fetch('/configuracion.json', { cache: 'no-store' });
   if (!r.ok) throw new Error('No se pudo leer /configuracion.json');
   return (await r.json()) as ConfigCentro;
+}
+
+/** La app de la que se llegó (`?desde=`), si es una del Centro de Control distinta de la actual; lo demás se ignora. */
+export function appOrigen(desde: string | null | undefined, actual: App): App | undefined {
+  return desde && desde !== actual && Object.hasOwn(NOMBRES_APPS, desde) ? (desde as App) : undefined;
+}
+
+/**
+ * FL-1: la URL de una ficha en otra app con `?desde=` (ofrece volver), o null si el rol no abre esa app: el enlace no
+ * promete lo que el guarda de la otra app rechaza.
+ */
+export function urlEnApp(config: Pick<ConfigCentro, 'app' | 'urls'>, roles: readonly string[], app: App, ruta: string): string | null {
+  if (!roles.some((r) => APPS_POR_ROL[r]?.includes(app))) return null;
+  return conDesde(`${config.urls[app]}${ruta}`, config.app);
 }

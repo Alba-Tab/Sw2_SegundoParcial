@@ -11,6 +11,7 @@ import { ErrorApi } from './api/cliente';
 import { opcionesPersistencia } from './compartido/offline/cache';
 import { ProveedorClienteActivo } from './compartido/sesion/ClienteActivo';
 import { ProveedorSesion } from './compartido/sesion/ProveedorSesion';
+import './compartido/tema/global.css';
 import { tema } from './compartido/tema/tema';
 import { router } from './rutas';
 
@@ -29,7 +30,7 @@ const consultas = new QueryClient({
 createRoot(document.getElementById('raiz')!).render(
   <StrictMode>
     <ThemeProvider theme={tema}>
-      <CssBaseline />
+      <CssBaseline enableColorScheme />
       <ProveedorSesion navegar={(destino) => router.history.replace(destino)}>
         <PersistQueryClientProvider client={consultas} persistOptions={opcionesPersistencia}>
           <ProveedorClienteActivo>

@@ -1,5 +1,6 @@
 import { DestroyRef, effect, inject, Injectable, signal, untracked } from '@angular/core';
 import { firstValueFrom, type Subscription } from 'rxjs';
+import { conDesde } from 'ui-comun/dominio';
 import { Intentos } from './clave';
 import { CONFIG_CENTRO, type App } from './configuracion';
 import { EstadoConexion, esperaReconexion } from './conexion';
@@ -125,11 +126,14 @@ export class Alertas {
     this.abiertas.update((n) => n + sumar * frescas.filter((a) => a.estado === 'ABIERTA').length);
   }
 
-  /** El enlace de Analítica es "/<app>/<ruta>": se abre en la app que corresponde, solo por URL (propuesta 6.1). */
+  /**
+   * El enlace de Analítica es "/<app>/<ruta>": se abre en la app que corresponde, solo por URL (propuesta 6.1). Lleva
+   * `?desde=<app actual>` para que la de destino ofrezca volver (N5).
+   */
   url(alerta: AlertaCamposFragment): string {
     const [, app, ...resto] = alerta.enlace.split('/');
     const base = this.config.urls[app as App] ?? '';
-    return `${base}/${resto.join('/')}`;
+    return conDesde(`${base}/${resto.join('/')}`, this.config.app);
   }
 
   async atender(alerta: AlertaCamposFragment, nota?: string): Promise<void> {
