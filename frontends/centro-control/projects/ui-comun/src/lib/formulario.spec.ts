@@ -57,7 +57,7 @@ describe('formularios (U8, W4)', () => {
       '2800.01',
       montoMaximo(() => saldo.valor),
     );
-    expect(textoError(c)).toBe('El monto supera el saldo (2.800,00 BOB).');
+    expect(textoError(c)).toBe('El monto supera el saldo (2.800,00\u00a0BOB).');
     c.setValue('2800');
     expect(c.valid).toBe(true);
     saldo.valor = null;

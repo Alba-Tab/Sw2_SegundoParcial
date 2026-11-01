@@ -67,9 +67,13 @@ describe('ui-comun', () => {
   });
 
   it('formatea dinero como texto (nunca float en cálculos), fechas y porcentajes', () => {
-    expect(new BobPipe().transform('2800.00')).toBe('2.800,00 BOB');
+    expect(new BobPipe().transform('2800.00')).toBe('2.800,00\u00a0BOB');
     expect(new BobPipe().transform(null)).toBe('Sin dato');
     expect(new FechaPipe().transform('2026-11-03')).toBe('03/11/2026');
+    // Un instante sale en La Paz (UTC−4), en 24 h y sin "a. m.".
+    expect(new FechaPipe().transform('2026-11-01T14:20:00Z', true)).toBe('01/11 10:20');
+    expect(new FechaPipe().transform('2026-11-01T02:05:00Z', true)).toBe('31/10 22:05');
+    expect(new FechaPipe().transform('2026-11-01T02:05:00Z')).toBe('31/10/2026');
     expect(pct(0.857)).toBe('86 %');
   });
 
@@ -119,9 +123,9 @@ describe('ui-comun', () => {
 
   it('dinero sin float: BobPipe no pasa por Number y las sumas van en centavos enteros', () => {
     // 2^53 + 1 centavos: con Number se perdería el último dígito.
-    expect(new BobPipe().transform('90071992547409.93')).toBe('90.071.992.547.409,93 BOB');
+    expect(new BobPipe().transform('90071992547409.93')).toBe('90.071.992.547.409,93\u00a0BOB');
     expect(new BobPipe().transform('-1250.5', false)).toBe('-1.250,50');
-    expect(new BobPipe().transform('0.00')).toBe('0,00 BOB');
+    expect(new BobPipe().transform('0.00')).toBe('0,00\u00a0BOB');
     expect(new BobPipe().transform('abc')).toBe('abc');
     expect(aCentavos('2800.005')).toBe(280001n); // HALF_UP al final
     expect(sumarMontos(['0.10', '0.20', null, 'x'])).toBe('0.30');
