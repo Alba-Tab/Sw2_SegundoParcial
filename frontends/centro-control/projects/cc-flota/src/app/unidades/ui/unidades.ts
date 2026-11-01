@@ -37,7 +37,7 @@ import { UnidadesFachada } from '../unidades.fachada';
   ],
   template: `
     <cc-encabezado titulo="Unidades" />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!unidades().length" />
+    <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!unidades().length" />
     <cc-filtros-lista [control]="lista" busqueda="Buscar por placa o tipo" grupo="EstadoUnidad" nombre="unidades" singular="unidad" />
     <div class="tabla-ancha" role="region" tabindex="0" aria-label="Unidades">
       <table
@@ -92,6 +92,7 @@ export class UnidadesPagina {
   private readonly fachada = inject(UnidadesFachada);
   readonly unidades = this.fachada.unidades;
   readonly error = this.fachada.error;
+  readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly campos = { unidades: 'Flota' };
   readonly columnas = ['placa', 'tipo', 'estado', 'km', 'documentos'];

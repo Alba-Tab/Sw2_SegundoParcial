@@ -11,6 +11,7 @@ export class LineasFachada {
   private readonly datos = toSignal(inject(LineasRepositorio).observar(60_000));
   readonly lineas = computed(() => conLinea(completo<LineasCreditoQuery>(this.datos())?.clientes ?? []));
   readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
   /** Clientes cuya línea no se pudo leer: no salen en la lista, y se dice (D-1). */
   readonly incompletas = computed(() => filasConError(this.datos()?.error, 'clientes', 'lineaCredito').size);

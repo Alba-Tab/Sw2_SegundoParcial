@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core';
+import { conservarUltimoBueno } from 'ui-comun';
 import {
   AprobarEntregaGQL,
   EntregasObservadasGQL,
@@ -27,7 +28,7 @@ export class ViajesRepositorio {
   private readonly resolverGql = inject(ResolverIntervencionGQL);
 
   observarViajes(estado: EstadoViaje | null, cadaMs: number) {
-    return this.viajesGql.watch({ variables: { estado }, pollInterval: cadaMs }).valueChanges;
+    return this.viajesGql.watch({ variables: { estado }, pollInterval: cadaMs }).valueChanges.pipe(conservarUltimoBueno());
   }
 
   /** Las variables dicen qué campos con `@roles` (monto, riesgo, unidad) pide el rol. */
@@ -37,15 +38,15 @@ export class ViajesRepositorio {
   }
 
   observarMapa(variables: MapaQueryVariables, cadaMs: number) {
-    return this.mapaGql.watch({ variables, pollInterval: cadaMs }).valueChanges;
+    return this.mapaGql.watch({ variables, pollInterval: cadaMs }).valueChanges.pipe(conservarUltimoBueno());
   }
 
   observarEntregasObservadas(cadaMs: number) {
-    return this.entregasGql.watch({ pollInterval: cadaMs }).valueChanges;
+    return this.entregasGql.watch({ pollInterval: cadaMs }).valueChanges.pipe(conservarUltimoBueno());
   }
 
   observarIntervenciones(cadaMs: number) {
-    return this.intervencionesGql.watch({ pollInterval: cadaMs }).valueChanges;
+    return this.intervencionesGql.watch({ pollInterval: cadaMs }).valueChanges.pipe(conservarUltimoBueno());
   }
 
   aprobarEntrega(viajeId: string, nota: string | undefined, clave: string) {

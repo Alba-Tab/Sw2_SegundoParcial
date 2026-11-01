@@ -1,7 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { switchMap } from 'rxjs';
-import { cargandoDe, Intentos, puedeVer, Sesion } from 'ui-comun';
+import { cargandoDe, conservarUltimoBueno, Intentos, puedeVer, Sesion } from 'ui-comun';
 import type { EstadoServicio } from '../graphql/generado';
 import { ServiciosRepositorio } from './data/servicios.repositorio';
 import { nombreCliente } from './domain/servicio';
@@ -17,10 +17,13 @@ export class ServiciosFachada {
   readonly estado = signal<EstadoServicio | null>(null);
   private consulta?: ReturnType<ServiciosRepositorio['observar']>;
   private readonly datos = toSignal(
-    toObservable(this.estado).pipe(switchMap((e) => (this.consulta = this.repo.observar(e, this.verMonto, 20_000)).valueChanges)),
+    toObservable(this.estado).pipe(
+      switchMap((e) => (this.consulta = this.repo.observar(e, this.verMonto, 20_000)).valueChanges.pipe(conservarUltimoBueno())),
+    ),
   );
   readonly servicios = computed(() => this.datos()?.data?.servicios ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
 
   nombreCliente(clienteId: string): string {

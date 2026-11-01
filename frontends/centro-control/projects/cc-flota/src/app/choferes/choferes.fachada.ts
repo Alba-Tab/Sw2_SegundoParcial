@@ -12,6 +12,7 @@ export class ChoferesFachada {
   private readonly datos = toSignal(inject(ChoferesRepositorio).observarChoferes(60_000));
   readonly choferes = computed(() => completo<ChoferesQuery>(this.datos())?.choferes ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
 }
 

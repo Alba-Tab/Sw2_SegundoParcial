@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core';
+import { conservarUltimoBueno } from 'ui-comun';
 import {
   CerrarMantenimientoGQL,
   ProgramarMantenimientoGQL,
@@ -17,7 +18,7 @@ export class UnidadesRepositorio {
   private readonly cerrarGql = inject(CerrarMantenimientoGQL);
 
   observarUnidades(cadaMs: number) {
-    return this.unidadesGql.watch({ pollInterval: cadaMs }).valueChanges;
+    return this.unidadesGql.watch({ pollInterval: cadaMs }).valueChanges.pipe(conservarUltimoBueno());
   }
 
   /** El `QueryRef`: `recargar` hace `refetch` sobre él, así la señal ya cambió cuando resuelve (V4-1). */

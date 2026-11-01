@@ -33,7 +33,7 @@ import { mensajeDisparo, urlTraza } from '../domain/mision';
     @if (cargando()) {
       <cc-esqueleto />
     }
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!misiones().length" />
+    <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!misiones().length" />
     <mat-accordion>
       @for (m of misiones(); track m.misionId) {
         <mat-expansion-panel [expanded]="mision() ? m.misionId === mision() : $first" [class.elegida]="m.misionId === mision()">
@@ -105,6 +105,7 @@ export class AgentePagina {
   readonly mision = input<string>();
   readonly misiones = this.fachada.misiones;
   readonly error = this.fachada.error;
+  readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly campos = { misionesAgente: 'Analítica' };
   readonly enviando = signal(false);

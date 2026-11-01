@@ -35,7 +35,7 @@ export function popupViaje(v: ViajeMapa, urlViaje: string): HTMLElement {
   providers: [MapaFachada],
   imports: [Encabezado, AvisoServicios],
   template: `<cc-encabezado titulo="Mapa en vivo" />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!viajes().length" />
+    <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!viajes().length" />
     <!-- La región vive siempre en el DOM para que el lector anuncie el texto cuando aparece (V3-6). -->
     <p class="secundario" role="status">
       @if (sinPosicion()) {
@@ -60,6 +60,7 @@ export class MapaPagina implements OnDestroy {
   private readonly fachada = inject(MapaFachada);
   readonly viajes = this.fachada.viajes;
   readonly error = this.fachada.error;
+  readonly datosAl = this.fachada.datosAl;
   readonly campos = { viajesEnCurso: 'Viajes', riesgo: 'Analítica' };
   /** `?viaje=<id>` (desde "Ver en el mapa" del detalle): se centra y abre ese marcador una vez (C-15). */
   readonly viaje = input<string>();

@@ -3,6 +3,7 @@ import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { Apollo } from 'apollo-angular';
 import { AvisoServicios } from './aviso-servicios';
+import { FechaPipe } from './formato';
 import { ordenarFilas } from './tabla-reporte';
 import { mostrarFalloArranque } from './proveedores';
 
@@ -118,6 +119,19 @@ describe('Reintentar con un padre real (V6-1, V4-3, V4-4)', () => {
     const { el, vivo } = await reintentar('Finanzas no disponible');
     expect(vivo).toBe('Sigue sin responder: Finanzas no disponible');
     expect(document.activeElement).toBe(el.querySelector('button.reintentar'));
+  });
+});
+
+describe('datos conservados (FB-1)', () => {
+  it('con datos de antes y la red caída, dice que no hay conexión, de cuándo son los datos y ofrece «Reintentar»', () => {
+    const f = TestBed.createComponent(AvisoServicios);
+    f.componentRef.setInput('error', new TypeError('Failed to fetch'));
+    f.componentRef.setInput('datosAl', '2026-11-01T14:20:00Z');
+    f.detectChanges();
+    const el: HTMLElement = f.nativeElement;
+    expect(el.querySelector('[role="alert"]')?.textContent).toContain('No se pudo hablar con el servidor');
+    expect(el.textContent).toContain(`Se muestran los datos al ${new FechaPipe().transform('2026-11-01T14:20:00Z', true)}.`);
+    expect(el.querySelector('button')?.textContent).toContain('Reintentar');
   });
 });
 

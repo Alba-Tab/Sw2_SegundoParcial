@@ -12,6 +12,7 @@ export class AgenteFachada {
   private readonly datos = toSignal(this.repo.observarMisiones(5_000));
   readonly misiones = computed(() => completo<MisionesQuery>(this.datos())?.misionesAgente ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
 
   disparar() {

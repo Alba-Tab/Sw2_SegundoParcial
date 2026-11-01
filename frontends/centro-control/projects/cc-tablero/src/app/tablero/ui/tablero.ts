@@ -27,7 +27,7 @@ import { TableroFachada } from '../tablero.fachada';
       <cc-esqueleto [filas]="6" />
     }
     <!-- Los servicios caídos los avisa cada bloque; aquí solo el error que deja al tablero entero sin datos. -->
-    <cc-aviso-servicios [error]="datos()?.error" [sinDatos]="!t && !cargando()" />
+    <cc-aviso-servicios [error]="datos()?.error" [datosAl]="datos()?.datosAl" [sinDatos]="!t && !cargando()" />
 
     @if (t) {
       @if (conPendientes(bloques)) {

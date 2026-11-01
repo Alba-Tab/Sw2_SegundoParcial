@@ -12,6 +12,7 @@ export class CotizacionesFachada {
   private readonly d = computed(() => completo<CotizacionesQuery>(this.datos()));
   readonly cotizaciones = computed(() => this.d()?.cotizaciones ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
 
   nombreCliente(id: string): string {

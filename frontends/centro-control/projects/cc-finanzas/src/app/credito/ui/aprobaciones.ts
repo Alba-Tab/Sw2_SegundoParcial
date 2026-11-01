@@ -53,7 +53,13 @@ import { CreditoFachada } from '../credito.fachada';
   ],
   template: `
     <cc-encabezado titulo="Aprobación de crédito" />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!solicitudes().length" [reintentar]="recargar" />
+    <cc-aviso-servicios
+      [error]="error()"
+      [datosAl]="datosAl()"
+      [campos]="campos"
+      [sinDatos]="!solicitudes().length"
+      [reintentar]="recargar"
+    />
     <cc-filtros-lista [control]="lista" busqueda="Buscar por cliente" grupo="EstadoAprobacion" nombre="solicitudes" singular="solicitud" />
     <div class="tarjetas">
       @for (s of lista.visibles(); track s.servicioId) {
@@ -143,6 +149,7 @@ export class AprobacionesPagina {
   readonly sesion = inject(Sesion);
   readonly solicitudes = this.fachada.solicitudes;
   readonly error = this.fachada.error;
+  readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly campos = { solicitudesAprobacion: 'Finanzas' };
   readonly lista = controlLista({

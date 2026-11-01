@@ -19,4 +19,5 @@ export * from './lib/marco';
 export * from './lib/no-encontrada';
 export * from './lib/proveedores';
 export * from './lib/sesion';
+export * from './lib/sondeo';
 export * from './lib/tabla-reporte';

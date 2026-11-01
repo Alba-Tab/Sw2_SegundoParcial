@@ -24,7 +24,7 @@ import { estadoCotizacion } from '../domain/cotizacion';
   imports: [Encabezado, MatTableModule, MatSortModule, BobPipe, FechaPipe, EtiquetaPipe, Estado, AvisoServicios, FiltrosLista, PieLista],
   template: `
     <cc-encabezado titulo="Cotizaciones" />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!cotizaciones().length" />
+    <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!cotizaciones().length" />
     <cc-filtros-lista
       [control]="lista"
       busqueda="Buscar por cliente, ruta o carga"
@@ -77,6 +77,7 @@ export class CotizacionesPagina {
   private readonly fachada = inject(CotizacionesFachada);
   readonly cotizaciones = this.fachada.cotizaciones;
   readonly error = this.fachada.error;
+  readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly campos = { cotizaciones: 'Finanzas', clientes: 'Viajes', rutas: 'Viajes' };
   readonly estado = estadoCotizacion;

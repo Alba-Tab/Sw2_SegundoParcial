@@ -14,7 +14,7 @@ import { ViajesFachada } from '../viajes.fachada';
   template: `
     <cc-encabezado titulo="Viajes" />
     @let r = datos();
-    <cc-aviso-servicios [error]="r?.error" [campos]="campos" [sinDatos]="!r?.data?.viajes?.length" />
+    <cc-aviso-servicios [error]="r?.error" [datosAl]="r?.datosAl" [campos]="campos" [sinDatos]="!r?.data?.viajes?.length" />
     <cc-filtros-lista
       [control]="lista"
       busqueda="Buscar por placa, cliente, ruta o chofer"

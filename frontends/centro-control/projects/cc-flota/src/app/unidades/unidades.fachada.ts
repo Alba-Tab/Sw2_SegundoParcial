@@ -12,6 +12,7 @@ export class UnidadesFachada {
   private readonly datos = toSignal(inject(UnidadesRepositorio).observarUnidades(30_000));
   readonly unidades = computed(() => completo<UnidadesQuery>(this.datos())?.unidades ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
 }
 

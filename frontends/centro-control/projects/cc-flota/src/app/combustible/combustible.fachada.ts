@@ -12,5 +12,6 @@ export class CombustibleFachada {
   readonly anomalias = computed(() => completo<CombustibleQuery>(this.datos())?.anomaliasCombustible ?? []);
   readonly cargas = computed(() => completo<CombustibleQuery>(this.datos())?.cargasCombustible ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
 }

@@ -15,6 +15,7 @@ export class FacturasFachada {
   private readonly datos = toSignal(toObservable(this.conSaldo).pipe(switchMap((c) => this.repo.observarFacturas(c, 30_000))));
   readonly facturas = computed(() => completo<FacturasQuery>(this.datos())?.facturas ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
 }
 

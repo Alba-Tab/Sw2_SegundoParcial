@@ -41,7 +41,7 @@ import { MantenimientosFachada } from '../mantenimientos.fachada';
   ],
   template: `
     <cc-encabezado titulo="Mantenimientos" subtitulo="Para programar uno nuevo, abre la unidad" />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!mantenimientos().length" />
+    <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!mantenimientos().length" />
     <cc-filtros-lista
       [control]="lista"
       busqueda="Buscar por placa, tipo o taller"
@@ -117,6 +117,7 @@ export class MantenimientosPagina {
   readonly sesion = inject(Sesion);
   readonly mantenimientos = this.fachada.mantenimientos;
   readonly error = this.fachada.error;
+  readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly campos = { mantenimientos: 'Flota' };
   readonly columnas = ['placa', 'tipo', 'fecha', 'taller', 'estado', 'acciones'];

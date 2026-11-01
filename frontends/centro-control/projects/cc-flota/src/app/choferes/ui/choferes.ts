@@ -23,7 +23,7 @@ import { estadoChofer, textoChofer, vigenciaLicencia, type Chofer } from '../dom
   imports: [Encabezado, MatTableModule, MatSortModule, RouterLink, FechaPipe, Estado, AvisoServicios, FiltrosLista, PieLista],
   template: `
     <cc-encabezado titulo="Choferes" />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!choferes().length" />
+    <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!choferes().length" />
     <cc-filtros-lista
       [control]="lista"
       busqueda="Buscar por nombre o licencia"
@@ -74,6 +74,7 @@ export class ChoferesPagina {
   private readonly fachada = inject(ChoferesFachada);
   readonly choferes = this.fachada.choferes;
   readonly error = this.fachada.error;
+  readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly campos = { choferes: 'Flota' };
   readonly limite = LIMITE_GATEWAY;

@@ -10,5 +10,6 @@ export class ConduccionFachada {
   private readonly datos = toSignal(inject(ConduccionRepositorio).observar(60_000));
   readonly puntajes = computed(() => completo<ConduccionQuery>(this.datos())?.puntajesConduccion);
   readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
 }

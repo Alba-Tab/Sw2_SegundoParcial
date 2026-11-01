@@ -13,6 +13,7 @@ export class ClientesFachada {
   private readonly datos = toSignal(inject(ClientesRepositorio).observarClientes(this.verCredito, 60_000));
   readonly clientes = computed(() => completo<ClientesQuery>(this.datos())?.clientes ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
   /** Clientes cuya línea no se pudo leer (no es lo mismo que no tener línea; D-1). */
   readonly sinLeerCredito = computed(() => {

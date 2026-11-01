@@ -40,7 +40,7 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
   ],
   template: `
     <cc-encabezado titulo="Clientes" />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!clientes().length" />
+    <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!clientes().length" />
     @if (verCredito) {
       <cc-filtros-lista
         [control]="lista"
@@ -121,6 +121,7 @@ export class ClientesPagina {
   private readonly fachada = inject(ClientesFachada);
   readonly clientes = this.fachada.clientes;
   readonly error = this.fachada.error;
+  readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly verCredito = this.fachada.verCredito;
   readonly sinLeerCredito = this.fachada.sinLeerCredito;

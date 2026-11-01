@@ -29,7 +29,7 @@ import { IntervencionesFachada } from '../viajes.fachada';
       titulo="Intervenciones"
       subtitulo="La cancelación automática no terminó (reserva o crédito sin liberar): reintenta o márcalo resuelto en el viaje"
     />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!lista.filas().length" />
+    <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!lista.filas().length" />
     <cc-filtros-lista
       [control]="lista"
       busqueda="Buscar por placa, cliente, ruta o motivo"
@@ -94,6 +94,7 @@ import { IntervencionesFachada } from '../viajes.fachada';
 export class IntervencionesPagina {
   private readonly fachada = inject(IntervencionesFachada);
   readonly error = this.fachada.error;
+  readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly decide = inject(Sesion).tiene('despachador');
   readonly campos = { intervenciones: 'Viajes' };

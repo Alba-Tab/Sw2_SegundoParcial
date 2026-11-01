@@ -4,6 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { Apollo } from 'apollo-angular';
 import { erroresGraphql, mensajeDe, servicioCaido } from './errores';
 import { enfocarTitulo } from './formulario';
+import { FechaPipe } from './formato';
 
 /** Qué servicio está detrás de cada campo de la consulta de una página, para decir cuál no está disponible ('' si lo dice la página). */
 export type CamposPorServicio = Record<string, string>;
@@ -34,7 +35,7 @@ export function avisosServicio(error: unknown, campos: CamposPorServicio, sinDat
  */
 @Component({
   selector: 'cc-aviso-servicios',
-  imports: [MatButtonModule, MatIconModule],
+  imports: [MatButtonModule, MatIconModule, FechaPipe],
   template: `
     @if (noEncontrado()) {
       <!-- No encontrado no es un servicio caído: otro ícono y sin «Reintentar»; la salida es el «volver» del encabezado (FB-2). -->
@@ -44,6 +45,10 @@ export function avisosServicio(error: unknown, campos: CamposPorServicio, sinDat
     }
     @for (a of avisos(); track a) {
       <p class="aviso-servicio" role="alert"><mat-icon>cloud_off</mat-icon> {{ a }}</p>
+    }
+    @if (avisos().length && datosAl(); as d) {
+      <!-- FB-1: lo que ya estaba en pantalla se conserva y se dice de cuándo es. -->
+      <p class="datos-al">Se muestran los datos al {{ d | fecha: true }}.</p>
     }
     @if (avisos().length) {
       <!-- disabledInteractive: con el foco encima, deshabilitarlo de verdad lo mandaría a <body> (V4, foco). -->
@@ -68,6 +73,10 @@ export function avisosServicio(error: unknown, campos: CamposPorServicio, sinDat
       background: var(--mat-sys-error-container);
       color: var(--mat-sys-on-error-container);
     }
+    .datos-al {
+      margin: -4px 0 12px;
+      color: var(--mat-sys-on-surface-variant);
+    }
     .no-encontrado {
       background: var(--mat-sys-surface-container-highest);
       color: var(--mat-sys-on-surface);
@@ -81,6 +90,8 @@ export class AvisoServicios {
   readonly sinDatos = input(false);
   /** Un aviso que la página arma sola (p. ej. «la lista está incompleta») y que también se arregla con «Reintentar» (V3-7). */
   readonly extra = input<string | null>(null);
+  /** Hora de los datos que se siguen mostrando tras un sondeo fallido (`conservarUltimoBueno`, FB-1). */
+  readonly datosAl = input<string | null | undefined>();
   /** Qué no se encontró, para el aviso de un detalle: «esta unidad», «este viaje». */
   readonly buscado = input('lo que buscas');
   /** Un detalle sin datos porque el servicio respondió NO_ENCONTRADO: se dice eso, no que el servicio falló (FB-2). */
@@ -90,7 +101,9 @@ export class AvisoServicios {
   readonly avisos = computed(() => {
     if (this.noEncontrado()) return [];
     const extra = this.extra();
-    return [...avisosServicio(this.error(), this.campos(), this.sinDatos()), ...(extra ? [extra] : [])];
+    // Con datos conservados la página no está vacía, pero el error se dice igual: lo que se ve puede estar viejo.
+    const sinDatos = this.sinDatos() || !!this.datosAl();
+    return [...avisosServicio(this.error(), this.campos(), sinDatos), ...(extra ? [extra] : [])];
   });
   /**
    * Qué hacer al reintentar (el `recargar` de la fachada). Sin él, se vuelven a pedir las consultas activas de la

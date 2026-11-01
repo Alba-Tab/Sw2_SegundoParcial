@@ -59,7 +59,7 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
       [titulo]="id() ? 'Acción propuesta' : 'Acciones del agente'"
       [migas]="id() ? [{ texto: 'Acciones del agente', ruta: '/acciones' }, { texto: 'Acción propuesta' }] : []"
     />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!visibles().length" [reintentar]="recargar" />
+    <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!visibles().length" [reintentar]="recargar" />
     <cc-filtros-lista [control]="lista" busqueda="Buscar por cliente o placa" grupo="EstadoAccion" nombre="acciones" singular="acción" />
     <div class="lista">
       @for (a of lista.visibles(); track a.accionId) {
@@ -168,6 +168,7 @@ export class AccionesPagina {
   readonly datos = this.fachada.datos;
   readonly visibles = computed(() => conLaElegidaPrimero(this.fachada.acciones(), this.id()));
   readonly error = this.fachada.error;
+  readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly lista = controlLista<Accion>({
     filas: this.visibles,

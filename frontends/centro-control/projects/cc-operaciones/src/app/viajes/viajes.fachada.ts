@@ -1,7 +1,7 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import { filter, switchMap } from 'rxjs';
-import { cargandoDe, completo, Intentos, puedeVer, Sesion } from 'ui-comun';
+import { cargandoDe, completo, conservarUltimoBueno, Intentos, puedeVer, Sesion } from 'ui-comun';
 import type { EstadoViaje, MapaQuery, OpcionIntervencion } from '../graphql/generado';
 import { ViajesRepositorio } from './data/viajes.repositorio';
 
@@ -30,7 +30,7 @@ export class ViajeFachada {
   readonly datos = toSignal(
     toObservable(this.id).pipe(
       filter((id): id is string => !!id),
-      switchMap((id) => (this.consulta = this.repo.observarViaje({ id, ...this.ver }, 20_000)).valueChanges),
+      switchMap((id) => (this.consulta = this.repo.observarViaje({ id, ...this.ver }, 20_000)).valueChanges.pipe(conservarUltimoBueno())),
     ),
   );
 
@@ -62,6 +62,7 @@ export class MapaFachada {
   );
   readonly viajes = computed(() => completo<MapaQuery>(this.datos())?.viajesEnCurso ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
 }
 
@@ -69,6 +70,7 @@ export class MapaFachada {
 export class EntregasFachada {
   readonly datos = toSignal(inject(ViajesRepositorio).observarEntregasObservadas(15_000));
   readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
 }
 
@@ -76,5 +78,6 @@ export class EntregasFachada {
 export class IntervencionesFachada {
   readonly datos = toSignal(inject(ViajesRepositorio).observarIntervenciones(15_000));
   readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
 }

@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core';
+import { conservarUltimoBueno } from 'ui-comun';
 import { DispararMisionGQL, MisionesGQL } from '../../graphql/generado';
 
 /** Repositorio sobre Apollo de las misiones del agente (spec 014). */
@@ -8,7 +9,7 @@ export class AgenteRepositorio {
   private readonly dispararGql = inject(DispararMisionGQL);
 
   observarMisiones(cadaMs: number) {
-    return this.misionesGql.watch({ pollInterval: cadaMs }).valueChanges;
+    return this.misionesGql.watch({ pollInterval: cadaMs }).valueChanges.pipe(conservarUltimoBueno());
   }
 
   disparar(clave: string) {

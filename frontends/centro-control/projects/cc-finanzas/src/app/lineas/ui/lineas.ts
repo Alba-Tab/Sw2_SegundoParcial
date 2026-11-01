@@ -25,7 +25,13 @@ import { LineasFachada } from '../lineas.fachada';
   template: `
     <cc-encabezado titulo="Líneas de crédito" />
     <!-- Las líneas que faltan se dicen una vez, en el mismo aviso y con su «Reintentar» (V1-11, V3-7). -->
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!lineas().length" [extra]="avisoIncompletas()" />
+    <cc-aviso-servicios
+      [error]="error()"
+      [datosAl]="datosAl()"
+      [campos]="campos"
+      [sinDatos]="!lineas().length"
+      [extra]="avisoIncompletas()"
+    />
     @if (clientesLeidos() >= limiteClientes) {
       <p class="secundario">Se revisan los primeros {{ limiteClientes }} clientes: si hay más, sus líneas no salen aquí.</p>
     }
@@ -90,6 +96,7 @@ export class LineasPagina {
   private readonly fachada = inject(LineasFachada);
   readonly lineas = this.fachada.lineas;
   readonly error = this.fachada.error;
+  readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly avisoIncompletas = computed(() => {
     const n = this.fachada.incompletas();

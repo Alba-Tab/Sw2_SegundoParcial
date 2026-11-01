@@ -59,7 +59,13 @@ import { ServiciosFachada } from '../servicios.fachada';
   ],
   template: `
     <cc-encabezado titulo="Servicios" />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!servicios().length" [reintentar]="recargar" />
+    <cc-aviso-servicios
+      [error]="error()"
+      [datosAl]="datosAl()"
+      [campos]="campos"
+      [sinDatos]="!servicios().length"
+      [reintentar]="recargar"
+    />
     <cc-filtros-lista
       [control]="lista"
       busqueda="Buscar por cliente, placa o chofer"
@@ -179,6 +185,7 @@ export class ServiciosPagina {
   readonly config = inject(CONFIG_CENTRO);
   readonly servicios = this.fachada.servicios;
   readonly error = this.fachada.error;
+  readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly campos = { servicios: 'Viajes', clientes: 'Viajes' };
   readonly puedeCancelar = computed(() => this.sesion.tiene('despachador', 'comercial'));

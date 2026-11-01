@@ -1,4 +1,5 @@
 import { inject, Injectable } from '@angular/core';
+import { conservarUltimoBueno } from 'ui-comun';
 import { ChoferesGQL, ChoferGQL } from '../../graphql/generado';
 
 /** Repositorio sobre Apollo de los choferes (G3, solo lectura). */
@@ -8,7 +9,7 @@ export class ChoferesRepositorio {
   private readonly choferGql = inject(ChoferGQL);
 
   observarChoferes(cadaMs: number) {
-    return this.choferesGql.watch({ pollInterval: cadaMs }).valueChanges;
+    return this.choferesGql.watch({ pollInterval: cadaMs }).valueChanges.pipe(conservarUltimoBueno());
   }
 
   observarChofer(choferId: string) {

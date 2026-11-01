@@ -15,7 +15,7 @@ import type { Anomalia, Carga } from '../domain/combustible';
       [titulo]="id() ? 'Carga marcada' : 'Combustible'"
       [migas]="id() ? [{ texto: 'Combustible', ruta: '/combustible' }, { texto: 'Carga marcada' }] : []"
     />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!anomalias().length && !cargas().length" />
+    <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!anomalias().length && !cargas().length" />
     @if (id()) {
       @let a = anomaliaMarcada();
       @let c = cargaMarcada();
@@ -143,6 +143,7 @@ export class CombustiblePagina {
   readonly anomalias = this.fachada.anomalias;
   readonly cargas = this.fachada.cargas;
   readonly error = this.fachada.error;
+  readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly campos = { anomaliasCombustible: 'Analítica', cargasCombustible: 'Flota' };
   /** La carga a la que lleva la alerta (`/combustible/:id`), arriba y sin depender de la página de la tabla. */

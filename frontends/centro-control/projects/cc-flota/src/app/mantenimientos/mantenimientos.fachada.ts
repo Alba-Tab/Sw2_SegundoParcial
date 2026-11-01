@@ -10,5 +10,6 @@ export class MantenimientosFachada {
   private readonly datos = toSignal(inject(MantenimientosRepositorio).observar(30_000));
   readonly mantenimientos = computed(() => completo<MantenimientosQuery>(this.datos())?.mantenimientos ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
 }

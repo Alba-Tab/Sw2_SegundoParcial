@@ -13,7 +13,7 @@ import { PUNTAJE_BAJO, type PuntajeChofer } from '../domain/conduccion';
   imports: [Encabezado, MatTableModule, MatSortModule, RouterLink, NumeroPipe, FechaPipe, AvisoServicios, FiltrosLista, PieLista],
   template: `
     <cc-encabezado titulo="Puntaje de conducción" />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!puntajes()" />
+    <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!puntajes()" />
     @if (puntajes(); as p) {
       <p class="secundario">
         Semana del {{ p.desde | fecha }} al {{ p.hasta | fecha }}
@@ -73,6 +73,7 @@ export class ConduccionPagina {
   private readonly fachada = inject(ConduccionFachada);
   readonly puntajes = this.fachada.puntajes;
   readonly error = this.fachada.error;
+  readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly puntajeBajo = PUNTAJE_BAJO;
   readonly campos = { puntajesConduccion: 'Analítica' };

@@ -36,7 +36,7 @@ import { cambioDeSaldo, ESTADOS_CON_SALDO } from '../domain/filtro';
   ],
   template: `
     <cc-encabezado titulo="Facturas" />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!facturas().length" />
+    <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!facturas().length" />
     <cc-filtros-lista
       [control]="lista"
       busqueda="Buscar por número o cliente"
@@ -109,6 +109,7 @@ export class FacturasPagina {
   private readonly fachada = inject(FacturasFachada);
   readonly facturas = this.fachada.facturas;
   readonly error = this.fachada.error;
+  readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly campos = { facturas: 'Finanzas' };
   readonly columnas = ['numero', 'cliente', 'monto', 'saldo', 'vence', 'estado'];

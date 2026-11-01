@@ -1,6 +1,6 @@
 import { computed, inject, Injectable } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
-import { cargandoDe, completo, Intentos } from 'ui-comun';
+import { cargandoDe, completo, conservarUltimoBueno, Intentos } from 'ui-comun';
 import type { SolicitudesQuery } from '../graphql/generado';
 import { CreditoRepositorio } from './data/credito.repositorio';
 
@@ -10,9 +10,10 @@ export class CreditoFachada {
   private readonly repo = inject(CreditoRepositorio);
   private readonly intentos = new Intentos();
   private readonly consulta = this.repo.observarSolicitudes(15_000);
-  private readonly datos = toSignal(this.consulta.valueChanges);
+  private readonly datos = toSignal(this.consulta.valueChanges.pipe(conservarUltimoBueno()));
   readonly solicitudes = computed(() => completo<SolicitudesQuery>(this.datos())?.solicitudesAprobacion ?? []);
   readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
 
   decidir(servicioId: string, aprobado: boolean, motivo: string | undefined) {
