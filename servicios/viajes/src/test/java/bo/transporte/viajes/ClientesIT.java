@@ -272,11 +272,12 @@ class ClientesIT {
                         .estado());
     }
 
-    private static String ruta(String nombre, int radio, String km, boolean activa) {
+    /** {@code activa} null: sin el campo, como en el alta (la ruta nace inactiva). */
+    private static String ruta(String nombre, int radio, String km, Boolean activa) {
         return """
                 {"nombre":"%s","origen":{"nombre":"Santa Cruz","coordenadas":{"lat":-17.78,"lng":-63.18}},
                  "destino":{"nombre":"La Paz","coordenadas":{"lat":-16.5,"lng":-68.15},"radioMetros":%d},
-                 "distanciaKm":%s,"activa":%s}""".formatted(nombre, radio, km, activa);
+                 "distanciaKm":%s%s}""".formatted(nombre, radio, km, activa == null ? "" : ",\"activa\":" + activa);
     }
 
     private JsonNode eventosDeRuta(String rutaId) {
@@ -292,9 +293,10 @@ class ClientesIT {
     void gerenteYDespachadorCreanYEditanRutasConSuEventoYSuVersion() throws Exception {
         String gerente = TokensDePrueba.token("sub-gerente", "gerente", null);
         UUID clave = UUID.randomUUID();
-        var alta = pedir("POST", "/api/v1/rutas", gerente, clave, ruta("SCZ – LPZ", 300, "850.06", true));
+        var alta = pedir("POST", "/api/v1/rutas", gerente, clave, ruta("SCZ – LPZ", 300, "850.06", null));
         assertEquals(201, alta.estado());
         String id = alta.cuerpo().get("rutaId").asString();
+        assertFalse(alta.cuerpo().get("activa").asBoolean(), "F1-2: nace inactiva hasta tener tarifa");
         assertEquals(
                 "/api/v1/rutas/" + id,
                 alta.cruda().headers().firstValue("Location").orElseThrow());
@@ -302,7 +304,7 @@ class ClientesIT {
                 0,
                 new java.math.BigDecimal("850.1")
                         .compareTo(alta.cuerpo().get("distanciaKm").decimalValue()));
-        var reenvio = pedir("POST", "/api/v1/rutas", gerente, clave, ruta("SCZ – LPZ", 300, "850.06", true));
+        var reenvio = pedir("POST", "/api/v1/rutas", gerente, clave, ruta("SCZ – LPZ", 300, "850.06", null));
         assertEquals(201, reenvio.estado());
         assertEquals(id, reenvio.cuerpo().get("rutaId").asString());
         assertEquals(1L, jdbc.sql("SELECT count(*) FROM ruta").query(Long.class).single());
@@ -312,20 +314,22 @@ class ClientesIT {
 
         String despacho = TokensDePrueba.token("sub-despacho", "despachador", null);
         var edicion =
-                pedir("PUT", "/api/v1/rutas/" + id, despacho, UUID.randomUUID(), ruta("SCZ – LPZ", 500, "851", false));
+                pedir("PUT", "/api/v1/rutas/" + id, despacho, UUID.randomUUID(), ruta("SCZ – LPZ", 500, "851", true));
         assertEquals(200, edicion.estado());
-        assertFalse(edicion.cuerpo().get("activa").asBoolean());
+        assertTrue(edicion.cuerpo().get("activa").asBoolean());
         assertEquals(500, edicion.cuerpo().get("destino").get("radioMetros").asInt());
         var eventos = eventosDeRuta(id);
         assertEquals(2, eventos.size());
+        assertFalse(eventos.get(0).get("datos").get("activa").asBoolean());
         assertEquals(2, eventos.get(1).get("datos").get("versionAgregado").asInt());
-        assertFalse(eventos.get(1).get("datos").get("activa").asBoolean());
+        assertTrue(eventos.get(1).get("datos").get("activa").asBoolean());
         assertEquals(
                 List.of("CREAR_RUTA", "EDITAR_RUTA"),
                 jdbc.sql("SELECT accion FROM auditoria WHERE entidad = 'Ruta' ORDER BY id")
                         .query(String.class)
                         .list());
 
+        pedir("PUT", "/api/v1/rutas/" + id, despacho, UUID.randomUUID(), ruta("SCZ – LPZ", 500, "851", false));
         assertEquals(
                 0, pedir("GET", "/api/v1/rutas", despacho, null, null).cuerpo().size());
         assertEquals(
@@ -342,22 +346,26 @@ class ClientesIT {
         String gerente = TokensDePrueba.token("sub-gerente", "gerente", null);
         assertEquals(
                 403,
-                pedir("POST", "/api/v1/rutas", chofer, UUID.randomUUID(), ruta("Ruta", 300, "10", true))
+                pedir("POST", "/api/v1/rutas", chofer, UUID.randomUUID(), ruta("Ruta", 300, "10", null))
                         .estado());
         assertEquals(
                 403,
-                pedir("POST", "/api/v1/rutas", comercial, UUID.randomUUID(), ruta("Ruta", 300, "10", true))
+                pedir("POST", "/api/v1/rutas", comercial, UUID.randomUUID(), ruta("Ruta", 300, "10", null))
                         .estado());
 
-        var radio = pedir("POST", "/api/v1/rutas", gerente, UUID.randomUUID(), ruta("Ruta", 40, "10", true));
+        var radio = pedir("POST", "/api/v1/rutas", gerente, UUID.randomUUID(), ruta("Ruta", 40, "10", null));
         assertEquals(400, radio.estado());
         assertEquals("VALIDACION", radio.cuerpo().get("codigo").asString());
-        var nombre = pedir("POST", "/api/v1/rutas", gerente, UUID.randomUUID(), ruta("  A ", 300, "10", true));
+        var nombre = pedir("POST", "/api/v1/rutas", gerente, UUID.randomUUID(), ruta("  A ", 300, "10", null));
         assertEquals(400, nombre.estado());
         assertEquals(
                 400,
-                pedir("POST", "/api/v1/rutas", gerente, null, ruta("Ruta", 300, "10", true))
+                pedir("POST", "/api/v1/rutas", gerente, null, ruta("Ruta", 300, "10", null))
                         .estado());
+        var conActiva = pedir("POST", "/api/v1/rutas", gerente, UUID.randomUUID(), ruta("Ruta", 300, "10", true));
+        assertEquals(400, conActiva.estado());
+        assertEquals(
+                "activa", conActiva.cuerpo().get("errores").get(0).get("campo").asString());
         assertEquals(
                 404,
                 pedir(
@@ -367,6 +375,11 @@ class ClientesIT {
                                 UUID.randomUUID(),
                                 ruta("Ruta", 300, "10", true))
                         .estado());
+        var sinActiva = pedir(
+                "PUT", "/api/v1/rutas/" + UUID.randomUUID(), gerente, UUID.randomUUID(), ruta("Ruta", 300, "10", null));
+        assertEquals(400, sinActiva.estado());
+        assertEquals(
+                "activa", sinActiva.cuerpo().get("errores").get(0).get("campo").asString());
         assertEquals(
                 0L,
                 jdbc.sql("SELECT count(*) FROM outbox_eventos")

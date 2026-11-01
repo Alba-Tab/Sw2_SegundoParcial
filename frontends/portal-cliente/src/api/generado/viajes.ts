@@ -154,7 +154,8 @@ export interface RutaNueva {
    * @exclusiveMinimum 0
    */
   distanciaKm: number;
-  activa: boolean;
+  /** Solo en la edición, donde es obligatoria; en el alta no va (la ruta nace inactiva). */
+  activa?: boolean;
 }
 
 export type RutaDestino = Lugar & {
@@ -1764,8 +1765,10 @@ export const getCrearRutaUrl = () => {
 };
 
 /**
- * En una transacción crea la ruta con `versionAgregado = 1`, audita y deja `RutaActualizada` en el Outbox
- * (Finanzas y Analítica crean su copia). La distancia se guarda con un decimal.
+ * La ruta **nace inactiva** (`activa: false`): las tarifas siguen de semilla (D10) y sin tarifa no se puede
+ * cotizar; se activa con la edición. Sin `activa` en el cuerpo: si viene, 400 `VALIDACION`. En una transacción
+ * crea la ruta con `versionAgregado = 1`, audita y deja `RutaActualizada` en el Outbox (Finanzas y Analítica
+ * crean su copia). La distancia se guarda con un decimal.
  * @summary Alta de una ruta (gerente, despachador). G4, D104.
  */
 export const crearRuta = async (rutaNueva: RutaNueva, options?: Parameters<typeof pedirViajes>[1]): Promise<Ruta> => {
@@ -1960,8 +1963,10 @@ export const getActualizarRutaUrl = (rutaId: Uuid) => {
 };
 
 /**
- * Documento completo. En una transacción, con la fila bloqueada, sube `versionAgregado`, audita y deja
- * `RutaActualizada` en el Outbox. Los viajes ya programados conservan la ruta; una ruta inactiva no se cotiza.
+ * Documento completo, con `activa` obligatoria (sin ella, 400 `VALIDACION`). Activar una ruta sin tarifa en
+ * Finanzas hace que cotizarla responda 422 `RUTA_SIN_TARIFA`. En una transacción, con la fila bloqueada, sube
+ * `versionAgregado`, audita y deja `RutaActualizada` en el Outbox. Los viajes ya programados conservan la ruta;
+ * una ruta inactiva no se cotiza.
  * @summary Edición de una ruta, también para activarla o desactivarla (gerente, despachador). G4, D104.
  */
 export const actualizarRuta = async (rutaId: Uuid, rutaNueva: RutaNueva, options?: Parameters<typeof pedirViajes>[1]): Promise<Ruta> => {

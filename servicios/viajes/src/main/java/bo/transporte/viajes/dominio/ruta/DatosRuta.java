@@ -28,6 +28,11 @@ public record DatosRuta(
                 "Debe ser mayor que 0 y de hasta 5000 km");
     }
 
+    /** F1-2: una ruta nueva nace inactiva; las tarifas son de semilla (D10) y sin tarifa no se cotiza. */
+    public DatosRuta inactiva() {
+        return new DatosRuta(nombre, origen, destino, radioMetros, distanciaKm, false);
+    }
+
     private static Lugar lugar(Lugar l, String campo) {
         String nombre = recortar(l == null ? null : l.nombre());
         exigir(nombre.length() >= 2 && nombre.length() <= 80, campo + ".nombre", "Debe tener entre 2 y 80 caracteres");

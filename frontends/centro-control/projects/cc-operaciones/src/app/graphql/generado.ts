@@ -60,7 +60,8 @@ export type OpcionIntervencion = 'MARCAR_RESUELTO' | 'REINTENTAR_COMPENSACION';
 
 /** Alta o edición de una ruta (G4); Viajes publica RutaActualizada. */
 export type RutaInput = {
-  activa: boolean;
+  /** Solo en editarRuta, donde es obligatoria. crearRuta no la lleva: la ruta nace inactiva hasta tener su tarifa (D10). */
+  activa?: boolean | null | undefined;
   claveIdempotencia: string | number;
   destino: DestinoInput;
   distanciaKm: number;

@@ -226,8 +226,10 @@ paths:
       operationId: crearRuta
       summary: Alta de una ruta (gerente, despachador). G4, D104.
       description: |
-        En una transacción crea la ruta con `versionAgregado = 1`, audita y deja `RutaActualizada` en el Outbox
-        (Finanzas y Analítica crean su copia). La distancia se guarda con un decimal.
+        La ruta **nace inactiva** (`activa: false`): las tarifas siguen de semilla (D10) y sin tarifa no se puede
+        cotizar; se activa con la edición. Sin `activa` en el cuerpo: si viene, 400 `VALIDACION`. En una transacción
+        crea la ruta con `versionAgregado = 1`, audita y deja `RutaActualizada` en el Outbox (Finanzas y Analítica
+        crean su copia). La distancia se guarda con un decimal.
       parameters:
         - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
         - $ref: './comun.yaml#/components/parameters/CorrelationId'
@@ -284,8 +286,10 @@ paths:
       operationId: actualizarRuta
       summary: Edición de una ruta, también para activarla o desactivarla (gerente, despachador). G4, D104.
       description: |
-        Documento completo. En una transacción, con la fila bloqueada, sube `versionAgregado`, audita y deja
-        `RutaActualizada` en el Outbox. Los viajes ya programados conservan la ruta; una ruta inactiva no se cotiza.
+        Documento completo, con `activa` obligatoria (sin ella, 400 `VALIDACION`). Activar una ruta sin tarifa en
+        Finanzas hace que cotizarla responda 422 `RUTA_SIN_TARIFA`. En una transacción, con la fila bloqueada, sube
+        `versionAgregado`, audita y deja `RutaActualizada` en el Outbox. Los viajes ya programados conservan la ruta;
+        una ruta inactiva no se cotiza.
       parameters:
         - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
         - $ref: './comun.yaml#/components/parameters/CorrelationId'
@@ -1251,7 +1255,7 @@ components:
     RutaNueva:
       type: object
       description: Alta o edición de una ruta (G4). Los mismos límites que RutaActualizada.v1.
-      required: [nombre, origen, destino, distanciaKm, activa]
+      required: [nombre, origen, destino, distanciaKm]
       additionalProperties: false
       properties:
         nombre:
@@ -1283,6 +1287,7 @@ components:
           maximum: 5000
         activa:
           type: boolean
+          description: Solo en la edición, donde es obligatoria; en el alta no va (la ruta nace inactiva).
     Ruta:
       type: object
       required: [rutaId, nombre, origen, destino, distanciaKm, activa]

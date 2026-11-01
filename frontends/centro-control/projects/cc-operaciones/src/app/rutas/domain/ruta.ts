@@ -13,6 +13,10 @@ export const LIMITES_RUTA = { radioMin: 50, radioMax: 5000, kmMax: 5000 } as con
 /** Lo que encuentra la búsqueda: nombre, origen y destino. */
 export const textoRuta = (r: Ruta): string => [r.nombre, r.origen, r.destino].join(' ');
 
+/** F1-2: una ruta nueva nace inactiva; las tarifas siguen de semilla (D10) y sin tarifa no se cotiza. */
+export const AVISO_ALTA_INACTIVA = 'La ruta queda inactiva hasta tener su tarifa.';
+export const AVISO_ACTIVAR_SIN_TARIFA = 'Actívala solo si Finanzas ya tiene su tarifa: sin tarifa, el portal no puede cotizarla.';
+
 /** «Inactiva» solo si Viajes lo dice: una ruta sin el dato se muestra como activa, igual que en el catálogo. */
 export const textoActiva = (r: { activa?: boolean | null }): string => (r.activa === false ? 'Inactiva' : 'Activa');
 
@@ -42,12 +46,15 @@ export function valoresIniciales(r?: FichaRuta | null): ValoresRuta {
     destinoLng: r?.destinoCoordenadas?.lng ?? null,
     radioMetros: r?.radioMetros ?? 300,
     distanciaKm: r?.distanciaKm ?? null,
-    activa: r?.activa ?? true,
+    activa: r?.activa ?? false,
   };
 }
 
-/** Del formulario ya validado al input de la mutación (sin la clave, que la pone la fachada). */
-export function aInputRuta(v: ValoresRuta): Omit<RutaInput, 'claveIdempotencia'> {
+/**
+ * Del formulario ya validado al input de la mutación (sin la clave, que la pone la fachada). En el alta no va
+ * `activa`: Viajes la crea inactiva y rechaza el campo.
+ */
+export function aInputRuta(v: ValoresRuta, alta = false): Omit<RutaInput, 'claveIdempotencia'> {
   return {
     nombre: v.nombre.trim(),
     origen: { nombre: v.origen.trim(), coordenadas: { lat: Number(v.origenLat), lng: Number(v.origenLng) } },
@@ -57,6 +64,6 @@ export function aInputRuta(v: ValoresRuta): Omit<RutaInput, 'claveIdempotencia'>
       radioMetros: Number(v.radioMetros),
     },
     distanciaKm: Number(v.distanciaKm),
-    activa: v.activa,
+    ...(alta ? {} : { activa: v.activa }),
   };
 }

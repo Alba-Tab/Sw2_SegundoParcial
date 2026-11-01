@@ -716,7 +716,8 @@ input RutaInput {
   origen: LugarInput!
   destino: DestinoInput!
   distanciaKm: Float!
-  activa: Boolean!
+  "Solo en editarRuta, donde es obligatoria. crearRuta no la lleva: la ruta nace inactiva hasta tener su tarifa (D10)."
+  activa: Boolean
   claveIdempotencia: ID!
 }
 

@@ -13,8 +13,8 @@ describe('rutas (dominio)', () => {
     expect(textoActiva({ activa: null })).toBe('Activa');
   });
 
-  it('un alta empieza activa con 300 m de geocerca; una edición trae los datos de la ruta', () => {
-    expect(valoresIniciales()).toMatchObject({ nombre: '', radioMetros: 300, activa: true, distanciaKm: null });
+  it('un alta empieza inactiva con 300 m de geocerca; una edición trae los datos de la ruta', () => {
+    expect(valoresIniciales()).toMatchObject({ nombre: '', radioMetros: 300, activa: false, distanciaKm: null });
     const ficha = {
       rutaId: 'r2',
       nombre: 'SCZ - PTS',
@@ -57,7 +57,9 @@ describe('rutas (dominio)', () => {
       origen: { nombre: 'Santa Cruz', coordenadas: { lat: -17.78, lng: -63.18 } },
       destino: { nombre: 'La Paz', coordenadas: { lat: -16.5, lng: -68.15 }, radioMetros: 300 },
       distanciaKm: 850.5,
-      activa: true,
+      activa: false,
     });
+    // F1-2: el alta no lleva `activa` (Viajes la crea inactiva y rechaza el campo).
+    expect(aInputRuta({ ...valoresIniciales(), activa: true }, true)).not.toHaveProperty('activa');
   });
 });

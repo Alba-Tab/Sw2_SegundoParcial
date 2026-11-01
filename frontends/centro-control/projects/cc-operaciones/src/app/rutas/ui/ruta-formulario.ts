@@ -1,4 +1,4 @@
-import { afterNextRender, Component, type ElementRef, input, type OnInit, output, viewChild } from '@angular/core';
+import { afterNextRender, Component, computed, type ElementRef, input, type OnInit, output, viewChild } from '@angular/core';
 import { type AbstractControl, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -6,7 +6,14 @@ import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { Campo, largoEntre, listoParaEnviar, textoError } from 'ui-comun';
-import { type FichaRuta, LIMITES_RUTA, valoresIniciales, type ValoresRuta } from '../domain/ruta';
+import {
+  AVISO_ACTIVAR_SIN_TARIFA,
+  AVISO_ALTA_INACTIVA,
+  type FichaRuta,
+  LIMITES_RUTA,
+  valoresIniciales,
+  type ValoresRuta,
+} from '../domain/ruta';
 
 const numero = (min: number, max: number) => [Validators.required, Validators.min(min), Validators.max(max)];
 const entero = (c: AbstractControl) => (c.value === null || Number.isInteger(c.value) ? null : { entero: true });
@@ -82,8 +89,11 @@ const entero = (c: AbstractControl) => (c.value === null || Number.isInteger(c.v
               <input matInput type="number" step="0.1" inputmode="decimal" formControlName="distanciaKm" />
               <mat-error>{{ texto(form.controls.distanciaKm) }}</mat-error>
             </mat-form-field>
-            <mat-checkbox formControlName="activa">Ruta activa (se puede cotizar y programar)</mat-checkbox>
+            @if (!alta()) {
+              <mat-checkbox formControlName="activa">Ruta activa (se puede cotizar y programar)</mat-checkbox>
+            }
           </div>
+          <p class="secundario">{{ alta() ? avisoAlta : avisoActivar }}</p>
           <div class="fila-acciones">
             <button mat-flat-button type="submit" [disabled]="enviando()" disabledInteractive>{{ accion() }}</button>
             <button mat-button type="button" (click)="cancelar.emit()" [disabled]="enviando()">Cancelar</button>
@@ -119,6 +129,10 @@ export class RutaFormulario implements OnInit {
   readonly guardar = output<ValoresRuta>();
   readonly cancelar = output<void>();
   readonly limites = LIMITES_RUTA;
+  readonly avisoAlta = AVISO_ALTA_INACTIVA;
+  readonly avisoActivar = AVISO_ACTIVAR_SIN_TARIFA;
+  /** Sin ruta que editar es un alta: no se elige si está activa (F1-2). */
+  readonly alta = computed(() => !this.inicial());
   private readonly primerCampo = viewChild<ElementRef<HTMLInputElement>>('primerCampo');
   readonly form = new FormGroup({
     nombre: new FormControl('', { nonNullable: true, validators: [Validators.required, largoEntre(3, 80)] }),
@@ -130,7 +144,7 @@ export class RutaFormulario implements OnInit {
     destinoLng: new FormControl<number | null>(null, numero(-180, 180)),
     radioMetros: new FormControl<number | null>(null, [...numero(LIMITES_RUTA.radioMin, LIMITES_RUTA.radioMax), entero]),
     distanciaKm: new FormControl<number | null>(null, numero(0.1, LIMITES_RUTA.kmMax)),
-    activa: new FormControl(true, { nonNullable: true }),
+    activa: new FormControl(false, { nonNullable: true }),
   });
 
   constructor() {

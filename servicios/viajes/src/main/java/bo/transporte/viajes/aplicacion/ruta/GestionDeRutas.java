@@ -15,7 +15,8 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * POST /api/v1/rutas y PUT /api/v1/rutas/{rutaId} (G4, D104), para gerente y despachador. En una transacción: guarda
+ * POST /api/v1/rutas y PUT /api/v1/rutas/{rutaId} (G4, D104), para gerente y despachador. Una ruta nueva nace
+ * inactiva hasta tener su tarifa (F1-2, D10); se activa al editarla. En una transacción: guarda
  * la ruta con su nueva {@code versionAgregado}, audita y deja RutaActualizada en el Outbox (Finanzas y Analítica
  * actualizan su copia y descartan versiones viejas).
  */
@@ -40,7 +41,12 @@ public class GestionDeRutas {
     public Ruta crear(Solicitante quien, DatosRuta datos, UUID clave, String hashCuerpo) {
         exigirPermiso(quien);
         return operacion
-                .ejecutar(CREAR, clave, hashCuerpo, 201, () -> guardar(quien, CREAR, Ruta.de(Uuid7.nuevo(), datos, 1)))
+                .ejecutar(
+                        CREAR,
+                        clave,
+                        hashCuerpo,
+                        201,
+                        () -> guardar(quien, CREAR, Ruta.de(Uuid7.nuevo(), datos.inactiva(), 1)))
                 .respuesta();
     }
 

@@ -368,7 +368,6 @@ describe('revisión del Gateway', () => {
     origen: { nombre: 'Santa Cruz', coordenadas: { lat: -17.78, lng: -63.18 } },
     destino: { nombre: 'La Paz', coordenadas: { lat: -16.5, lng: -68.15 }, radioMetros: 300 },
     distanciaKm: 850,
-    activa: false,
     claveIdempotencia: 'clave-ruta',
   };
   const CAMPOS_RUTA = 'rutaId activa radioMetros destino destinoCoordenadas { lat lng } origenCoordenadas { lat }';
@@ -396,9 +395,13 @@ describe('revisión del Gateway', () => {
     const { claveIdempotencia: _, ...cuerpo } = RUTA_INPUT;
     expect(JSON.parse(post.cuerpo)).toEqual(cuerpo);
 
-    expect((await gql(['despachador'], editar, { i: RUTA_INPUT })).body.data.editarRuta).toEqual({ rutaId: 'r1', activa: false });
+    expect((await gql(['despachador'], editar, { i: { ...RUTA_INPUT, activa: false } })).body.data.editarRuta).toEqual({
+      rutaId: 'r1',
+      activa: false,
+    });
     const put = pedidos.find((p) => p.metodo === 'PUT')!;
     expect(put.ruta).toBe('/viajes/api/v1/rutas/r1');
+    expect(JSON.parse(put.cuerpo).activa).toBe(false);
     expect(put.cabeceras['idempotency-key']).toBe('clave-ruta');
   });
 

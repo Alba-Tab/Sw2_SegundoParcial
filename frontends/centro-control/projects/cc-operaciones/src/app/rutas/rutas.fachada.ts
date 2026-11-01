@@ -19,7 +19,7 @@ export class RutasFachada {
 
   /** Alta (G4): devuelve el id de la ruta creada. */
   async crear(valores: ValoresRuta): Promise<string | undefined> {
-    const input = aInputRuta(valores);
+    const input = aInputRuta(valores, true);
     const r = await this.intentos.enviar('crearRuta', input, (clave) => this.repo.crear({ ...input, claveIdempotencia: clave }));
     await this.consulta.refetch();
     return r.data?.crearRuta.rutaId;

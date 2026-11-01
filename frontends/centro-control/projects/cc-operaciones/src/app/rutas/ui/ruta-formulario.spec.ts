@@ -42,6 +42,12 @@ describe('formulario de ruta (G4)', () => {
     expect(c.texto(c.form.controls.radioMetros)).toBe('Escribe un número entero de metros.');
     c.form.controls.radioMetros.setValue(300);
     c.enviar(raiz);
-    expect(emitidos).toEqual([expect.objectContaining({ nombre: 'SCZ - LPZ', radioMetros: 300, activa: true })]);
+    expect(emitidos).toEqual([expect.objectContaining({ nombre: 'SCZ - LPZ', radioMetros: 300 })]);
+  });
+
+  it('el alta no ofrece activarla y dice que queda inactiva hasta tener su tarifa (F1-2)', () => {
+    const { raiz } = crear();
+    expect(raiz.querySelector('mat-checkbox')).toBeNull();
+    expect(raiz.textContent).toContain('La ruta queda inactiva hasta tener su tarifa.');
   });
 });

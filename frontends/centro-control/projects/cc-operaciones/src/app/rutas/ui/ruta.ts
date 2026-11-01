@@ -2,7 +2,7 @@ import { afterNextRender, Component, effect, inject, Injector, input, signal, vi
 import { MatButton, MatButtonModule } from '@angular/material/button';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { AvisoServicios, Encabezado, enfocarTitulo, Esqueleto, mensajeDe, NumeroPipe, Sesion } from 'ui-comun';
-import { ROLES_GESTION_RUTAS, textoActiva, type ValoresRuta } from '../domain/ruta';
+import { AVISO_ACTIVAR_SIN_TARIFA, ROLES_GESTION_RUTAS, textoActiva, type ValoresRuta } from '../domain/ruta';
 import { RutaFachada } from '../rutas.fachada';
 import { RutaFormulario } from './ruta-formulario';
 
@@ -49,6 +49,11 @@ import { RutaFormulario } from './ruta-formulario';
           (cancelar)="cerrar()"
         />
       }
+      @if (r.activa === false) {
+        <p class="secundario" role="status">Inactiva: no se cotiza ni se programa. {{ avisoActivar }}</p>
+      } @else if (gestiona) {
+        <p class="secundario">Activa: si Finanzas no tiene su tarifa para una carga, el portal no puede cotizarla.</p>
+      }
       <dl class="datos">
         <div>
           <dt>Estado</dt>
@@ -87,6 +92,7 @@ export class RutaPagina {
   readonly cargando = this.fachada.cargando;
   readonly campos = { ruta: 'Viajes' };
   readonly textoActiva = textoActiva;
+  readonly avisoActivar = AVISO_ACTIVAR_SIN_TARIFA;
   readonly editando = signal(false);
   readonly enviando = signal(false);
   readonly recargar = () => this.fachada.recargar();

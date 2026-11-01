@@ -1,6 +1,7 @@
 package bo.transporte.viajes.dominio.ruta;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import bo.transporte.viajes.dominio.comun.ErrorDeDominio;
@@ -30,6 +31,8 @@ class DatosRutaTest {
         var r = Ruta.de(UUID.randomUUID(), d, 3);
         assertEquals(3, r.versionAgregado());
         assertEquals(300, r.radioMetros());
+        assertFalse(d.inactiva().activa(), "F1-2: el alta nace inactiva");
+        assertEquals(d.nombre(), d.inactiva().nombre());
     }
 
     @Test

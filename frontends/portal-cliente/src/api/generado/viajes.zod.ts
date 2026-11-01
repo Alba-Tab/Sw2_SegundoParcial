@@ -375,8 +375,10 @@ export const ListarRutasResponseItem = zod.object({
 export const ListarRutasResponse = zod.array(ListarRutasResponseItem);
 
 /**
- * En una transacción crea la ruta con `versionAgregado = 1`, audita y deja `RutaActualizada` en el Outbox
- * (Finanzas y Analítica crean su copia). La distancia se guarda con un decimal.
+ * La ruta **nace inactiva** (`activa: false`): las tarifas siguen de semilla (D10) y sin tarifa no se puede
+ * cotizar; se activa con la edición. Sin `activa` en el cuerpo: si viene, 400 `VALIDACION`. En una transacción
+ * crea la ruta con `versionAgregado = 1`, audita y deja `RutaActualizada` en el Outbox (Finanzas y Analítica
+ * crean su copia). La distancia se guarda con un decimal.
  * @summary Alta de una ruta (gerente, despachador). G4, D104.
  */
 export const CrearRutaHeader = zod.object({
@@ -434,7 +436,7 @@ export const CrearRutaBody = zod
         .describe('Radio de la geocerca (D06).'),
     }),
     distanciaKm: zod.number().gt(crearRutaBodyDistanciaKmExclusiveMin).max(crearRutaBodyDistanciaKmMax),
-    activa: zod.boolean(),
+    activa: zod.boolean().optional().describe('Solo en la edición, donde es obligatoria; en el alta no va (la ruta nace inactiva).'),
   })
   .describe('Alta o edición de una ruta (G4). Los mismos límites que RutaActualizada.v1.');
 
@@ -542,8 +544,10 @@ export const ObtenerRutaResponse = zod.object({
 });
 
 /**
- * Documento completo. En una transacción, con la fila bloqueada, sube `versionAgregado`, audita y deja
- * `RutaActualizada` en el Outbox. Los viajes ya programados conservan la ruta; una ruta inactiva no se cotiza.
+ * Documento completo, con `activa` obligatoria (sin ella, 400 `VALIDACION`). Activar una ruta sin tarifa en
+ * Finanzas hace que cotizarla responda 422 `RUTA_SIN_TARIFA`. En una transacción, con la fila bloqueada, sube
+ * `versionAgregado`, audita y deja `RutaActualizada` en el Outbox. Los viajes ya programados conservan la ruta;
+ * una ruta inactiva no se cotiza.
  * @summary Edición de una ruta, también para activarla o desactivarla (gerente, despachador). G4, D104.
  */
 export const ActualizarRutaParams = zod.object({
@@ -605,7 +609,7 @@ export const ActualizarRutaBody = zod
         .describe('Radio de la geocerca (D06).'),
     }),
     distanciaKm: zod.number().gt(actualizarRutaBodyDistanciaKmExclusiveMin).max(actualizarRutaBodyDistanciaKmMax),
-    activa: zod.boolean(),
+    activa: zod.boolean().optional().describe('Solo en la edición, donde es obligatoria; en el alta no va (la ruta nace inactiva).'),
   })
   .describe('Alta o edición de una ruta (G4). Los mismos límites que RutaActualizada.v1.');
 
