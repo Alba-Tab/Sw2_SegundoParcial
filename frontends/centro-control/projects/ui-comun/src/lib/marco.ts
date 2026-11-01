@@ -73,16 +73,17 @@ export async function appDisponible(urlApp: string, pedir: typeof fetch = (url, 
         <button
           mat-icon-button
           [matMenuTriggerFor]="menuAlertas"
-          aria-label="Alertas"
+          [attr.aria-label]="alertas.disponible() ? 'Alertas' : 'Alertas no disponibles: el servicio de alertas no responde'"
+          [matTooltip]="alertas.disponible() ? '' : 'Alertas no disponibles: el servicio de alertas no responde'"
           [matBadge]="alertas.abiertas() || null"
           [matBadgeDescription]="descripcionAlertas()"
           matBadgeColor="warn"
         >
-          <mat-icon>{{ alertas.disponible() ? 'notifications' : 'notifications_off' }}</mat-icon>
+          <mat-icon>{{ alertas.disponible() ? 'notifications' : 'cloud_off' }}</mat-icon>
         </button>
         <mat-menu #menuAlertas="matMenu" class="menu-alertas">
           @if (!alertas.disponible()) {
-            <p class="aviso">Alertas no disponibles</p>
+            <p class="aviso">Alertas no disponibles: el servicio de alertas no responde. Se reintenta solo.</p>
           }
           @if (alertas.errorAtencion(); as e) {
             <p class="aviso no-atendida" role="alert">{{ e }}</p>

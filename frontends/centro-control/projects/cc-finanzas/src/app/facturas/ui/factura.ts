@@ -1,4 +1,4 @@
-import { Component, effect, inject, input, signal } from '@angular/core';
+import { Component, computed, effect, inject, input, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -42,19 +42,49 @@ import { FacturaFachada } from '../facturas.fachada';
       @if (factura(); as f) {
         <cc-estado grupo="EstadoFactura" [valor]="f.estado" />
       }
+      @if (puedeRegistrar()) {
+        <button
+          mat-flat-button
+          (click)="registrando.set(!registrando())"
+          [attr.aria-expanded]="registrando()"
+          aria-controls="registrar-pago"
+        >
+          <mat-icon>price_check</mat-icon>Registrar pago
+        </button>
+      }
     </cc-encabezado>
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!factura()" />
     @if (factura(); as f) {
-      <p>{{ f.razonSocial }} · emitida {{ f.emitidaEl | fecha }} · vence {{ f.venceEl | fecha }}</p>
-      <p><b>Monto:</b> {{ f.monto | bob }} · <b>Saldo:</b> {{ f.saldo | bob }}</p>
+      <dl class="datos">
+        <div>
+          <dt>Cliente</dt>
+          <dd>{{ f.razonSocial }}</dd>
+        </div>
+        <div>
+          <dt>Emitida</dt>
+          <dd>{{ f.emitidaEl | fecha }}</dd>
+        </div>
+        <div>
+          <dt>Monto</dt>
+          <dd>{{ f.monto | bob }}</dd>
+        </div>
+        <div>
+          <dt>Saldo</dt>
+          <dd>{{ f.saldo | bob }}</dd>
+        </div>
+        <div>
+          <dt>Vence</dt>
+          <dd>{{ f.venceEl | fecha }}</dd>
+        </div>
+      </dl>
 
-      @if (sesion.tiene('administracion') && f.saldo !== '0.00') {
-        <mat-card class="pago">
+      @if (registrando() && puedeRegistrar()) {
+        <mat-card class="pago" id="registrar-pago">
           <mat-card-header><mat-card-title>Registrar pago</mat-card-title></mat-card-header>
           <mat-card-content>
             <div class="fila-acciones">
               <label class="recibo" mat-stroked-button>
-                <mat-icon>document_scanner</mat-icon> Leer recibo (OCR)
+                <mat-icon>document_scanner</mat-icon>Leer recibo (OCR)
                 <input type="file" accept="image/*" (change)="ocr($event)" hidden />
               </label>
               @if (leyendo()) {
@@ -79,7 +109,12 @@ import { FacturaFachada } from '../facturas.fachada';
               </mat-form-field>
               <mat-form-field><mat-label>Referencia</mat-label><input matInput [(ngModel)]="pago.referencia" /></mat-form-field>
             </div>
-            <button mat-flat-button (click)="registrar(f.facturaId)" [disabled]="enviando() || !valido()">Registrar pago</button>
+            <div class="fila-acciones">
+              <button mat-flat-button (click)="registrar(f.facturaId)" [disabled]="enviando() || !valido()">
+                <mat-icon>price_check</mat-icon>Guardar el pago
+              </button>
+              <button mat-button (click)="registrando.set(false)" [disabled]="enviando()">Cancelar</button>
+            </div>
           </mat-card-content>
         </mat-card>
       }
@@ -118,6 +153,9 @@ export class FacturaPagina {
   readonly medios = MEDIOS_PAGO;
   readonly enviando = signal(false);
   readonly leyendo = signal(false);
+  /** El formulario de pago se abre desde la acción del encabezado; solo administración y con saldo. */
+  readonly registrando = signal(false);
+  readonly puedeRegistrar = computed(() => this.sesion.tiene('administracion') && !!this.factura() && this.factura()!.saldo !== '0.00');
   pago = pagoNuevo();
 
   constructor() {

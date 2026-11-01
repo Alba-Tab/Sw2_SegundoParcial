@@ -1,39 +1,97 @@
-import { Component, inject } from '@angular/core';
-import { MatCardModule } from '@angular/material/card';
+import { Component, computed, inject } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
+import { MatSortModule } from '@angular/material/sort';
+import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { Encabezado, AvisoServicios, FechaPipe } from 'ui-comun';
+import { AvisoServicios, controlLista, Encabezado, FechaPipe, FiltrosLista, PieLista } from 'ui-comun';
+import { textoViaje } from '../domain/viaje';
 import { EntregasFachada } from '../viajes.fachada';
 
 /** Spec 007: entregas fuera de la geocerca o sin firma, para aprobar o rechazar en el detalle del viaje. */
 @Component({
   selector: 'app-entregas',
   providers: [EntregasFachada],
-  imports: [Encabezado, MatCardModule, RouterLink, FechaPipe, AvisoServicios],
+  imports: [
+    Encabezado,
+    MatTableModule,
+    MatSortModule,
+    MatButtonModule,
+    MatIconModule,
+    RouterLink,
+    FechaPipe,
+    AvisoServicios,
+    FiltrosLista,
+    PieLista,
+  ],
   template: `
-    <cc-encabezado titulo="Entregas observadas" />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!datos()?.data?.entregasObservadas?.length" />
-    <div class="tarjetas">
-      @for (v of datos()?.data?.entregasObservadas ?? []; track v.viajeId) {
-        <mat-card>
-          <mat-card-header
-            ><mat-card-title>{{ v.placa }} · {{ v.cliente?.razonSocial }}</mat-card-title></mat-card-header
-          >
-          <mat-card-content>
-            <p>{{ v.ruta?.nombre }} · {{ v.entrega?.registradaEn | fecha: true }}</p>
-            <p>A {{ v.entrega?.distanciaMetros }} m del destino · {{ v.entrega?.conFirma ? 'con firma' : 'sin firma' }}</p>
-            <p class="secundario">{{ v.entrega?.razones?.join(', ') }}</p>
-            <a [routerLink]="['/viajes', v.viajeId]">Revisar y decidir →</a>
-          </mat-card-content>
-        </mat-card>
-      } @empty {
-        <p class="secundario">No hay entregas observadas.</p>
-      }
+    <cc-encabezado titulo="Entregas observadas" subtitulo="Fuera de la geocerca o sin firma: se aprueban o rechazan en el viaje" />
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!lista.filas().length" />
+    <cc-filtros-lista [control]="lista" busqueda="Buscar por placa, cliente, ruta o chofer" nombre="entregas" singular="entrega" />
+    <div class="tabla-ancha">
+      <table
+        mat-table
+        [dataSource]="lista.visibles()"
+        matSort
+        [matSortActive]="lista.orden()"
+        [matSortDirection]="lista.dir()"
+        (matSortChange)="lista.ordenarPor($event)"
+      >
+        <ng-container matColumnDef="placa"
+          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Placa</th>
+          <td mat-cell *matCellDef="let v">{{ v.placa }}</td></ng-container
+        >
+        <ng-container matColumnDef="cliente"
+          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Cliente</th>
+          <td mat-cell *matCellDef="let v">{{ v.cliente?.razonSocial }}</td></ng-container
+        >
+        <ng-container matColumnDef="ruta"
+          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Ruta</th>
+          <td mat-cell *matCellDef="let v">{{ v.ruta?.nombre }}</td></ng-container
+        >
+        <ng-container matColumnDef="registrada"
+          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Registrada</th>
+          <td mat-cell *matCellDef="let v">{{ v.entrega?.registradaEn | fecha: true }}</td></ng-container
+        >
+        <ng-container matColumnDef="distancia"
+          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Distancia al destino</th>
+          <td mat-cell *matCellDef="let v">{{ v.entrega?.distanciaMetros }} m</td></ng-container
+        >
+        <ng-container matColumnDef="observacion"
+          ><th mat-header-cell *matHeaderCellDef>Observación</th>
+          <td mat-cell *matCellDef="let v">
+            {{ v.entrega?.conFirma ? 'Con firma' : 'Sin firma'
+            }}{{ v.entrega?.razones?.length ? ' · ' + v.entrega.razones.join(', ') : '' }}
+          </td></ng-container
+        >
+        <ng-container matColumnDef="accion"
+          ><th mat-header-cell *matHeaderCellDef><span class="cdk-visually-hidden">Acción</span></th>
+          <td mat-cell *matCellDef="let v">
+            <a mat-stroked-button [routerLink]="['/viajes', v.viajeId]"><mat-icon>rule</mat-icon>Revisar y decidir</a>
+          </td></ng-container
+        >
+        <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+        <tr mat-row *matRowDef="let v; columns: columnas"></tr>
+      </table>
     </div>
+    <cc-pie-lista [control]="lista" nombre="entregas observadas" vacio="No hay entregas observadas." [error]="error()" />
   `,
 })
 export class EntregasPagina {
   private readonly fachada = inject(EntregasFachada);
-  readonly datos = this.fachada.datos;
   readonly error = this.fachada.error;
   readonly campos = { entregasObservadas: 'Viajes' };
+  readonly columnas = ['placa', 'cliente', 'ruta', 'registrada', 'distancia', 'observacion', 'accion'];
+  readonly lista = controlLista({
+    filas: computed(() => this.fachada.datos()?.data?.entregasObservadas ?? []),
+    texto: textoViaje,
+    orden: {
+      placa: (v) => v.placa,
+      cliente: (v) => v.cliente?.razonSocial,
+      ruta: (v) => v.ruta?.nombre,
+      registrada: (v) => v.entrega?.registradaEn,
+      distancia: (v) => v.entrega?.distanciaMetros,
+    },
+    ordenInicial: { orden: 'registrada', dir: 'asc' },
+  });
 }

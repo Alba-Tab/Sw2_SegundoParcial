@@ -1,20 +1,21 @@
 import { Component, inject } from '@angular/core';
+import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Sesion } from 'ui-comun';
 import { puedeAbrir, type Pagina } from './tablero/domain/tablero';
 
-const ENLACES: { ruta: '' | Pagina; titulo: string }[] = [
-  { ruta: '', titulo: 'Tablero' },
-  { ruta: 'reportes', titulo: 'Reportes' },
-  { ruta: 'voz', titulo: 'Pregunta por voz' },
-  { ruta: 'agente', titulo: 'Agente' },
+const ENLACES: { ruta: '' | Pagina; titulo: string; icono: string }[] = [
+  { ruta: '', titulo: 'Tablero', icono: 'dashboard' },
+  { ruta: 'reportes', titulo: 'Reportes', icono: 'bar_chart' },
+  { ruta: 'voz', titulo: 'Pregunta por voz', icono: 'mic' },
+  { ruta: 'agente', titulo: 'Agente', icono: 'smart_toy' },
 ];
 
 /** Pestañas del tablero (N2): reportes y voz (spec 015) y el agente (spec 014), solo para los roles que los usan. */
 @Component({
   selector: 'app-seccion',
-  imports: [MatTabsModule, RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [MatTabsModule, MatIconModule, RouterLink, RouterLinkActive, RouterOutlet],
   template: `
     <nav mat-tab-nav-bar [tabPanel]="panel" aria-label="Tablero">
       @for (e of enlaces; track e.ruta) {
@@ -25,6 +26,7 @@ const ENLACES: { ruta: '' | Pagina; titulo: string }[] = [
           [routerLinkActiveOptions]="{ exact: !e.ruta }"
           #a="routerLinkActive"
           [active]="a.isActive"
+          ><mat-icon>{{ e.icono }}</mat-icon
           >{{ e.titulo }}</a
         >
       }

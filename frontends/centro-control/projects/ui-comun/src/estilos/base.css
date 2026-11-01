@@ -57,3 +57,41 @@ h3 {
 table {
   width: 100%;
 }
+
+/* Detalle (U2): lista de definiciones en dos columnas que pasa a una en pantallas angostas. Sin tarjetas. */
+.datos {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 32px;
+  margin: 0 0 24px;
+}
+.datos > div {
+  min-width: 0;
+}
+.datos dt {
+  font: var(--mat-sys-label-large);
+  color: var(--mat-sys-on-surface-variant);
+}
+.datos dd {
+  margin: 2px 0 0;
+  font: var(--mat-sys-body-large);
+  overflow-wrap: anywhere;
+}
+.datos .completo {
+  grid-column: 1 / -1;
+}
+@media (max-width: 600px) {
+  .datos {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Icono dentro de una pestaña de sección: acompaña al texto. */
+.mat-mdc-tab-link mat-icon {
+  margin-right: 8px;
+}
+
+/* Fila marcada al llegar desde una alerta (`/combustible/:id`). */
+tr.marcada {
+  background: var(--mat-sys-error-container);
+}

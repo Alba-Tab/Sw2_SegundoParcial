@@ -3,12 +3,24 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { RouterLink } from '@angular/router';
-import { Encabezado, AvisoServicios, CONFIG_CENTRO, Estado, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import {
+  AvisoServicios,
+  CONFIG_CENTRO,
+  controlLista,
+  Encabezado,
+  Estado,
+  FechaPipe,
+  FiltrosLista,
+  mensajeDe,
+  PieLista,
+  Sesion,
+} from 'ui-comun';
 import { AccionesFachada } from '../acciones.fachada';
-import { conLaElegidaPrimero } from '../domain/accion';
+import { conLaElegidaPrimero, type Accion } from '../domain/accion';
 
 /**
  * CU-18 (spec 014): el agente propone; el despachador revisa la evidencia, edita el mensaje y aprueba (sale el correo
@@ -22,12 +34,15 @@ import { conLaElegidaPrimero } from '../domain/accion';
     FormsModule,
     MatCardModule,
     MatButtonModule,
+    MatIconModule,
     MatFormFieldModule,
     MatInputModule,
     RouterLink,
     FechaPipe,
     Estado,
     AvisoServicios,
+    FiltrosLista,
+    PieLista,
   ],
   template: `
     <cc-encabezado
@@ -35,8 +50,9 @@ import { conLaElegidaPrimero } from '../domain/accion';
       [migas]="id() ? [{ texto: 'Acciones del agente', ruta: '/acciones' }, { texto: 'Acción propuesta' }] : []"
     />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!visibles().length" />
+    <cc-filtros-lista [control]="lista" busqueda="Buscar por cliente o placa" grupo="EstadoAccion" nombre="acciones" singular="acción" />
     <div class="lista">
-      @for (a of visibles(); track a.accionId) {
+      @for (a of lista.visibles(); track a.accionId) {
         <mat-card [class.elegida]="a.accionId === id()">
           <mat-card-header>
             <mat-card-title>Avisar retraso a {{ a.razonSocial }}</mat-card-title>
@@ -74,12 +90,14 @@ import { conLaElegidaPrimero } from '../domain/accion';
                   (click)="aprobar(a.accionId)"
                   [disabled]="enviando() || (mensajes[a.accionId] ?? '').trim().length < 10"
                 >
-                  Aprobar y enviar
+                  <mat-icon>send</mat-icon>Aprobar y enviar
                 </button>
                 <mat-form-field
                   ><mat-label>Motivo del rechazo</mat-label><input matInput [(ngModel)]="motivos[a.accionId]"
                 /></mat-form-field>
-                <button mat-stroked-button (click)="rechazar(a.accionId)" [disabled]="enviando()">Rechazar</button>
+                <button mat-stroked-button (click)="rechazar(a.accionId)" [disabled]="enviando()">
+                  <mat-icon>block</mat-icon>Rechazar
+                </button>
               </div>
             } @else {
               <p class="mensaje-final">“{{ a.mensaje }}”</p>
@@ -89,10 +107,9 @@ import { conLaElegidaPrimero } from '../domain/accion';
             }
           </mat-card-content>
         </mat-card>
-      } @empty {
-        <p class="secundario">El agente no propuso acciones.</p>
       }
     </div>
+    <cc-pie-lista [control]="lista" nombre="acciones" vacio="El agente no propuso acciones." [error]="error()" />
   `,
   styles: `
     .lista {
@@ -108,7 +125,6 @@ import { conLaElegidaPrimero } from '../domain/accion';
     }
     .evidencia {
       margin: 4px 0;
-      font-size: 14px;
     }
     .mensaje-final {
       font-style: italic;
@@ -128,6 +144,11 @@ export class AccionesPagina {
     return conLaElegidaPrimero(todas, this.id());
   });
   readonly error = this.fachada.error;
+  readonly lista = controlLista<Accion>({
+    filas: this.visibles,
+    texto: (a) => [a.razonSocial, a.viaje?.placa, a.viaje?.ruta?.destino].filter(Boolean).join(' '),
+    estado: (a) => a.estado,
+  });
   readonly campos = { accionesPropuestas: 'Analítica', viaje: 'Viajes' };
   readonly enviando = signal(false);
   mensajes: Record<string, string> = {};

@@ -2,10 +2,26 @@ import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
-import { Encabezado, AvisoServicios, BobPipe, CONFIG_CENTRO, EtiquetaPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import {
+  aCentavos,
+  AvisoServicios,
+  BobPipe,
+  CONFIG_CENTRO,
+  controlLista,
+  Encabezado,
+  etiqueta,
+  EtiquetaPipe,
+  FechaPipe,
+  FiltrosLista,
+  mensajeDe,
+  PieLista,
+  Sesion,
+} from 'ui-comun';
 import { motivoCancelacionValido } from '../domain/servicio';
 import { ServiciosFachada } from '../servicios.fachada';
 
@@ -20,41 +36,53 @@ import { ServiciosFachada } from '../servicios.fachada';
     Encabezado,
     FormsModule,
     MatTableModule,
+    MatSortModule,
     MatButtonModule,
+    MatIconModule,
     MatFormFieldModule,
     MatInputModule,
     BobPipe,
     FechaPipe,
     EtiquetaPipe,
     AvisoServicios,
+    FiltrosLista,
+    PieLista,
   ],
   template: `
     <cc-encabezado titulo="Servicios confirmados" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!servicios().length" />
+    <cc-filtros-lista [control]="lista" busqueda="Buscar por cliente, placa o chofer" nombre="servicios" singular="servicio" />
     <div class="tabla-ancha">
-      <table mat-table [dataSource]="servicios()">
+      <table
+        mat-table
+        [dataSource]="lista.visibles()"
+        matSort
+        [matSortActive]="lista.orden()"
+        [matSortDirection]="lista.dir()"
+        (matSortChange)="lista.ordenarPor($event)"
+      >
         <ng-container matColumnDef="cliente"
-          ><th mat-header-cell *matHeaderCellDef>Cliente</th>
+          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Cliente</th>
           <td mat-cell *matCellDef="let s">{{ nombre(s.clienteId) }}</td></ng-container
         >
         <ng-container matColumnDef="carga"
-          ><th mat-header-cell *matHeaderCellDef>Carga</th>
+          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Carga</th>
           <td mat-cell *matCellDef="let s">{{ s.tipoCarga | etiqueta: 'TipoCarga' }} · {{ s.toneladas }} t</td></ng-container
         >
         <ng-container matColumnDef="fecha"
-          ><th mat-header-cell *matHeaderCellDef>Fecha</th>
+          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha</th>
           <td mat-cell *matCellDef="let s">{{ s.fechaViaje | fecha }}</td></ng-container
         >
         <ng-container matColumnDef="unidad"
-          ><th mat-header-cell *matHeaderCellDef>Unidad</th>
+          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Unidad</th>
           <td mat-cell *matCellDef="let s">{{ s.placa }} · {{ s.choferNombre }}</td></ng-container
         >
         <ng-container matColumnDef="monto"
-          ><th mat-header-cell *matHeaderCellDef>Monto</th>
+          ><th mat-header-cell *matHeaderCellDef mat-sort-header>Monto</th>
           <td mat-cell *matCellDef="let s">{{ s.monto | bob }}</td></ng-container
         >
         <ng-container matColumnDef="acciones">
-          <th mat-header-cell *matHeaderCellDef></th>
+          <th mat-header-cell *matHeaderCellDef><span class="cdk-visually-hidden">Acciones</span></th>
           <td mat-cell *matCellDef="let s">
             @if (puedeCancelar() && s.confirmacionCompleta) {
               @if (confirmando() === s.servicioId) {
@@ -65,17 +93,19 @@ import { ServiciosFachada } from '../servicios.fachada';
                     ><input matInput [(ngModel)]="motivos[s.servicioId]" minlength="3" maxlength="300" required
                   /></mat-form-field>
                   <button mat-flat-button (click)="cancelar(s.servicioId)" [disabled]="!motivoValido(s.servicioId) || enviando()">
-                    Sí, cancelar el servicio
+                    <mat-icon>cancel</mat-icon>Sí, cancelar el servicio
                   </button>
                   <button mat-button (click)="confirmando.set(null)" [disabled]="enviando()">No</button>
                 </div>
               } @else {
-                <button mat-button (click)="confirmando.set(s.servicioId)" [disabled]="enviando()">Cancelar…</button>
+                <button mat-button (click)="confirmando.set(s.servicioId)" [disabled]="enviando()">
+                  <mat-icon>cancel</mat-icon>Cancelar…
+                </button>
               }
             }
             @if (sesion.tiene('comercial')) {
-              <a mat-button [href]="config.urls['portal-cliente'] + '/servicios?clienteId=' + s.clienteId" target="_blank"
-                >Ver como cliente</a
+              <a mat-button [href]="config.urls['portal-cliente'] + '/servicios?clienteId=' + s.clienteId" target="_blank" rel="noopener"
+                ><mat-icon>open_in_new</mat-icon>Ver como cliente <span class="cdk-visually-hidden">(se abre en otra pestaña)</span></a
               >
             }
           </td>
@@ -84,6 +114,7 @@ import { ServiciosFachada } from '../servicios.fachada';
         <tr mat-row *matRowDef="let s; columns: columnas()"></tr>
       </table>
     </div>
+    <cc-pie-lista [control]="lista" nombre="servicios" vacio="No hay servicios confirmados." [error]="error()" />
   `,
   styles: `
     .confirmacion {
@@ -113,6 +144,18 @@ export class ServiciosPagina {
       ? ['cliente', 'carga', 'fecha', 'unidad', 'monto', 'acciones']
       : ['cliente', 'carga', 'fecha', 'unidad', 'acciones'],
   );
+  readonly lista = controlLista({
+    filas: this.servicios,
+    texto: (s) => [this.nombre(s.clienteId ?? ''), s.placa, s.choferNombre, etiqueta('TipoCarga', s.tipoCarga).texto].join(' '),
+    orden: {
+      cliente: (s) => this.nombre(s.clienteId ?? ''),
+      carga: (s) => etiqueta('TipoCarga', s.tipoCarga).texto,
+      fecha: (s) => s.fechaViaje,
+      unidad: (s) => s.placa,
+      monto: (s) => aCentavos(s.monto ?? ''),
+    },
+    ordenInicial: { orden: 'fecha', dir: 'asc' },
+  });
   readonly enviando = signal(false);
   /** La fila que está pidiendo confirmación; cada fila tiene su propio motivo. */
   readonly confirmando = signal<string | null>(null);

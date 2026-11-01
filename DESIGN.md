@@ -71,6 +71,34 @@ Material Symbols Outlined (paquete `material-symbols`), cargado en `base.css` y 
 | `build` | Mantenimiento |
 | `schedule` | Riesgo de retraso |
 | `help` | Valor desconocido |
+| `cloud_off` | Un servicio no responde (aviso de servicios, alertas no disponibles) |
+| `notifications` | Alertas |
+| `thumb_up` | Aprobar, aprobado |
+| `send` | Enviar al cliente |
+| `rule` | Revisar y decidir |
+| `replay` | Reintentar |
+| `task_alt` | Marcar resuelto |
+| `price_check` | Registrar un pago |
+| `document_scanner` | Leer un recibo (OCR) |
+| `open_in_new` | Se abre en otra pestaña o app |
+| `search`, `search_off`, `filter_alt_off` | Buscar, sin resultados, limpiar filtros |
+| `arrow_back`, `logout` | Volver, cerrar sesión |
+
+**Secciones y menú.** Cada pestaña lleva su ícono y el portal usa el mismo para la misma idea:
+
+| Ícono | Sección |
+|---|---|
+| `dashboard`, `bar_chart`, `mic`, `smart_toy` | Tablero, Reportes, Pregunta por voz, Agente (y Acciones del agente) |
+| `route` | Viajes |
+| `map` | Mapa en vivo |
+| `warning`, `error` | Entregas observadas, Intervenciones (los mismos íconos de su estado) |
+| `assignment` | Servicios (portal: «Mis servicios») |
+| `local_shipping`, `local_gas_station`, `speed` | Unidades, Combustible, Conducción |
+| `receipt_long` | Facturas |
+| `account_balance_wallet`, `credit_score`, `request_quote` | Cuentas por cobrar, Aprobación de crédito, Cotizaciones (portal: «Cotizar») |
+| `business`, `groups` | Portal: Mi empresa, Clientes |
+
+En el portal la página actual se marca con fondo y peso en el botón del menú, no con subrayado.
 
 ## Patrones de página
 
@@ -78,6 +106,14 @@ Material Symbols Outlined (paquete `material-symbols`), cargado en `base.css` y 
 
 **Lista.** Tabla de Material dentro de `.tabla-ancha` (scroll horizontal en pantallas angostas). La primera columna enlaza al detalle. El estado va en su columna con `cc-estado`. Si un servicio no responde, `cc-aviso-servicios` dice cuál y la tabla muestra lo que haya.
 
-**Detalle.** Encabezado, luego los datos agrupados en tarjetas (`.tarjetas`, grilla de 260 px mínimo) y las secciones con `h2` (bitácora, pagos, mantenimientos). Los formularios de una acción van en su propia tarjeta con título en verbo («Registrar pago», «Programar mantenimiento»).
+- `controlLista({ filas, texto, estado, orden, ordenInicial })` (ui-comun) busca sin tildes, filtra por estado, ordena y pagina en el navegador. Las funciones puras viven en `ui-comun/dominio/src/lista.ts`. El filtro vive en la URL (`q`, `estado`, `orden`, `dir`, `pagina`, `tamano`; con `prefijo` si hay dos listas en la página), así volver desde el detalle lo conserva y un enlace puede abrir la lista ya filtrada (`/unidades?estado=MANTENIMIENTO_PENDIENTE`).
+- Arriba `<cc-filtros-lista>`: búsqueda con etiqueta que dice por qué busca, selector de estado con las opciones de `ETIQUETAS` y el número de resultados con `role="status"`. Filtros propios de la página van proyectados y también en la URL (`lista.parametro()`, `lista.poner()`).
+- En la tabla, `matSort` con `mat-sort-header` (pone `aria-sort`). Los montos se ordenan en centavos (`aCentavos`), nunca en float.
+- Abajo `<cc-pie-lista>`: sin resultados por filtro, «No hay … con ese filtro» y «Limpiar filtros»; sin datos, el texto propio de la lista; si no, el paginador en español.
+- Una lista de tarjetas con formularios (aprobaciones, acciones del agente) usa el mismo control sin `matSort`.
 
-**Vacío, carga y error.** Barra de progreso indeterminada mientras carga sin datos; texto `.secundario` cuando no hay elementos; `cc-aviso-servicios` cuando falla una fuente.
+**Detalle.** Encabezado con el estado y las acciones (el botón de la acción abre su formulario debajo, con `aria-expanded`); si hay una decisión pendiente (entrega observada, intervención), va primero. Los datos van en una lista de definiciones `<dl class="datos">` (dos columnas, una en pantallas angostas; `.completo` ocupa el ancho), nunca en párrafos `<b>Etiqueta:</b> valor` ni en tarjetas anidadas. Después, las secciones con `h2` (riesgo, entrega, bitácora, pagos, mantenimientos). Los formularios de una acción van en su propia tarjeta con título en verbo («Registrar pago», «Programar mantenimiento»).
+
+**Tablero.** Primero «Pide acción»: lista de lo que hay que resolver (viajes en riesgo, facturas vencidas, unidades con mantenimiento pendiente, alertas abiertas), cada línea con ícono, tono de fondo y enlace a la app que lo resuelve con `?desde=cc-tablero`; si un servicio cae, la línea dice cuál en vez de callar. Después «Cifras del periodo» en una franja compacta y, al final, el detalle (viajes en curso, próximas a vencer). Sin grilla de tarjetas con cifra gigante.
+
+**Vacío, carga y error.** Barra de progreso indeterminada mientras carga sin datos; en una lista, `cc-pie-lista` dice qué pasa y cuál es el siguiente paso; `cc-aviso-servicios` cuando falla una fuente.

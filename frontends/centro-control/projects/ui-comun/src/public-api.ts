@@ -11,6 +11,7 @@ export * from './lib/configuracion';
 export * from './lib/errores';
 export * from './lib/estado';
 export * from './lib/formato';
+export * from './lib/lista';
 export * from './lib/marco';
 export * from './lib/no-encontrada';
 export * from './lib/proveedores';

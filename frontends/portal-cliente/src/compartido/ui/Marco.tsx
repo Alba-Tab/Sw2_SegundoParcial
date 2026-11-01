@@ -1,3 +1,9 @@
+import Assignment from '@mui/icons-material/Assignment';
+import Business from '@mui/icons-material/Business';
+import Groups from '@mui/icons-material/Groups';
+import Logout from '@mui/icons-material/Logout';
+import ReceiptLong from '@mui/icons-material/ReceiptLong';
+import RequestQuote from '@mui/icons-material/RequestQuote';
 import Alert from '@mui/material/Alert';
 import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
@@ -6,8 +12,10 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Container from '@mui/material/Container';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
+import { alpha } from '@mui/material/styles';
 import { useQueryClient } from '@tanstack/react-query';
 import { Navigate, Outlet, useRouterState } from '@tanstack/react-router';
+import type { ReactNode } from 'react';
 import { limpiarCache } from '../offline/cache';
 import { useCacheDelUsuario } from '../offline/useCacheDelUsuario';
 import { useEnLinea } from '../offline/useEnLinea';
@@ -18,17 +26,18 @@ import { Bienvenida } from './Bienvenida';
 import { BotonEnlace } from './BotonEnlace';
 
 type Ruta = '/cotizar' | '/servicios' | '/facturas' | '/empresa' | '/clientes';
-const MENU_CLIENTE: { a: Ruta; texto: string }[] = [
-  { a: '/cotizar', texto: 'Cotizar' },
-  { a: '/servicios', texto: 'Mis servicios' },
-  { a: '/facturas', texto: 'Facturas' },
-  { a: '/empresa', texto: 'Mi empresa' },
+// Un icono, un significado (DESIGN.md, "Iconografía"); el icono acompaña al texto y MUI lo marca aria-hidden.
+const MENU_CLIENTE: { a: Ruta; texto: string; icono: ReactNode }[] = [
+  { a: '/cotizar', texto: 'Cotizar', icono: <RequestQuote /> },
+  { a: '/servicios', texto: 'Mis servicios', icono: <Assignment /> },
+  { a: '/facturas', texto: 'Facturas', icono: <ReceiptLong /> },
+  { a: '/empresa', texto: 'Mi empresa', icono: <Business /> },
 ];
-const MENU_COMERCIAL: { a: Ruta; texto: string }[] = [
-  { a: '/clientes', texto: 'Clientes' },
-  { a: '/cotizar', texto: 'Cotizar' },
-  { a: '/servicios', texto: 'Servicios' },
-  { a: '/facturas', texto: 'Facturas' },
+const MENU_COMERCIAL: { a: Ruta; texto: string; icono: ReactNode }[] = [
+  { a: '/clientes', texto: 'Clientes', icono: <Groups /> },
+  { a: '/cotizar', texto: 'Cotizar', icono: <RequestQuote /> },
+  { a: '/servicios', texto: 'Servicios', icono: <Assignment /> },
+  { a: '/facturas', texto: 'Facturas', icono: <ReceiptLong /> },
 ];
 /** Lo que se puede leer sin conexión desde la caché (propuesta 6.4). */
 const SIN_CONEXION = ['/servicios', '/facturas'];
@@ -69,7 +78,13 @@ export function Marco() {
                 key={m.a}
                 color="inherit"
                 to={m.a}
-                activeProps={{ 'aria-current': 'page', style: { textDecoration: 'underline' } }}
+                startIcon={m.icono}
+                activeProps={{ 'aria-current': 'page' }}
+                // La página actual se marca con fondo y peso (I6), no con subrayado.
+                sx={{
+                  minHeight: 44,
+                  '&[aria-current="page"]': { bgcolor: (t) => alpha(t.palette.common.white, 0.18), fontWeight: 700 },
+                }}
               >
                 {m.texto}
               </BotonEnlace>
@@ -80,6 +95,8 @@ export function Marco() {
                 <Typography variant="body2">{s.nombre}</Typography>
                 <Button
                   color="inherit"
+                  startIcon={<Logout />}
+                  sx={{ minHeight: 44 }}
                   onClick={() => {
                     limpiarCache(consultas);
                     void s.cerrar();

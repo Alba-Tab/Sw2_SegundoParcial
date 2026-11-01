@@ -1,4 +1,5 @@
 import { Component, inject } from '@angular/core';
+import { MatIconModule } from '@angular/material/icon';
 import { MatTabsModule } from '@angular/material/tabs';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { Sesion } from 'ui-comun';
@@ -6,22 +7,25 @@ import { Sesion } from 'ui-comun';
 /** Las acciones del agente (accionesPropuestas): gerente y despachador (spec 014); comercial no las ve. */
 export const ROLES_ACCIONES = ['gerente', 'despachador'];
 
-const ENLACES: { ruta: string; titulo: string; roles?: string[] }[] = [
-  { ruta: 'viajes', titulo: 'Viajes' },
-  { ruta: 'mapa', titulo: 'Mapa en vivo' },
-  { ruta: 'entregas-observadas', titulo: 'Entregas observadas' },
-  { ruta: 'intervenciones', titulo: 'Intervenciones' },
-  { ruta: 'servicios', titulo: 'Servicios' },
-  { ruta: 'acciones', titulo: 'Acciones del agente', roles: ROLES_ACCIONES },
+const ENLACES: { ruta: string; titulo: string; icono: string; roles?: string[] }[] = [
+  { ruta: 'viajes', titulo: 'Viajes', icono: 'route' },
+  { ruta: 'mapa', titulo: 'Mapa en vivo', icono: 'map' },
+  { ruta: 'entregas-observadas', titulo: 'Entregas observadas', icono: 'warning' },
+  { ruta: 'intervenciones', titulo: 'Intervenciones', icono: 'error' },
+  { ruta: 'servicios', titulo: 'Servicios', icono: 'assignment' },
+  { ruta: 'acciones', titulo: 'Acciones del agente', icono: 'smart_toy', roles: ROLES_ACCIONES },
 ];
 
 @Component({
   selector: 'app-seccion',
-  imports: [MatTabsModule, RouterLink, RouterLinkActive, RouterOutlet],
+  imports: [MatTabsModule, MatIconModule, RouterLink, RouterLinkActive, RouterOutlet],
   template: `
     <nav mat-tab-nav-bar [tabPanel]="panel" aria-label="Operaciones">
       @for (e of enlaces; track e.ruta) {
-        <a mat-tab-link [routerLink]="e.ruta" routerLinkActive #a="routerLinkActive" [active]="a.isActive">{{ e.titulo }}</a>
+        <a mat-tab-link [routerLink]="e.ruta" routerLinkActive #a="routerLinkActive" [active]="a.isActive"
+          ><mat-icon>{{ e.icono }}</mat-icon
+          >{{ e.titulo }}</a
+        >
       }
     </nav>
     <mat-tab-nav-panel #panel

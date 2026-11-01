@@ -3,9 +3,22 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatSnackBar } from '@angular/material/snack-bar';
-import { Encabezado, AvisoServicios, BobPipe, Estado, EtiquetaPipe, FechaPipe, mensajeDe, Sesion } from 'ui-comun';
+import {
+  AvisoServicios,
+  BobPipe,
+  controlLista,
+  Encabezado,
+  Estado,
+  EtiquetaPipe,
+  FechaPipe,
+  FiltrosLista,
+  mensajeDe,
+  PieLista,
+  Sesion,
+} from 'ui-comun';
 import { CreditoFachada } from '../credito.fachada';
 import { puedeRechazar } from '../domain/credito';
 
@@ -18,6 +31,7 @@ import { puedeRechazar } from '../domain/credito';
     FormsModule,
     MatCardModule,
     MatButtonModule,
+    MatIconModule,
     MatFormFieldModule,
     MatInputModule,
     BobPipe,
@@ -25,12 +39,15 @@ import { puedeRechazar } from '../domain/credito';
     EtiquetaPipe,
     Estado,
     AvisoServicios,
+    FiltrosLista,
+    PieLista,
   ],
   template: `
     <cc-encabezado titulo="Aprobación de crédito" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!solicitudes().length" />
+    <cc-filtros-lista [control]="lista" busqueda="Buscar por cliente" grupo="EstadoAprobacion" nombre="solicitudes" singular="solicitud" />
     <div class="tarjetas">
-      @for (s of solicitudes(); track s.servicioId) {
+      @for (s of lista.visibles(); track s.servicioId) {
         <mat-card>
           <mat-card-header>
             <mat-card-title>{{ s.razonSocial }} · {{ s.monto | bob }}</mat-card-title>
@@ -53,13 +70,15 @@ import { puedeRechazar } from '../domain/credito';
                 ><mat-label>Motivo (obligatorio para rechazar)</mat-label><input matInput [(ngModel)]="motivos[s.servicioId]"
               /></mat-form-field>
               <div class="fila-acciones">
-                <button mat-flat-button (click)="decidir(s.servicioId, true)" [disabled]="enviando()">Aprobar</button>
+                <button mat-flat-button (click)="decidir(s.servicioId, true)" [disabled]="enviando()">
+                  <mat-icon>thumb_up</mat-icon>Aprobar
+                </button>
                 <button
                   mat-stroked-button
                   (click)="decidir(s.servicioId, false)"
                   [disabled]="enviando() || !puedeRechazar(motivos[s.servicioId])"
                 >
-                  Rechazar
+                  <mat-icon>block</mat-icon>Rechazar
                 </button>
               </div>
             } @else if (s.decididaPor) {
@@ -67,10 +86,9 @@ import { puedeRechazar } from '../domain/credito';
             }
           </mat-card-content>
         </mat-card>
-      } @empty {
-        <p class="secundario">No hay solicitudes.</p>
       }
     </div>
+    <cc-pie-lista [control]="lista" nombre="solicitudes" vacio="No hay solicitudes de aprobación." [error]="error()" />
   `,
   styles: `
     .ancho {
@@ -85,6 +103,11 @@ export class AprobacionesPagina {
   readonly solicitudes = this.fachada.solicitudes;
   readonly error = this.fachada.error;
   readonly campos = { solicitudesAprobacion: 'Finanzas' };
+  readonly lista = controlLista({
+    filas: this.solicitudes,
+    texto: (s) => s.razonSocial ?? '',
+    estado: (s) => s.estado,
+  });
   readonly enviando = signal(false);
   readonly puedeRechazar = puedeRechazar;
   motivos: Record<string, string> = {};

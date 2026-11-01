@@ -1,4 +1,5 @@
-import { cierreInicial, lineasChecklist, puedeProgramar, type Mantenimiento } from './unidad';
+import { filtrar } from 'ui-comun/dominio';
+import { cierreInicial, lineasChecklist, puedeProgramar, textoUnidad, type Mantenimiento, type Unidad } from './unidad';
 
 describe('unidades (dominio)', () => {
   it('el checklist es una línea por ítem, sin líneas vacías', () => {
@@ -14,5 +15,14 @@ describe('unidades (dominio)', () => {
     expect(puedeProgramar('DISPONIBLE')).toBe(true);
     expect(puedeProgramar('MANTENIMIENTO_PENDIENTE')).toBe(true);
     expect(puedeProgramar('EN_VIAJE')).toBe(false);
+  });
+
+  it('la búsqueda encuentra por placa y por el tipo como se lee en pantalla, sin tildes', () => {
+    const u = [
+      { placa: 'ABC-123', tipoUnidad: 'TRACTO', tipoRemolque: null },
+      { placa: 'R-77', tipoUnidad: 'REMOLQUE', tipoRemolque: 'FURGON' },
+    ] as unknown as Unidad[];
+    expect(filtrar(u, 'furgon', textoUnidad).map((x) => x.placa)).toEqual(['R-77']);
+    expect(filtrar(u, 'tracto', textoUnidad).map((x) => x.placa)).toEqual(['ABC-123']);
   });
 });

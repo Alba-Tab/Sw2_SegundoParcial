@@ -12,15 +12,21 @@ function montar(roles: string[], respuesta: { data?: unknown; error?: unknown })
   TestBed.configureTestingModule({
     providers: [
       provideRouter([]),
-      { provide: CONFIG_CENTRO, useValue: { app: 'cc-tablero', urls: { 'cc-operaciones': 'http://o' } } as unknown as ConfigCentro },
+      {
+        provide: CONFIG_CENTRO,
+        useValue: {
+          app: 'cc-tablero',
+          urls: { 'cc-operaciones': 'http://o', 'cc-flota': 'http://f', 'cc-finanzas': 'http://fi' },
+        } as unknown as ConfigCentro,
+      },
       { provide: Sesion, useValue: { roles: signal(roles) } },
       { provide: TableroRepositorio, useValue: { observar } },
     ],
   });
   const f = TestBed.createComponent(TableroPagina);
   f.detectChanges();
-  const texto = (f.nativeElement as HTMLElement).textContent ?? '';
-  return { observar, texto };
+  const el = f.nativeElement as HTMLElement;
+  return { observar, texto: el.textContent ?? '', el };
 }
 
 describe('Tablero por rol (spec 016, paso 10)', () => {
@@ -61,5 +67,42 @@ describe('Tablero por rol (spec 016, paso 10)', () => {
     });
     expect(texto).toContain('Sin acceso');
     expect(texto).toContain('Analítica no disponible');
+  });
+
+  it('lo que pide acción va primero y enlaza a la app que lo resuelve con ?desde=cc-tablero (U7, N3)', () => {
+    const { el } = montar(['gerente'], {
+      data: {
+        tablero: {
+          periodo: 'ESTA_SEMANA',
+          viajesEnCurso: [{ viajeId: 'v1', placa: 'AAA-1', riesgo: { enRiesgo: true, probabilidad: 0.7 } }],
+          unidadesPorEstado: [{ estado: 'MANTENIMIENTO_PENDIENTE', cantidad: 2 }],
+          cuentasPorCobrar: { saldoTotal: '100.00', facturasPorVencer: 0, facturasVencidas: 1, proximas: [] },
+          alertasAbiertas: 0,
+          datosAl: null,
+        },
+      },
+    });
+    const h2 = [...el.querySelectorAll('h2')].map((h) => h.textContent?.trim());
+    expect(h2.indexOf('Pide acción')).toBeLessThan(h2.indexOf('Cifras del periodo'));
+    const enlaces = [...el.querySelectorAll('.pendientes a')].map((a) => a.getAttribute('href'));
+    expect(enlaces).toEqual([
+      'http://o/viajes/v1?desde=cc-tablero',
+      'http://fi/cobranza?desde=cc-tablero',
+      'http://f/unidades?estado=MANTENIMIENTO_PENDIENTE&desde=cc-tablero',
+    ]);
+  });
+
+  it('sin pendientes lo dice, en vez de dejar la sección vacía', () => {
+    const { texto } = montar(['administracion'], {
+      data: {
+        tablero: {
+          periodo: 'ESTA_SEMANA',
+          cuentasPorCobrar: { saldoTotal: '0.00', facturasPorVencer: 0, facturasVencidas: 0, proximas: [] },
+          alertasAbiertas: 0,
+          datosAl: null,
+        },
+      },
+    });
+    expect(texto).toContain('Nada pide acción ahora.');
   });
 });
