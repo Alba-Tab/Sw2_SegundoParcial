@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -26,7 +26,8 @@ import { ReportesFachada } from '../reportes.fachada';
 
 /**
  * Los 5 reportes del catálogo con botones (spec 015): sin LLM ni MCP, `reporte(id, params)` va directo a Analítica.
- * "Exportar a Excel" pide un enlace HMAC al Gateway (D21) con una clave nueva por clic.
+ * "Exportar a Excel" pide un enlace HMAC al Gateway (D21) con una clave nueva por clic. La página abre con el primer
+ * reporte que el rol puede ver (el catálogo pone primero lo que pide acción: cobranza, riesgo), no con un lienzo vacío (JV-5).
  */
 @Component({
   selector: 'app-reportes',
@@ -69,6 +70,9 @@ import { ReportesFachada } from '../reportes.fachada';
         </button>
       }
     </div>
+    @if (definicion(); as d) {
+      <p class="secundario">{{ d.descripcion }}</p>
+    }
     @if (elegido(); as id) {
       <mat-card class="parametros">
         <mat-card-content>
@@ -203,6 +207,13 @@ export class ReportesPagina {
   });
   /** El reporte y los parámetros del resultado que se ve: "Exportar" usa estos, no lo que se editó después sin "Ver". */
   mostrado: { id: ReporteId; params: ReporteParams } | null = null;
+
+  constructor() {
+    effect(() => {
+      const primero = this.permitidos()[0]?.reporteId;
+      if (primero && !untracked(this.elegido)) untracked(() => this.elegir(primero));
+    });
+  }
 
   usa(campo: string): boolean {
     return usaParametro(this.definicion()?.parametros, campo);
