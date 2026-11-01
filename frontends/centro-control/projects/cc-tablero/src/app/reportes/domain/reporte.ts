@@ -1,13 +1,13 @@
-import { fechaLaPaz } from 'ui-comun/dominio';
+import { fechaLaPaz, paramsCobranza } from 'ui-comun/dominio';
 import type { ReporteId, ReporteParams } from '../../graphql/generado';
 
 /**
- * Parámetros con que abre cada reporte: cuentas por cobrar mira vencimientos ("esta semana" hacia adelante), viajes en
- * riesgo usa el umbral de 0,70 y los demás, el último mes (rentabilidad agrupada por ruta).
+ * Parámetros con que abre cada reporte: cuentas por cobrar, lo mismo que Finanzas (lo vencido de 2 meses y lo que vence
+ * en 30 días, NG-2), viajes en riesgo usa el umbral de 0,70 y los demás, el último mes (rentabilidad agrupada por ruta).
  */
 export function paramsPorDefecto(id: ReporteId, ahora = new Date()): ReporteParams {
   const dia = (n: number) => fechaLaPaz(n, ahora);
-  if (id === 'CUENTAS_POR_COBRAR') return { desde: dia(0), hasta: dia(6) };
+  if (id === 'CUENTAS_POR_COBRAR') return paramsCobranza(ahora);
   if (id === 'VIAJES_EN_RIESGO') return { umbral: 0.7 };
   return id === 'RENTABILIDAD' ? { desde: dia(-30), hasta: dia(0), agrupar: 'RUTA' } : { desde: dia(-30), hasta: dia(0) };
 }

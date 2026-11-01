@@ -1,10 +1,12 @@
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { Component, signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { Apollo } from 'apollo-angular';
 import { AvisoServicios } from './aviso-servicios';
 import { FechaPipe } from './formato';
-import { ordenarFilas } from './tabla-reporte';
+import { CONFIG_CENTRO, type ConfigCentro } from './configuracion';
+import { ordenarFilas, TablaReporte } from './tabla-reporte';
 import { mostrarFalloArranque } from './proveedores';
 
 describe('Reintentar (revisión E-2)', () => {
@@ -169,6 +171,39 @@ describe('tabla de un reporte', () => {
     expect(ordenarFilas(filas, col, 'desc').map((f) => f['saldo'])).toEqual(['10000.00', '2800.50', '900.00', null]);
     expect(ordenarFilas(filas, col, 'asc').map((f) => f['saldo'])).toEqual(['900.00', '2800.50', '10000.00', null]);
     expect(ordenarFilas(filas, undefined, '')).toEqual(filas);
+  });
+
+  it('NG-2: cuentas por cobrar separa vencida y por vencer, enlaza la factura en Finanzas y dice BOB en el encabezado', () => {
+    TestBed.configureTestingModule({
+      providers: [
+        provideRouter([]),
+        { provide: CONFIG_CENTRO, useValue: { app: 'cc-tablero', urls: { 'cc-finanzas': 'http://fi' } } as unknown as ConfigCentro },
+      ],
+    });
+    const f = TestBed.createComponent(TablaReporte);
+    f.componentRef.setInput('resultado', {
+      titulo: 'Cuentas por cobrar',
+      columnas: [
+        { clave: 'factura', titulo: 'Factura', tipo: 'TEXTO' },
+        { clave: 'saldo', titulo: 'Saldo', tipo: 'MONTO' },
+        { clave: 'vencida', titulo: 'Vencida', tipo: 'BOOLEANO' },
+      ],
+      filas: [
+        { facturaId: 'f1', factura: 'FAC-000001', saldo: '5000.00', vencida: true },
+        { facturaId: 'f2', factura: 'FAC-000002', saldo: '400.00', vencida: false },
+      ],
+      totales: { saldo: '5400.00' },
+      grafico: { tipo: 'BARRAS', ejeX: 'factura', series: [{ clave: 'saldo', titulo: 'Saldo' }], datos: [] },
+    });
+    f.detectChanges();
+    const el: HTMLElement = f.nativeElement;
+    expect([...el.querySelectorAll('th')].map((th) => th.textContent?.trim())).toContain('Saldo (BOB)');
+    expect(el.querySelector('td a')?.getAttribute('href')).toBe('http://fi/facturas/f1?desde=cc-tablero');
+    const chips = [...el.querySelectorAll('cc-estado')];
+    expect(chips.map((c) => [c.getAttribute('data-tono'), c.querySelector('mat-icon')?.textContent, c.lastChild?.textContent])).toEqual([
+      ['error', 'event_busy', 'Vencida'],
+      ['aviso', 'warning', 'Por vencer'],
+    ]);
   });
 });
 

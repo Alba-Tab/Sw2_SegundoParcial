@@ -198,6 +198,8 @@ export class ReportesPagina {
     placa: new FormControl<string | null>(null),
     umbral: new FormControl<number | null>(null, [Validators.min(0.5), Validators.max(0.95)]),
     agrupar: new FormControl<string | null>(null),
+    /** Sin campo en pantalla: cuentas por cobrar siempre incluye lo vencido (NG-2), aunque se cambien las fechas. */
+    incluirVencidas: new FormControl<boolean | null>(null),
   });
   /** El reporte y los parámetros del resultado que se ve: "Exportar" usa estos, no lo que se editó después sin "Ver". */
   mostrado: { id: ReporteId; params: ReporteParams } | null = null;
@@ -211,7 +213,13 @@ export class ReportesPagina {
     this.resultado.set(null);
     this.mostrado = null;
     const p = paramsPorDefecto(id);
-    this.params.reset({ desde: p.desde ?? null, hasta: p.hasta ?? null, umbral: p.umbral ?? null, agrupar: p.agrupar ?? null });
+    this.params.reset({
+      desde: p.desde ?? null,
+      hasta: p.hasta ?? null,
+      umbral: p.umbral ?? null,
+      agrupar: p.agrupar ?? null,
+      incluirVencidas: p.incluirVencidas ?? null,
+    });
     void this.ver();
   }
 

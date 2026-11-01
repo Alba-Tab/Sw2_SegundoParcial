@@ -51,7 +51,13 @@ import { etiqueta, type GrupoEtiqueta } from 'ui-comun/dominio';
 export class Estado {
   readonly grupo = input.required<GrupoEtiqueta>();
   readonly valor = input<string | null | undefined>();
-  readonly e = computed(() => etiqueta(this.grupo(), this.valor()));
+  /** Otro texto con el mismo ícono y tono del valor («Vencida hace 3 días» con el de `Vigencia.VENCIDO`). */
+  readonly texto = input<string>();
+  readonly e = computed(() => {
+    const e = etiqueta(this.grupo(), this.valor());
+    const texto = this.texto();
+    return texto ? { ...e, texto } : e;
+  });
 }
 
 /** Solo el texto de un valor que no es estado (tipo de carga, de unidad, medio de pago): `{{ x | etiqueta: 'TipoCarga' }}`. */

@@ -1,4 +1,5 @@
-import { filtrarCuentas, paramsCobranza } from './cobranza';
+import { paramsCobranza } from 'ui-comun/dominio';
+import { filtrarCuentas } from './cobranza';
 
 const MAXIMO_DIAS_ANALITICA = 92; // servicios/analitica/app/dominio/reportes.py, CUENTAS_POR_COBRAR
 

@@ -1,7 +1,10 @@
-import { Component, computed, input, signal } from '@angular/core';
+import { Component, computed, inject, input, signal } from '@angular/core';
 import { MatSortModule, type Sort } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
-import { aCentavos, type Direccion, numero, ordenar, pct, SIN_DATO, sumarMontos } from 'ui-comun/dominio';
+import { RouterLink } from '@angular/router';
+import { aCentavos, conDesde, type Direccion, numero, ordenar, pct, SIN_DATO, sumarMontos } from 'ui-comun/dominio';
+import { CONFIG_CENTRO } from './configuracion';
+import { Estado } from './estado';
 import { BobPipe, FechaPipe } from './formato';
 
 export interface Columna {
@@ -37,7 +40,7 @@ export function ordenarFilas(filas: readonly Record<string, unknown>[], columna:
  */
 @Component({
   selector: 'cc-tabla-reporte',
-  imports: [MatTableModule, MatSortModule, FechaPipe],
+  imports: [MatTableModule, MatSortModule, RouterLink, FechaPipe, Estado],
   template: `
     @let r = resultado();
     @if (r.datosAl) {
@@ -61,8 +64,30 @@ export function ordenarFilas(filas: readonly Record<string, unknown>[], columna:
       <table mat-table [dataSource]="filas()" matSort (matSortChange)="orden.set($event)">
         @for (c of r.columnas; track c.clave) {
           <ng-container [matColumnDef]="c.clave">
-            <th mat-header-cell *matHeaderCellDef mat-sort-header [class.numero]="numerica(c)">{{ c.titulo }}</th>
-            <td mat-cell *matCellDef="let f" [class.numero]="numerica(c)">{{ celda(f[c.clave], c) }}</td>
+            <!-- Los montos van sin «BOB» en cada celda: la moneda la dice el encabezado (NG-2). -->
+            <th mat-header-cell *matHeaderCellDef mat-sort-header [class.numero]="numerica(c)">
+              {{ c.titulo }}{{ c.tipo === 'MONTO' ? ' (BOB)' : '' }}
+            </th>
+            <td mat-cell *matCellDef="let f" [class.numero]="numerica(c)">
+              @if (c.clave === 'factura' && f['facturaId']) {
+                @if (config?.app === 'cc-finanzas') {
+                  <a [routerLink]="['/facturas', f['facturaId']]">{{ celda(f[c.clave], c) }}</a>
+                } @else if (config) {
+                  <a [href]="urlFactura(f['facturaId'])">{{ celda(f[c.clave], c) }}</a>
+                } @else {
+                  {{ celda(f[c.clave], c) }}
+                }
+              } @else if (c.clave === 'vencida' && c.tipo === 'BOOLEANO') {
+                <!-- Vencida y por vencer se separan con texto, ícono y tono, no con «Sí»/«No» (NG-2). -->
+                <cc-estado
+                  grupo="Vigencia"
+                  [valor]="f[c.clave] ? 'VENCIDO' : 'POR_VENCER'"
+                  [texto]="f[c.clave] ? 'Vencida' : 'Por vencer'"
+                />
+              } @else {
+                {{ celda(f[c.clave], c) }}
+              }
+            </td>
             <td mat-footer-cell *matFooterCellDef [class.numero]="numerica(c)">
               {{ $first ? 'Total' : r.totales[c.clave] !== undefined ? celda(r.totales[c.clave], c) : '' }}
             </td>
@@ -126,7 +151,13 @@ export class TablaReporte {
     );
   });
   readonly ancho = 720;
+  readonly config = inject(CONFIG_CENTRO, { optional: true });
   private readonly bob = new BobPipe();
+
+  /** La factura de una fila de cuentas por cobrar se abre en Finanzas, con «Volver» a la app de origen. */
+  urlFactura(facturaId: unknown): string {
+    return conDesde(`${this.config!.urls['cc-finanzas']}/facturas/${String(facturaId)}`, this.config!.app);
+  }
   private readonly fecha = new FechaPipe();
 
   readonly claves = computed(() => this.resultado().columnas.map((c) => c.clave));
