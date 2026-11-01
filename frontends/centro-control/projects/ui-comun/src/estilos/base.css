@@ -40,6 +40,17 @@ h3 {
   font: var(--mat-sys-title-medium);
   margin: 16px 0 4px;
 }
+/* Sin palabras sueltas en la última línea (JV-8): títulos con líneas parejas, párrafos sin huérfanas. */
+h1,
+h2,
+h3 {
+  text-wrap: balance;
+}
+p,
+dd,
+li {
+  text-wrap: pretty;
+}
 
 .tarjetas {
   display: grid;
