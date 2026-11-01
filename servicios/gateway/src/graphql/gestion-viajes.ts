@@ -23,7 +23,7 @@ export function resolversGestionViajes(s: ClienteServicios) {
     /** E5-1: una página de Viajes tal cual, con su cursor opaco (000 §4). */
     clientes: async (ctx: Contexto, limite: number, despuesDe?: string | null) => {
       const r = await s.get<Json>(ctx, 'viajes', rutaRest`/api/v1/clientes`, { query: { limite, cursor: despuesDe } });
-      return { items: m.items(r), siguienteCursor: r?.['siguienteCursor'] ?? null };
+      return m.pagina(r, (c) => c);
     },
     Servicio: { razonSocial },
     Cotizacion: { razonSocial },
