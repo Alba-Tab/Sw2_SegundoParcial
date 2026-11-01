@@ -205,7 +205,14 @@ import { ViajeFachada } from '../viajes.fachada';
         </div>
         <div>
           <dt>Chofer</dt>
-          <dd>{{ v.choferNombre ?? 'Sin dato' }}</dd>
+          <dd>
+            <!-- Como la unidad: a la ficha del chofer en Flota, si el rol abre Flota. -->
+            @if (v.choferNombre && urlChofer(v.choferId); as url) {
+              <a [href]="url">{{ v.choferNombre }}</a>
+            } @else {
+              {{ v.choferNombre ?? 'Sin dato' }}
+            }
+          </dd>
         </div>
         <div>
           <dt>Unidad</dt>
@@ -329,6 +336,10 @@ export class ViajePagina {
   urlUnidad(unidadId: string | null | undefined): string | null {
     if (!unidadId) return null;
     return urlEnApp(this.config, this.sesion.roles(), 'cc-flota', `/unidades/${encodeURIComponent(unidadId)}`);
+  }
+  urlChofer(choferId: string | null | undefined): string | null {
+    if (!choferId) return null;
+    return urlEnApp(this.config, this.sesion.roles(), 'cc-flota', `/choferes/${encodeURIComponent(choferId)}`);
   }
   readonly id = input.required<string>();
   /** La cola desde la que se abrió (`?de=`), validada contra una lista cerrada: miga y "volver" llevan ahí (V1-5). */
