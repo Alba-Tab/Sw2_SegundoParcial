@@ -43,6 +43,12 @@ export const VISTAS = {
       gap: 8px;
       margin: 0 0 16px;
     }
+    /* 44 px para el dedo (CA-5). */
+    @media (pointer: coarse) {
+      a {
+        min-height: 44px;
+      }
+    }
     .actual {
       background: var(--mat-sys-secondary-container);
       color: var(--mat-sys-on-secondary-container);
