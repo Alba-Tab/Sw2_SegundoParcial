@@ -1,7 +1,7 @@
 import { etiqueta, vigencia } from 'ui-comun/dominio';
 import type { ChoferesQuery, ChoferQuery } from '../../graphql/generado';
 
-/** Choferes (G3): solo lectura; el alta, la edición y la habilitación esperan backend (specs/pendientes-frontend-web.md). */
+/** Choferes (G3): solo lectura; el alta, la edición y la habilitación esperan backend (specs/pendientes.md). */
 export type Chofer = NonNullable<ChoferesQuery['choferes']>[number];
 export type PuntajesChofer = NonNullable<ChoferQuery['puntajesConduccion']>;
 
