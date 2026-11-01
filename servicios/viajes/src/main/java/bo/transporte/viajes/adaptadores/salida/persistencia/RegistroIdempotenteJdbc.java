@@ -2,6 +2,7 @@ package bo.transporte.viajes.adaptadores.salida.persistencia;
 
 import bo.transporte.viajes.aplicacion.cliente.AltaDeCliente;
 import bo.transporte.viajes.aplicacion.cliente.ClienteVista;
+import bo.transporte.viajes.aplicacion.cliente.EdicionDeCliente;
 import bo.transporte.viajes.aplicacion.puerto.salida.RegistroIdempotente;
 import bo.transporte.viajes.aplicacion.ruta.GestionDeRutas;
 import bo.transporte.viajes.aplicacion.servicio.CancelacionDeServicio;
@@ -39,6 +40,7 @@ class RegistroIdempotenteJdbc implements RegistroIdempotente {
             Map.entry(EntregaDeViaje.APROBAR, ViajeVista.class),
             Map.entry(EntregaDeViaje.RECHAZAR, ViajeVista.class),
             Map.entry(AltaDeCliente.OPERACION, ClienteVista.class),
+            Map.entry(EdicionDeCliente.OPERACION, ClienteVista.class),
             Map.entry(GestionDeRutas.CREAR, Ruta.class),
             Map.entry(GestionDeRutas.EDITAR, Ruta.class),
             Map.entry(ConfirmacionDeServicio.OPERACION, ServicioAceptado.class),

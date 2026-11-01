@@ -374,4 +374,80 @@ class ClientesIT {
                         .single());
     }
 
+    private static String edicion(String razon, String nit, String correo) {
+        return """
+                {"razonSocial":"%s","nit":"%s","correo":"%s"}""".formatted(razon, nit, correo);
+    }
+
+    @Test
+    void comercialYGerenteEditanElClienteConLasReglasDelAltaYSuEvento() throws Exception {
+        String comercial = TokensDePrueba.token("sub-comercial", "comercial", null);
+        String id = pedir("POST", "/api/v1/clientes", comercial, UUID.randomUUID(), empresa("1000001"))
+                .cuerpo()
+                .get("clienteId")
+                .asString();
+        String otro = pedir("POST", "/api/v1/clientes", comercial, UUID.randomUUID(), empresa("1000002"))
+                .cuerpo()
+                .get("clienteId")
+                .asString();
+        jdbc.sql("DELETE FROM outbox_eventos").update();
+
+        UUID clave = UUID.randomUUID();
+        String cuerpo = edicion("Agroexport Bolivia SRL", "1000009", "pagos@agroexport.example");
+        var r = pedir("PUT", "/api/v1/clientes/" + id, comercial, clave, cuerpo);
+        assertEquals(200, r.estado());
+        assertEquals("Agroexport Bolivia SRL", r.cuerpo().get("razonSocial").asString());
+        assertEquals("+59133456789", r.cuerpo().get("telefono").asString(), "el teléfono no cambia");
+        assertEquals(
+                200,
+                pedir("PUT", "/api/v1/clientes/" + id, comercial, clave, cuerpo).estado());
+        JsonNode sobre = json.readTree(jdbc.sql("SELECT sobre::text FROM outbox_eventos")
+                .query(String.class)
+                .single());
+        assertEquals("ClienteActualizado", sobre.get("tipo").asString());
+        assertEquals(2, sobre.get("datos").get("versionAgregado").asInt());
+        assertEquals(
+                "pagos@agroexport.example", sobre.get("datos").get("correo").asString());
+
+        String gerente = TokensDePrueba.token("sub-gerente", "gerente", null);
+        var mismoNit = pedir(
+                "PUT",
+                "/api/v1/clientes/" + otro,
+                gerente,
+                UUID.randomUUID(),
+                edicion("Otra SRL", "1000009", "o@x.example"));
+        assertEquals(409, mismoNit.estado());
+        assertEquals(id, mismoNit.cuerpo().get("clienteId").asString());
+        var nitMalo = pedir(
+                "PUT",
+                "/api/v1/clientes/" + otro,
+                gerente,
+                UUID.randomUUID(),
+                edicion("Otra SRL", "12a", "o@x.example"));
+        assertEquals(400, nitMalo.estado());
+        String despacho = TokensDePrueba.token("sub-despacho", "despachador", null);
+        assertEquals(
+                403,
+                pedir(
+                                "PUT",
+                                "/api/v1/clientes/" + otro,
+                                despacho,
+                                UUID.randomUUID(),
+                                edicion("Otra SRL", "1000003", "o@x.example"))
+                        .estado());
+        assertEquals(
+                404,
+                pedir(
+                                "PUT",
+                                "/api/v1/clientes/" + UUID.randomUUID(),
+                                gerente,
+                                UUID.randomUUID(),
+                                edicion("Otra SRL", "1000003", "o@x.example"))
+                        .estado());
+        assertEquals(
+                1L,
+                jdbc.sql("SELECT count(*) FROM outbox_eventos")
+                        .query(Long.class)
+                        .single());
+    }
 }

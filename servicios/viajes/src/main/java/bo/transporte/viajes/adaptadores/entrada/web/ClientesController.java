@@ -3,11 +3,13 @@ package bo.transporte.viajes.adaptadores.entrada.web;
 import bo.transporte.viajes.adaptadores.entrada.web.api.ClientesApi;
 import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.CanalServicioDto;
 import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.ClienteDto;
+import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.ClienteEdicionDto;
 import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.ClienteNuevoDto;
 import bo.transporte.viajes.adaptadores.entrada.web.api.modelo.PaginaClientesDto;
 import bo.transporte.viajes.aplicacion.cliente.AltaDeCliente;
 import bo.transporte.viajes.aplicacion.cliente.ClienteVista;
 import bo.transporte.viajes.aplicacion.cliente.ConsultaDeClientes;
+import bo.transporte.viajes.aplicacion.cliente.EdicionDeCliente;
 import bo.transporte.viajes.aplicacion.cliente.VinculacionDeCliente;
 import bo.transporte.viajes.dominio.cliente.DatosCliente;
 import bo.transporte.viajes.dominio.comun.ErrorDeDominio;
@@ -26,14 +28,33 @@ class ClientesController implements ClientesApi {
     private final AltaDeCliente alta;
     private final VinculacionDeCliente vinculacion;
     private final ConsultaDeClientes consulta;
+    private final EdicionDeCliente edicion;
     private final JsonMapper json;
 
     ClientesController(
-            AltaDeCliente alta, VinculacionDeCliente vinculacion, ConsultaDeClientes consulta, JsonMapper json) {
+            AltaDeCliente alta,
+            VinculacionDeCliente vinculacion,
+            ConsultaDeClientes consulta,
+            EdicionDeCliente edicion,
+            JsonMapper json) {
         this.alta = alta;
         this.vinculacion = vinculacion;
         this.consulta = consulta;
+        this.edicion = edicion;
         this.json = json;
+    }
+
+    @Override
+    public ResponseEntity<ClienteDto> actualizarCliente(
+            UUID clienteId, UUID clave, ClienteEdicionDto cambio, UUID correlacion) {
+        return ResponseEntity.ok(dto(edicion.ejecutar(
+                SolicitanteActual.obtener(),
+                clienteId,
+                cambio.getRazonSocial(),
+                cambio.getNit(),
+                cambio.getCorreo(),
+                clave,
+                HashCuerpo.de(json, cambio))));
     }
 
     @Override

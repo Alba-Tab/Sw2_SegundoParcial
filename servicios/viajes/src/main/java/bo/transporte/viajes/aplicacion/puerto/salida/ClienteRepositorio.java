@@ -11,6 +11,12 @@ public interface ClienteRepositorio {
 
     void marcarVinculado(UUID clienteId);
 
+    /** El cliente con su fila bloqueada hasta el fin de la transacción (000 §9), para editarlo. */
+    Optional<Cliente> paraActualizar(UUID clienteId);
+
+    /** Escribe los datos y la versión del cliente ya editado. */
+    void actualizar(Cliente cliente);
+
     Optional<Cliente> porId(UUID clienteId);
 
     /** Los clientes de esos ids en una consulta. */

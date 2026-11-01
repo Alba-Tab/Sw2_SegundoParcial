@@ -2,6 +2,7 @@ package bo.transporte.viajes.configuracion;
 
 import bo.transporte.viajes.aplicacion.cliente.AltaDeCliente;
 import bo.transporte.viajes.aplicacion.cliente.ConsultaDeClientes;
+import bo.transporte.viajes.aplicacion.cliente.EdicionDeCliente;
 import bo.transporte.viajes.aplicacion.cliente.VinculacionDeCliente;
 import bo.transporte.viajes.aplicacion.comun.OperacionIdempotente;
 import bo.transporte.viajes.aplicacion.dispositivo.AvisosPush;
@@ -94,6 +95,15 @@ class CasosDeUso {
     GestionDeRutas gestionDeRutas(
             RutaRepositorio rutas, RegistroDeEventos eventos, Auditoria auditoria, OperacionIdempotente operacion) {
         return new GestionDeRutas(rutas, eventos, auditoria, operacion);
+    }
+
+    @Bean
+    EdicionDeCliente edicionDeCliente(
+            ClienteRepositorio clientes,
+            RegistroDeEventos eventos,
+            Auditoria auditoria,
+            OperacionIdempotente operacion) {
+        return new EdicionDeCliente(clientes, eventos, auditoria, operacion);
     }
 
     @Bean

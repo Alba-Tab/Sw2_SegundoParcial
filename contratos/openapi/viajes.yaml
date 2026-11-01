@@ -160,6 +160,42 @@ paths:
           $ref: './comun.yaml#/components/responses/SinPermiso'
         '404':
           $ref: './comun.yaml#/components/responses/NoEncontrado'
+    put:
+      tags: [clientes]
+      operationId: actualizarCliente
+      summary: Edita razón social, NIT y correo desde el Centro de Control (comercial, gerente). G7, D104.
+      description: |
+        Mismas validaciones que el alta (spec 001); un NIT de otro cliente activo responde 409 `CONFLICTO_ESTADO`.
+        Teléfono, dirección, canal y cuenta no cambian. En una transacción sube `versionAgregado`, audita y deja
+        `ClienteActualizado` en el Outbox (Finanzas y Analítica actualizan su copia).
+      parameters:
+        - $ref: './comun.yaml#/components/parameters/IdempotencyKey'
+        - $ref: './comun.yaml#/components/parameters/CorrelationId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ClienteEdicion'
+      responses:
+        '200':
+          description: Cliente actualizado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Cliente'
+        '400':
+          $ref: './comun.yaml#/components/responses/Validacion'
+        '401':
+          $ref: './comun.yaml#/components/responses/NoAutenticado'
+        '403':
+          $ref: './comun.yaml#/components/responses/SinPermiso'
+        '404':
+          $ref: './comun.yaml#/components/responses/NoEncontrado'
+        '409':
+          $ref: './comun.yaml#/components/responses/Conflicto'
+        '422':
+          $ref: './comun.yaml#/components/responses/ReglaDeNegocio'
 
   /api/v1/rutas:
     get:
@@ -1166,6 +1202,22 @@ components:
               $ref: './comun.yaml#/components/schemas/Sub'
             creadoEn:
               $ref: './comun.yaml#/components/schemas/Instante'
+    ClienteEdicion:
+      type: object
+      description: Lo que se edita desde el Centro de Control (G7); mismas reglas que en ClienteNuevo.
+      required: [razonSocial, nit, correo]
+      additionalProperties: false
+      properties:
+        razonSocial:
+          type: string
+          minLength: 3
+          maxLength: 120
+        nit:
+          type: string
+          pattern: '^[0-9]{5,20}$'
+        correo:
+          type: string
+          format: email
     PaginaClientes:
       type: object
       required: [items, siguienteCursor]
