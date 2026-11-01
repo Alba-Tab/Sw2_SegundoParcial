@@ -4,7 +4,7 @@ import { esperaReconexion } from './conexion';
 import { APPS_POR_ROL, DESTINO_POR_ROL } from './configuracion';
 import { codigoDe, mensajeDe, servicioCaido, sinPermiso } from './errores';
 import { aCentavos, fechaLaPaz, pct, puedeVer, sumarMontos } from 'ui-comun/dominio';
-import { BobPipe, FechaPipe } from './formato';
+import { BobPipe, FechaPipe, NumeroPipe } from './formato';
 import { reclamos } from './sesion';
 
 const jwt = (datos: object) => `x.${btoa(JSON.stringify(datos)).replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_')}.y`;
@@ -104,6 +104,17 @@ describe('ui-comun', () => {
       errors: [{ message: 'Analítica no disponible', path: ['viaje', 'riesgo'], extensions: { codigo: 'DEPENDENCIA_NO_DISPONIBLE' } }],
     });
     expect(avisosServicio(riesgo, { ...campos, riesgo: '' })).toEqual([]);
+  });
+
+  it('NG-1: los números van con miles en punto y decimales en coma (es-BO), nunca "1,300"', () => {
+    const p = new NumeroPipe();
+    expect(p.transform(1300)).toBe('1.300');
+    expect(p.transform(1234567.891)).toBe('1.234.567,89');
+    expect(p.transform(12.34, 1)).toBe('12,3');
+    expect(p.transform(0.6, 2, 2)).toBe('0,60');
+    expect(p.transform('850')).toBe('850');
+    expect(p.transform(null)).toBe('Sin dato');
+    expect(p.transform('abc')).toBe('abc');
   });
 
   it('dinero sin float: BobPipe no pasa por Number y las sumas van en centavos enteros', () => {

@@ -9,6 +9,25 @@ export function fechaLaPaz(dias = 0, ahora: Date = new Date()): string {
 /** El único texto para un valor que falta, en fichas, celdas y cifras (DESIGN.md, "Valor vacío"). */
 export const SIN_DATO = 'Sin dato';
 
+const formatos = new Map<string, Intl.NumberFormat>();
+
+/**
+ * 1300.5 → "1.300,5": miles con punto y decimales con coma, como en Bolivia (NG-1). Nunca el pipe `number` de Angular
+ * sin locale, que escribe "1,300" (se lee 1,3). `maximo` y `minimo` son los decimales.
+ */
+export function numero(valor: number | string | null | undefined, maximo = 2, minimo = 0): string {
+  if (valor === null || valor === undefined || valor === '') return SIN_DATO;
+  const n = Number(valor);
+  if (!Number.isFinite(n)) return String(valor);
+  const clave = `${minimo}-${maximo}`;
+  let formato = formatos.get(clave);
+  if (!formato) {
+    formato = new Intl.NumberFormat('es-BO', { minimumFractionDigits: minimo, maximumFractionDigits: maximo });
+    formatos.set(clave, formato);
+  }
+  return formato.format(n);
+}
+
 /** 0.857 → "86 %". */
 export const pct = (p: number | null | undefined) => (p === null || p === undefined ? SIN_DATO : `${Math.round(p * 100)} %`);
 

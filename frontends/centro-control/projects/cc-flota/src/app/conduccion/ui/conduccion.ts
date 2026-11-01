@@ -1,9 +1,8 @@
-import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject } from '@angular/core';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, controlLista, Encabezado, FechaPipe, FiltrosLista, PieLista } from 'ui-comun';
+import { AvisoServicios, controlLista, Encabezado, FechaPipe, FiltrosLista, PieLista, NumeroPipe } from 'ui-comun';
 import { ConduccionFachada } from '../conduccion.fachada';
 import { PUNTAJE_BAJO, type PuntajeChofer } from '../domain/conduccion';
 
@@ -11,7 +10,7 @@ import { PUNTAJE_BAJO, type PuntajeChofer } from '../domain/conduccion';
 @Component({
   selector: 'app-conduccion',
   providers: [ConduccionFachada],
-  imports: [Encabezado, MatTableModule, MatSortModule, RouterLink, DecimalPipe, FechaPipe, AvisoServicios, FiltrosLista, PieLista],
+  imports: [Encabezado, MatTableModule, MatSortModule, RouterLink, NumeroPipe, FechaPipe, AvisoServicios, FiltrosLista, PieLista],
   template: `
     <cc-encabezado titulo="Puntaje de conducción" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!puntajes()" />
@@ -48,12 +47,12 @@ import { PUNTAJE_BAJO, type PuntajeChofer } from '../domain/conduccion';
           >
           <ng-container matColumnDef="km"
             ><th mat-header-cell *matHeaderCellDef mat-sort-header>Km</th>
-            <td mat-cell *matCellDef="let c">{{ c.km | number: '1.0-0' }}</td></ng-container
+            <td mat-cell *matCellDef="let c">{{ c.km | numero: 0 }}</td></ng-container
           >
           <ng-container matColumnDef="puntaje"
             ><th mat-header-cell *matHeaderCellDef mat-sort-header>Puntaje</th>
             <td mat-cell *matCellDef="let c" [class.no-disponible]="c.puntaje < puntajeBajo">
-              {{ c.puntaje | number: '1.0-1' }}
+              {{ c.puntaje | numero: 1 }}
             </td></ng-container
           >
           <tr mat-header-row *matHeaderRowDef="columnas"></tr>

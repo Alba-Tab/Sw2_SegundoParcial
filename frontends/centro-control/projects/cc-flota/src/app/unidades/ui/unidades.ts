@@ -1,4 +1,3 @@
-import { DecimalPipe } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
@@ -15,6 +14,7 @@ import {
   PieLista,
   posicionEstado,
   vigencia,
+  NumeroPipe,
 } from 'ui-comun';
 import { AVISO_KM, textoUnidad, type Unidad } from '../domain/unidad';
 import { UnidadesFachada } from '../unidades.fachada';
@@ -30,7 +30,7 @@ import { UnidadesFachada } from '../unidades.fachada';
     FechaPipe,
     EtiquetaPipe,
     Estado,
-    DecimalPipe,
+    NumeroPipe,
     AvisoServicios,
     FiltrosLista,
     PieLista,
@@ -68,7 +68,7 @@ import { UnidadesFachada } from '../unidades.fachada';
         <ng-container matColumnDef="km"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Km desde el mantenimiento</th>
           <td mat-cell *matCellDef="let u" [class.no-disponible]="u.kmDesdeUltimoMantenimiento >= avisoKm">
-            {{ u.kmDesdeUltimoMantenimiento | number }}
+            {{ u.kmDesdeUltimoMantenimiento | numero }}
           </td></ng-container
         >
         <ng-container matColumnDef="documentos"

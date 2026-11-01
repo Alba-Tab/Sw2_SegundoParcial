@@ -1,8 +1,7 @@
-import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
-import { aCentavos, AvisoServicios, BobPipe, controlLista, Encabezado, FechaPipe, FiltrosLista, PieLista } from 'ui-comun';
+import { aCentavos, AvisoServicios, BobPipe, controlLista, Encabezado, FechaPipe, FiltrosLista, PieLista, NumeroPipe } from 'ui-comun';
 import { CombustibleFachada } from '../combustible.fachada';
 import type { Anomalia, Carga } from '../domain/combustible';
 
@@ -10,7 +9,7 @@ import type { Anomalia, Carga } from '../domain/combustible';
 @Component({
   selector: 'app-combustible',
   providers: [CombustibleFachada],
-  imports: [Encabezado, MatTableModule, MatSortModule, DecimalPipe, BobPipe, FechaPipe, AvisoServicios, FiltrosLista, PieLista],
+  imports: [Encabezado, MatTableModule, MatSortModule, NumeroPipe, BobPipe, FechaPipe, AvisoServicios, FiltrosLista, PieLista],
   template: `
     <cc-encabezado
       [titulo]="id() ? 'Carga marcada' : 'Combustible'"
@@ -33,16 +32,16 @@ import type { Anomalia, Carga } from '../domain/combustible';
           </div>
           <div>
             <dt>Litros</dt>
-            <dd>{{ a?.litros ?? c?.litros | number: '1.0-1' }}</dd>
+            <dd>{{ a?.litros ?? c?.litros | numero: 1 }}</dd>
           </div>
           @if (a) {
             <div>
               <dt>Km/L</dt>
-              <dd>{{ a.kmPorLitro | number: '1.2-2' }}</dd>
+              <dd>{{ a.kmPorLitro | numero: 2 : 2 }}</dd>
             </div>
             <div>
               <dt>Puntaje de anomalía</dt>
-              <dd>{{ a.puntaje | number: '1.2-2' }}</dd>
+              <dd>{{ a.puntaje | numero: 2 : 2 }}</dd>
             </div>
           }
           @if (c) {
@@ -52,7 +51,7 @@ import type { Anomalia, Carga } from '../domain/combustible';
             </div>
             <div>
               <dt>Odómetro</dt>
-              <dd>{{ c.kilometraje | number }} km</dd>
+              <dd>{{ c.kilometraje | numero }} km</dd>
             </div>
           }
         </dl>
@@ -75,15 +74,15 @@ import type { Anomalia, Carga } from '../domain/combustible';
         >
         <ng-container matColumnDef="litros"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Litros</th>
-          <td mat-cell *matCellDef="let a">{{ a.litros | number: '1.0-1' }}</td></ng-container
+          <td mat-cell *matCellDef="let a">{{ a.litros | numero: 1 }}</td></ng-container
         >
         <ng-container matColumnDef="kmPorLitro"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Km/L</th>
-          <td mat-cell *matCellDef="let a">{{ a.kmPorLitro | number: '1.2-2' }}</td></ng-container
+          <td mat-cell *matCellDef="let a">{{ a.kmPorLitro | numero: 2 : 2 }}</td></ng-container
         >
         <ng-container matColumnDef="puntaje"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Puntaje</th>
-          <td mat-cell *matCellDef="let a">{{ a.puntaje | number: '1.2-2' }}</td></ng-container
+          <td mat-cell *matCellDef="let a">{{ a.puntaje | numero: 2 : 2 }}</td></ng-container
         >
         <ng-container matColumnDef="fecha"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Registrada</th>
@@ -117,7 +116,7 @@ import type { Anomalia, Carga } from '../domain/combustible';
         >
         <ng-container matColumnDef="litros"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Litros</th>
-          <td mat-cell *matCellDef="let c">{{ c.litros | number: '1.0-1' }}</td></ng-container
+          <td mat-cell *matCellDef="let c">{{ c.litros | numero: 1 }}</td></ng-container
         >
         <ng-container matColumnDef="monto"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Monto</th>
@@ -125,7 +124,7 @@ import type { Anomalia, Carga } from '../domain/combustible';
         >
         <ng-container matColumnDef="km"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Odómetro</th>
-          <td mat-cell *matCellDef="let c">{{ c.kilometraje | number }}</td></ng-container
+          <td mat-cell *matCellDef="let c">{{ c.kilometraje | numero }}</td></ng-container
         >
         <ng-container matColumnDef="fecha"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Registrada</th>

@@ -1,9 +1,8 @@
-import { DecimalPipe } from '@angular/common';
 import { Component, inject } from '@angular/core';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, controlLista, Encabezado, FiltrosLista, PieLista } from 'ui-comun';
+import { AvisoServicios, controlLista, Encabezado, FiltrosLista, PieLista, NumeroPipe } from 'ui-comun';
 import { textoRuta, type Ruta } from '../domain/ruta';
 import { RutasFachada } from '../rutas.fachada';
 
@@ -11,7 +10,7 @@ import { RutasFachada } from '../rutas.fachada';
 @Component({
   selector: 'app-rutas',
   providers: [RutasFachada],
-  imports: [Encabezado, MatTableModule, MatSortModule, RouterLink, DecimalPipe, AvisoServicios, FiltrosLista, PieLista],
+  imports: [Encabezado, MatTableModule, MatSortModule, RouterLink, NumeroPipe, AvisoServicios, FiltrosLista, PieLista],
   template: `
     <cc-encabezado titulo="Rutas" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!rutas().length" />
@@ -41,7 +40,7 @@ import { RutasFachada } from '../rutas.fachada';
         >
         <ng-container matColumnDef="distancia"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Distancia</th>
-          <td mat-cell *matCellDef="let r">{{ r.distanciaKm | number: '1.0-1' }} km</td></ng-container
+          <td mat-cell *matCellDef="let r">{{ r.distanciaKm | numero: 1 }} km</td></ng-container
         >
         <tr mat-header-row *matHeaderRowDef="columnas"></tr>
         <tr mat-row *matRowDef="let r; columns: columnas"></tr>

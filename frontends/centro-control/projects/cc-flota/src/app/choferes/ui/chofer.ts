@@ -1,7 +1,6 @@
-import { DecimalPipe } from '@angular/common';
 import { Component, computed, effect, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, Encabezado, Esqueleto, Estado, FechaPipe, LIMITE_GATEWAY } from 'ui-comun';
+import { AvisoServicios, Encabezado, Esqueleto, Estado, FechaPipe, LIMITE_GATEWAY, NumeroPipe } from 'ui-comun';
 import { PUNTAJE_BAJO } from '../../conduccion/domain/conduccion';
 import { ChoferFachada } from '../choferes.fachada';
 import { estadoChofer, vigenciaLicencia } from '../domain/chofer';
@@ -10,7 +9,7 @@ import { estadoChofer, vigenciaLicencia } from '../domain/chofer';
 @Component({
   selector: 'app-chofer',
   providers: [ChoferFachada],
-  imports: [Esqueleto, Encabezado, Estado, FechaPipe, DecimalPipe, AvisoServicios, RouterLink],
+  imports: [Esqueleto, Encabezado, Estado, FechaPipe, NumeroPipe, AvisoServicios, RouterLink],
   template: `
     @let titulo = chofer()?.nombre ?? 'Chofer';
     <cc-encabezado [titulo]="titulo" [migas]="[{ texto: 'Choferes', ruta: '/choferes' }, { texto: titulo }]">
@@ -40,11 +39,11 @@ import { estadoChofer, vigenciaLicencia } from '../domain/chofer';
           <dl class="datos">
             <div>
               <dt>Puntaje</dt>
-              <dd [class.no-disponible]="r.puntaje < puntajeBajo">{{ r.puntaje | number: '1.0-1' }}</dd>
+              <dd [class.no-disponible]="r.puntaje < puntajeBajo">{{ r.puntaje | numero: 1 }}</dd>
             </div>
             <div>
               <dt>Kilómetros</dt>
-              <dd>{{ r.km | number: '1.0-0' }} km</dd>
+              <dd>{{ r.km | numero: 0 }} km</dd>
             </div>
             <div>
               <dt>Frenadas bruscas</dt>
@@ -59,7 +58,7 @@ import { estadoChofer, vigenciaLicencia } from '../domain/chofer';
           <ul>
             @for (v of p.viajes; track v.viajeId) {
               <li>
-                Viaje {{ $index + 1 }}: puntaje {{ v.puntaje | number: '1.0-1' }}, {{ v.km | number: '1.0-0' }} km, {{ v.frenadas }}
+                Viaje {{ $index + 1 }}: puntaje {{ v.puntaje | numero: 1 }}, {{ v.km | numero: 0 }} km, {{ v.frenadas }}
                 {{ v.frenadas === 1 ? 'frenada brusca' : 'frenadas bruscas' }}
               </li>
             } @empty {

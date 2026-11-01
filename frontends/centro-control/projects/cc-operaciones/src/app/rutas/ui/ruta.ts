@@ -1,14 +1,13 @@
-import { DecimalPipe } from '@angular/common';
 import { Component, computed, inject, input } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, Encabezado, Esqueleto } from 'ui-comun';
+import { AvisoServicios, Encabezado, Esqueleto, NumeroPipe } from 'ui-comun';
 import { RutasFachada } from '../rutas.fachada';
 
 /** Ficha de una ruta (G4) con lo que trae el esquema. */
 @Component({
   selector: 'app-ruta',
   providers: [RutasFachada],
-  imports: [Esqueleto, Encabezado, DecimalPipe, AvisoServicios, RouterLink],
+  imports: [Esqueleto, Encabezado, NumeroPipe, AvisoServicios, RouterLink],
   template: `
     @let titulo = ruta()?.nombre ?? 'Ruta';
     <cc-encabezado [titulo]="titulo" [migas]="[{ texto: 'Rutas', ruta: '/rutas' }, { texto: titulo }]" />
@@ -28,7 +27,7 @@ import { RutasFachada } from '../rutas.fachada';
         </div>
         <div>
           <dt>Distancia</dt>
-          <dd>{{ r.distanciaKm | number: '1.0-1' }} km</dd>
+          <dd>{{ r.distanciaKm | numero: 1 }} km</dd>
         </div>
       </dl>
     } @else if (cargado()) {

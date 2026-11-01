@@ -1,7 +1,7 @@
 import { Component, computed, input, signal } from '@angular/core';
 import { MatSortModule, type Sort } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
-import { aCentavos, type Direccion, ordenar, pct, SIN_DATO, sumarMontos } from 'ui-comun/dominio';
+import { aCentavos, type Direccion, numero, ordenar, pct, SIN_DATO, sumarMontos } from 'ui-comun/dominio';
 import { BobPipe, FechaPipe } from './formato';
 
 export interface Columna {
@@ -185,7 +185,7 @@ export class TablaReporte {
       case 'BOOLEANO':
         return valor ? 'Sí' : 'No';
       case 'NUMERO':
-        return Number(valor).toLocaleString('es-BO', { maximumFractionDigits: 2 });
+        return numero(valor as number | string);
       default:
         return String(valor);
     }

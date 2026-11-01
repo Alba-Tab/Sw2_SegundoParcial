@@ -1,5 +1,5 @@
 import { Pipe, type PipeTransform } from '@angular/core';
-import { aCentavos, SIN_DATO } from 'ui-comun/dominio';
+import { aCentavos, numero, SIN_DATO } from 'ui-comun/dominio';
 
 const fecha = new Intl.DateTimeFormat('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/La_Paz' });
 const hora = new Intl.DateTimeFormat('es-BO', {
@@ -34,5 +34,13 @@ export class FechaPipe implements PipeTransform {
       return `${d}/${m}/${a}`;
     }
     return (conHora ? hora : fecha).format(new Date(valor));
+  }
+}
+
+/** `{{ km | numero }}` → "1.300"; `{{ puntaje | numero: 2 : 2 }}` → "0,65" (decimales máximos y mínimos). */
+@Pipe({ name: 'numero' })
+export class NumeroPipe implements PipeTransform {
+  transform(valor: number | string | null | undefined, maximo = 2, minimo = 0): string {
+    return numero(valor, maximo, minimo);
   }
 }

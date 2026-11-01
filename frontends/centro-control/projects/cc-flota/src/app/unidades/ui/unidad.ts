@@ -1,4 +1,3 @@
-import { DecimalPipe } from '@angular/common';
 import { afterNextRender, Component, effect, inject, Injector, input, signal, viewChild } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButton, MatButtonModule } from '@angular/material/button';
@@ -29,6 +28,7 @@ import {
   largoEntre,
   listoParaEnviar,
   textoError,
+  NumeroPipe,
 } from 'ui-comun';
 import {
   AVISO_KM,
@@ -54,7 +54,7 @@ import { UnidadFachada } from '../unidades.fachada';
     ReactiveFormsModule,
     Campo,
     Confirmacion,
-    DecimalPipe,
+    NumeroPipe,
     MatCardModule,
     MatButtonModule,
     MatFormFieldModule,
@@ -108,11 +108,11 @@ import { UnidadFachada } from '../unidades.fachada';
         </div>
         <div>
           <dt>Kilometraje</dt>
-          <dd>{{ u.kilometraje !== null && u.kilometraje !== undefined ? (u.kilometraje | number) + ' km' : 'Sin dato' }}</dd>
+          <dd>{{ u.kilometraje !== null && u.kilometraje !== undefined ? (u.kilometraje | numero) + ' km' : 'Sin dato' }}</dd>
         </div>
         <div>
           <dt>Desde el último mantenimiento</dt>
-          <dd [class.no-disponible]="u.kmDesdeUltimoMantenimiento >= avisoKm">{{ u.kmDesdeUltimoMantenimiento | number }} km</dd>
+          <dd [class.no-disponible]="u.kmDesdeUltimoMantenimiento >= avisoKm">{{ u.kmDesdeUltimoMantenimiento | numero }} km</dd>
         </div>
         @for (d of u.documentos; track d.tipo) {
           <div>
