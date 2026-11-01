@@ -75,19 +75,14 @@
       },
       {
         "name": "gerente",
-        "description": "Todo en lectura, tablero, voz y reportes; administra usuarios en la consola del realm (D103)",
+        "description": "Todo en lectura, tablero, voz y reportes",
         "composite": true,
         "composites": {
           "realm": [
             "interno"
           ],
           "client": {
-            "realm-management": [
-              "view-users",
-              "manage-users",
-              "query-groups",
-              "view-realm"
-            ]
+            "realm-management": []
           }
         }
       },
@@ -113,6 +108,21 @@
     {
       "name": "registro-portal",
       "path": "/registro-portal"
+    },
+    {
+      "name": "personal-interno",
+      "path": "/personal-interno"
+    },
+    {
+      "name": "administra-usuarios",
+      "path": "/administra-usuarios",
+      "clientRoles": {
+        "realm-management": [
+          "query-users",
+          "query-groups",
+          "view-realm"
+        ]
+      }
     }
   ],
   "defaultGroups": [
