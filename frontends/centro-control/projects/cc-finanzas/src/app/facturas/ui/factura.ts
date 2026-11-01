@@ -14,6 +14,7 @@ import {
   BobPipe,
   Campo,
   codigoDe,
+  erroresGraphql,
   Confirmacion,
   Encabezado,
   Esqueleto,
@@ -35,7 +36,7 @@ import {
   validarMonto,
 } from 'ui-comun';
 import { completarConRecibo } from '../domain/recibo';
-import { MEDIOS_PAGO, saldoDespuesDe, type PagoEnEdicion } from '../domain/pago';
+import { MEDIOS_PAGO, pagoRepetido, saldoDelError, saldoDespuesDe, type PagoEnEdicion } from '../domain/pago';
 import { FacturaFachada } from '../facturas.fachada';
 
 /**
@@ -175,7 +176,7 @@ import { FacturaFachada } from '../facturas.fachada';
         </mat-card>
       }
 
-      <h2 id="titulo-pagos">Pagos</h2>
+      <h2 id="titulo-pagos" tabindex="-1">Pagos</h2>
       @if (f.pagos?.length) {
         <div class="tabla-ancha" role="region" aria-labelledby="titulo-pagos" tabindex="0">
           <table mat-table [dataSource]="f.pagos!" aria-labelledby="titulo-pagos">
@@ -200,7 +201,7 @@ import { FacturaFachada } from '../facturas.fachada';
               <td mat-cell *matCellDef="let p" class="secundario">{{ p.nota ?? '' }}</td></ng-container
             >
             <tr mat-header-row *matHeaderRowDef="columnasPagos"></tr>
-            <tr mat-row *matRowDef="let p; columns: columnasPagos"></tr>
+            <tr mat-row *matRowDef="let p; columns: columnasPagos" [class.repetido]="p.pagoId === repetido()"></tr>
           </table>
         </div>
       } @else {
@@ -211,6 +212,9 @@ import { FacturaFachada } from '../facturas.fachada';
   styles: `
     .pago {
       margin: 16px 0;
+    }
+    .repetido {
+      background: var(--mat-sys-advertencia-container);
     }
   `,
 })
@@ -236,6 +240,9 @@ export class FacturaPagina {
   readonly columnasPagos = ['fecha', 'monto', 'medio', 'referencia', 'nota'];
   readonly recargar = () => this.fachada.recargar();
   private readonly bob = new BobPipe();
+  private readonly fecha = new FechaPipe();
+  /** El pago con el que chocó un PAGO_DUPLICADO: se marca en la tabla de pagos (spec 008). */
+  readonly repetido = signal<string | undefined>(undefined);
   private readonly botonPago = viewChild<MatButton>('botonPago');
   private readonly primerCampo = viewChild<ElementRef<HTMLInputElement>>('primerCampo');
   private readonly injector = inject(Injector);
@@ -316,20 +323,45 @@ export class FacturaPagina {
       const p = this.form.getRawValue();
       await this.fachada.registrarPago(facturaId, { ...p, monto: montoConDecimales(p.monto), referencia: p.referencia.trim() });
       this.avisos.open('Pago registrado: se liberó el crédito', undefined, { duration: 5000 });
+      this.repetido.set(undefined);
       this.form.reset({ fecha: p.fecha, medio: p.medio });
       this.cerrar();
       await this.fachada.recargar();
       // Con saldo 0 el botón "Registrar pago" ya no está: el foco va al título de la factura.
       if (!this.puedeRegistrar()) enfocarTitulo();
     } catch (e) {
-      // Spec 008: si el saldo cambió (otro pago), se dice cuál es y se relee la factura.
-      const saldo =
-        codigoDe(e) === 'PAGO_EXCEDE_SALDO' && this.factura() ? ` El saldo es ${this.bob.transform(this.factura()!.saldo)}.` : '';
-      this.avisos.open(mensajeDe(e) + saldo, 'Cerrar');
-      if (saldo) void this.fachada.recargar();
       this.volver();
+      await this.explicarFallo(e);
     } finally {
       this.enviando.set(false);
     }
+  }
+
+  /** Spec 008: el saldo actual si el monto lo supera, y el pago existente si la referencia ya estaba. */
+  private async explicarFallo(e: unknown): Promise<void> {
+    const codigo = codigoDe(e);
+    const ext = erroresGraphql(e)[0]?.extensions ?? {};
+    if (codigo === 'PAGO_EXCEDE_SALDO') {
+      const saldo = saldoDelError(ext['saldo'], this.factura()?.saldo);
+      this.avisos.open(mensajeDe(e) + (saldo ? ` El saldo es ${this.bob.transform(saldo)}.` : ''), 'Cerrar');
+      void this.fachada.recargar();
+      return;
+    }
+    if (codigo !== 'PAGO_DUPLICADO') {
+      this.avisos.open(mensajeDe(e), 'Cerrar');
+      return;
+    }
+    await this.fachada.recargar();
+    const p = this.form.getRawValue();
+    const existente = pagoRepetido(this.factura()?.pagos ?? [], ext['pagoId'], p.medio, p.referencia);
+    this.repetido.set(existente?.pagoId);
+    const texto = existente
+      ? `Ese pago ya está registrado: ${this.bob.transform(existente.monto)} del ${this.fecha.transform(existente.fecha)} ` +
+        `por ${etiqueta('MedioPago', existente.medio).texto.toLowerCase()}, referencia ${existente.referencia}. Está marcado en Pagos.`
+      : `${mensajeDe(e)} Revisa la lista de pagos de esta factura.`;
+    this.avisos
+      .open(texto, 'Ver pagos')
+      .onAction()
+      .subscribe(() => enfocar('titulo-pagos'));
   }
 }

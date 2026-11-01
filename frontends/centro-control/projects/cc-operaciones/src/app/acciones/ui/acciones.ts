@@ -67,7 +67,8 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
             <mat-card-title>Avisar retraso a {{ a.razonSocial }}</mat-card-title>
             <mat-card-subtitle>
               <cc-estado grupo="EstadoAccion" [valor]="a.estado" />
-              · {{ a.creadaEn | fecha: true }} · viaje <a [routerLink]="['/viajes', a.viajeId]">{{ a.viaje?.placa ?? a.viajeId }}</a>
+              · {{ a.creadaEn | fecha: true }} · viaje
+              <a [routerLink]="['/viajes', a.viajeId]" [queryParams]="{ de: 'acciones' }">{{ a.viaje?.placa ?? 'sin unidad' }}</a>
               {{ a.viaje?.ruta.destino ? '→ ' + a.viaje.ruta.destino : '' }}
               @if (a.misionId) {
                 · <a [href]="config.urls['cc-tablero'] + '/agente?mision=' + a.misionId">ver la misión del agente</a>

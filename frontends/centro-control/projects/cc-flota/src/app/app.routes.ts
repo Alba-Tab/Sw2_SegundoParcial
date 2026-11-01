@@ -27,12 +27,12 @@ export const rutas: Routes = [
       {
         path: 'combustible/:id',
         loadComponent: () => import('./combustible/ui/combustible').then((m) => m.CombustiblePagina),
-        title: 'Carga',
+        title: 'Carga marcada',
       },
       {
         path: 'conduccion',
         loadComponent: () => import('./conduccion/ui/conduccion').then((m) => m.ConduccionPagina),
-        title: 'Conducción',
+        title: 'Puntaje de conducción',
       },
     ],
   },

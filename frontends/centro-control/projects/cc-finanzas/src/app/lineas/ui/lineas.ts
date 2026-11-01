@@ -25,7 +25,7 @@ import { LineasFachada } from '../lineas.fachada';
   imports: [Encabezado, MatIconModule, MatTableModule, MatSortModule, RouterLink, BobPipe, Estado, AvisoServicios, FiltrosLista, PieLista],
   template: `
     <cc-encabezado titulo="Líneas de crédito" />
-    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!lineas().length || incompletas() > 0" />
+    <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!lineas().length" />
     @if (incompletas(); as n) {
       <p class="aviso-lista" role="status">
         <mat-icon>cloud_off</mat-icon>No se pudo leer la línea de {{ n }} {{ n === 1 ? 'cliente' : 'clientes' }}: la lista está incompleta.
@@ -99,7 +99,8 @@ export class LineasPagina {
   readonly incompletas = this.fachada.incompletas;
   readonly clientesLeidos = this.fachada.clientesLeidos;
   readonly limiteClientes = LIMITE_GATEWAY;
-  readonly campos = { clientes: 'Viajes', lineaCredito: 'Finanzas' };
+  /** Una línea caída la cuenta el aviso de la lista: sin banner repetido (V1-11). */
+  readonly campos = { clientes: 'Viajes', lineaCredito: '' };
   readonly columnas = ['cliente', 'limite', 'reservado', 'utilizado', 'disponible', 'estado'];
   readonly estado = estadoLinea;
   readonly lista = controlLista({

@@ -227,8 +227,8 @@ export class FiltrosLista {
   readonly singular = input.required<string>();
   /** Cuántas filas pide la página como máximo: si llegan todas, se dice que la lista está truncada (C-8, D-2, D-3). */
   readonly limite = input<number>();
-  /** El servidor las manda de la más reciente a la más antigua ("los 80 más recientes"); si no, "los primeros 100". */
-  readonly recientes = input(false);
+  /** En qué orden corta el servidor: "recientes" (más nuevo primero), "antiguos" (más viejo primero) o sin orden conocido. */
+  readonly corte = input<CorteServidor>(null);
   /** El filtro de estado ya lo aplicó el servidor: el "de N" solo se muestra si filtra la búsqueda (C-14). */
   readonly estadoEnServidor = input(false);
   readonly opciones = computed(() => (this.grupo() ? opcionesEstado(this.grupo()!, this.valores()) : []));
@@ -246,8 +246,7 @@ export class FiltrosLista {
   readonly tope = computed(() => {
     const n = this.limite();
     if (!n || this.control().filas().length < n) return null;
-    const cuales = this.recientes() ? `los ${n} ${this.nombre()} más recientes` : `los primeros ${n} ${this.nombre()}`;
-    return `Se muestran ${cuales}; la búsqueda y el orden solo usan esos.`;
+    return textoTope(n, this.nombre(), this.corte(), !!this.grupo() && !this.control().filtro().estado);
   });
 
   constructor() {
@@ -268,6 +267,19 @@ export class FiltrosLista {
       this.control().buscar(valor);
     }, 250);
   }
+}
+
+export type CorteServidor = 'antiguos' | 'recientes' | null;
+
+/** Qué parte de la lista llegó cuando el servidor la cortó en `n` (C-8, V1-1, V1-3). */
+export function textoTope(n: number, nombre: string, corte: CorteServidor, conEstado: boolean): string {
+  if (corte === 'antiguos') {
+    // El servidor manda primero los más viejos: lo nuevo queda fuera y hay que decirlo (V1-1).
+    const salida = conEstado ? 'filtra por estado para ver los más nuevos' : 'los más nuevos no aparecen';
+    return `Se muestran los ${n} ${nombre} más antiguos; ${salida}.`;
+  }
+  const cuales = corte === 'recientes' ? `los ${n} ${nombre} más recientes` : `los primeros ${n} ${nombre}`;
+  return `Se muestran ${cuales}; la búsqueda y el orden solo usan esos.`;
 }
 
 /** Estado vacío con siguiente paso o el paginador (en español). */

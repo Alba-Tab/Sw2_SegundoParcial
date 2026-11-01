@@ -31,7 +31,8 @@ export function AvisoComercial() {
       ) : (
         'Modo comercial: elige un cliente'
       )}
-      <Typography variant="body2" component="span" sx={{ display: 'block' }}>
+      {/* En un celular la banda queda fija en una línea (V1-14): la nota de responsabilidad, desde sm. */}
+      <Typography variant="body2" component="span" sx={{ display: { xs: 'none', sm: 'block' } }}>
         Lo que registres queda a nombre de {sesion.nombre}, por teléfono.
       </Typography>
     </Alert>

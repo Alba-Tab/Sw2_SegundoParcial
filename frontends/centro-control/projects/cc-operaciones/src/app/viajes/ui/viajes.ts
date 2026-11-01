@@ -23,6 +23,7 @@ import { ViajesFachada } from '../viajes.fachada';
       nombre="viajes"
       singular="viaje"
       [limite]="80"
+      corte="antiguos"
       [estadoEnServidor]="true"
     />
     <div class="tabla-ancha" role="region" tabindex="0" aria-label="Viajes">

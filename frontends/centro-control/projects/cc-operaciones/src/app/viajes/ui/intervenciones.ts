@@ -4,7 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, controlLista, Encabezado, FechaPipe, FiltrosLista, PieLista } from 'ui-comun';
+import { AvisoServicios, controlLista, Encabezado, FechaPipe, FiltrosLista, PieLista, Sesion } from 'ui-comun';
 import { textoViaje } from '../domain/viaje';
 import { IntervencionesFachada } from '../viajes.fachada';
 
@@ -65,7 +65,14 @@ import { IntervencionesFachada } from '../viajes.fachada';
         <ng-container matColumnDef="accion"
           ><th mat-header-cell *matHeaderCellDef><span class="cdk-visually-hidden">Acción</span></th>
           <td mat-cell *matCellDef="let v">
-            <a mat-stroked-button [routerLink]="['/viajes', v.viajeId]"><mat-icon>rule</mat-icon>Resolver</a>
+            <!-- Solo el despachador resuelve en el viaje; los demás roles lo ven (V1-4). -->
+            @if (decide) {
+              <a mat-stroked-button [routerLink]="['/viajes', v.viajeId]" [queryParams]="{ de: 'intervenciones' }"
+                ><mat-icon>rule</mat-icon>Resolver</a
+              >
+            } @else {
+              <a mat-stroked-button [routerLink]="['/viajes', v.viajeId]" [queryParams]="{ de: 'intervenciones' }">Ver detalle</a>
+            }
           </td></ng-container
         >
         <tr mat-header-row *matHeaderRowDef="columnas"></tr>
@@ -85,6 +92,7 @@ export class IntervencionesPagina {
   private readonly fachada = inject(IntervencionesFachada);
   readonly error = this.fachada.error;
   readonly cargando = this.fachada.cargando;
+  readonly decide = inject(Sesion).tiene('despachador');
   readonly campos = { intervenciones: 'Viajes' };
   readonly columnas = ['placa', 'cliente', 'ruta', 'fecha', 'motivo', 'accion'];
   readonly lista = controlLista({

@@ -35,9 +35,11 @@ const GRUPO_EN_LINEA: Record<string, string> = {
   'Mision.estado': 'EstadoMision',
   'Mision.origen': 'OrigenMision',
   'Documento.tipo': 'TipoDocumento',
+  'HitoNuevo.origen': 'OrigenHito', // viajes.yaml, Hito hereda de HitoNuevo
+  'Entrega.tipo': 'TipoEntrega', // viajes.yaml
 };
 /** Cada esquema de `components.schemas` (4 espacios) con sus propiedades string de valores cerrados (8 espacios). */
-const enumsEnLinea = [analitica, flota].flatMap((yaml) =>
+const enumsEnLinea = [analitica, flota, viajes].flatMap((yaml) =>
   yaml.split(/^ {4}(?=\w+:\n)/m).flatMap((bloque) => {
     const esquema = bloque.match(/^(\w+):/)?.[1];
     return [...bloque.matchAll(/^ {8}(\w+):\n {10}type: string\n {10}enum: \[([^\]]*)\]/gm)]
@@ -48,7 +50,7 @@ const enumsEnLinea = [analitica, flota].flatMap((yaml) =>
 );
 
 describe('etiquetas de los enums', () => {
-  it('lee los enums en línea de OpenAPI (severidad, misión, documento)', () => {
+  it('lee los enums en línea de OpenAPI (severidad, misión, documento, origen del hito, tipo de entrega)', () => {
     expect(enumsEnLinea.map((x) => x.campo).sort()).toEqual(Object.keys(GRUPO_EN_LINEA).sort());
   });
 

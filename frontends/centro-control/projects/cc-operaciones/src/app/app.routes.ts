@@ -30,7 +30,7 @@ export const rutas: Routes = [
       {
         path: 'acciones/:id',
         canActivate: [soloRoles(...ROLES_ACCIONES)],
-        ...p(() => import('./acciones/ui/acciones').then((m) => m.AccionesPagina), 'Acción del agente'),
+        ...p(() => import('./acciones/ui/acciones').then((m) => m.AccionesPagina), 'Acción propuesta'),
       },
     ],
   },

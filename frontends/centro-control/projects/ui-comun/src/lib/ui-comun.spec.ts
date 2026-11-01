@@ -68,7 +68,7 @@ describe('ui-comun', () => {
 
   it('formatea dinero como texto (nunca float en cálculos), fechas y porcentajes', () => {
     expect(new BobPipe().transform('2800.00')).toBe('2.800,00 BOB');
-    expect(new BobPipe().transform(null)).toBe('—');
+    expect(new BobPipe().transform(null)).toBe('Sin dato');
     expect(new FechaPipe().transform('2026-11-03')).toBe('03/11/2026');
     expect(pct(0.857)).toBe('86 %');
   });
@@ -99,6 +99,11 @@ describe('ui-comun', () => {
       'No se pudo hablar con el servidor. Revisa la conexión e intenta de nuevo.',
     ]);
     expect(avisosServicio(undefined, campos, true)).toEqual([]);
+    // Un campo con nombre vacío lo explica su sección: ni su servicio ni "Viajes" (el padre del path) en el banner (V1-10).
+    const riesgo = new CombinedGraphQLErrors({
+      errors: [{ message: 'Analítica no disponible', path: ['viaje', 'riesgo'], extensions: { codigo: 'DEPENDENCIA_NO_DISPONIBLE' } }],
+    });
+    expect(avisosServicio(riesgo, { ...campos, riesgo: '' })).toEqual([]);
   });
 
   it('dinero sin float: BobPipe no pasa por Number y las sumas van en centavos enteros', () => {

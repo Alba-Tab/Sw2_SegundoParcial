@@ -29,13 +29,16 @@ export function popupViaje(v: ViajeMapa, urlViaje: string): HTMLElement {
   return caja;
 }
 
-/** Mapa en vivo (spec 005): la última posición de cada viaje en ruta, cada 15 s; en rojo los que tienen riesgo. */
+/** Mapa en vivo (spec 005): la última posición de cada viaje en ruta, cada 15 s; en ámbar (aviso, como su chip) los que tienen riesgo. */
 @Component({
   selector: 'app-mapa',
   providers: [MapaFachada],
   imports: [Encabezado, AvisoServicios],
   template: `<cc-encabezado titulo="Mapa en vivo" />
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!viajes().length" />
+    @if (sinPosicion()) {
+      <p class="secundario" role="status">Ese viaje aún no reporta posición.</p>
+    }
     <div #mapa class="mapa" role="application" aria-label="Mapa de viajes en ruta"></div>`,
   styles: `
     .mapa {
@@ -54,7 +57,9 @@ export class MapaPagina implements OnDestroy {
   readonly campos = { viajesEnCurso: 'Viajes', riesgo: 'Analítica' };
   /** `?viaje=<id>` (desde "Ver en el mapa" del detalle): se centra y abre ese marcador una vez (C-15). */
   readonly viaje = input<string>();
-  private mapa?: L.Map;
+  /** Señal: si los datos llegan antes que el mapa (caché al volver), el centrado espera a que exista (V1-9). */
+  private readonly mapa = signal<L.Map | undefined>(undefined);
+  readonly sinPosicion = signal(false);
   private capa = L.layerGroup();
   private centrado = false;
   /** Cambia con el tema del sistema: los marcadores se repintan con los colores nuevos (A-11). */
@@ -64,16 +69,18 @@ export class MapaPagina implements OnDestroy {
   constructor() {
     matchMedia('(prefers-color-scheme: dark)').addEventListener('change', this.alCambiarTema);
     afterNextRender(() => {
-      this.mapa = L.map(this.contenedor().nativeElement).setView([-17.78, -63.18], 7);
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(this.mapa);
-      this.capa.addTo(this.mapa);
+      const mapa = L.map(this.contenedor().nativeElement).setView([-17.78, -63.18], 7);
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18, attribution: '© OpenStreetMap' }).addTo(mapa);
+      this.capa.addTo(mapa);
+      this.mapa.set(mapa);
     });
     effect(() => {
       const viajes = this.viajes();
+      const mapa = this.mapa();
       this.oscuro();
       // Leaflet pinta en SVG con colores en JS: se leen de los tokens para seguir el tema (claro u oscuro).
       const tokens = getComputedStyle(document.documentElement);
-      const conRiesgo = tokens.getPropertyValue('--mat-sys-error').trim();
+      const conRiesgo = tokens.getPropertyValue('--mat-sys-advertencia').trim();
       const normal = tokens.getPropertyValue('--mat-sys-primary').trim();
       this.capa.clearLayers();
       for (const v of viajes) {
@@ -84,17 +91,18 @@ export class MapaPagina implements OnDestroy {
         const marcador = L.circleMarker([lat, lng], { radius: 9, color: riesgo ? conRiesgo : normal, fillOpacity: 0.8 })
           .bindPopup(popupViaje(v, `${this.config.urls['cc-operaciones']}/viajes/${encodeURIComponent(v.viajeId)}`))
           .addTo(this.capa);
-        if (!this.centrado && this.mapa && v.viajeId === this.viaje()) {
+        if (!this.centrado && mapa && v.viajeId === this.viaje()) {
           this.centrado = true;
-          this.mapa.setView([lat, lng], 11);
+          mapa.setView([lat, lng], 11);
           marcador.openPopup();
         }
       }
+      this.sinPosicion.set(!!mapa && !!this.viaje() && !this.centrado && !this.fachada.cargando());
     });
   }
 
   ngOnDestroy(): void {
     matchMedia('(prefers-color-scheme: dark)').removeEventListener('change', this.alCambiarTema);
-    this.mapa?.remove();
+    this.mapa()?.remove();
   }
 }

@@ -1,7 +1,7 @@
 import { Component, computed, input, signal } from '@angular/core';
 import { MatSortModule, type Sort } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
-import { aCentavos, type Direccion, ordenar, pct, sumarMontos } from 'ui-comun/dominio';
+import { aCentavos, type Direccion, ordenar, pct, SIN_DATO, sumarMontos } from 'ui-comun/dominio';
 import { BobPipe, FechaPipe } from './formato';
 
 export interface Columna {
@@ -40,7 +40,9 @@ export function ordenarFilas(filas: readonly Record<string, unknown>[], columna:
   imports: [MatTableModule, MatSortModule, FechaPipe],
   template: `
     @let r = resultado();
-    <p class="datos-al">Datos al {{ r.datosAl ? (r.datosAl | fecha: true) : '—' }}</p>
+    @if (r.datosAl) {
+      <p class="datos-al">Datos al {{ r.datosAl | fecha: true }}</p>
+    }
     @if (barras().length) {
       <svg class="grafico" [attr.viewBox]="'0 0 ' + ancho + ' ' + (barras().length * 28 + 8)" role="img" [attr.aria-label]="r.titulo">
         @for (b of barras(); track b.etiqueta; let i = $index) {
@@ -170,7 +172,7 @@ export class TablaReporte {
   }
 
   celda(valor: unknown, c: Columna): string {
-    if (valor === null || valor === undefined || valor === '') return '—';
+    if (valor === null || valor === undefined || valor === '') return SIN_DATO;
     switch (c.tipo) {
       case 'MONTO':
         return this.bob.transform(String(valor), false);

@@ -37,10 +37,17 @@ describe('riesgo de retraso en el detalle del viaje (W3, B-1)', () => {
     expect(montar({ data: { viaje: { ...viaje, riesgo: null } } })).toContain('Aún no hay datos para estimar el retraso');
   });
 
-  it('con error en riesgo dice que Analítica no responde, nunca "aún no hay datos"', () => {
+  it('con error en riesgo dice "Riesgo no disponible", nunca "aún no hay datos"', () => {
     const texto = montar({ data: { viaje: { ...viaje, riesgo: null } }, error: errorEn('ERROR_INTERNO') });
-    expect(texto).toContain('Analítica no responde');
+    expect(texto).toContain('Riesgo no disponible');
     expect(texto).not.toContain('Aún no hay datos');
+  });
+
+  it('con Analítica caída lo dice una sola vez, en la sección; sin banner (V1-10)', () => {
+    const texto = montar({ data: { viaje: { ...viaje, riesgo: null } }, error: errorEn('DEPENDENCIA_NO_DISPONIBLE') });
+    expect(texto).toContain('Riesgo no disponible');
+    expect(texto).not.toContain('Analítica no disponible');
+    expect(texto).not.toContain('Viajes no disponible');
   });
 
   it('con la predicción muestra la probabilidad', () => {

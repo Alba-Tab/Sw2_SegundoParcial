@@ -38,8 +38,9 @@ const ESTADOS: Record<EstadoViaje, Etiqueta> = {
   CANCELADO: { texto: 'Cancelado', icono: <Cancel />, color: 'default' },
   ENTREGA_OBSERVADA: { texto: 'Entrega en revisión', icono: <Warning />, color: 'warning' },
   ENTREGA_RECHAZADA: { texto: 'Entrega rechazada', icono: <Block />, color: 'error' },
-  // Para el cliente es «esperando a la empresa», no una falla: mismo icono y tono que «Confirmando» (A-5).
-  REQUIERE_INTERVENCION: { texto: 'En revisión por la empresa', icono: <HourglassTop />, color: 'primary' },
+  // Para el cliente es «esperando a la empresa», no una falla: mismo icono y tono que «Confirmando» (A-5); el texto no se
+  // confunde con «Entrega en revisión» (V1-15).
+  REQUIERE_INTERVENCION: { texto: 'La empresa está resolviendo un imprevisto', icono: <HourglassTop />, color: 'primary' },
 };
 
 const EN_APROBACION: Etiqueta = { texto: 'En aprobación', icono: <HourglassTop />, color: 'warning' };

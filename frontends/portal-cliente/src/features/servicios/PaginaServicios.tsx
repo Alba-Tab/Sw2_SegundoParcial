@@ -39,10 +39,10 @@ export function PaginaServicios() {
   const columnas = useMemo(
     () => [
       col.accessor('creadoEn', { header: 'Pedido', cell: (c) => fecha(c.getValue().slice(0, 10)) }),
-      col.accessor('rutaId', { header: 'Ruta', cell: (c) => nombreRuta.get(c.getValue() ?? '') ?? '—' }),
-      col.accessor('tipoCarga', { header: 'Carga', cell: (c) => (c.getValue() ? TIPOS_CARGA[c.getValue()!] : '—') }),
-      col.accessor('toneladas', { header: 'Toneladas', cell: (c) => c.getValue() ?? '—' }),
-      col.accessor('monto', { header: 'Monto', cell: (c) => (c.getValue() ? dinero(c.getValue()!) : '—') }),
+      col.accessor('rutaId', { header: 'Ruta', cell: (c) => nombreRuta.get(c.getValue() ?? '') ?? 'Sin dato' }),
+      col.accessor('tipoCarga', { header: 'Carga', cell: (c) => (c.getValue() ? TIPOS_CARGA[c.getValue()!] : 'Sin dato') }),
+      col.accessor('toneladas', { header: 'Toneladas', cell: (c) => c.getValue() ?? 'Sin dato' }),
+      col.accessor('monto', { header: 'Monto', cell: (c) => (c.getValue() ? dinero(c.getValue()!) : 'Sin dato') }),
       col.accessor('estado', { header: 'Estado', cell: (c) => <EstadoServicio estado={c.getValue()} etapa={c.row.original.etapa} /> }),
     ],
     [nombreRuta],

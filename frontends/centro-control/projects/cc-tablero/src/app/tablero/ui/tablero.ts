@@ -15,7 +15,7 @@ import { TableroFachada } from '../tablero.fachada';
   providers: [TableroFachada],
   imports: [MatButtonToggleModule, MatIconModule, Encabezado, Esqueleto, BobPipe, FechaPipe, Estado, AvisoServicios],
   template: `
-    <cc-encabezado titulo="Tablero" [subtitulo]="bloques.verAlertas ? 'Datos al ' + (datosAl() ?? '—') : undefined">
+    <cc-encabezado titulo="Tablero" [subtitulo]="bloques.verAlertas && datosAl() ? 'Datos al ' + datosAl() : undefined">
       <mat-button-toggle-group [value]="periodo()" (change)="periodo.set($event.value)" aria-label="Periodo de las cifras">
         <mat-button-toggle value="HOY">Hoy</mat-button-toggle>
         <mat-button-toggle value="ESTA_SEMANA">Esta semana</mat-button-toggle>
@@ -72,7 +72,7 @@ import { TableroFachada } from '../tablero.fachada';
                     <span class="no-disponible">Sin acceso</span>
                   }
                   @default {
-                    {{ t.viajesEnCurso?.length ?? '—' }}
+                    {{ t.viajesEnCurso?.length ?? 'Sin dato' }}
                   }
                 }
               </dd>
@@ -90,7 +90,7 @@ import { TableroFachada } from '../tablero.fachada';
                     <span class="no-disponible">Sin acceso</span>
                   }
                   @default {
-                    {{ t.alertasAbiertas ?? '—' }}
+                    {{ t.alertasAbiertas ?? 'Sin dato' }}
                   }
                 }
               </dd>

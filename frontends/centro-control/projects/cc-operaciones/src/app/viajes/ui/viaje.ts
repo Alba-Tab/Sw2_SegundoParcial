@@ -28,6 +28,7 @@ import {
 } from 'ui-comun';
 import { RouterLink } from '@angular/router';
 import type { OpcionIntervencion } from '../../graphql/generado';
+import { colaDeOrigen } from '../domain/viaje';
 import { ViajeFachada } from '../viajes.fachada';
 
 /** Detalle del viaje (al que llevan las alertas): bitácora, entrega, riesgo y las decisiones del despachador. */
@@ -55,7 +56,7 @@ import { ViajeFachada } from '../viajes.fachada';
     @let r = datos();
     @let placa = r?.data?.viaje?.placa;
     @let titulo = placa ? 'Viaje ' + placa : 'Viaje';
-    <cc-encabezado [titulo]="titulo" [migas]="[{ texto: 'Viajes', ruta: '/viajes' }, { texto: titulo }]">
+    <cc-encabezado [titulo]="titulo" [migas]="[origen(), { texto: titulo }]">
       @if (r?.data?.viaje; as v) {
         <cc-estado grupo="EstadoViaje" [valor]="v.estado" />
       }
@@ -66,7 +67,7 @@ import { ViajeFachada } from '../viajes.fachada';
     @if (cargandoDe(r)) {
       <cc-esqueleto [filas]="6" />
     }
-    <!-- El Gateway ya convierte el 404 de la predicción en null (W3): un error en riesgo es una falla real (B-1). -->
+    <!-- El Gateway ya convierte el 404 de la predicción en null (W3): un error en riesgo lo dice su sección (B-1, V1-10). -->
     <cc-aviso-servicios [error]="r?.error" [campos]="campos" [sinDatos]="!r?.data?.viaje" [reintentar]="recargar" />
     @if (r?.data?.viaje; as v) {
       <!-- Lo que pide una decisión va primero (PRODUCT.md, principio 1). -->
@@ -133,7 +134,7 @@ import { ViajeFachada } from '../viajes.fachada';
       <dl class="datos">
         <div>
           <dt>Cliente</dt>
-          <dd>{{ v.cliente?.razonSocial ?? '—' }}</dd>
+          <dd>{{ v.cliente?.razonSocial ?? 'Sin dato' }}</dd>
         </div>
         <div>
           <dt>Ruta</dt>
@@ -149,7 +150,7 @@ import { ViajeFachada } from '../viajes.fachada';
         </div>
         <div>
           <dt>Chofer</dt>
-          <dd>{{ v.choferNombre ?? '—' }}</dd>
+          <dd>{{ v.choferNombre ?? 'Sin dato' }}</dd>
         </div>
         <div>
           <dt>Unidad</dt>
@@ -190,7 +191,7 @@ import { ViajeFachada } from '../viajes.fachada';
       } @else if (verRiesgo && v.estado === 'EN_RUTA') {
         <h2>Riesgo de retraso</h2>
         @if (errorRiesgo()) {
-          <p class="secundario">Riesgo no disponible: Analítica no responde. Reintenta en unos minutos.</p>
+          <p class="secundario">Riesgo no disponible. Reintenta en unos minutos.</p>
         } @else {
           <p class="secundario">Aún no hay datos para estimar el retraso.</p>
         }
@@ -265,6 +266,9 @@ export class ViajePagina {
   private readonly avisos = inject(MatSnackBar);
   readonly sesion = inject(Sesion);
   readonly id = input.required<string>();
+  /** La cola desde la que se abrió (`?de=`), validada contra una lista cerrada: miga y "volver" llevan ahí (V1-5). */
+  readonly de = input<string>();
+  readonly origen = computed(() => colaDeOrigen(this.de()));
   readonly datos = this.fachada.datos;
   readonly verMonto = this.fachada.verMonto;
   readonly verRiesgo = this.fachada.verRiesgo;
@@ -272,7 +276,7 @@ export class ViajePagina {
   readonly errorRiesgo = computed(() => erroresGraphql(this.datos()?.error).some((e) => e.path?.includes('riesgo')));
   readonly enviando = signal(false);
   readonly pct = pct;
-  readonly campos = { viaje: 'Viajes', unidad: 'Flota', riesgo: 'Analítica' };
+  readonly campos = { viaje: 'Viajes', unidad: 'Flota', riesgo: '' };
   readonly cargandoDe = cargandoDe;
   readonly textoError = textoError;
   /** Rechazar la entrega no se deshace: se confirma con un resumen. */

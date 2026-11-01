@@ -2,7 +2,7 @@ import { signal } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter, Router } from '@angular/router';
 import { aCentavos, aParametros, filtrar, leerFiltro, normalizar, opcionesEstado, ordenar, paginar } from 'ui-comun/dominio';
-import { controlLista, MemoriaListas } from './lista';
+import { controlLista, MemoriaListas, textoTope } from './lista';
 
 const filas = [
   { placa: 'ABC-123', chofer: 'José Peña', estado: 'EN_RUTA', monto: '2800.00', km: 900 },
@@ -61,6 +61,17 @@ describe('listas: lo puro', () => {
       estado: 'PAGADA',
     });
     expect(aParametros({ pagina: 2 }, 'a-')).toEqual({ 'a-pagina': '3' });
+  });
+});
+
+describe('textoTope', () => {
+  it('dice la verdad sobre qué parte de la lista cortó el servidor (V1-1, V1-3)', () => {
+    expect(textoTope(80, 'viajes', 'antiguos', true)).toBe(
+      'Se muestran los 80 viajes más antiguos; filtra por estado para ver los más nuevos.',
+    );
+    expect(textoTope(80, 'viajes', 'antiguos', false)).toContain('los más nuevos no aparecen');
+    expect(textoTope(80, 'servicios', 'recientes', true)).toContain('los 80 servicios más recientes');
+    expect(textoTope(100, 'clientes', null, false)).toContain('los primeros 100 clientes');
   });
 });
 

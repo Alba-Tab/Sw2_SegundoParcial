@@ -29,7 +29,7 @@ export const rutas: Routes = [
         path: 'agente',
         canActivate: [soloRoles(...ROLES_PAGINA.agente)],
         loadComponent: () => import('./agente/ui/agente').then((m) => m.AgentePagina),
-        title: 'Agente',
+        title: 'Agente «vigilar viajes»',
       },
     ],
   },

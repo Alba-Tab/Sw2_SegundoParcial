@@ -17,6 +17,7 @@ import {
 } from 'ui-comun';
 import { FacturasFachada } from '../facturas.fachada';
 
+import { cambioDeSaldo, ESTADOS_CON_SALDO } from '../domain/filtro';
 @Component({
   selector: 'app-facturas',
   providers: [FacturasFachada],
@@ -46,7 +47,7 @@ import { FacturasFachada } from '../facturas.fachada';
     >
       <mat-button-toggle-group
         [value]="saldo() === 'todas' ? 'todas' : 'con-saldo'"
-        (change)="lista.poner({ saldo: $event.value === 'todas' ? 'todas' : null })"
+        (change)="lista.poner(cambioDeSaldo($event.value, lista.filtro().estado))"
         aria-label="Facturas a mostrar"
       >
         <mat-button-toggle value="con-saldo">Con saldo</mat-button-toggle>
@@ -127,8 +128,8 @@ export class FacturasPagina {
   });
   /** "Con saldo" (por defecto) o "todas": lo filtra Finanzas y vive en la URL como los demás filtros. */
   readonly saldo = this.lista.parametro('saldo');
-  /** Con saldo, una factura pagada no puede salir: el filtro de estado no la ofrece (C-9). */
-  readonly estadosConSaldo = ['EMITIDA', 'PAGADA_PARCIAL'];
+  readonly estadosConSaldo = ESTADOS_CON_SALDO;
+  readonly cambioDeSaldo = cambioDeSaldo;
 
   constructor() {
     effect(() => this.fachada.conSaldo.set(this.saldo() === 'todas' ? null : true));

@@ -43,7 +43,7 @@ Rama `feat/ui-comun/arreglos-ux-web`, sobre `ced8d5d` (Fases A a E).
 
 | id | estado | nota |
 |---|---|---|
-| A-1 | ya resuelto en E | Fuente recortada a la lista cerrada de `iconos.ts` (13 KB en WOFF), `font-display: swap` y los íconos ocultos hasta que carga; `npm run iconos` falla si se usa uno que no está |
+| A-1 | ya resuelto en E | Fuente recortada a la lista cerrada de `iconos.ts` (13 KB en WOFF), `font-display: block` para que los íconos queden ocultos hasta que carga y nunca se vea el nombre de la ligadura; `npm run iconos` falla si se usa uno que no está |
 | A-2 | hecho | Grupo `RazonObservacion` en `ETIQUETAS`; `viaje.ts` y `entregas.ts` muestran «Fuera de la geocerca», «Sin firma» |
 | A-3 | hecho | `estado.spec.ts` lee los esquemas con nombre de `contratos/openapi/*.yaml` y los compara con su grupo. Los enums en línea (severidad, misión, documento) siguen sin prueba |
 | A-4 | hecho | La severidad va en su propia línea con `label-large`; el pie queda con fecha y estado |

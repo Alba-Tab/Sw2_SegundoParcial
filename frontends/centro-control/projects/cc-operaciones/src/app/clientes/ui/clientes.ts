@@ -81,11 +81,11 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
         >
         <ng-container matColumnDef="nit"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>NIT</th>
-          <td mat-cell *matCellDef="let c">{{ c.nit ?? '—' }}</td></ng-container
+          <td mat-cell *matCellDef="let c">{{ c.nit ?? 'Sin dato' }}</td></ng-container
         >
         <ng-container matColumnDef="correo"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Correo</th>
-          <td mat-cell *matCellDef="let c">{{ c.correo ?? '—' }}</td></ng-container
+          <td mat-cell *matCellDef="let c">{{ c.correo ?? 'Sin dato' }}</td></ng-container
         >
         <ng-container matColumnDef="canal"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Canal</th>

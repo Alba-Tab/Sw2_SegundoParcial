@@ -1,5 +1,5 @@
 import { Pipe, type PipeTransform } from '@angular/core';
-import { aCentavos } from 'ui-comun/dominio';
+import { aCentavos, SIN_DATO } from 'ui-comun/dominio';
 
 const fecha = new Intl.DateTimeFormat('es-BO', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/La_Paz' });
 const hora = new Intl.DateTimeFormat('es-BO', {
@@ -14,7 +14,7 @@ const hora = new Intl.DateTimeFormat('es-BO', {
 @Pipe({ name: 'bob' })
 export class BobPipe implements PipeTransform {
   transform(monto: string | null | undefined, conMoneda = true): string {
-    if (monto === null || monto === undefined) return '—';
+    if (monto === null || monto === undefined) return SIN_DATO;
     const centavos = aCentavos(monto);
     if (centavos === null) return String(monto);
     const absoluto = centavos < 0n ? -centavos : centavos;
@@ -28,7 +28,7 @@ export class BobPipe implements PipeTransform {
 @Pipe({ name: 'fecha' })
 export class FechaPipe implements PipeTransform {
   transform(valor: string | null | undefined, conHora = false): string {
-    if (!valor) return '—';
+    if (!valor) return SIN_DATO;
     if (/^\d{4}-\d{2}-\d{2}$/.test(valor)) {
       const [a, m, d] = valor.split('-');
       return `${d}/${m}/${a}`;

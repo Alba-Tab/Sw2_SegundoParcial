@@ -34,7 +34,7 @@ import { Cargando } from '../../compartido/ui/Cargando';
 
 const col = createColumnHelper<Factura>();
 
-/** Páginas que se piden solas para encontrar la factura del enlace; después, el cliente sigue con «Cargar más». */
+/** Páginas que se piden solas para encontrar la factura del enlace; después, el cliente sigue con «Ver más». */
 const PAGINAS_PARA_BUSCAR = 5;
 
 /** Specs 006 y 008: facturas con su saldo (TanStack Table con orden) y la línea de crédito. */
@@ -90,10 +90,11 @@ export function PaginaFacturas() {
   // La factura del enlace puede estar en una página que aún no se cargó: se piden más, hasta un tope (B-3).
   const falta = !!elegida && !datos.some((f) => f.facturaId === elegida);
   const paginasLeidas = paginas.data?.pages.length ?? 0;
-  const { hasNextPage, isFetchingNextPage, fetchNextPage } = paginas;
+  const { hasNextPage, isFetchingNextPage, isFetchNextPageError, fetchNextPage } = paginas;
+  // Si la página siguiente falla, se para: sin esto el efecto la vuelve a pedir sin pausa (V1-2).
   useEffect(() => {
-    if (falta && hasNextPage && !isFetchingNextPage && paginasLeidas < PAGINAS_PARA_BUSCAR) void fetchNextPage();
-  }, [falta, hasNextPage, isFetchingNextPage, paginasLeidas, fetchNextPage]);
+    if (falta && hasNextPage && !isFetchingNextPage && !isFetchNextPageError && paginasLeidas < PAGINAS_PARA_BUSCAR) void fetchNextPage();
+  }, [falta, hasNextPage, isFetchingNextPage, isFetchNextPageError, paginasLeidas, fetchNextPage]);
   // React Compiler deja sin memoizar este componente (TanStack Table no es compatible); es lo esperado.
   // eslint-disable-next-line react-hooks/incompatible-library
   const tabla = useReactTable({
@@ -179,7 +180,8 @@ export function PaginaFacturas() {
           </Table>
         </Paper>
       )}
-      {paginas.hasNextPage && (
+      {isFetchNextPageError && <Problema error={paginas.error} reintentar={() => void fetchNextPage()} />}
+      {paginas.hasNextPage && !isFetchNextPageError && (
         <Button onClick={() => void paginas.fetchNextPage()} loading={paginas.isFetchingNextPage} sx={{ alignSelf: 'flex-start' }}>
           Ver más
         </Button>

@@ -67,6 +67,7 @@ import { ServiciosFachada } from '../servicios.fachada';
       nombre="servicios"
       singular="servicio"
       [limite]="80"
+      corte="recientes"
       [estadoEnServidor]="true"
     />
     <div class="tabla-ancha" role="region" tabindex="0" aria-label="Servicios">

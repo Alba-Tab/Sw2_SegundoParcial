@@ -57,11 +57,11 @@ import { nombreRuta } from '../domain/cliente';
       <dl class="datos">
         <div>
           <dt>NIT</dt>
-          <dd>{{ c.nit ?? '—' }}</dd>
+          <dd>{{ c.nit ?? 'Sin dato' }}</dd>
         </div>
         <div>
           <dt>Correo</dt>
-          <dd>{{ c.correo ?? '—' }}</dd>
+          <dd>{{ c.correo ?? 'Sin dato' }}</dd>
         </div>
         <div>
           <dt>Canal</dt>
@@ -125,7 +125,7 @@ import { nombreRuta } from '../domain/cliente';
             >
             <ng-container matColumnDef="placa"
               ><th mat-header-cell *matHeaderCellDef>Unidad</th>
-              <td mat-cell *matCellDef="let s">{{ s.placa ?? '—' }}</td></ng-container
+              <td mat-cell *matCellDef="let s">{{ s.placa ?? 'Sin dato' }}</td></ng-container
             >
             <ng-container matColumnDef="monto"
               ><th mat-header-cell *matHeaderCellDef>Monto</th>

@@ -66,9 +66,9 @@ export function Marco() {
   const menu = !s.autenticado || s.necesitaEmpresa ? [] : activo.modoComercial ? MENU_COMERCIAL : MENU_CLIENTE;
   return (
     <>
-      {/* La barra y la banda del modo comercial quedan fijas juntas (N7), solo desde md: en un celular las dos líneas
-          de la barra y la banda taparían más de un cuarto de la pantalla (B-4). */}
-      <Box sx={{ position: { xs: 'static', md: 'sticky' }, top: 0, zIndex: (t) => t.zIndex.appBar }}>
+      {/* Desde md, la barra y la banda del modo comercial quedan fijas juntas (N7). En un celular la barra se va con el
+          scroll (B-4) y solo la banda, en una línea, queda fija: con `display: contents` la caja no la encierra (V1-14). */}
+      <Box sx={{ display: { xs: 'contents', md: 'block' }, position: { md: 'sticky' }, top: 0, zIndex: (t) => t.zIndex.appBar }}>
         <AppBar position="static" elevation={0}>
           <Toolbar sx={{ gap: 1, flexWrap: 'wrap' }}>
             <Typography variant="h6" component="h1" sx={{ mr: 2 }}>
@@ -109,7 +109,11 @@ export function Marco() {
             )}
           </Toolbar>
         </AppBar>
-        {s.autenticado && cacheLista && <AvisoComercial />}
+        {s.autenticado && cacheLista && (
+          <Box sx={{ position: { xs: 'sticky', md: 'static' }, top: 0, zIndex: (t) => t.zIndex.appBar }}>
+            <AvisoComercial />
+          </Box>
+        )}
       </Box>
       {soloCache && (
         <Alert severity="info" square>

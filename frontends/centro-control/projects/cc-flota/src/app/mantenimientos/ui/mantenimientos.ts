@@ -49,7 +49,7 @@ import { MantenimientosFachada } from '../mantenimientos.fachada';
       nombre="mantenimientos"
       singular="mantenimiento"
       [limite]="limite"
-      [recientes]="true"
+      corte="recientes"
     />
     <div class="tabla-ancha" role="region" tabindex="0" aria-label="Mantenimientos">
       <table

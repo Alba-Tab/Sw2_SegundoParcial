@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { conConsultas, simularApi } from '../../pruebas/utilidades';
+import { conConsultas, problema, simularApi } from '../../pruebas/utilidades';
 import { PaginaFacturas } from './PaginaFacturas';
 
 const clienteActivo = vi.hoisted(() => ({ actual: { modoComercial: false, clienteId: undefined as string | undefined } }));
@@ -100,6 +100,26 @@ describe('Facturas y crédito (specs 006 y 008)', () => {
     const fila = (await screen.findByText('FAC-000009')).closest('tr')!;
     expect(fila.getAttribute('aria-current')).toBe('true');
     expect(screen.queryByText(/No encontramos la factura/)).toBeNull();
+    ruta.params = {};
+  });
+
+  it('si falla la página siguiente al buscar la factura del enlace, no insiste y ofrece reintentar (V1-2)', async () => {
+    ruta.params = { facturaId: 'FAC-000009' };
+    const llamadas = simularApi({
+      'GET /api/v1/lineas-credito/mia': { estado: 200, cuerpo: linea },
+      'GET /api/v1/facturas': [
+        { estado: 200, cuerpo: { items: [factura('FAC-000002', '2800.00', '2800.00', '2026-11-30')], siguienteCursor: 'c2' } },
+        { estado: 500, cuerpo: problema(500, 'ERROR_INTERNO') },
+        { estado: 200, cuerpo: { items: [factura('FAC-000009', '100.00', '100.00', '2026-12-31')], siguienteCursor: null } },
+      ],
+    });
+    conConsultas(<PaginaFacturas />);
+    const reintentar = await screen.findByRole('button', { name: /Reintentar/ });
+    await new Promise((r) => setTimeout(r, 50));
+    expect(llamadas.filter((l) => l.url === '/api/v1/facturas').length).toBe(2);
+    expect(screen.queryByRole('button', { name: 'Ver más' })).toBeNull();
+    fireEvent.click(reintentar);
+    expect(await screen.findByText('FAC-000009')).toBeTruthy();
     ruta.params = {};
   });
 

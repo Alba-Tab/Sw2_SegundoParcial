@@ -108,7 +108,7 @@ import { UnidadFachada } from '../unidades.fachada';
         </div>
         <div>
           <dt>Kilometraje</dt>
-          <dd>{{ u.kilometraje !== null && u.kilometraje !== undefined ? (u.kilometraje | number) + ' km' : '—' }}</dd>
+          <dd>{{ u.kilometraje !== null && u.kilometraje !== undefined ? (u.kilometraje | number) + ' km' : 'Sin dato' }}</dd>
         </div>
         <div>
           <dt>Desde el último mantenimiento</dt>

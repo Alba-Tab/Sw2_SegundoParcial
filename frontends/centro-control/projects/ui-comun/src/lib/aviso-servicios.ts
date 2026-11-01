@@ -4,7 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { Apollo } from 'apollo-angular';
 import { erroresGraphql, mensajeDe, servicioCaido } from './errores';
 
-/** Qué servicio está detrás de cada campo de la consulta de una página, para decir cuál no está disponible. */
+/** Qué servicio está detrás de cada campo de la consulta de una página, para decir cuál no está disponible ('' si lo dice la página). */
 export type CamposPorServicio = Record<string, string>;
 
 /**
@@ -19,6 +19,8 @@ export function avisosServicio(error: unknown, campos: CamposPorServicio, sinDat
     if (e.extensions?.['codigo'] !== 'DEPENDENCIA_NO_DISPONIBLE') continue;
     // El campo más profundo del path manda: en ['viaje', 'unidad'] la que cayó es Flota, no Viajes.
     const campo = [...(e.path ?? [])].reverse().find((p): p is string => typeof p === 'string' && servicioCaido(error, p) && p in campos);
+    // Un campo con nombre vacío lo explica su propia sección: sin banner repetido (V1-10).
+    if (campo && !campos[campo]) continue;
     caidos.add(campo ? `${campos[campo]} no disponible` : 'Un servicio no está disponible');
   }
   if (caidos.size) return [...caidos];

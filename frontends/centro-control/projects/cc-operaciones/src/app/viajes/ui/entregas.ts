@@ -4,7 +4,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { AvisoServicios, controlLista, Encabezado, EtiquetaPipe, FechaPipe, FiltrosLista, PieLista } from 'ui-comun';
+import { AvisoServicios, controlLista, Encabezado, EtiquetaPipe, FechaPipe, FiltrosLista, PieLista, Sesion } from 'ui-comun';
 import { textoViaje } from '../domain/viaje';
 import { EntregasFachada } from '../viajes.fachada';
 
@@ -61,16 +61,25 @@ import { EntregasFachada } from '../viajes.fachada';
         <ng-container matColumnDef="observacion"
           ><th mat-header-cell *matHeaderCellDef>Observación</th>
           <td mat-cell *matCellDef="let v">
-            {{ v.entrega?.conFirma ? 'Con firma' : 'Sin firma' }}
+            <!-- Sin firma ya viene como razón (SIN_FIRMA): "Con firma" solo si no hay ninguna (V1-7). -->
             @for (razon of v.entrega?.razones ?? []; track razon) {
-              · {{ razon | etiqueta: 'RazonObservacion' }}
+              {{ razon | etiqueta: 'RazonObservacion' }}{{ $last ? '' : ' · ' }}
+            } @empty {
+              {{ v.entrega?.conFirma ? 'Con firma' : 'Sin firma' }}
             }
           </td></ng-container
         >
         <ng-container matColumnDef="accion"
           ><th mat-header-cell *matHeaderCellDef><span class="cdk-visually-hidden">Acción</span></th>
           <td mat-cell *matCellDef="let v">
-            <a mat-stroked-button [routerLink]="['/viajes', v.viajeId]"><mat-icon>rule</mat-icon>Revisar y decidir</a>
+            <!-- Solo el despachador decide en el viaje; los demás roles lo ven (V1-4). -->
+            @if (decide) {
+              <a mat-stroked-button [routerLink]="['/viajes', v.viajeId]" [queryParams]="{ de: 'entregas-observadas' }"
+                ><mat-icon>rule</mat-icon>Revisar y decidir</a
+              >
+            } @else {
+              <a mat-stroked-button [routerLink]="['/viajes', v.viajeId]" [queryParams]="{ de: 'entregas-observadas' }">Ver detalle</a>
+            }
           </td></ng-container
         >
         <tr mat-header-row *matHeaderRowDef="columnas"></tr>
@@ -90,6 +99,7 @@ export class EntregasPagina {
   private readonly fachada = inject(EntregasFachada);
   readonly error = this.fachada.error;
   readonly cargando = this.fachada.cargando;
+  readonly decide = inject(Sesion).tiene('despachador');
   readonly campos = { entregasObservadas: 'Viajes' };
   readonly columnas = ['placa', 'cliente', 'ruta', 'registrada', 'distancia', 'observacion', 'accion'];
   readonly lista = controlLista({
