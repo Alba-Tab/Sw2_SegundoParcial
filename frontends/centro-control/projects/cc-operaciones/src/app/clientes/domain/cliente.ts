@@ -2,7 +2,7 @@ import { type ErroresCampo, mensajeCampo } from 'ui-comun/dominio';
 import type { ClienteFichaFragment, ClienteQuery, ClientesQuery } from '../../graphql/generado';
 
 /** Clientes (G7): lista, ficha por id (B1) y edición de razón social, NIT y correo (comercial y gerente). */
-export type FilaCliente = NonNullable<ClientesQuery['clientes']>[number];
+export type FilaCliente = NonNullable<ClientesQuery['clientes']>['items'][number];
 export type DatosCliente = ClienteFichaFragment;
 export type ServicioCliente = NonNullable<ClienteQuery['servicios']>[number];
 

@@ -94,7 +94,7 @@ import { ReportesFachada } from '../reportes.fachada';
                 <mat-label>Cliente</mat-label>
                 <mat-select formControlName="clienteId">
                   <mat-option [value]="null">Todos</mat-option>
-                  @for (c of catalogo()?.clientes ?? []; track c.clienteId) {
+                  @for (c of catalogo()?.clientes?.items ?? []; track c.clienteId) {
                     <mat-option [value]="c.clienteId">{{ c.razonSocial }}</mat-option>
                   }
                 </mat-select>

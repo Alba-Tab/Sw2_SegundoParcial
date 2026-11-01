@@ -226,6 +226,7 @@ export type ServiciosQuery = {
   servicios: Array<{
     servicioId: string;
     clienteId: string;
+    razonSocial: string | null;
     estado: EstadoServicio;
     tipoCarga: TipoCarga | null;
     toneladas: number | null;
@@ -235,22 +236,25 @@ export type ServiciosQuery = {
     choferNombre: string | null;
     confirmacionCompleta: boolean;
   }> | null;
-  clientes: Array<{ clienteId: string; razonSocial: string }> | null;
 };
 
 export type ClientesQueryVariables = Exact<{
   verCredito: boolean;
+  despuesDe?: string | null | undefined;
 }>;
 
 export type ClientesQuery = {
-  clientes: Array<{
-    clienteId: string;
-    razonSocial: string;
-    nit: string | null;
-    correo: string | null;
-    canal: string | null;
-    lineaCredito?: { limite: string; disponible: string; enMora: boolean } | null;
-  }> | null;
+  clientes: {
+    siguienteCursor: string | null;
+    items: Array<{
+      clienteId: string;
+      razonSocial: string;
+      nit: string | null;
+      correo: string | null;
+      canal: string | null;
+      lineaCredito?: { limite: string; disponible: string; enMora: boolean; suspendida: boolean } | null;
+    }>;
+  } | null;
 };
 
 export type ClienteQueryVariables = Exact<{
@@ -661,6 +665,7 @@ export const ServiciosDocument = gql`
     servicios(estado: $estado, limite: 80) {
       servicioId
       clienteId
+      razonSocial
       estado
       tipoCarga
       toneladas
@@ -669,10 +674,6 @@ export const ServiciosDocument = gql`
       placa
       choferNombre
       confirmacionCompleta
-    }
-    clientes {
-      clienteId
-      razonSocial
     }
   }
 `;
@@ -688,18 +689,22 @@ export class ServiciosGQL extends Apollo.Query<ServiciosQuery, ServiciosQueryVar
   }
 }
 export const ClientesDocument = gql`
-  query Clientes($verCredito: Boolean!) {
-    clientes {
-      clienteId
-      razonSocial
-      nit
-      correo
-      canal
-      lineaCredito @include(if: $verCredito) {
-        limite
-        disponible
-        enMora
+  query Clientes($verCredito: Boolean!, $despuesDe: Cursor) {
+    clientes(limite: 50, despuesDe: $despuesDe) {
+      items {
+        clienteId
+        razonSocial
+        nit
+        correo
+        canal
+        lineaCredito @include(if: $verCredito) {
+          limite
+          disponible
+          enMora
+          suspendida
+        }
       }
+      siguienteCursor
     }
   }
 `;

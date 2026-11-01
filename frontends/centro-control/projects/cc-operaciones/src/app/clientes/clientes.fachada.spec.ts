@@ -14,6 +14,7 @@ function preparar(roles: string[]) {
     observarClientes: vi.fn(vacio),
     observarCliente: vi.fn(() => ({ valueChanges: vacio(), refetch })),
     editar: vi.fn(() => of({ data: {} })),
+    pagina: vi.fn(() => of({ data: { clientes: { items: [{ clienteId: 'c3' }], siguienteCursor: null } } })),
     refetch,
   };
   TestBed.configureTestingModule({
@@ -68,5 +69,20 @@ describe('clientes: edición (G7)', () => {
     fachada.id.set(ID);
     TestBed.tick();
     await expect(fachada.editar(ID, { razonSocial: 'Agro SRL', nit: '1020304', correo: 'a@agro.bo' })).resolves.toBeUndefined();
+  });
+});
+
+describe('clientes: «Cargar más» (E5-1)', () => {
+  it('pide la página siguiente con el cursor de la primera y la agrega al final', async () => {
+    const repo = preparar(['comercial']);
+    repo.observarClientes.mockReturnValue(
+      of({ data: { clientes: { items: [{ clienteId: 'c1' }, { clienteId: 'c2' }], siguienteCursor: 'p2' } }, loading: false }) as never,
+    );
+    const fachada = TestBed.inject(ClientesFachada);
+    expect(fachada.paginas.siguienteCursor()).toBe('p2');
+    await fachada.paginas.cargarMas();
+    expect(repo.pagina).toHaveBeenCalledWith(true, 'p2');
+    expect(fachada.clientes().map((c) => c.clienteId)).toEqual(['c1', 'c2', 'c3']);
+    expect(fachada.paginas.siguienteCursor()).toBeNull();
   });
 });

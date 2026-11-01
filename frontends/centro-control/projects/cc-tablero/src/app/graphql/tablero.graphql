@@ -56,9 +56,12 @@ query Catalogo($verClientes: Boolean!) {
     maxDias
     parametros
   }
-  clientes @include(if: $verClientes) {
-    clienteId
-    razonSocial
+  # E5-1: la primera página de 100 para el selector (la búsqueda por nombre en el selector queda pendiente).
+  clientes(limite: 100) @include(if: $verClientes) {
+    items {
+      clienteId
+      razonSocial
+    }
   }
   rutas {
     rutaId

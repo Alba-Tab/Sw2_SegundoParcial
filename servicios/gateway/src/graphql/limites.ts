@@ -64,9 +64,12 @@ export function limiteContado(campo: Pick<GraphQLField<unknown, unknown>, 'args'
   return Math.max(1, Math.min(LIMITE_MAXIMO, Math.trunc(Number.isFinite(n) ? n : LIMITE_POR_DEFECTO)));
 }
 
-/** Cada campo vale 1 y una lista con argumento `limite` multiplica por él, acotado a 1–100 (D101). */
+/**
+ * Cada campo vale 1 y una lista con argumento `limite` multiplica por él, acotado a 1–100 (D101). Una página con cursor
+ * (tipo `…Pagina`, E5-1) cuenta igual que una lista: su `items` trae hasta `limite` filas.
+ */
 const porLimite: ComplexityEstimator = ({ field, args, childComplexity }) => {
-  if (!String(field.type).includes('[') || !field.args.some((a) => a.name === 'limite')) return undefined;
+  if (!/\[|Pagina!?$/.test(String(field.type)) || !field.args.some((a) => a.name === 'limite')) return undefined;
   return 1 + limiteContado(field, args['limite']) * Math.max(1, childComplexity);
 };
 

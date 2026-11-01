@@ -1,22 +1,27 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
-import { filter, switchMap } from 'rxjs';
-import { cargandoDe, completo, esUuid, filasConError, Intentos, puedeVer, Sesion } from 'ui-comun';
+import { filter, firstValueFrom, switchMap } from 'rxjs';
+import { cargandoDe, completo, esUuid, filasConError, Intentos, PaginasCursor, puedeVer, Sesion } from 'ui-comun';
 import type { ClienteEdicionInput, ClienteQuery, ClientesQuery } from '../graphql/generado';
 import { ClientesRepositorio } from './data/clientes.repositorio';
 
-/** Fachada de la lista de clientes, cada 60 s. */
+/** Fachada de la lista de clientes: la primera página cada 60 s y las siguientes con «Cargar más» (E5-1). */
 @Injectable()
 export class ClientesFachada {
+  private readonly repo = inject(ClientesRepositorio);
   readonly verCredito = puedeVer(inject(Sesion).roles(), 'lineaCredito');
-  private readonly datos = toSignal(inject(ClientesRepositorio).observarClientes(this.verCredito, 60_000));
-  readonly clientes = computed(() => completo<ClientesQuery>(this.datos())?.clientes ?? []);
+  private readonly datos = toSignal(this.repo.observarClientes(this.verCredito, 60_000));
+  readonly paginas = new PaginasCursor(
+    () => completo<ClientesQuery>(this.datos())?.clientes,
+    async (despuesDe) => completo<ClientesQuery>(await firstValueFrom(this.repo.pagina(this.verCredito, despuesDe)))?.clientes,
+  );
+  readonly clientes = this.paginas.items;
   readonly error = computed(() => this.datos()?.error);
   readonly datosAl = computed(() => this.datos()?.datosAl);
   readonly cargando = computed(() => cargandoDe(this.datos()));
   /** Clientes cuya línea no se pudo leer (no es lo mismo que no tener línea; D-1). */
   readonly sinLeerCredito = computed(() => {
-    const filas = filasConError(this.datos()?.error, 'clientes', 'lineaCredito');
+    const filas = filasConError(this.datos()?.error, 'clientes.items', 'lineaCredito');
     // Las que se repusieron con la última línea leída (FB-1) ya tienen dato: no se cuentan.
     return new Set([...filas].filter((i) => !this.clientes()[i]?.lineaCredito).map((i) => this.clientes()[i]?.clienteId));
   });

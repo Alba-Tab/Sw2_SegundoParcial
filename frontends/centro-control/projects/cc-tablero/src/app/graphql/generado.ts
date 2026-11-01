@@ -67,7 +67,7 @@ export type CatalogoQuery = {
     maxDias: number | null;
     parametros: any;
   }> | null;
-  clientes?: Array<{ clienteId: string; razonSocial: string }> | null;
+  clientes?: { items: Array<{ clienteId: string; razonSocial: string }> } | null;
   rutas: Array<{ rutaId: string; nombre: string }> | null;
 };
 
@@ -214,9 +214,11 @@ export const CatalogoDocument = gql`
       maxDias
       parametros
     }
-    clientes @include(if: $verClientes) {
-      clienteId
-      razonSocial
+    clientes(limite: 100) @include(if: $verClientes) {
+      items {
+        clienteId
+        razonSocial
+      }
     }
     rutas {
       rutaId

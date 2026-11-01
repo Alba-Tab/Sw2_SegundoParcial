@@ -2,12 +2,10 @@ import { SIN_DATO } from 'ui-comun/dominio';
 import type { CotizacionesQuery } from '../../graphql/generado';
 
 export type Cotizacion = NonNullable<CotizacionesQuery['cotizaciones']>[number];
-type Cliente = NonNullable<CotizacionesQuery['clientes']>[number];
 type Ruta = NonNullable<CotizacionesQuery['rutas']>[number];
 
-/** La razón social de la copia de clientes; nunca el id crudo: sin lista (Viajes no respondió), "Sin dato". */
-export const nombreCliente = (clientes: Cliente[] | null | undefined, id: string): string =>
-  clientes ? (clientes.find((c) => c.clienteId === id)?.razonSocial ?? 'Cliente fuera de la lista cargada') : SIN_DATO;
+/** La razón social que trae la cotización (E5-1); nunca el id crudo: si Viajes no la dio, "Sin dato". */
+export const nombreCliente = (c: { razonSocial?: string | null }): string => c.razonSocial ?? SIN_DATO;
 
 /** El nombre de la ruta; nunca el id crudo. */
 export const nombreRuta = (rutas: Ruta[] | null | undefined, id: string): string =>

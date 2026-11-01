@@ -49,6 +49,8 @@ export function crearCargadores(servicios: ClienteServicios, ctx: Contexto) {
         .get<Json>(ctx, 'flota', rutaRest`/api/v1/unidades`, { query: { placa, limite: 1 } })
         .then((r) => m.items(r).map(m.unidad)[0] ?? null),
     ),
+    /** La razón social de servicios y cotizaciones (E5-1): `clientes` ya no trae todos. */
+    cliente: cargador((id) => nuloSi404(servicios.get<Json>(ctx, 'viajes', rutaRest`/api/v1/clientes/${id}`))),
     lineaCredito: cargador((id) =>
       nuloSi404(servicios.get<Json>(ctx, 'finanzas', rutaRest`/api/v1/lineas-credito/${id}`).then(m.lineaCredito)),
     ),

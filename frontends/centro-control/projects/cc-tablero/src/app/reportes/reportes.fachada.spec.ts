@@ -29,7 +29,7 @@ describe('ReportesFachada: el catálogo no se traga el error', () => {
     const error = new CombinedGraphQLErrors({
       errors: [{ message: 'Analítica no responde', path: ['catalogoReportes'], extensions: { codigo: 'DEPENDENCIA_NO_DISPONIBLE' } }],
     });
-    const f = fachada(of({ data: { catalogoReportes: null, clientes: [], rutas: [] }, error }));
+    const f = fachada(of({ data: { catalogoReportes: null, clientes: { items: [] }, rutas: [] }, error }));
     expect(f.errorCatalogo()).toBe(error);
     expect(f.catalogo()?.catalogoReportes).toBeNull();
     expect(f.cargandoCatalogo()).toBe(false);
@@ -55,7 +55,7 @@ describe('ReportesFachada: el catálogo no se traga el error', () => {
     expect(f.errorCatalogo()).toBe(red);
     await Promise.resolve();
     expect(listo).toBe(false);
-    pendiente.next({ data: { catalogoReportes: [], clientes: [], rutas: [] } });
+    pendiente.next({ data: { catalogoReportes: [], clientes: { items: [] }, rutas: [] } });
     await promesa;
     expect(f.errorCatalogo()).toBeUndefined();
     expect(f.cargandoCatalogo()).toBe(false);

@@ -130,11 +130,13 @@ query Intervenciones {
   }
 }
 
-# 80 × 11 + 1 más los clientes = 885. `monto` no se pide al despachador (Servicio.monto: gerente, administracion, comercial).
+# 80 × 12 + 1 = 961. `monto` no se pide al despachador (Servicio.monto: gerente, administracion, comercial). La razón
+# social viene en cada servicio (E5-1: `clientes` es por páginas).
 query Servicios($estado: EstadoServicio, $verMonto: Boolean!) {
   servicios(estado: $estado, limite: 80) {
     servicioId
     clienteId
+    razonSocial
     estado
     tipoCarga
     toneladas
@@ -144,26 +146,27 @@ query Servicios($estado: EstadoServicio, $verMonto: Boolean!) {
     choferNombre
     confirmacionCompleta
   }
-  clientes {
-    clienteId
-    razonSocial
-  }
 }
 
 # G7. `lineaCredito` solo a quien la puede ver (gerente, administracion, comercial): el despachador no la pide.
-# Cada línea es una llamada a Finanzas por cliente (presupuesto del Gateway: 200 por petición).
-query Clientes($verCredito: Boolean!) {
-  clientes {
-    clienteId
-    razonSocial
-    nit
-    correo
-    canal
-    lineaCredito @include(if: $verCredito) {
-      limite
-      disponible
-      enMora
+# Cada línea es una llamada a Finanzas por cliente (presupuesto del Gateway: 200 por petición). E5-1: de a 50, con
+# «Cargar más» por `despuesDe`.
+query Clientes($verCredito: Boolean!, $despuesDe: Cursor) {
+  clientes(limite: 50, despuesDe: $despuesDe) {
+    items {
+      clienteId
+      razonSocial
+      nit
+      correo
+      canal
+      lineaCredito @include(if: $verCredito) {
+        limite
+        disponible
+        enMora
+        suspendida
+      }
     }
+    siguienteCursor
   }
 }
 

@@ -143,12 +143,11 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
             }),
           )
           .map(m.servicio),
-      // B2: todas las páginas (el esquema no cambia y las fichas usan cliente(id)); cada página cuenta en el presupuesto.
-      clientes: (_: unknown, __: Args, ctx: Ctx) => todas(ctx, 'viajes', rutaRest`/api/v1/clientes`),
       // listarRutas devuelve un arreglo plano, no una página (contratos/openapi/viajes.yaml).
       rutas: async (_: unknown, { incluirInactivas }: Args, ctx: Ctx) =>
         m.items(await s.get<Json>(ctx, 'viajes', rutaRest`/api/v1/rutas`, { query: { incluirInactivas } })).map(m.ruta),
       ...gestionViajes.Query,
+      clientes: (_: unknown, { limite, despuesDe }: Args, ctx: Ctx) => gestionViajes.clientes(ctx, limiteValido(limite, 50), despuesDe),
 
       unidades: async (_: unknown, { tipo, estado, placa }: Args, ctx: Ctx) =>
         m
@@ -250,6 +249,8 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
       riesgo: (v: Json, __: Args, ctx: Ctx) => (v['estado'] === 'EN_RUTA' ? ctx.cargadores.riesgo.load(v['viajeId']) : null),
       unidad: (v: Json, __: Args, ctx: Ctx) => (v['placa'] ? ctx.cargadores.unidadPorPlaca.load(v['placa']) : null),
     },
+    Servicio: gestionViajes.Servicio,
+    Cotizacion: gestionViajes.Cotizacion,
     Cliente: {
       lineaCredito: (c: Json, __: Args, ctx: Ctx) => ctx.cargadores.lineaCredito.load(c['clienteId']),
     },

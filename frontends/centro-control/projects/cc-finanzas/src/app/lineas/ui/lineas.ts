@@ -1,4 +1,6 @@
 import { Component, computed, inject } from '@angular/core';
+import { MatButtonModule } from '@angular/material/button';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
@@ -11,7 +13,7 @@ import {
   Encabezado,
   Estado,
   FiltrosLista,
-  LIMITE_GATEWAY,
+  mensajeDe,
   PieLista,
   posicionEstado,
 } from 'ui-comun';
@@ -22,7 +24,18 @@ import { LineasFachada } from '../lineas.fachada';
 @Component({
   selector: 'app-lineas',
   providers: [LineasFachada],
-  imports: [Encabezado, MatTableModule, MatSortModule, RouterLink, BobPipe, Estado, AvisoServicios, FiltrosLista, PieLista],
+  imports: [
+    Encabezado,
+    MatButtonModule,
+    MatTableModule,
+    MatSortModule,
+    RouterLink,
+    BobPipe,
+    Estado,
+    AvisoServicios,
+    FiltrosLista,
+    PieLista,
+  ],
   template: `
     <cc-encabezado titulo="Líneas de crédito" />
     <!-- Las líneas que faltan se dicen una vez, en el mismo aviso y con su «Reintentar» (V1-11, V3-7). -->
@@ -33,9 +46,6 @@ import { LineasFachada } from '../lineas.fachada';
       [sinDatos]="!lineas().length"
       [extra]="avisoIncompletas()"
     />
-    @if (clientesLeidos() >= limiteClientes) {
-      <p class="secundario">Se revisan los primeros {{ limiteClientes }} clientes: si hay más, sus líneas no salen aquí.</p>
-    }
     <cc-filtros-lista
       [control]="lista"
       [cargando]="cargando()"
@@ -92,6 +102,11 @@ import { LineasFachada } from '../lineas.fachada';
       [error]="error()"
       [cargando]="cargando()"
     />
+    @if (paginas.siguienteCursor()) {
+      <!-- E5-1: la búsqueda y el orden usan solo los clientes ya cargados. -->
+      <p class="secundario">Hay más clientes; la búsqueda y el orden solo usan las líneas ya cargadas.</p>
+      <button mat-stroked-button (click)="cargarMas()" [disabled]="paginas.cargandoMas()" disabledInteractive>Cargar más clientes</button>
+    }
   `,
 })
 export class LineasPagina {
@@ -104,8 +119,16 @@ export class LineasPagina {
     const n = this.fachada.incompletas();
     return n ? `No se pudo leer la línea de ${n} ${n === 1 ? 'cliente' : 'clientes'}: la lista está incompleta.` : null;
   });
-  readonly clientesLeidos = this.fachada.clientesLeidos;
-  readonly limiteClientes = LIMITE_GATEWAY;
+  readonly paginas = this.fachada.paginas;
+  private readonly avisos = inject(MatSnackBar);
+
+  async cargarMas(): Promise<void> {
+    try {
+      await this.paginas.cargarMas();
+    } catch (e) {
+      this.avisos.open(mensajeDe(e), 'Cerrar');
+    }
+  }
   /** Una línea caída la cuenta el aviso de la lista: sin banner repetido (V1-11). */
   readonly campos = { clientes: 'Viajes', lineaCredito: '' };
   readonly columnas = columnasConEstado(['cliente', 'limite', 'reservado', 'utilizado', 'disponible', 'estado']);

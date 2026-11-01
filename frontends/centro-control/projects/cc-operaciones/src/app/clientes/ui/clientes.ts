@@ -1,6 +1,7 @@
 import { Component, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
@@ -17,6 +18,7 @@ import {
   etiqueta,
   EtiquetaPipe,
   FiltrosLista,
+  mensajeDe,
   PieLista,
   posicionEstado,
   Sesion,
@@ -125,6 +127,11 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
       </table>
     </div>
     <cc-pie-lista [control]="lista" nombre="clientes" vacio="No hay clientes registrados." [error]="error()" [cargando]="cargando()" />
+    @if (paginas.siguienteCursor()) {
+      <!-- E5-1: la búsqueda y el orden usan solo los clientes ya cargados. -->
+      <p class="secundario">Se muestran los primeros {{ clientes().length }} clientes; la búsqueda y el orden solo usan esos.</p>
+      <button mat-stroked-button (click)="cargarMas()" [disabled]="paginas.cargandoMas()" disabledInteractive>Cargar más clientes</button>
+    }
   `,
 })
 export class ClientesPagina {
@@ -135,10 +142,20 @@ export class ClientesPagina {
   readonly cargando = this.fachada.cargando;
   readonly verCredito = this.fachada.verCredito;
   readonly sinLeerCredito = this.fachada.sinLeerCredito;
+  readonly paginas = this.fachada.paginas;
+  private readonly avisos = inject(MatSnackBar);
   readonly campos = { clientes: 'Viajes', lineaCredito: 'Finanzas' };
   readonly columnas = columnasConEstado(['razonSocial', 'nit', 'correo', 'canal', ...(this.verCredito ? ['disponible', 'estado'] : [])]);
   readonly estadoLinea = estadoLineaCredito;
   readonly urlLineas = urlEnApp(inject(CONFIG_CENTRO), inject(Sesion).roles(), 'cc-finanzas', '/lineas-credito');
+  async cargarMas(): Promise<void> {
+    try {
+      await this.paginas.cargarMas();
+    } catch (e) {
+      this.avisos.open(mensajeDe(e), 'Cerrar');
+    }
+  }
+
   readonly lista = controlLista<FilaCliente>({
     filas: this.clientes,
     texto: textoCliente,

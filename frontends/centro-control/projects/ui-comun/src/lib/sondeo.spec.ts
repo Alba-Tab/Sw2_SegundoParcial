@@ -62,6 +62,26 @@ describe('conservarUltimoBueno (FB-1)', () => {
     expect(segundo.datosAl).toBe('2026-11-01T14:20:00Z');
   });
 
+  it('E5-1: también dentro de una página con cursor (clientes.items[i].lineaCredito)', async () => {
+    type P = {
+      data?: { clientes: { items: { clienteId: string; lineaCredito: string | null }[]; siguienteCursor: string | null } };
+      error?: unknown;
+    };
+    const caida = new CombinedGraphQLErrors({
+      errors: [{ message: 'x', path: ['clientes', 'items', 0, 'lineaCredito'], extensions: { codigo: 'DEPENDENCIA_NO_DISPONIBLE' } }],
+    });
+    const [, segundo] = await firstValueFrom(
+      of<P[]>(
+        { data: { clientes: { items: [{ clienteId: 'a', lineaCredito: 'L' }], siguienteCursor: 'c2' } } },
+        { data: { clientes: { items: [{ clienteId: 'a', lineaCredito: null }], siguienteCursor: 'c2' } }, error: caida },
+      ).pipe(
+        conservarUltimoBueno<P>(() => 't', { 'clientes.items': { clave: 'clienteId', campos: ['lineaCredito'] } }),
+        toArray(),
+      ),
+    );
+    expect(segundo.data?.clientes).toEqual({ items: [{ clienteId: 'a', lineaCredito: 'L' }], siguienteCursor: 'c2' });
+  });
+
   it('R1F-6: repone con el servicio del campo caído, pero no con NO_ENCONTRADO ni SIN_PERMISO', async () => {
     const graphql = (codigo: string) =>
       new CombinedGraphQLErrors({ errors: [{ message: codigo, path: ['viajes'], extensions: { codigo } }] });

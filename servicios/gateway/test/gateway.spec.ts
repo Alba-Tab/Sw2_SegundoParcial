@@ -438,7 +438,7 @@ describe('revisión del Gateway', () => {
     expect(n.body.errors[0].extensions).toMatchObject({ codigo: 'NO_ENCONTRADO', status: 404 });
   });
 
-  it('B2: clientes sigue el cursor de Viajes hasta la última página', async () => {
+  it('E5-1: clientes es una página con cursor; despuesDe viaja como cursor y la complejidad cuenta el limite', async () => {
     rutas.set('GET /viajes/api/v1/clientes', (_req, _c, url) =>
       url.searchParams.get('cursor') === 'p2'
         ? { json: { items: [{ clienteId: 'c3', razonSocial: 'C' }], siguienteCursor: null } }
@@ -452,11 +452,34 @@ describe('revisión del Gateway', () => {
             },
           },
     );
-    const r = await gql(['comercial'], '{ clientes { clienteId } }');
-    expect(r.body.data.clientes.map((c: { clienteId: string }) => c.clienteId)).toEqual(['c1', 'c2', 'c3']);
+    const pagina = 'query($d: Cursor) { clientes(limite: 2, despuesDe: $d) { items { clienteId } siguienteCursor } }';
+    const primera = await gql(['comercial'], pagina);
+    expect(primera.body.data.clientes).toEqual({ items: [{ clienteId: 'c1' }, { clienteId: 'c2' }], siguienteCursor: 'p2' });
+    const segunda = await gql(['comercial'], pagina, { d: 'p2' });
+    expect(segunda.body.data.clientes).toEqual({ items: [{ clienteId: 'c3' }], siguienteCursor: null });
     expect(pedidos.filter((p) => p.ruta.startsWith('/viajes/api/v1/clientes')).map((p) => p.ruta)).toEqual([
-      '/viajes/api/v1/clientes?limite=100',
-      '/viajes/api/v1/clientes?limite=100&cursor=p2',
+      '/viajes/api/v1/clientes?limite=2',
+      '/viajes/api/v1/clientes?limite=2&cursor=p2',
+    ]);
+    const largo = await gql(['comercial'], '{ clientes(limite: 500) { items { clienteId } } }');
+    expect(largo.body.errors[0].extensions.codigo).toBe('VALIDACION');
+    // 100 filas × 11 campos pasan de 1.000 (D101): la página cuenta como una lista.
+    const campos = 'clienteId razonSocial nit correo canal a: nit b: nit c: nit d: nit e: nit';
+    const pesada = await gql(['comercial'], `{ clientes(limite: 100) { items { ${campos} } } }`);
+    expect(pesada.body.errors[0].extensions.codigo).toBe('CONSULTA_DEMASIADO_COMPLEJA');
+  });
+
+  it('E5-1: la razón social de servicios y cotizaciones sale de Viajes, una vez por cliente', async () => {
+    rutas.set('GET /viajes/api/v1/servicios', () => ({
+      json: { items: [1, 2, 3].map((i) => ({ servicioId: `s${i}`, clienteId: i === 3 ? 'c9' : 'c1', estado: 'CONFIRMADO' })) },
+    }));
+    rutas.set('GET /viajes/api/v1/clientes/c1', () => ({ json: { clienteId: 'c1', razonSocial: 'Agro SRL' } }));
+    const r = await gql(['despachador'], '{ servicios { servicioId razonSocial } }');
+    expect(r.body.data.servicios.map((s: { razonSocial: string | null }) => s.razonSocial)).toEqual(['Agro SRL', 'Agro SRL', null]);
+    expect(r.body.errors).toBeUndefined();
+    expect(pedidos.filter((p) => p.ruta.startsWith('/viajes/api/v1/clientes/')).map((p) => p.ruta)).toEqual([
+      '/viajes/api/v1/clientes/c1',
+      '/viajes/api/v1/clientes/c9',
     ]);
   });
 

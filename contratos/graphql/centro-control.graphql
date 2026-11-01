@@ -128,6 +128,12 @@ type Cliente {
   lineaCredito: LineaCredito @roles(permitidos: [gerente, administracion, comercial])
 }
 
+"Una página de clientes (E5-1), por clienteId ascendente; `siguienteCursor` null es la última."
+type ClientePagina {
+  items: [Cliente!]!
+  siguienteCursor: Cursor
+}
+
 type Viaje {
   viajeId: ID!
   servicioId: ID!
@@ -196,6 +202,8 @@ type Servicio {
   servicioId: ID!
   viajeId: ID
   clienteId: ID!
+  "Razón social del cliente (Viajes, por DataLoader: una llamada por cliente distinto)."
+  razonSocial: String
   estado: EstadoServicio!
   etapa: String
   motivo: String
@@ -382,6 +390,8 @@ type LineaCredito {
 type Cotizacion {
   cotizacionId: ID!
   clienteId: ID!
+  "Razón social del cliente (Viajes, por DataLoader: una llamada por cliente distinto)."
+  razonSocial: String
   rutaId: ID!
   tipoCarga: TipoCarga!
   toneladas: Float!
@@ -624,8 +634,8 @@ type Query {
   entregasObservadas: [Viaje!] @roles(permitidos: [gerente, despachador, jefe_flota, comercial])
   intervenciones: [Viaje!] @roles(permitidos: [gerente, despachador, jefe_flota, comercial])
   servicios(estado: EstadoServicio, clienteId: ID, limite: Int = 50): [Servicio!] @roles(permitidos: [gerente, despachador, administracion, comercial])
-  "Todos los clientes activos: el Gateway sigue el cursor de Viajes (hasta 2.000, dentro de los 3 s de D98)."
-  clientes: [Cliente!] @roles(permitidos: [gerente, despachador, administracion, comercial])
+  "Clientes activos por páginas (E5-1): `despuesDe` es el `siguienteCursor` de la página anterior."
+  clientes(limite: Int = 50, despuesDe: Cursor): ClientePagina @roles(permitidos: [gerente, despachador, administracion, comercial])
   cliente(id: ID!): Cliente @roles(permitidos: [gerente, despachador, administracion, comercial])
   "Las activas; con incluirInactivas, también las inactivas (gestión de rutas, G4)."
   rutas(incluirInactivas: Boolean = false): [Ruta!]

@@ -64,8 +64,10 @@ export function sinErroresDe(error: unknown, campo: string): unknown {
 
 /** Los índices de una lista cuyas filas salieron con ese campo en null por un error (`clientes[i].lineaCredito`, D-1). */
 export function filasConError(error: unknown, lista: string, campo: string): Set<number> {
+  // `lista` puede ser una ruta con puntos para una página con cursor: "clientes.items" (E5-1).
+  const ruta = lista.split('.');
   const filas = erroresGraphql(error)
-    .filter((e) => e.path?.[0] === lista && e.path.includes(campo) && typeof e.path[1] === 'number')
-    .map((e) => e.path![1] as number);
+    .filter((e) => ruta.every((p, i) => e.path?.[i] === p) && e.path!.includes(campo) && typeof e.path![ruta.length] === 'number')
+    .map((e) => e.path![ruta.length] as number);
   return new Set(filas);
 }

@@ -116,6 +116,7 @@ export type CotizacionesQuery = {
   cotizaciones: Array<{
     cotizacionId: string;
     clienteId: string;
+    razonSocial: string | null;
     rutaId: string;
     tipoCarga: TipoCarga;
     toneladas: number;
@@ -125,7 +126,6 @@ export type CotizacionesQuery = {
     canal: string | null;
     creadaEn: string | null;
   }> | null;
-  clientes: Array<{ clienteId: string; razonSocial: string }> | null;
   rutas: Array<{ rutaId: string; nombre: string }> | null;
 };
 
@@ -157,15 +157,20 @@ export type LineaCreditoQuery = {
   lineaCredito: { limite: string; reservado: string; utilizado: string; disponible: string; enMora: boolean } | null;
 };
 
-export type LineasCreditoQueryVariables = Exact<{ [key: string]: never }>;
+export type LineasCreditoQueryVariables = Exact<{
+  despuesDe?: string | null | undefined;
+}>;
 
 export type LineasCreditoQuery = {
-  clientes: Array<{
-    clienteId: string;
-    razonSocial: string;
-    nit: string | null;
-    lineaCredito: { limite: string; reservado: string; utilizado: string; disponible: string; enMora: boolean } | null;
-  }> | null;
+  clientes: {
+    siguienteCursor: string | null;
+    items: Array<{
+      clienteId: string;
+      razonSocial: string;
+      nit: string | null;
+      lineaCredito: { limite: string; reservado: string; utilizado: string; disponible: string; enMora: boolean } | null;
+    }>;
+  } | null;
 };
 
 export type CobranzaQueryVariables = Exact<{
@@ -279,6 +284,7 @@ export const CotizacionesDocument = gql`
     cotizaciones(limite: 80) {
       cotizacionId
       clienteId
+      razonSocial
       rutaId
       tipoCarga
       toneladas
@@ -287,10 +293,6 @@ export const CotizacionesDocument = gql`
       vencida
       canal
       creadaEn
-    }
-    clientes {
-      clienteId
-      razonSocial
     }
     rutas {
       rutaId
@@ -366,18 +368,21 @@ export class LineaCreditoGQL extends Apollo.Query<LineaCreditoQuery, LineaCredit
   }
 }
 export const LineasCreditoDocument = gql`
-  query LineasCredito {
-    clientes {
-      clienteId
-      razonSocial
-      nit
-      lineaCredito {
-        limite
-        reservado
-        utilizado
-        disponible
-        enMora
+  query LineasCredito($despuesDe: Cursor) {
+    clientes(limite: 50, despuesDe: $despuesDe) {
+      items {
+        clienteId
+        razonSocial
+        nit
+        lineaCredito {
+          limite
+          reservado
+          utilizado
+          disponible
+          enMora
+        }
       }
+      siguienteCursor
     }
   }
 `;

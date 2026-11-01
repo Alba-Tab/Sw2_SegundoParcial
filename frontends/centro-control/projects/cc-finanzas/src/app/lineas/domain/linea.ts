@@ -2,7 +2,7 @@ import { estadoLineaCredito } from 'ui-comun/dominio';
 import type { LineasCreditoQuery } from '../../graphql/generado';
 
 /** G6: un cliente con su línea de crédito (solo lectura; el ajuste espera backend). */
-export type ClienteConLinea = NonNullable<LineasCreditoQuery['clientes']>[number];
+export type ClienteConLinea = NonNullable<LineasCreditoQuery['clientes']>['items'][number];
 export type Linea = NonNullable<ClienteConLinea['lineaCredito']>;
 
 /** Solo los clientes con línea: sin ella (o si Finanzas no la dio) no hay nada que mostrar en esta lista. */
