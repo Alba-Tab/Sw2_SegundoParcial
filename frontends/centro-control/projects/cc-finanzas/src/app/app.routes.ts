@@ -3,7 +3,7 @@ import { NoEncontrada, SinAcceso, soloInternos, soloRoles } from 'ui-comun';
 import { Seccion } from './seccion';
 
 export const rutas: Routes = [
-  { path: 'sin-acceso', component: SinAcceso },
+  { path: 'sin-acceso', component: SinAcceso, title: 'Sin acceso' },
   {
     path: '',
     component: Seccion,

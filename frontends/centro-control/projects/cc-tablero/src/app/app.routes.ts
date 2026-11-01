@@ -5,7 +5,7 @@ import { Seccion } from './seccion';
 import { ROLES_PAGINA } from './tablero/domain/tablero';
 
 export const rutas: Routes = [
-  { path: 'sin-acceso', component: SinAcceso },
+  { path: 'sin-acceso', component: SinAcceso, title: 'Sin acceso' },
   {
     path: '',
     component: Seccion,

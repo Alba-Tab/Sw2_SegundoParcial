@@ -5,7 +5,7 @@ import { ROLES_ACCIONES, Seccion } from './seccion';
 const p = (carga: () => Promise<unknown>, title: string) => ({ loadComponent: carga as never, title });
 
 export const rutas: Routes = [
-  { path: 'sin-acceso', component: SinAcceso },
+  { path: 'sin-acceso', component: SinAcceso, title: 'Sin acceso' },
   {
     path: '',
     component: Seccion,

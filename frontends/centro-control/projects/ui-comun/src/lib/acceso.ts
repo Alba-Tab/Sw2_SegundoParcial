@@ -1,5 +1,6 @@
 import { Component, computed, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
+import { MatIconModule } from '@angular/material/icon';
 import { type CanActivateFn, Router } from '@angular/router';
 import { appsDeRoles, CONFIG_CENTRO, NOMBRES_APPS } from './configuracion';
 import { Sesion } from './sesion';
@@ -18,9 +19,11 @@ export const soloRoles =
 
 @Component({
   selector: 'cc-sin-acceso',
-  imports: [MatButtonModule],
+  imports: [MatButtonModule, MatIconModule],
   template: `
     <section class="sin-acceso">
+      <!-- R2F-6: el ícono de «Sin permiso» de DESIGN.md (tabla de errores). -->
+      <mat-icon class="icono">lock_person</mat-icon>
       @if (sesion.tiene('cliente')) {
         <h1>Esta es el área interna de la empresa</h1>
         <p>Tus servicios, facturas y cotizaciones están en el portal del cliente.</p>
@@ -51,6 +54,9 @@ export const soloRoles =
       flex-direction: column;
       gap: 12px;
       align-items: flex-start;
+    }
+    .icono {
+      color: var(--mat-sys-on-surface-variant);
     }
     .apps {
       margin: 0;
