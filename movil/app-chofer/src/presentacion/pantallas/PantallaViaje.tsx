@@ -188,7 +188,7 @@ export function PantallaViaje({
 }
 
 const FALLIDA: Record<string, { que: string; otraVez: string; conflicto: string }> = {
-  INICIO: { que: 'El inicio', otraVez: 'Vuelve a iniciarlo', conflicto: 'el viaje ya no se puede iniciar' },
+  INICIO: { que: 'El inicio', otraVez: 'Vuelve a iniciarlo', conflicto: 'Viajes no deja iniciarlo ahora (¿otro viaje en ruta?)' },
   ENTREGA: { que: 'La entrega', otraVez: 'Vuelve a registrarla', conflicto: 'el viaje ya no está en ruta' },
   RECHAZO: { que: 'El rechazo', otraVez: 'Vuelve a registrarlo', conflicto: 'el viaje ya no está en ruta' },
 };

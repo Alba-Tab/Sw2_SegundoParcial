@@ -4,7 +4,7 @@ import type { TipoEvidencia } from '../dominio/evidencia';
 import { descripcionValida, type OrigenHito, type TipoHito } from '../dominio/hito';
 import { kmh, type Lectura, MuestreoGps, velocidadEstimada } from '../dominio/muestreo';
 import type { TipoOperacion } from '../dominio/operacion';
-import { estadoVisible, puedeIniciar } from '../dominio/viaje';
+import { estadoVisible, inicioRechazado, puedeIniciar, type ViajeLocal } from '../dominio/viaje';
 import type {
   Api,
   Archivos,
@@ -20,6 +20,16 @@ import type {
   Sesion,
   Viajes,
 } from './puertos';
+
+/**
+ * Guarda lo que bajó de `GET /viajes/mios` y libera los inicios que Viajes rechazó con el viaje todavía CONFIRMADO
+ * (D106). Lo usan la descarga del chofer y la del motor tras un 409: sin red, decide la próxima descarga.
+ */
+export function guardarViajesDelServidor(viajes: Viajes, cola: Cola, delServidor: ViajeLocal[]): void {
+  viajes.guardarDelServidor(delServidor);
+  const ops = cola.visibles();
+  for (const v of viajes.todos()) if (inicioRechazado(v, ops)) viajes.liberarMarca(v.viajeId, 'INICIO');
+}
 
 /** Lo que hace el chofer. Las escrituras van primero a la cola local; el motor las envía cuando hay señal. */
 export class CasosDeUso {
@@ -45,7 +55,7 @@ export class CasosDeUso {
 
   /** Paso 1 (con señal): `GET /viajes/mios` a SQLite para operar sin red. */
   async descargarViajes(): Promise<void> {
-    this.viajes.guardarDelServidor(await this.api.misViajes(await this.sesion.tokenVigente()));
+    guardarViajesDelServidor(this.viajes, this.cola, await this.api.misViajes(await this.sesion.tokenVigente()));
   }
 
   /** Paso 2: el `opId` y la hora salen del celular al pulsar, no al enviar (FO1). */

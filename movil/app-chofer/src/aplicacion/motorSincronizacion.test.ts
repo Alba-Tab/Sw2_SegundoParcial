@@ -109,7 +109,11 @@ class ApiFalsa implements Api {
   estadoDelViaje = async (): Promise<Respuesta> => this.respuestasEstado.shift() ?? { estado: 200, cuerpo: { estado: this.estado } };
   /** Lo que devuelve `GET /viajes/mios`. */
   viajesServidor: ViajeLocal[] = [];
-  misViajes = async () => this.viajesServidor;
+  misViajesSinRed = false;
+  misViajes = async () => {
+    if (this.misViajesSinRed) throw new TypeError('Network request failed');
+    return this.viajesServidor;
+  };
   cursor = async (_d: string, viajeId: string) => {
     if (this.cursorQueLanza.has(viajeId)) throw new TypeError('Network request failed');
     return this.cursorServidor;
@@ -508,6 +512,30 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     expect(cola.ops[0]).toMatchObject({ estado: 'FALLIDA', codigoError: 'CONFLICTO_ESTADO' });
     expect(viajes.porId('v1')).toMatchObject({ estado: 'EN_RUTA', iniciadoLocal: true });
     expect(estadoVisible(viajes.porId('v1')!)).toBe('EN_RUTA');
+  });
+
+  it('D106: un inicio con 409 porque el chofer ya tiene otro viaje en ruta (sigue CONFIRMADO) libera la marca', async () => {
+    const inicio = casos.iniciarViaje('v1', null);
+    api.responder(`INICIO:${inicio}`, { estado: 409, codigo: 'CONFLICTO_ESTADO' });
+    api.estado = 'CONFIRMADO';
+    api.viajesServidor = [viaje('v1'), { ...viaje('v2'), estado: 'EN_RUTA' }];
+    await motor.sincronizar();
+    expect(cola.ops[0]).toMatchObject({ estado: 'FALLIDA', codigoError: 'CONFLICTO_ESTADO' });
+    expect(viajes.porId('v1')?.iniciadoLocal).toBe(false);
+    expect(estadoVisible(viajes.porId('v1')!)).toBe('CONFIRMADO');
+  });
+
+  it('D106: sin red para bajar los viajes tras el 409, la marca queda y decide la próxima descarga', async () => {
+    const inicio = casos.iniciarViaje('v1', null);
+    api.responder(`INICIO:${inicio}`, { estado: 409, codigo: 'CONFLICTO_ESTADO' });
+    api.estado = 'CONFIRMADO';
+    api.misViajesSinRed = true;
+    await motor.sincronizar();
+    expect(viajes.porId('v1')?.iniciadoLocal).toBe(true);
+    api.misViajesSinRed = false;
+    api.viajesServidor = [viaje('v1')];
+    await casos.descargarViajes();
+    expect(viajes.porId('v1')?.iniciadoLocal).toBe(false);
   });
 
   it('un envío que lanza no rompe la tanda: esa operación se reintenta y los otros viajes siguen', async () => {
