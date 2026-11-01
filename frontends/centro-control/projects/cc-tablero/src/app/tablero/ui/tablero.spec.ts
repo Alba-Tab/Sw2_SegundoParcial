@@ -19,7 +19,7 @@ function montar(roles: string[], respuesta: { data?: unknown; error?: unknown })
           urls: { 'cc-operaciones': 'http://o', 'cc-flota': 'http://f', 'cc-finanzas': 'http://fi' },
         } as unknown as ConfigCentro,
       },
-      { provide: Sesion, useValue: { roles: signal(roles) } },
+      { provide: Sesion, useValue: { roles: signal(roles), tiene: (...r: string[]) => roles.some((x) => r.includes(x)) } },
       { provide: TableroRepositorio, useValue: { observar } },
     ],
   });

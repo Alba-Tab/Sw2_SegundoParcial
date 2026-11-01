@@ -1,7 +1,7 @@
 import { Component, computed, inject } from '@angular/core';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
-import { AvisoServicios, BobPipe, CONFIG_CENTRO, conDesde, Encabezado, Esqueleto, Estado, FechaPipe, pct } from 'ui-comun';
+import { AvisoServicios, BobPipe, CONFIG_CENTRO, conDesde, Encabezado, Esqueleto, Estado, FechaPipe, pct, Sesion } from 'ui-comun';
 import { conPendientes, pendientes, type EstadoTarjeta, type Pendiente } from '../domain/tablero';
 import { TableroFachada } from '../tablero.fachada';
 
@@ -269,7 +269,8 @@ export class TableroPagina {
   readonly cargando = this.fachada.cargando;
   readonly bloques = this.fachada.bloques;
   readonly conPendientes = conPendientes;
-  readonly lista = computed(() => pendientes(this.datos()?.data?.tablero, this.bloques, (c) => this.fachada.estado(c)));
+  private readonly puedeAtender = inject(Sesion).tiene('despachador', 'jefe_flota', 'administracion');
+  readonly lista = computed(() => pendientes(this.datos()?.data?.tablero, this.bloques, (c) => this.fachada.estado(c), this.puedeAtender));
   readonly datosAl = computed(() => {
     const al = this.datos()?.data?.tablero?.datosAl;
     return al ? this.fecha.transform(al, true) : undefined;

@@ -74,7 +74,13 @@ const plural = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno
  * unidades con mantenimiento pendiente y alertas abiertas. Un bloque que el rol no ve no aparece; uno cuyo servicio
  * cayó lo dice ("no se sabe"), para que la ausencia de pendientes no se lea como "todo bien".
  */
-export function pendientes(t: LecturaTablero | null | undefined, b: Bloques, estado: (campo: string) => EstadoTarjeta): Pendiente[] {
+export function pendientes(
+  t: LecturaTablero | null | undefined,
+  b: Bloques,
+  estado: (campo: string) => EstadoTarjeta,
+  /** El rol puede marcar alertas atendidas (despachador, jefe de flota, administración); el gerente solo las ve (NG-3). */
+  puedeAtender = true,
+): Pendiente[] {
   const lista: Pendiente[] = [];
   const caido = (campo: string, servicio: string, que: string) => {
     const e = estado(campo);
@@ -138,7 +144,9 @@ export function pendientes(t: LecturaTablero | null | undefined, b: Bloques, est
         icono: 'notifications',
         tono: 'aviso',
         texto: plural(n, 'alerta abierta', 'alertas abiertas'),
-        detalle: 'Se revisan y se marcan atendidas desde la campana de la barra.',
+        detalle: puedeAtender
+          ? 'Se revisan y se marcan atendidas desde la campana de la barra.'
+          : 'Se revisan desde la campana de la barra; las marca atendidas quien las resuelve (despacho, flota o administración).',
       });
   }
   return lista;

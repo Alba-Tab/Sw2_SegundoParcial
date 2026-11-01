@@ -104,6 +104,12 @@ describe('lo que pide acción (U7)', () => {
     expect(p[4].app).toBeUndefined();
   });
 
+  it('NG-3: al gerente no le promete marcar alertas atendidas; al que las atiende, sí', () => {
+    const alertas = (puede: boolean) => pendientes(t, todo, bien, puede).find((x) => x.clave === 'alertas')?.detalle;
+    expect(alertas(true)).toBe('Se revisan y se marcan atendidas desde la campana de la barra.');
+    expect(alertas(false)).toContain('las marca atendidas quien las resuelve');
+  });
+
   it('cada rol ve solo lo suyo: el jefe de flota no ve riesgo ni mora', () => {
     expect(pendientes(t, bloquesVisibles(['jefe_flota']), bien).map((x) => x.clave)).toEqual(['mantenimiento', 'alertas']);
   });
