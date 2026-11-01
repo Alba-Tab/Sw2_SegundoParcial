@@ -65,6 +65,7 @@ export function lineaCredito(l: Json): Json {
     utilizado: dinero(l['utilizado']),
     disponible: dinero(l['disponible']),
     enMora: Boolean(l['enMora']),
+    suspendida: Boolean(l['suspendida']),
   };
 }
 

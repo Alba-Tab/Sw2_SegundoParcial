@@ -261,7 +261,7 @@ export type ClienteQueryVariables = Exact<{
 
 export type ClienteQuery = {
   cliente: { clienteId: string; razonSocial: string; nit: string | null; correo: string | null; canal: string | null } | null;
-  lineaCredito?: { limite: string; reservado: string; utilizado: string; disponible: string; enMora: boolean } | null;
+  lineaCredito?: { limite: string; reservado: string; utilizado: string; disponible: string; enMora: boolean; suspendida: boolean } | null;
   servicios: Array<{
     servicioId: string;
     viajeId: string | null;
@@ -725,6 +725,7 @@ export const ClienteDocument = gql`
       utilizado
       disponible
       enMora
+      suspendida
     }
     servicios(clienteId: $clienteId, limite: 50) {
       servicioId

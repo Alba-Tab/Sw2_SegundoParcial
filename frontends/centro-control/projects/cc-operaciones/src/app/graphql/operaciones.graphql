@@ -178,6 +178,7 @@ query Cliente($clienteId: ID!, $verCredito: Boolean!, $verMonto: Boolean!) {
     utilizado
     disponible
     enMora
+    suspendida
   }
   servicios(clienteId: $clienteId, limite: 50) {
     servicioId

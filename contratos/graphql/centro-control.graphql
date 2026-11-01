@@ -375,6 +375,8 @@ type LineaCredito {
   utilizado: Dinero!
   disponible: Dinero!
   enMora: Boolean!
+  "Suspendida por administración o gerente: la saga rechaza reservas nuevas con CREDITO_RECHAZADO (spec 012)."
+  suspendida: Boolean!
 }
 
 type Cotizacion {
