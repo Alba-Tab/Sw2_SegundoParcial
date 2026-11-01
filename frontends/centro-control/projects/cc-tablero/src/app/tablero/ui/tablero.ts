@@ -124,7 +124,8 @@ import { TableroFachada } from '../tablero.fachada';
           }
           @if (bloques.verUnidades) {
             <div class="completo">
-              <dt>Unidades por estado</dt>
+              <!-- JV-6: un viaje ocupa un tracto y un remolque; «En viaje 2» junto a «Viajes en curso 1» no es un error. -->
+              <dt>Unidades por estado (tractos y remolques)</dt>
               <dd class="unidades">
                 @switch (estado('unidadesPorEstado')) {
                   @case ('no-disponible') {
