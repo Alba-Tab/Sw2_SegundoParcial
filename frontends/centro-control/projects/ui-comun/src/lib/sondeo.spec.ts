@@ -65,13 +65,16 @@ describe('conservarUltimoBueno (FB-1)', () => {
   it('R1F-6: repone con el servicio del campo caído, pero no con NO_ENCONTRADO ni SIN_PERMISO', async () => {
     const graphql = (codigo: string) =>
       new CombinedGraphQLErrors({ errors: [{ message: codigo, path: ['viajes'], extensions: { codigo } }] });
-    const [, caido, borrado, sinPermiso] = await emitir(
+    const [, caido, interno, borrado, sinPermiso] = await emitir(
       { data: { viajes: ['A'] } },
       { data: { viajes: null }, error: graphql('DEPENDENCIA_NO_DISPONIBLE') },
+      { data: { viajes: null }, error: graphql('ERROR_INTERNO') },
       { data: { viajes: null }, error: graphql('NO_ENCONTRADO') },
       { data: { viajes: null }, error: graphql('SIN_PERMISO') },
     );
     expect(caido.data?.viajes).toEqual(['A']);
+    // R2F-7: ERROR_INTERNO es pasajero, igual que en esTransitorio.
+    expect(interno.data?.viajes).toEqual(['A']);
     expect(borrado.data?.viajes).toBeNull();
     expect(borrado.datosAl).toBeUndefined();
     expect(sinPermiso.data?.viajes).toBeNull();

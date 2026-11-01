@@ -33,6 +33,11 @@ export function servicioCaido(error: unknown, campo: string): boolean {
   return errorEnCampo(error, campo, 'DEPENDENCIA_NO_DISPONIBLE');
 }
 
+/** El campo falló por algo pasajero del servicio dueño: caído o con `ERROR_INTERNO`, como lo trata `esTransitorio` (R2F-7). */
+export function falloPasajero(error: unknown, campo: string): boolean {
+  return servicioCaido(error, campo) || errorEnCampo(error, campo, 'ERROR_INTERNO');
+}
+
 /** El campo salió en null porque el rol no lo puede ver (`@roles` del Gateway o el 403 del servicio dueño). */
 export function sinPermiso(error: unknown, campo: string): boolean {
   return errorEnCampo(error, campo, 'SIN_PERMISO');

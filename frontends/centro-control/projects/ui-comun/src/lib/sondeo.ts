@@ -1,6 +1,6 @@
 import { defer, map, type OperatorFunction } from 'rxjs';
 import { CombinedGraphQLErrors } from '@apollo/client/errors';
-import { filasConError, servicioCaido } from './errores';
+import { falloPasajero, filasConError } from './errores';
 
 /**
  * Campos de las filas de una lista raíz que otro servicio llena (`clientes[i].lineaCredito` sale de Finanzas): si ese
@@ -59,12 +59,13 @@ export function conservarUltimoBueno<R extends { data?: unknown; error?: unknown
           if (!bueno) return r;
           const mezcla: Record<string, unknown> = { ...data };
           let repuesto = false;
-          // R1F-6: solo un fallo de red o del Gateway, o el servicio del campo caído. Con NO_ENCONTRADO o SIN_PERMISO
+          // R1F-6: solo un fallo de red o del Gateway, o uno pasajero del servicio del campo (caído o ERROR_INTERNO,
+          // R2F-7). Con NO_ENCONTRADO o SIN_PERMISO
           // el dato viejo ya no vale y no se muestra como si solo hubiera fallado la red.
           const deRed = !CombinedGraphQLErrors.is(r.error);
           for (const [campo, valor] of Object.entries(bueno)) {
             if (mezcla[campo] !== null && mezcla[campo] !== undefined) continue;
-            if (!deRed && !servicioCaido(r.error, campo)) continue;
+            if (!deRed && !falloPasajero(r.error, campo)) continue;
             mezcla[campo] = valor;
             repuesto = true;
           }
