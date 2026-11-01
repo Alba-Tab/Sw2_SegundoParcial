@@ -1,6 +1,7 @@
 import { Component, inject, input, signal } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
 import { MatExpansionModule } from '@angular/material/expansion';
+import { MatIconModule } from '@angular/material/icon';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   Encabezado,
@@ -15,7 +16,7 @@ import {
   Esqueleto,
 } from 'ui-comun';
 import { AgenteFachada } from '../agente.fachada';
-import { mensajeDisparo, urlTraza } from '../domain/mision';
+import { conclusionLegible, mensajeDisparo, pasoLegible, urlTraza } from '../domain/mision';
 
 /**
  * Panel del agente (spec 014): cada misión con sus pasos (herramienta, argumentos, resumen y ms). El gerente y el
@@ -24,7 +25,7 @@ import { mensajeDisparo, urlTraza } from '../domain/mision';
 @Component({
   selector: 'app-agente',
   providers: [AgenteFachada],
-  imports: [Esqueleto, Encabezado, MatButtonModule, MatExpansionModule, FechaPipe, EtiquetaPipe, Estado, AvisoServicios],
+  imports: [Esqueleto, Encabezado, MatButtonModule, MatExpansionModule, MatIconModule, FechaPipe, EtiquetaPipe, Estado, AvisoServicios],
   template: `
     <cc-encabezado titulo="Agente «vigilar viajes»">
       <button mat-flat-button (click)="disparar()" [disabled]="enviando()" disabledInteractive>Disparar misión</button>
@@ -47,26 +48,43 @@ import { mensajeDisparo, urlTraza } from '../domain/mision';
               {{ m.codigo ? '· ' + (m.codigo | etiqueta: 'MotivoMision') : '' }}
             </mat-panel-description>
           </mat-expansion-panel-header>
-          @for (p of m.pasos; track p.numero) {
-            <div class="paso" [class.error]="p.error">
-              <b>{{ p.numero }}. {{ p.herramienta }}</b> <span class="secundario">({{ p.ms }} ms)</span>
-              <code>{{ json(p.argumentos) }}</code>
-              <span class="secundario">{{ p.resumen }}</span>
-            </div>
+          <!-- JV-3: lo que hizo el agente en frases; el JSON, los nombres de herramienta y la traza van detrás de «Ver detalle técnico». -->
+          <ol class="pasos">
+            @for (p of m.pasos; track p.numero) {
+              <li>
+                {{ pasoLegible(p.herramienta) }}
+                @if (p.error) {
+                  <span class="fallo"><mat-icon>error</mat-icon>No respondió</span>
+                }
+              </li>
+            }
+          </ol>
+          @if (conclusionLegible(m.conclusion, m.estado); as c) {
+            <p>{{ c }}</p>
           }
-          @if (m.conclusion) {
-            <p class="secundario">Conclusión: {{ m.conclusion }}</p>
-          }
-          @if (m.traceId) {
-            <p class="secundario">
-              Traza:
-              @if (urlTraza(m.traceId); as url) {
-                <a [href]="url" target="_blank" rel="noopener">{{ m.traceId }} en Jaeger</a>
-              } @else {
-                {{ m.traceId }}
-              }
-            </p>
-          }
+          <details class="tecnico">
+            <summary>Ver detalle técnico</summary>
+            @for (p of m.pasos; track p.numero) {
+              <div class="paso">
+                <b>{{ p.numero }}. {{ p.herramienta }}</b> <span class="secundario">({{ p.ms }} ms)</span>
+                <code>{{ json(p.argumentos) }}</code>
+                <span class="secundario">{{ p.resumen }}</span>
+              </div>
+            }
+            @if (m.conclusion) {
+              <p class="secundario">Conclusión: {{ m.conclusion }}</p>
+            }
+            @if (m.traceId) {
+              <p class="secundario">
+                Traza:
+                @if (urlTraza(m.traceId); as url) {
+                  <a [href]="url" target="_blank" rel="noopener">{{ m.traceId }} en Jaeger</a>
+                } @else {
+                  {{ m.traceId }}
+                }
+              </p>
+            }
+          </details>
         </mat-expansion-panel>
       } @empty {
         @if (!cargando()) {
@@ -86,8 +104,31 @@ import { mensajeDisparo, urlTraza } from '../domain/mision';
     .elegida {
       outline: 2px solid var(--mat-sys-primary);
     }
-    .paso.error b {
+    .pasos {
+      margin: 0 0 8px;
+      padding-left: 24px;
+    }
+    .pasos li {
+      padding: 4px 0;
+    }
+    .fallo {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-left: 8px;
       color: var(--mat-sys-error);
+    }
+    .fallo mat-icon {
+      font-size: 18px;
+      width: 18px;
+      height: 18px;
+    }
+    .tecnico summary {
+      cursor: pointer;
+      min-height: 44px;
+      display: flex;
+      align-items: center;
+      color: var(--mat-sys-primary);
     }
     code {
       font: var(--mat-sys-body-small);
@@ -110,6 +151,8 @@ export class AgentePagina {
   readonly campos = { misionesAgente: 'Analítica' };
   readonly enviando = signal(false);
   readonly json = (v: unknown) => JSON.stringify(v);
+  readonly pasoLegible = pasoLegible;
+  readonly conclusionLegible = conclusionLegible;
 
   urlTraza(traceId: string): string | null {
     return urlTraza(this.config.jaegerUrl, traceId);
