@@ -15,11 +15,11 @@ Un solo origen: `libs/design-tokens` (Style Dictionary). No se escriben colores,
 
 Tema oscuro: `data-tema="dark"` en `<html>` o la preferencia del sistema. Si un componente necesita un color en JavaScript (por ejemplo, Leaflet), lo lee del token con `getComputedStyle(document.documentElement).getPropertyValue('--mat-sys-…')`.
 
-Las fuentes (Roboto y Material Symbols) se sirven desde el hosting de cada app, empaquetadas desde npm; nunca desde Google Fonts.
+Las fuentes (Roboto y Material Symbols) se sirven desde el hosting de cada app, empaquetadas desde npm; nunca desde Google Fonts. Roboto es la variable de `@fontsource-variable/roboto` con un `@font-face` propio llamado «Roboto» y solo latín (43 KB) y latín extendido (29 KB, se baja si una página lo usa): en el Centro de Control en `ui-comun/src/estilos/fuentes.css` y en el portal en `src/compartido/tema/global.css`, que la PWA guarda para abrir sin conexión.
 
 ## Escala tipográfica
 
-Cada paso de título es al menos 1,25 veces el siguiente. Definida una sola vez en `frontends/centro-control/projects/ui-comun/src/estilos/base.css`.
+Cada paso de título es al menos 1,25 veces el siguiente. Definida una sola vez en `frontends/centro-control/projects/ui-comun/src/estilos/base.css`. Los títulos llevan `text-wrap: balance` y los párrafos, definiciones e ítems de lista `text-wrap: pretty`, para que ninguna palabra quede sola en la última línea (en el portal, en `global.css`).
 
 | Uso | Token M3 | Tamaño / alto de línea | Razón con el siguiente |
 |---|---|---|---|
@@ -51,6 +51,10 @@ Las alertas del marco no llevan raya lateral: ícono de severidad, texto de seve
 
 El reloj de arena (`hourglass_top`) siempre significa espera; el tono dice quién espera a quién. `info` si la empresa está trabajando y el cliente solo espera («Confirmando», «La empresa está resolviendo un imprevisto»); `aviso` si la espera tiene una decisión o un pago pendiente («En aprobación» de crédito, «Pago parcial», una acción del agente «Pendiente»).
 
+Un número que pide mirarlo (km cerca del mantenimiento, puntaje de conducción bajo) lleva el ícono `warning` en línea (`.icono-en-linea`, en `base.css`) y un texto solo para el lector («, cerca del mantenimiento»), además del color.
+
+**Lo bloqueado dice por qué y quién lo resuelve.** Una unidad que no puede salir, un botón que el rol no tiene o una acción que espera a otro dicen el motivo con lo que ya llega del servidor y quién lo destraba («No puede salir: lleva 10.380 km desde el último mantenimiento. Lo programa el jefe de flota.»); si no se sabe el motivo, una frase genérica, nunca un invento. Nada de botones grises sin explicación (`PRODUCT.md`, anti-referencias).
+
 Excepción a «los estados con `cc-estado`»: el tipo de hito de la bitácora (`TipoHito`) se muestra como chip, porque su tono es lo que el despachador busca al recorrerla (bloqueo, falla mecánica).
 
 ## Iconografía
@@ -66,7 +70,7 @@ Material Symbols Outlined, fijado como fuente por defecto de `<mat-icon>` en `co
 | `check_circle` | Hecho, disponible, pagado |
 | `hourglass_top` | En espera de otro (confirmación, aprobación, pago) |
 | `route` | En ruta, en viaje |
-| `warning` | Hay que revisarlo (observación, mantenimiento pendiente o requerido, documento por vencer) |
+| `warning` | Hay que revisarlo (observación, mantenimiento pendiente o requerido, documento por vencer, puntaje bajo, «Datos al …» viejo) |
 | `error` | Falla o intervención requerida |
 | `block` | Rechazado |
 | `cancel` | Cancelado |
@@ -131,6 +135,14 @@ En el portal la página actual se marca con fondo y peso en el botón del menú,
 
 ## Patrones de página
 
+**Navegación de sección.** Pestañas `mat-tab-nav-bar` con ícono y texto, alineadas a la izquierda y con su propio ancho (`MAT_TABS_CONFIG` con `stretchTabs: false` en `configurarApp`), **seis como máximo**. Si una app necesita más, se agrupan: Operaciones lleva el mapa como vista dentro de Viajes y las dos colas en Decisiones. La pestaña y el `h1` de la página que abre dicen lo mismo («Conducción» abre «Conducción»). El portal sigue la misma regla en su menú.
+
+**Ancho mínimo.** Todo se usa a 375 px sin desborde horizontal de la página: la tabla se desplaza dentro de `.tabla-ancha`, la barra común se pliega bajo 900 px (las apps en el menú «Apps» y el usuario solo con su ícono) y bajo 600 px el estado pasa a segunda columna de la lista.
+
+**Enlaces.** Color `primary` del tema, en claro y en oscuro, con subrayado (`:where(a)` en `base.css`, sin pisar botones ni menús; en el portal, `Link` de MUI). Nunca el azul del navegador ni un color escrito a mano. Las fichas se enlazan entre sí: dentro de la app con `routerLink`; hacia otra app con `urlEnApp` y `?desde=<app>`, solo si el rol la abre, para que el destino ofrezca «Volver a …».
+
+**Un dato, una dueña.** Si un dato aparece en dos apps, una es la fuente y la otra lo resume y enlaza a ella: la línea de crédito y la cobranza son de Finanzas; la ficha del cliente en Operaciones muestra el estado y el disponible y lleva a «Ver la línea en Finanzas».
+
 **Encabezado.** `<cc-encabezado>` en toda página: `h1` con el nombre de la página o del objeto («Viaje ABC-123») y su estado (`cc-estado` proyectado), subtítulo opcional y las acciones proyectadas a la derecha. En un detalle lleva migas (`Unidades › ABC-123`) y el botón de volver a la lista; si se llegó desde otra app con `?desde=<app>`, ofrece «Volver a <app>». Una sola acción primaria (`mat-flat-button`) por pantalla: el botón del encabezado que abre un formulario es `mat-stroked-button` y solo el envío del formulario abierto es `mat-flat-button`. En el portal, el detalle empieza con «Volver a …» (ícono `ArrowBack`).
 
 **Lista.** Tabla de Material dentro de `.tabla-ancha` (scroll horizontal en pantallas angostas). La primera columna enlaza al detalle. El estado va en su columna con `cc-estado`. Si un servicio no responde, `cc-aviso-servicios` dice cuál y la tabla muestra lo que haya.
@@ -146,9 +158,21 @@ En el portal la página actual se marca con fondo y peso en el botón del menú,
 
 **Tablero.** Primero «Pide acción»: lista de lo que hay que resolver (viajes en riesgo, facturas vencidas, unidades con mantenimiento pendiente, alertas abiertas), cada línea con ícono, tono de fondo y enlace a la app que lo resuelve con `?desde=cc-tablero`; si un servicio cae, la línea dice cuál en vez de callar. Después «Cifras del periodo» en una franja compacta y, al final, el detalle (viajes en curso, próximas a vencer). Sin grilla de tarjetas con cifra gigante. El orden de «Pide acción» es de urgencia: viajes en riesgo (el más probable arriba), facturas vencidas, mantenimiento pendiente y alertas abiertas. El tono de cada línea es el de su estado en el resto de la interfaz: el riesgo es `aviso`, igual que su chip (es una predicción, no una falla), y la factura vencida es `error`. Un rol que no ve ningún bloque que pueda pedir acción (comercial) no tiene la sección: «Nada pide acción» sería una afirmación que no puede saber.
 
-**Vacío, carga y error.** Mientras no llega la primera respuesta, esqueleto con la forma de lo que viene (`<cc-esqueleto>`; en una lista lo pone `cc-pie-lista` con `[cargando]`; en el portal, `Cargando`), nunca «No hay …» antes de tiempo. En una lista vacía, `cc-pie-lista` dice qué pasa y cuál es el siguiente paso. Si falla una fuente, `cc-aviso-servicios` dice cuál y ofrece «Reintentar»; en un detalle queda además el «volver» del encabezado. El texto de un error sale del `codigo` de 000 §5 (`ui-comun/dominio/src/errores.ts`; portal: `compartido/ui/Problema.tsx`), nunca del mensaje del servidor.
+**Vacío, carga y error.** Mientras no llega la primera respuesta, esqueleto con la forma de lo que viene (`<cc-esqueleto>`; en una lista lo pone `cc-pie-lista` con `[cargando]` y el contador dice «Cargando…»; en el portal, `Cargando`), nunca «No hay …» ni «0 viajes» antes de tiempo. En una lista vacía, `cc-pie-lista` dice qué pasa y cuál es el siguiente paso.
+
+Tres errores distintos, cada uno con su ícono y su salida, nunca mezclados:
+
+| Caso | Ícono | Texto | Salida |
+|---|---|---|---|
+| Un servicio no responde | `cloud_off` | Lo que no se pudo cargar, no el nombre técnico: «No se pudieron cargar los viajes de este cliente: Viajes no responde.» | «Reintentar» |
+| No existe (`NO_ENCONTRADO`, o el id no está en la lista) | `search_off` | «No encontramos esta unidad. Puede que el enlace esté mal o que ya no exista.» | Solo «Volver»: reintentar no lo arregla |
+| Sin permiso (`SIN_PERMISO`, ruta que el rol no abre) | Por decidir: `lock` ya significa «Cerrado» | Qué no puede hacer y quién sí («Lo programa el jefe de flota»); la página `/sin-acceso` dice a quién pedir el rol | Volver o ir a la app que sí abre |
+
+**Lo ya mostrado no desaparece por un fallo.** Un sondeo que falla no vacía la tabla: `conservarUltimoBueno` (`ui-comun/src/lib/sondeo.ts`) deja las últimas filas buenas y `cc-aviso-servicios [datosAl]` dice el error con «Se muestran los datos al …» junto a «Reintentar». «Datos al …» de Analítica (`<cc-datos-al>`, tablero, reportes y conducción) pasa a tono `aviso`, con `warning` y «las cifras pueden no estar al día», cuando lleva más de 30 minutos sin datos nuevos (`MINUTOS_DATOS_VIEJOS` en `ui-comun/dominio/src/formato.ts`): con viajes en ruta llegan posiciones e hitos cada pocos minutos, así que media hora sin nada ya es para mirarlo; no afirma una falla, porque también pasa cuando no hay operación. El texto de un error sale del `codigo` de 000 §5 (`ui-comun/dominio/src/errores.ts`; portal: `compartido/ui/Problema.tsx`), nunca del mensaje del servidor.
 
 **Valor vacío.** Un dato que falta se escribe siempre «Sin dato», en fichas (`<dd>`), celdas de tabla y cifras, en el Centro de Control y en el portal. Es el mismo texto de `etiqueta()` para un enum nulo y de los pipes `bob` y `fecha` y de `pct` (`SIN_DATO` en `ui-comun/dominio/src/formato.ts`). Nada de guion largo: un lector de pantalla no lo lee y en una ficha parece un error de carga. Si la frase entera depende del dato («Datos al …»), no se muestra.
+
+**Números.** Todo número visible con decimales o de cuatro cifras o más pasa por un formateador `es-BO`: miles con punto y decimales con coma («1.300 km», «25,5 t», «0,65»). En el Centro de Control, el pipe `numero` (y la función `numero` de `ui-comun/dominio` en código); el dinero, `bob` («2.800,00 BOB», en centavos, sin float); los porcentajes, `pct`. En el portal, `numero`, `dinero` y `porcentaje` de `compartido/formato/formato.ts`. Nunca el pipe `number` de Angular sin locale (escribe «1,300», que en Bolivia se lee 1,3), `DecimalPipe`, `toFixed` ni el valor crudo en pantalla. No se cambia `LOCALE_ID` (movería las fechas de Material). Un puntaje dice su escala junto al número («Puntaje (0 a 100)», «Puntaje de anomalía (0 a 1)») y la interfaz no inventa una severidad que el servidor no da. Las coordenadas van con coma decimal y punto y coma entre latitud y longitud («-17,7833; -63,1821»).
 
 **Riesgo de retraso.** Es `aviso` en todas partes: el chip, la línea de «Pide acción» del tablero y el marcador del mapa (`--mat-sys-advertencia`). Es una predicción, no una falla; `error` queda para lo que ya salió mal (factura vencida, entrega rechazada).
 
@@ -156,4 +180,4 @@ En el portal la página actual se marca con fondo y peso en el botón del menú,
 
 **Acciones que no se deshacen** (registrar pago, rechazar entrega, cerrar mantenimiento, rechazar una acción del agente, rechazar un crédito): confirmación en línea con `<cc-confirmacion>`, que dice qué va a pasar con los datos («Se registra un pago de 2.800,00 BOB…») y toma el foco. Mientras se confirma, el formulario queda bloqueado (lo que dice el resumen es lo que se envía); «No, volver» o un envío fallido lo desbloquean y devuelven el foco al botón que pidió la confirmación; tras el éxito, si ese botón ya no existe, el foco va al `h1`. Cancelar un servicio usa su propia confirmación en la fila (resumen, motivo y «Sí, cancelar el servicio»), con el resumen asociado al campo por `aria-describedby`. Cerrar un mantenimiento exige todos los ítems marcados (spec 010). En el portal, el diálogo de cancelar ya era la confirmación.
 
-**Accesibilidad.** Foco visible (`:focus-visible` con `primary`), objetivos de 44 px en pantallas táctiles (enlaces de tablas y datos), sin texto atenuado con `opacity`, tablas con scroll horizontal dentro de `.tabla-ancha` a 375 px y sin animaciones si el sistema pide menos movimiento. Contraste AA calculado con los tokens (texto sobre fondo y sobre cada contenedor de tono, claro y oscuro): el par más bajo es `primary` sobre `advertencia-container`, 4,96 en claro (el botón «No, volver» dentro de `cc-confirmacion`); pasa AA para texto normal (4,5).
+**Accesibilidad.** Foco visible (`:focus-visible` con `primary`), objetivos de 44 px en pantallas táctiles (enlaces de tablas y datos), sin texto atenuado con `opacity`, sin desborde a 375 px («Ancho mínimo») y sin animaciones si el sistema pide menos movimiento. Contraste AA calculado con los tokens (texto sobre fondo y sobre cada contenedor de tono, claro y oscuro): el par más bajo es `primary` sobre `advertencia-container`, 4,96 en claro (el botón «No, volver» dentro de `cc-confirmacion`); pasa AA para texto normal (4,5).
