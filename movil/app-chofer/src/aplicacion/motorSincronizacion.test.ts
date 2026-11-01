@@ -551,12 +551,28 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     expect(cola.ops).toHaveLength(1);
   });
 
+  it('E2-1: la velocidad sale del GPS; con -1 se calcula por distancia y tiempo; con la lectura de más de 10 s no se sabe', () => {
+    const t0 = ahora.getTime();
+    const lectura = (en: number, lat: number, velocidadMs: number) => ({ lat, lng: -63.18, velocidadMs, precisionMetros: 5, en: t0 + en });
+    expect(casos.velocidadKmh()).toBeNull();
+    casos.registrarLectura('v1', lectura(0, -17.7, -1));
+    expect(casos.velocidadKmh()).toBeNull();
+    // 0,001° de latitud son 111,2 m; en 10 s, 40 km/h.
+    ahora = new Date(t0 + 10_000);
+    casos.registrarLectura('v1', lectura(10_000, -17.701, -1));
+    expect(casos.velocidadKmh()).toBe(40);
+    casos.registrarLectura('v1', lectura(10_000, -17.701, 2));
+    expect(casos.velocidadKmh()).toBe(7.2);
+    ahora = new Date(t0 + 20_001);
+    expect(casos.velocidadKmh()).toBeNull();
+  });
+
   it('cada lectura del GPS queda guardada como última posición; olvidar limpia la memoria', () => {
     casos.registrarLectura('v1', { lat: -17.71, lng: -63.18, velocidadMs: 10, precisionMetros: 5, en: ahora.getTime() });
     expect(posicion.p).toEqual({ lat: -17.71, lng: -63.18 });
     casos.olvidar();
     expect(casos.ultimaPosicion()).toBeNull();
-    expect(casos.velocidadKmh()).toBe(0);
+    expect(casos.velocidadKmh()).toBeNull();
   });
 
   it('T7.6: el monto escrito con coma o sin decimales se normaliza como texto; uno inválido no entra a la cola', () => {

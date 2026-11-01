@@ -28,7 +28,7 @@ export function PantallaHito({ viajeId, alGuardar }: { viajeId: string; alGuarda
   const [origen, setOrigen] = useState<'VOZ' | 'TEXTO'>('TEXTO');
   const [estado, setEstado] = useState<'listo' | 'grabando' | 'transcribiendo'>('listo');
   const [error, setError] = useState<string | null>(null);
-  const escribir = puedeEscribir(casos.velocidadKmh());
+  const escribir = puedeEscribir(casos.velocidadKmh() ?? 0);
   const dictado = Platform.OS === 'ios';
 
   useEffect(() => precargarWhisper(), []);

@@ -83,8 +83,11 @@ export class DetectorFatiga {
   /** Si la última muestra contó como rostro visible (para que la pantalla no diga «vigilando» cuando no puede). */
   rostroVisible = false;
 
-  /** `velocidadKmh` es la última del GPS (0 si no se conoce): solo la usa SIN_ROSTRO. */
-  muestra(en: number, m: Medidas | null, velocidadKmh: number): MotivoFatiga | null {
+  /**
+   * `velocidadKmh` solo la usa SIN_ROSTRO. `null` (no se sabe) cuenta como en marcha: el detector solo corre con el
+   * viaje en ruta, y es mejor una alerta de más que quedar ciego.
+   */
+  muestra(en: number, m: Medidas | null, velocidadKmh: number | null): MotivoFatiga | null {
     this.alfa = this.anterior === null ? 1 : 1 - Math.exp(-(en - this.anterior) / BASE_TAU_MS);
     this.anterior = en;
     this.rostroVisible = false;
@@ -115,7 +118,7 @@ export class DetectorFatiga {
     return this.bostezos.filter((t) => en - t <= VENTANA_BOSTEZOS_MS).length;
   }
 
-  private sinRostro(en: number, velocidadKmh: number): MotivoFatiga | null {
+  private sinRostro(en: number, velocidadKmh: number | null): MotivoFatiga | null {
     // Un hueco corto no corta el episodio; uno de 0,5 s o más sí (sin olvidar los bostezos de la ventana).
     if (this.ultimoRostro === null || en - this.ultimoRostro >= HUECO_SIN_ROSTRO_MS) {
       this.cerradosDesde = null;
@@ -126,7 +129,7 @@ export class DetectorFatiga {
       this.bostezoContado = false;
     }
     // Detenido no cuenta, y al arrancar los 3 s empiezan de nuevo.
-    this.sinRostroDesde = velocidadKmh > SIN_ROSTRO_KMH ? (this.sinRostroDesde ?? en) : null;
+    this.sinRostroDesde = velocidadKmh === null || velocidadKmh > SIN_ROSTRO_KMH ? (this.sinRostroDesde ?? en) : null;
     if (this.sinRostroDesde === null || this.avisoSinRostro || en - this.sinRostroDesde < SIN_ROSTRO_MS) return null;
     this.avisoSinRostro = true;
     return 'SIN_ROSTRO';

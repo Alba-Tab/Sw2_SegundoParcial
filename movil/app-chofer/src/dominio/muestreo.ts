@@ -33,3 +33,17 @@ export class MuestreoGps {
 }
 
 export const kmh = (velocidadMs: number) => Math.max(0, Math.round(velocidadMs * 3.6 * 10) / 10);
+
+/** Una lectura de más de 10 s ya no dice a qué velocidad va el camión. */
+export const LECTURA_VIGENTE_MS = 10_000;
+
+/**
+ * km/h de la última lectura: la que da el GPS o, si no la da (`-1`: iOS sin dato, Android sin `hasSpeed`), distancia
+ * sobre tiempo desde la anterior. `null` si no se sabe: sin lecturas, con la última de más de 10 s o sin anterior.
+ */
+export function velocidadEstimada(ultima: Lectura | null, anterior: Lectura | null, ahora: number): number | null {
+  if (!ultima || ahora - ultima.en > LECTURA_VIGENTE_MS) return null;
+  if (ultima.velocidadMs >= 0) return kmh(ultima.velocidadMs);
+  if (!anterior || ultima.en <= anterior.en) return null;
+  return kmh(metros(anterior, ultima) / ((ultima.en - anterior.en) / 1000));
+}

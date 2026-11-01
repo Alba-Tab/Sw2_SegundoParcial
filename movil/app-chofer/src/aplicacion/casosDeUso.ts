@@ -2,7 +2,7 @@ import { esPositivo, normalizarMonto } from '../dominio/dinero';
 import { ErrorDeUsuario } from '../dominio/errores';
 import type { TipoEvidencia } from '../dominio/evidencia';
 import { descripcionValida, type OrigenHito, type TipoHito } from '../dominio/hito';
-import { kmh, type Lectura, MuestreoGps } from '../dominio/muestreo';
+import { kmh, type Lectura, MuestreoGps, velocidadEstimada } from '../dominio/muestreo';
 import type { TipoOperacion } from '../dominio/operacion';
 import { estadoVisible, puedeIniciar } from '../dominio/viaje';
 import type {
@@ -25,6 +25,7 @@ import type {
 export class CasosDeUso {
   private readonly muestreos = new Map<string, MuestreoGps>();
   private ultima: Lectura | null = null;
+  private anterior: Lectura | null = null;
 
   constructor(
     private readonly cola: Cola,
@@ -62,6 +63,7 @@ export class CasosDeUso {
 
   /** Spec 005, paso 4: cada lectura del GPS; se guarda solo si pasa el muestreo de D52. */
   registrarLectura(viajeId: string, l: Lectura): boolean {
+    this.anterior = this.ultima;
     this.ultima = l;
     this.posicionGuardada?.guardar({ lat: l.lat, lng: l.lng });
     this.encolarFatigasSinPosicion({ lat: l.lat, lng: l.lng });
@@ -84,8 +86,9 @@ export class CasosDeUso {
     return this.ultima ? { lat: this.ultima.lat, lng: this.ultima.lng } : null;
   }
 
-  velocidadKmh(): number {
-    return this.ultima ? kmh(this.ultima.velocidadMs) : 0;
+  /** La velocidad del camión ahora, o `null` si no se sabe (ver `velocidadEstimada`). */
+  velocidadKmh(): number | null {
+    return velocidadEstimada(this.ultima, this.anterior, this.reloj.ahora().getTime());
   }
 
   /**
@@ -99,6 +102,7 @@ export class CasosDeUso {
   /** Al cerrar sesión: nada de la posición ni del muestreo del chofer anterior queda en memoria. */
   olvidar(): void {
     this.ultima = null;
+    this.anterior = null;
     this.muestreos.clear();
   }
 

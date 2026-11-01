@@ -6,7 +6,7 @@ const cerrados: Medidas = { ...abiertos, ojos: 0.9 };
 const bostezo: Medidas = { ...abiertos, boca: 0.8 };
 
 /** Cuadros cada 100 ms desde `desde` hasta `hasta` (incluido), con el camión a `kmh`; devuelve las alertas. */
-function serie(d: DetectorFatiga, desde: number, hasta: number, m: Medidas | null, kmh = 60) {
+function serie(d: DetectorFatiga, desde: number, hasta: number, m: Medidas | null, kmh: number | null = 60) {
   const alertas = [];
   for (let t = desde; t <= hasta; t += 100) {
     const a = d.muestra(t, m, kmh);
@@ -101,6 +101,12 @@ describe('detector de fatiga (D60)', () => {
     expect(serie(d, 600, 10_000, null, 0)).toEqual([]);
     expect(serie(d, 10_100, 13_000, null, 6)).toEqual([]);
     expect(serie(d, 13_100, 15_000, null, 6)).toEqual([{ t: 13_100, a: 'SIN_ROSTRO' }]);
+  });
+
+  it('SIN_ROSTRO con la velocidad desconocida cuenta como en marcha (el lado seguro)', () => {
+    const d = new DetectorFatiga();
+    serie(d, 0, 500, abiertos, null);
+    expect(serie(d, 600, 4000, null, null)).toEqual([{ t: 3600, a: 'SIN_ROSTRO' }]);
   });
 
   it('SIN_ROSTRO: si el camión se detiene a mitad del episodio, el conteo vuelve a empezar al arrancar', () => {
