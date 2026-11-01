@@ -20,7 +20,13 @@ import { estadoChofer, vigenciaLicencia } from '../domain/chofer';
     @if (cargando()) {
       <cc-esqueleto />
     }
-    <cc-aviso-servicios buscado="este chofer" [error]="error()" [campos]="campos" [sinDatos]="!chofer()" />
+    <cc-aviso-servicios
+      buscado="este chofer"
+      [error]="error()"
+      [campos]="campos"
+      [sinDatos]="!chofer()"
+      [sinResultado]="(cargado() || !idValido()) && !listaTruncada()"
+    />
     @if (chofer(); as c) {
       <dl class="datos">
         <div>
@@ -69,14 +75,11 @@ import { estadoChofer, vigenciaLicencia } from '../domain/chofer';
           <p class="secundario">Sin viajes del {{ p.desde | fecha }} al {{ p.hasta | fecha }}.</p>
         }
       }
-    } @else if (cargado() || !idValido()) {
+    } @else if (listaTruncada()) {
+      <!-- El «no encontrado» lo dice cc-aviso-servicios; aquí solo el caso de la lista cortada (D-2). -->
       <p class="secundario">
-        @if (listaTruncada()) {
-          Ese chofer no está entre los primeros {{ limite }} que lee el Centro de Control.
-        } @else {
-          No se encontró ese chofer.
-        }
-        Vuelve a la <a routerLink="/choferes">lista de choferes</a>.
+        Ese chofer no está entre los primeros {{ limite }} que lee el Centro de Control. Vuelve a la
+        <a routerLink="/choferes">lista de choferes</a>.
       </p>
     }
   `,

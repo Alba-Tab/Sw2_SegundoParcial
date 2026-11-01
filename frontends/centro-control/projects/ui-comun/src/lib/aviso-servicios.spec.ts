@@ -156,6 +156,19 @@ describe('no encontrado (FB-2)', () => {
     expect(el.querySelector('button')).toBeNull();
   });
 
+  it('una ficha que busca en una lista (chofer, cliente, ruta): carga terminada sin error y sin el dato también es «no encontrado»', () => {
+    const f = TestBed.createComponent(AvisoServicios);
+    f.componentRef.setInput('sinDatos', true);
+    f.componentRef.setInput('sinResultado', true);
+    f.componentRef.setInput('buscado', 'este chofer');
+    f.detectChanges();
+    expect((f.nativeElement as HTMLElement).textContent).toContain('No encontramos este chofer.');
+    // Si la lista no llegó, el problema es el servicio, no el chofer.
+    f.componentRef.setInput('error', new TypeError('Failed to fetch'));
+    f.detectChanges();
+    expect((f.nativeElement as HTMLElement).textContent).not.toContain('No encontramos');
+  });
+
   it('con datos en pantalla, un NO_ENCONTRADO de otro campo no reemplaza la página', () => {
     const f = TestBed.createComponent(AvisoServicios);
     f.componentRef.setInput('error', noEncontrado);

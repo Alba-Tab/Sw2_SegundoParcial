@@ -53,7 +53,13 @@ import { nombreRuta } from '../domain/cliente';
     @if (cargando()) {
       <cc-esqueleto />
     }
-    <cc-aviso-servicios buscado="este cliente" [error]="error()" [campos]="campos" [sinDatos]="!cliente()" />
+    <cc-aviso-servicios
+      buscado="este cliente"
+      [error]="error()"
+      [campos]="campos"
+      [sinDatos]="!cliente()"
+      [sinResultado]="(cargado() || !idValido()) && !listaTruncada()"
+    />
     @if (cliente(); as c) {
       <dl class="datos">
         <div>
@@ -138,14 +144,11 @@ import { nombreRuta } from '../domain/cliente';
       } @else if (!error()) {
         <p class="secundario">El cliente aún no tiene servicios.</p>
       }
-    } @else if (cargado() || !idValido()) {
+    } @else if (listaTruncada()) {
+      <!-- El «no encontrado» lo dice cc-aviso-servicios; aquí solo el caso de la lista cortada (D-2). -->
       <p class="secundario">
-        @if (listaTruncada()) {
-          Ese cliente no está entre los primeros {{ limiteClientes }} que lee el Centro de Control.
-        } @else {
-          No se encontró ese cliente.
-        }
-        Vuelve a la <a routerLink="/clientes">lista de clientes</a>.
+        Ese cliente no está entre los primeros {{ limiteClientes }} que lee el Centro de Control. Vuelve a la
+        <a routerLink="/clientes">lista de clientes</a>.
       </p>
     }
   `,

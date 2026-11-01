@@ -101,9 +101,16 @@ export class AvisoServicios {
   readonly datosAl = input<string | null | undefined>();
   /** Qué no se encontró, para el aviso de un detalle: «esta unidad», «este viaje». */
   readonly buscado = input('lo que buscas');
+  /**
+   * La carga terminó sin error y no trajo lo buscado. Las fichas de chofer, cliente y ruta buscan en una lista del
+   * Gateway (no hay consulta por id), así que «no existe» llega como ausencia, no como NO_ENCONTRADO.
+   */
+  readonly sinResultado = input(false);
   /** Un detalle sin datos porque el servicio respondió NO_ENCONTRADO: se dice eso, no que el servicio falló (FB-2). */
   readonly noEncontrado = computed(
-    () => this.sinDatos() && erroresGraphql(this.error()).some((e) => e.extensions?.['codigo'] === 'NO_ENCONTRADO'),
+    () =>
+      this.sinDatos() &&
+      ((this.sinResultado() && !this.error()) || erroresGraphql(this.error()).some((e) => e.extensions?.['codigo'] === 'NO_ENCONTRADO')),
   );
   readonly avisos = computed(() => {
     if (this.noEncontrado()) return [];
