@@ -17,7 +17,6 @@ import {
   etiqueta,
   EtiquetaPipe,
   FiltrosLista,
-  LIMITE_GATEWAY,
   PieLista,
   posicionEstado,
   Sesion,
@@ -60,7 +59,6 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
         grupo="EstadoLineaCredito"
         nombre="clientes"
         singular="cliente"
-        [limite]="limite"
       />
     } @else {
       <cc-filtros-lista
@@ -69,7 +67,6 @@ import { textoCliente, type FilaCliente } from '../domain/cliente';
         busqueda="Buscar por razón social, NIT o correo"
         nombre="clientes"
         singular="cliente"
-        [limite]="limite"
       />
     }
     @if (sinLeerCredito().size; as n) {
@@ -138,7 +135,6 @@ export class ClientesPagina {
   readonly cargando = this.fachada.cargando;
   readonly verCredito = this.fachada.verCredito;
   readonly sinLeerCredito = this.fachada.sinLeerCredito;
-  readonly limite = LIMITE_GATEWAY;
   readonly campos = { clientes: 'Viajes', lineaCredito: 'Finanzas' };
   readonly columnas = columnasConEstado(['razonSocial', 'nit', 'correo', 'canal', ...(this.verCredito ? ['disponible', 'estado'] : [])]);
   readonly estadoLinea = estadoLineaCredito;

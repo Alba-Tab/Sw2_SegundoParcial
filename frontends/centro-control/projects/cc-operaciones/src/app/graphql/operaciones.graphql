@@ -167,14 +167,10 @@ query Clientes($verCredito: Boolean!) {
   }
 }
 
-# No hay `cliente(id)` en el esquema: la ficha sale de `clientes`. 50 × 12 + 1 más clientes, rutas y línea = 569.
+# B1: la ficha lee el cliente por id. 50 × 12 + 1 más cliente, rutas y línea = 570.
 query Cliente($clienteId: ID!, $verCredito: Boolean!, $verMonto: Boolean!) {
-  clientes {
-    clienteId
-    razonSocial
-    nit
-    correo
-    canal
+  cliente(id: $clienteId) {
+    ...ClienteFicha
   }
   lineaCredito(clienteId: $clienteId) @include(if: $verCredito) {
     limite
@@ -201,14 +197,68 @@ query Cliente($clienteId: ID!, $verCredito: Boolean!, $verMonto: Boolean!) {
   }
 }
 
-# G4. Lo que el esquema trae de cada ruta; `radioMetros` aún no está en el Gateway.
+fragment ClienteFicha on Cliente {
+  clienteId
+  razonSocial
+  nit
+  correo
+  canal
+}
+
+# G7: comercial y gerente; Viajes valida como en el alta (spec 001) y publica ClienteActualizado.
+mutation EditarCliente($clienteId: ID!, $input: ClienteEdicionInput!) {
+  editarCliente(clienteId: $clienteId, input: $input) {
+    ...ClienteFicha
+  }
+}
+
+# G4. Activas e inactivas: la gestión también reactiva las inactivas.
 query Rutas {
-  rutas {
+  rutas(incluirInactivas: true) {
     rutaId
     nombre
     origen
     destino
     distanciaKm
+    activa
+  }
+}
+
+fragment RutaFicha on Ruta {
+  rutaId
+  nombre
+  origen
+  destino
+  distanciaKm
+  activa
+  radioMetros
+  origenCoordenadas {
+    lat
+    lng
+  }
+  destinoCoordenadas {
+    lat
+    lng
+  }
+}
+
+# B1: la ficha lee la ruta por id.
+query Ruta($id: ID!) {
+  ruta(id: $id) {
+    ...RutaFicha
+  }
+}
+
+# G4: gerente y despachador; Viajes publica RutaActualizada.
+mutation CrearRuta($input: RutaInput!) {
+  crearRuta(input: $input) {
+    ...RutaFicha
+  }
+}
+
+mutation EditarRuta($rutaId: ID!, $input: RutaInput!) {
+  editarRuta(rutaId: $rutaId, input: $input) {
+    ...RutaFicha
   }
 }
 
