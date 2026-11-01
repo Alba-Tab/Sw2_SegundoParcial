@@ -9,7 +9,7 @@ import { LineasPagina } from './lineas';
 const linea = { limite: '30000.00', reservado: '7600.00', utilizado: '2800.00', disponible: '19600.00', enMora: false, suspendida: false };
 const clientes = [{ clienteId: 'c1', razonSocial: 'Agroexport SRL', nit: '1023456019', lineaCredito: linea }];
 
-function montar() {
+function montar(siguienteCursor: string | null = null, siguientes: typeof clientes = []) {
   // jsdom no trae matchMedia (columnasConEstado la usa para pantallas angostas).
   const nada = () => undefined;
   vi.stubGlobal('matchMedia', () => ({
@@ -21,11 +21,14 @@ function montar() {
   }));
   const repo = {
     observar: () => ({
-      valueChanges: of({ loading: false, data: { clientes: { items: clientes, siguienteCursor: null } } }),
+      valueChanges: of({ loading: false, data: { clientes: { items: clientes, siguienteCursor } } }),
       refetch: vi.fn(async () => ({})),
     }),
+    pagina: vi.fn(() => of({ loading: false, data: { clientes: { items: siguientes, siguienteCursor: null } } })),
     ajustar: vi.fn(() => of({ data: {} })),
-    cambiarEstado: vi.fn(() => of({ data: {} })),
+    cambiarEstado: vi.fn((clienteId: string, suspendida: boolean) =>
+      of({ data: { cambiarEstadoLineaCredito: { clienteId, suspendida } } }),
+    ),
   };
   TestBed.configureTestingModule({
     providers: [
@@ -39,6 +42,8 @@ function montar() {
   f.detectChanges();
   return { f, repo, raiz: f.nativeElement as HTMLElement };
 }
+
+const fila = (raiz: HTMLElement, texto: string) => [...raiz.querySelectorAll('tr')].find((tr) => tr.textContent?.includes(texto))!;
 
 const boton = (raiz: HTMLElement, texto: string) =>
   [...raiz.querySelectorAll<HTMLButtonElement>('button')].find((b) => b.textContent?.includes(texto))!;
@@ -92,5 +97,20 @@ describe('gestión de la línea de crédito (G6, spec 012)', () => {
     await clic(f, boton(raiz, 'Sí, suspender la línea'));
     expect(repo.cambiarEstado).toHaveBeenCalledWith('c1', true, 'Cheque rechazado', expect.any(String));
     expect(repo.ajustar).not.toHaveBeenCalled();
+  });
+
+  it('una línea de «Cargar más» se muestra con lo que devolvió la mutación (recargar solo relee la primera página)', async () => {
+    const otro = { clienteId: 'c2', razonSocial: 'Soya del Este', nit: '2034567011', lineaCredito: linea };
+    const { f, raiz } = montar('k1', [otro]);
+    await clic(f, boton(raiz, 'Cargar más clientes'));
+    await f.whenStable();
+    f.detectChanges();
+    await clic(f, boton(raiz, 'la línea de Soya del Este'));
+    await escribir(f, 'motivo', 'Cheque rechazado');
+    await clic(f, boton(raiz, 'Suspender la línea'));
+    await clic(f, boton(raiz, 'Sí, suspender la línea'));
+    await f.whenStable();
+    f.detectChanges();
+    expect(fila(raiz, 'Soya del Este').textContent).toContain('Suspendida');
   });
 });
