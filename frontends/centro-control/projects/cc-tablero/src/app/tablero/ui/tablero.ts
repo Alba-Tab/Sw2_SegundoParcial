@@ -160,7 +160,9 @@ import { TableroFachada } from '../tablero.fachada';
               } @else {
                 {{ v.placa ?? 'Sin unidad' }}
               }
-              · {{ v.cliente?.razonSocial }} · {{ v.ruta?.nombre }}
+              @if (detalleViaje(v); as d) {
+                · {{ d }}
+              }
               @if (v.riesgo?.enRiesgo) {
                 <cc-estado grupo="Riesgo" valor="EN_RIESGO" /> {{ pct(v.riesgo.probabilidad) }}
               }
@@ -295,6 +297,11 @@ export class TableroPagina {
   /** Hacia otra app con `?desde=cc-tablero` (N3), solo si el rol la abre; si no, null y la línea va en texto (R2F-1). */
   enlace(p: Pendiente): string | null {
     return p.app ? urlEnApp(this.config, this.sesion.roles(), p.app, p.ruta ?? '') : null;
+  }
+
+  /** Cliente y ruta, sin «· ·» cuando falta alguno (R2F-5). */
+  detalleViaje(v: { cliente?: { razonSocial?: string | null } | null; ruta?: { nombre?: string | null } | null }): string {
+    return [v.cliente?.razonSocial, v.ruta?.nombre].filter(Boolean).join(' · ');
   }
 
   enlaceViaje(id: string | undefined): string | null {

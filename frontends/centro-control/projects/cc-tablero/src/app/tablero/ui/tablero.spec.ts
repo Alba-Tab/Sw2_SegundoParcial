@@ -145,6 +145,8 @@ describe('Tablero por rol (spec 016, paso 10)', () => {
     expect(enlaces).toEqual(['http://f/unidades?estado=MANTENIMIENTO_PENDIENTE&desde=cc-tablero']);
     expect(texto).toContain('AAA-1');
     expect(texto).not.toContain('Lo programa el jefe de flota.');
+    // R2F-5: sin cliente ni ruta, la línea no queda con «· ·».
+    expect(texto).not.toMatch(/·\s*·/);
   });
 
   it('sin pendientes lo dice, en vez de dejar la sección vacía', () => {
