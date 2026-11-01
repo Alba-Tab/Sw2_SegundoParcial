@@ -163,6 +163,7 @@ export type CombustibleQuery = {
     kilometraje: number;
     registradaEn: string;
   }> | null;
+  unidades: Array<{ unidadId: string; placa: string }> | null;
 };
 
 export type ConduccionQueryVariables = Exact<{
@@ -382,6 +383,10 @@ export const CombustibleDocument = gql`
       monto
       kilometraje
       registradaEn
+    }
+    unidades {
+      unidadId
+      placa
     }
   }
 `;

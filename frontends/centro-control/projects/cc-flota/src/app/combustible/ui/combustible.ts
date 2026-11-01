@@ -80,8 +80,9 @@ import type { Anomalia, Carga } from '../domain/combustible';
         <ng-container matColumnDef="placa"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Placa</th>
           <td mat-cell *matCellDef="let a">
-            <!-- FL-1: la placa lleva a la unidad (la consulta trae la placa, no el id). -->
-            <a routerLink="/unidades" [queryParams]="{ q: a.placa }">{{ a.placa }}</a>
+            <!-- 5b: la placa lleva a la ficha de la unidad (o a la lista filtrada si Flota no la trae). -->
+            @let da = destino()(a.placa);
+            <a [routerLink]="da.ruta" [queryParams]="da.q ? { q: da.q } : null">{{ a.placa }}</a>
           </td></ng-container
         >
         <ng-container matColumnDef="litros"
@@ -125,8 +126,8 @@ import type { Anomalia, Carga } from '../domain/combustible';
         <ng-container matColumnDef="placa"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Placa</th>
           <td mat-cell *matCellDef="let c">
-            <!-- FL-1: la placa lleva a la unidad (la consulta trae la placa, no el id). -->
-            <a routerLink="/unidades" [queryParams]="{ q: c.placa }">{{ c.placa }}</a>
+            @let dc = destino()(c.placa);
+            <a [routerLink]="dc.ruta" [queryParams]="dc.q ? { q: dc.q } : null">{{ c.placa }}</a>
           </td></ng-container
         >
         <ng-container matColumnDef="litros"
@@ -157,10 +158,11 @@ export class CombustiblePagina {
   private readonly fachada = inject(CombustibleFachada);
   readonly anomalias = this.fachada.anomalias;
   readonly cargas = this.fachada.cargas;
+  readonly destino = this.fachada.destino;
   readonly error = this.fachada.error;
   readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
-  readonly campos = { anomaliasCombustible: 'Analítica', cargasCombustible: 'Flota' };
+  readonly campos = { anomaliasCombustible: 'Analítica', cargasCombustible: 'Flota', unidades: 'Flota' };
   /** La carga a la que lleva la alerta (`/combustible/:id`), arriba y sin depender de la página de la tabla. */
   readonly anomaliaMarcada = computed(() => this.anomalias().find((a) => a.cargaId === this.id()));
   readonly cargaMarcada = computed(() => this.cargas().find((c) => c.cargaId === this.id()));

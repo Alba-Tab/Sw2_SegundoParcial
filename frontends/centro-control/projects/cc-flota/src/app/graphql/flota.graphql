@@ -122,6 +122,10 @@ query Combustible($desde: Fecha!) {
     monto
     kilometraje
     registradaEn
+  } # 5b: la placa es única y no cambia (spec 010), así que basta para llegar a la ficha sin pedir unidadId a Analítica.
+  unidades {
+    unidadId
+    placa
   }
 }
 
