@@ -26,7 +26,7 @@ export const ENLACES: { ruta: string; titulo: string; icono: Icono; roles?: stri
       @for (e of enlaces; track e.ruta) {
         <a mat-tab-link [routerLink]="e.ruta" routerLinkActive #a="routerLinkActive" [active]="a.isActive"
           ><mat-icon>{{ e.icono }}</mat-icon
-          >{{ e.titulo }}</a
+          ><span class="texto-pestana">{{ e.titulo }}</span></a
         >
       }
     </nav>

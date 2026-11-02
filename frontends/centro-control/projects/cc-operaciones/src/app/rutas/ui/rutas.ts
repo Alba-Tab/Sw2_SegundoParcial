@@ -4,7 +4,18 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { Router, RouterLink } from '@angular/router';
-import { AvisoServicios, controlLista, Encabezado, enfocarTitulo, FiltrosLista, mensajeDe, NumeroPipe, PieLista, Sesion } from 'ui-comun';
+import {
+  AvisoServicios,
+  controlLista,
+  Encabezado,
+  Estado,
+  enfocarTitulo,
+  FiltrosLista,
+  mensajeDe,
+  NumeroPipe,
+  PieLista,
+  Sesion,
+} from 'ui-comun';
 import { ROLES_GESTION_RUTAS, textoActiva, textoRuta, type Ruta, type ValoresRuta } from '../domain/ruta';
 import { RutasFachada } from '../rutas.fachada';
 import { RutaFormulario } from './ruta-formulario';
@@ -14,6 +25,7 @@ import { RutaFormulario } from './ruta-formulario';
   selector: 'app-rutas',
   providers: [RutasFachada],
   imports: [
+    Estado,
     Encabezado,
     MatButtonModule,
     MatTableModule,
@@ -86,8 +98,9 @@ import { RutaFormulario } from './ruta-formulario';
         >
         <ng-container matColumnDef="activa"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
-          <td mat-cell *matCellDef="let r" [class.secundario]="r.activa === false">{{ textoActiva(r) }}</td></ng-container
-        >
+          <td mat-cell *matCellDef="let r">
+            <cc-estado grupo="EstadoRuta" [valor]="r.activa === false ? 'INACTIVA' : 'ACTIVA'" /></td
+        ></ng-container>
         <tr mat-header-row *matHeaderRowDef="columnas"></tr>
         <tr mat-row *matRowDef="let r; columns: columnas"></tr>
       </table>
@@ -109,7 +122,6 @@ export class RutasPagina {
   readonly cargando = this.fachada.cargando;
   readonly campos = { rutas: 'Viajes' };
   readonly columnas = ['nombre', 'origen', 'destino', 'distancia', 'activa'];
-  readonly textoActiva = textoActiva;
   readonly lista = controlLista<Ruta>({
     filas: this.rutas,
     texto: textoRuta,

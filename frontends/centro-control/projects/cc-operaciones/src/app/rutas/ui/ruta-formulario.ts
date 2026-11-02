@@ -1,11 +1,10 @@
 import { afterNextRender, Component, computed, type ElementRef, input, type OnInit, output, signal, viewChild } from '@angular/core';
 import { type AbstractControl, FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { Campo, Confirmacion, enfocar, largoEntre, listoParaEnviar, textoError } from 'ui-comun';
+import { Campo, Confirmacion, enfocar, largoEntre, listoParaEnviar, textoError, Panel } from 'ui-comun';
 import {
   activaLaRuta,
   AVISO_ACTIVAR_SIN_TARIFA,
@@ -26,103 +25,89 @@ const entero = (c: AbstractControl) => (c.value === null || Number.isInteger(c.v
  */
 @Component({
   selector: 'app-ruta-formulario',
-  imports: [
-    ReactiveFormsModule,
-    Campo,
-    Confirmacion,
-    MatCardModule,
-    MatButtonModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatCheckboxModule,
-  ],
+  imports: [Panel, ReactiveFormsModule, Campo, Confirmacion, MatButtonModule, MatFormFieldModule, MatInputModule, MatCheckboxModule],
   template: `
-    <mat-card class="formulario">
-      <mat-card-header
-        ><mat-card-title>{{ titulo() }}</mat-card-title></mat-card-header
-      >
-      <mat-card-content>
-        <form [formGroup]="form" (ngSubmit)="enviar(raiz)" #raiz novalidate>
-          <mat-form-field class="ancho">
-            <mat-label>Nombre</mat-label>
-            <input matInput formControlName="nombre" #primerCampo />
-            <mat-error>{{ texto(form.controls.nombre) }}</mat-error>
-          </mat-form-field>
-          <fieldset>
-            <legend>Origen</legend>
-            <div class="fila-acciones">
-              <mat-form-field>
-                <mat-label>Lugar</mat-label>
-                <input matInput formControlName="origen" />
-                <mat-error>{{ texto(form.controls.origen) }}</mat-error>
-              </mat-form-field>
-              <mat-form-field>
-                <mat-label>Latitud</mat-label>
-                <input matInput type="number" step="any" formControlName="origenLat" />
-                <mat-error>{{ texto(form.controls.origenLat) }}</mat-error>
-              </mat-form-field>
-              <mat-form-field>
-                <mat-label>Longitud</mat-label>
-                <input matInput type="number" step="any" formControlName="origenLng" />
-                <mat-error>{{ texto(form.controls.origenLng) }}</mat-error>
-              </mat-form-field>
-            </div>
-          </fieldset>
-          <fieldset>
-            <legend>Destino</legend>
-            <div class="fila-acciones">
-              <mat-form-field>
-                <mat-label>Lugar</mat-label>
-                <input matInput formControlName="destino" />
-                <mat-error>{{ texto(form.controls.destino) }}</mat-error>
-              </mat-form-field>
-              <mat-form-field>
-                <mat-label>Latitud</mat-label>
-                <input matInput type="number" step="any" formControlName="destinoLat" />
-                <mat-error>{{ texto(form.controls.destinoLat) }}</mat-error>
-              </mat-form-field>
-              <mat-form-field>
-                <mat-label>Longitud</mat-label>
-                <input matInput type="number" step="any" formControlName="destinoLng" />
-                <mat-error>{{ texto(form.controls.destinoLng) }}</mat-error>
-              </mat-form-field>
-              <mat-form-field>
-                <mat-label>Radio de la geocerca (m)</mat-label>
-                <input matInput type="number" step="1" inputmode="numeric" formControlName="radioMetros" />
-                <mat-hint>De {{ limites.radioMin }} a {{ limites.radioMax }} m</mat-hint>
-                <mat-error>{{ texto(form.controls.radioMetros) }}</mat-error>
-              </mat-form-field>
-            </div>
-          </fieldset>
+    <cc-panel class="formulario" titulo="{{ titulo() }}">
+      <form [formGroup]="form" (ngSubmit)="enviar(raiz)" #raiz novalidate>
+        <mat-form-field class="ancho">
+          <mat-label>Nombre</mat-label>
+          <input matInput formControlName="nombre" #primerCampo />
+          <mat-error>{{ texto(form.controls.nombre) }}</mat-error>
+        </mat-form-field>
+        <fieldset>
+          <legend>Origen</legend>
           <div class="fila-acciones">
             <mat-form-field>
-              <mat-label>Distancia (km)</mat-label>
-              <input matInput type="number" step="0.1" inputmode="decimal" formControlName="distanciaKm" />
-              <mat-error>{{ texto(form.controls.distanciaKm) }}</mat-error>
+              <mat-label>Lugar</mat-label>
+              <input matInput formControlName="origen" />
+              <mat-error>{{ texto(form.controls.origen) }}</mat-error>
             </mat-form-field>
-            @if (!alta()) {
-              <mat-checkbox formControlName="activa">Ruta activa (se puede cotizar y programar)</mat-checkbox>
-            }
+            <mat-form-field>
+              <mat-label>Latitud</mat-label>
+              <input matInput type="number" step="any" formControlName="origenLat" />
+              <mat-error>{{ texto(form.controls.origenLat) }}</mat-error>
+            </mat-form-field>
+            <mat-form-field>
+              <mat-label>Longitud</mat-label>
+              <input matInput type="number" step="any" formControlName="origenLng" />
+              <mat-error>{{ texto(form.controls.origenLng) }}</mat-error>
+            </mat-form-field>
           </div>
-          <p class="secundario">{{ alta() ? avisoAlta : avisoActivar }}</p>
-          @if (confirmando()) {
-            <cc-confirmacion
-              [resumen]="confirmarActivar"
-              accion="Sí, activarla"
-              icono="check_circle"
-              [enviando]="enviando()"
-              (confirmar)="confirmarActivacion()"
-              (volver)="volver()"
-            />
-          } @else {
-            <div class="fila-acciones">
-              <button mat-flat-button type="submit" id="guardar-ruta" [disabled]="enviando()" disabledInteractive>{{ accion() }}</button>
-              <button mat-button type="button" (click)="cancelar.emit()" [disabled]="enviando()">Cancelar</button>
-            </div>
+        </fieldset>
+        <fieldset>
+          <legend>Destino</legend>
+          <div class="fila-acciones">
+            <mat-form-field>
+              <mat-label>Lugar</mat-label>
+              <input matInput formControlName="destino" />
+              <mat-error>{{ texto(form.controls.destino) }}</mat-error>
+            </mat-form-field>
+            <mat-form-field>
+              <mat-label>Latitud</mat-label>
+              <input matInput type="number" step="any" formControlName="destinoLat" />
+              <mat-error>{{ texto(form.controls.destinoLat) }}</mat-error>
+            </mat-form-field>
+            <mat-form-field>
+              <mat-label>Longitud</mat-label>
+              <input matInput type="number" step="any" formControlName="destinoLng" />
+              <mat-error>{{ texto(form.controls.destinoLng) }}</mat-error>
+            </mat-form-field>
+            <mat-form-field>
+              <mat-label>Radio de la geocerca (m)</mat-label>
+              <input matInput type="number" step="1" inputmode="numeric" formControlName="radioMetros" />
+              <mat-hint>De {{ limites.radioMin }} a {{ limites.radioMax }} m</mat-hint>
+              <mat-error>{{ texto(form.controls.radioMetros) }}</mat-error>
+            </mat-form-field>
+          </div>
+        </fieldset>
+        <div class="fila-acciones">
+          <mat-form-field>
+            <mat-label>Distancia (km)</mat-label>
+            <input matInput type="number" step="0.1" inputmode="decimal" formControlName="distanciaKm" />
+            <mat-error>{{ texto(form.controls.distanciaKm) }}</mat-error>
+          </mat-form-field>
+          @if (!alta()) {
+            <mat-checkbox formControlName="activa">Ruta activa (se puede cotizar y programar)</mat-checkbox>
           }
-        </form>
-      </mat-card-content>
-    </mat-card>
+        </div>
+        <p class="secundario">{{ alta() ? avisoAlta : avisoActivar }}</p>
+        @if (confirmando()) {
+          <cc-confirmacion
+            [resumen]="confirmarActivar"
+            accion="Sí, activarla"
+            icono="check_circle"
+            [enviando]="enviando()"
+            (confirmar)="confirmarActivacion()"
+            (volver)="volver()"
+          />
+        } @else {
+          <div class="fila-acciones">
+            <button mat-flat-button type="submit" id="guardar-ruta" [disabled]="enviando()" disabledInteractive>{{ accion() }}</button>
+            <button mat-button type="button" (click)="cancelar.emit()" [disabled]="enviando()">Cancelar</button>
+          </div>
+        }
+      </form>
+    </cc-panel>
   `,
   styles: `
     .formulario {
