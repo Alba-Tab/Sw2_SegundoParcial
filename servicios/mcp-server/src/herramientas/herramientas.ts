@@ -280,6 +280,8 @@ export const HERRAMIENTAS: Herramienta[] = [
             umbral: z.number().min(0.5).max(0.95).optional(),
             agrupar: z.enum(['VIAJE', 'RUTA']).optional(),
             incluirVencidas: z.boolean().optional(),
+            // D111: subconjunto de las columnas del catálogo; viaja como `columnas=a,b` (String de un arreglo).
+            columnas: z.array(z.string().max(40)).max(20).optional(),
           })
           .strict()
           .default({}),
