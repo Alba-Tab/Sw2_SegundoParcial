@@ -265,6 +265,18 @@ describe('Gateway (spec 016)', () => {
     const { firmarDescarga } = await import('../src/graphql/resolvers');
     const vencido = firmarDescarga('hmac-de-prueba', 'e1', 'u1', Math.floor(Date.now() / 1000) - 1);
     expect((await request(app.getHttpServer()).get(`/exportaciones/${vencido}`)).body.codigo).toBe('EXPORTACION_VENCIDA');
+
+    // D110 y D111: el formato va en el cuerpo (EXCEL si no se dice) y las columnas, como arreglo o separadas por coma.
+    const exportar = () => pedidos.filter((p) => p.ruta === '/analitica/api/v1/exportaciones').map((p) => JSON.parse(p.cuerpo));
+    expect(exportar()[0].formato).toBe('EXCEL');
+    await gql(
+      ['gerente'],
+      'mutation { exportarReporte(id: CUENTAS_POR_COBRAR, params: { columnas: ["saldo", "cliente"] }, formato: PDF, claveIdempotencia: "k2") { url } }',
+    );
+    expect(exportar().at(-1)).toMatchObject({ formato: 'PDF', parametros: { columnas: ['saldo', 'cliente'] } });
+    rutas.set('GET /analitica/api/v1/reportes/CUENTAS_POR_COBRAR', () => ({ json: { titulo: 'Cuentas por cobrar' } }));
+    await gql(['gerente'], '{ reporte(id: CUENTAS_POR_COBRAR, params: { columnas: ["saldo", "cliente"] }) { titulo } }');
+    expect(pedidos.at(-1)!.ruta).toBe('/analitica/api/v1/reportes/CUENTAS_POR_COBRAR?columnas=saldo%2Ccliente');
   });
 
   it('suscripción: 4401 sin token válido, 4403 para clientes y alertas nuevas para el despachador', async () => {
