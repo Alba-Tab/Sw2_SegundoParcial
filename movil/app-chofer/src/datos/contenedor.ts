@@ -6,6 +6,7 @@ import { ApiViajes } from './apiViajes';
 import { archivos } from './archivos';
 import { bd } from './bd';
 import { dispositivo, ids, red, reloj } from './plataforma';
+import { avisadorLocal } from './push';
 import { ColaSqlite, EvidenciasSqlite, FatigasSqlite, PosicionSqlite, PuntosSqlite, ViajesSqlite } from './repositorios';
 import { SesionKeycloak } from './sesion';
 
@@ -34,4 +35,5 @@ export const casos = new CasosDeUso(
   new PosicionSqlite(),
   (fn) => bd.transaction(() => fn()),
   fatigasSinPosicion,
+  avisadorLocal,
 );

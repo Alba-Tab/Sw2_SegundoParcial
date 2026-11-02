@@ -2,7 +2,7 @@ import type { EvidenciaLocal, Parte } from '../dominio/evidencia';
 import type { PuntoGps } from '../dominio/gps';
 import type { Operacion, TipoOperacion } from '../dominio/operacion';
 import type { Respuesta } from '../dominio/reintento';
-import type { ViajeLocal } from '../dominio/viaje';
+import type { Aviso, ViajeLocal } from '../dominio/viaje';
 
 /** Puertos de la app (Clean): la aplicación no conoce SQLite, fetch ni Expo. */
 
@@ -58,6 +58,11 @@ export interface Api {
   /** Último `seq` que el servidor tiene del dispositivo (D55); null si no hay o no se pudo saber (nunca lanza). */
   cursor(dispositivoId: string, viajeId: string, token: string): Promise<number | null>;
   registrarDispositivo(dispositivoId: string, plataforma: 'ANDROID' | 'IOS', tokenPush: string | null, token: string): Promise<Respuesta>;
+}
+
+/** D112: muestra al chofer un aviso de un viaje (notificación local en iPhone; en Android ya llega el push de FCM). */
+export interface Avisador {
+  avisar(aviso: Aviso): void;
 }
 
 /** La sesión renueva el access token con el refresh token (offline_access, D27) antes de cada tanda. */

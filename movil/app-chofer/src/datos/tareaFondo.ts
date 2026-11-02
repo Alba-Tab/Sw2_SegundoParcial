@@ -1,6 +1,6 @@
 import * as BackgroundTask from 'expo-background-task';
 import * as TaskManager from 'expo-task-manager';
-import { motor } from './contenedor';
+import { casos, motor } from './contenedor';
 
 /** Disparador en segundo plano del motor (spec 005); se define al cargar el bundle, antes de registrar la app. */
 export const TAREA_SINCRONIZAR = 'sincronizar-cola';
@@ -8,6 +8,8 @@ export const TAREA_SINCRONIZAR = 'sincronizar-cola';
 TaskManager.defineTask(TAREA_SINCRONIZAR, async () => {
   try {
     await motor.sincronizar();
+    // D112: en iPhone, si iOS la corre, también avisa lo que cambió en Viajes (sin garantía de cuándo).
+    await casos.descargarViajes().catch(() => {});
     return BackgroundTask.BackgroundTaskResult.Success;
   } catch {
     return BackgroundTask.BackgroundTaskResult.Failed;
