@@ -2,7 +2,18 @@ import { Component, computed, inject, input } from '@angular/core';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
-import { aCentavos, AvisoServicios, BobPipe, controlLista, Encabezado, FechaPipe, FiltrosLista, PieLista, NumeroPipe } from 'ui-comun';
+import {
+  aCentavos,
+  AvisoServicios,
+  BobPipe,
+  controlLista,
+  Encabezado,
+  FechaPipe,
+  FiltrosLista,
+  PieLista,
+  NumeroPipe,
+  Panel,
+} from 'ui-comun';
 import { CombustibleFachada } from '../combustible.fachada';
 import type { Anomalia, Carga } from '../domain/combustible';
 
@@ -10,7 +21,19 @@ import type { Anomalia, Carga } from '../domain/combustible';
 @Component({
   selector: 'app-combustible',
   providers: [CombustibleFachada],
-  imports: [Encabezado, RouterLink, MatTableModule, MatSortModule, NumeroPipe, BobPipe, FechaPipe, AvisoServicios, FiltrosLista, PieLista],
+  imports: [
+    Panel,
+    Encabezado,
+    RouterLink,
+    MatTableModule,
+    MatSortModule,
+    NumeroPipe,
+    BobPipe,
+    FechaPipe,
+    AvisoServicios,
+    FiltrosLista,
+    PieLista,
+  ],
   template: `
     <cc-encabezado
       [titulo]="id() ? 'Carga marcada' : 'Combustible'"
@@ -21,41 +44,42 @@ import type { Anomalia, Carga } from '../domain/combustible';
       @let a = anomaliaMarcada();
       @let c = cargaMarcada();
       @if (a || c) {
-        <h2>Detalle de la carga</h2>
-        <dl class="datos">
-          <div>
-            <dt>Placa</dt>
-            <dd>{{ a?.placa ?? c?.placa }}</dd>
-          </div>
-          <div>
-            <dt>Registrada</dt>
-            <dd>{{ a?.registradaEn ?? c?.registradaEn | fecha: true }}</dd>
-          </div>
-          <div>
-            <dt>Litros</dt>
-            <dd>{{ a?.litros ?? c?.litros | numero: 1 }}</dd>
-          </div>
-          @if (a) {
+        <cc-panel titulo="Detalle de la carga" [tono]="a ? 'aviso' : null">
+          <dl class="datos">
             <div>
-              <dt>Km/L</dt>
-              <dd>{{ a.kmPorLitro | numero: 2 : 2 }}</dd>
+              <dt>Placa</dt>
+              <dd>{{ a?.placa ?? c?.placa }}</dd>
             </div>
             <div>
-              <dt>Puntaje de anomalía (0 a 1)</dt>
-              <dd>{{ a.puntaje | numero: 2 : 2 }}</dd>
-            </div>
-          }
-          @if (c) {
-            <div>
-              <dt>Monto</dt>
-              <dd>{{ c.monto | bob }}</dd>
+              <dt>Registrada</dt>
+              <dd>{{ a?.registradaEn ?? c?.registradaEn | fecha: true }}</dd>
             </div>
             <div>
-              <dt>Odómetro</dt>
-              <dd>{{ c.kilometraje | numero }} km</dd>
+              <dt>Litros</dt>
+              <dd>{{ a?.litros ?? c?.litros | numero: 1 }}</dd>
             </div>
-          }
-        </dl>
+            @if (a) {
+              <div>
+                <dt>Km/L</dt>
+                <dd>{{ a.kmPorLitro | numero: 2 : 2 }}</dd>
+              </div>
+              <div>
+                <dt>Puntaje de anomalía (0 a 1)</dt>
+                <dd>{{ a.puntaje | numero: 2 : 2 }}</dd>
+              </div>
+            }
+            @if (c) {
+              <div>
+                <dt>Monto</dt>
+                <dd>{{ c.monto | bob }}</dd>
+              </div>
+              <div>
+                <dt>Odómetro</dt>
+                <dd>{{ c.kilometraje | numero }} km</dd>
+              </div>
+            }
+          </dl>
+        </cc-panel>
       }
     }
     <h2>Anomalías de los últimos 30 días</h2>

@@ -45,6 +45,9 @@ import { UnidadesFachada } from '../unidades.fachada';
     <cc-encabezado titulo="Unidades">
       @if (sesion.tiene('jefe_flota')) {
         <a mat-stroked-button routerLink="/unidades/nueva"><mat-icon>local_shipping</mat-icon>Nueva unidad</a>
+      } @else {
+        <!-- P8: lo que el rol no hace dice quién lo hace, en vez de callar. -->
+        <span class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>Las unidades las da de alta el jefe de flota.</span>
       }
     </cc-encabezado>
     <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!unidades().length" />
@@ -99,10 +102,13 @@ import { UnidadesFachada } from '../unidades.fachada';
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Documentos</th>
           <td mat-cell *matCellDef="let u">
             @for (d of u.documentos; track d.tipo) {
-              <span class="secundario">{{ d.tipo | etiqueta: 'TipoDocumento' }} {{ d.venceEl | fecha }} </span>
-              @if (vigencia(d.venceEl) !== 'VIGENTE') {
-                <cc-estado grupo="Vigencia" [valor]="vigencia(d.venceEl)" />
-              }
+              <!-- Un documento por línea (P1): «SOAT 01/04/2027» no se mezcla con el siguiente. -->
+              <div class="documento">
+                <span class="secundario">{{ d.tipo | etiqueta: 'TipoDocumento' }} {{ d.venceEl | fecha }}</span>
+                @if (vigencia(d.venceEl) !== 'VIGENTE') {
+                  <cc-estado grupo="Vigencia" [valor]="vigencia(d.venceEl)" />
+                }
+              </div>
             }</td
         ></ng-container>
         <tr mat-header-row *matHeaderRowDef="columnas()"></tr>

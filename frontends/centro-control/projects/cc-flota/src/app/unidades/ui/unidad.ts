@@ -1,7 +1,6 @@
 import { afterNextRender, Component, computed, effect, inject, Injector, input, signal, viewChild } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -29,6 +28,7 @@ import {
   listoParaEnviar,
   textoError,
   NumeroPipe,
+  Panel,
 } from 'ui-comun';
 import {
   AVISO_KM,
@@ -52,13 +52,14 @@ import { UnidadFachada } from '../unidades.fachada';
 import { ajustarCampos, CamposUnidad, formularioCampos } from './campos-unidad';
 
 /** El formulario abierto de la ficha: uno a la vez, cada uno con su botón en el encabezado. */
-type Panel = 'programar' | 'editar' | 'baja';
+type PanelAbierto = 'programar' | 'editar' | 'baja';
 
 /** Spec 010: programar un mantenimiento (la unidad pasa a EN_MANTENIMIENTO) y cerrarlo con su checklist. */
 @Component({
   selector: 'app-unidad',
   providers: [UnidadFachada],
   imports: [
+    Panel,
     Esqueleto,
     Encabezado,
     ReactiveFormsModule,
@@ -66,7 +67,6 @@ type Panel = 'programar' | 'editar' | 'baja';
     Confirmacion,
     CamposUnidad,
     NumeroPipe,
-    MatCardModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -172,24 +172,20 @@ type Panel = 'programar' | 'editar' | 'baja';
       </dl>
 
       @if (panel() === 'editar' && sesion.tiene('jefe_flota') && puedeProgramar(u.estado)) {
-        <mat-card class="formulario" id="editar">
-          <mat-card-header><mat-card-title>Editar unidad</mat-card-title></mat-card-header>
-          <mat-card-content>
-            <form [formGroup]="edicion" (ngSubmit)="editar(u, formEditar)" #formEditar novalidate>
-              <app-campos-unidad [form]="edicion" [clase]="clase()" />
-              <div class="fila-acciones">
-                <button mat-flat-button type="submit" [disabled]="enviando()" disabledInteractive>Guardar</button>
-                <button mat-button type="button" (click)="cerrarPanel()" [disabled]="enviando()">Cancelar</button>
-              </div>
-            </form>
-          </mat-card-content>
-        </mat-card>
+        <cc-panel class="formulario" id="editar" titulo="Editar unidad">
+          <form [formGroup]="edicion" (ngSubmit)="editar(u, formEditar)" #formEditar novalidate>
+            <app-campos-unidad [form]="edicion" [clase]="clase()" />
+            <div class="fila-acciones">
+              <button mat-flat-button type="submit" [disabled]="enviando()" disabledInteractive>Guardar</button>
+              <button mat-button type="button" (click)="cerrarPanel()" [disabled]="enviando()">Cancelar</button>
+            </div>
+          </form>
+        </cc-panel>
       }
 
       @if (panel() === 'baja' && sesion.tiene('jefe_flota') && puedeProgramar(u.estado)) {
-        <mat-card class="formulario" id="baja">
-          <mat-card-header><mat-card-title>Dar de baja</mat-card-title></mat-card-header>
-          <mat-card-content #zonaBaja>
+        <cc-panel class="formulario" id="baja" titulo="Dar de baja">
+          <div #zonaBaja>
             <mat-form-field class="ancho">
               <mat-label>Motivo</mat-label>
               <input matInput [formControl]="motivoBaja" id="motivo-baja" />
@@ -211,117 +207,113 @@ type Panel = 'programar' | 'editar' | 'baja';
                 <button mat-button type="button" (click)="cerrarPanel()">Cancelar</button>
               </div>
             }
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </cc-panel>
       }
 
       @if (programando() && sesion.tiene('jefe_flota') && puedeProgramar(u.estado)) {
-        <mat-card class="formulario" id="programar">
-          <mat-card-header><mat-card-title>Programar mantenimiento</mat-card-title></mat-card-header>
-          <mat-card-content>
-            <form [formGroup]="nuevo" (ngSubmit)="programar(u.unidadId, formProgramar)" #formProgramar novalidate>
-              <div class="fila-acciones">
-                <mat-form-field>
-                  <mat-label>Tipo</mat-label>
-                  <mat-select formControlName="tipo" #primerCampo>
-                    @for (t of tiposMantenimiento; track t) {
-                      <mat-option [value]="t">{{ t | etiqueta: 'TipoMantenimiento' }}</mat-option>
-                    }
-                  </mat-select>
-                </mat-form-field>
-                <mat-form-field>
-                  <mat-label>Fecha</mat-label>
-                  <input matInput type="date" formControlName="fechaProgramada" [min]="hoy" />
-                  <mat-error>{{ textoError(nuevo.controls.fechaProgramada) }}</mat-error>
-                </mat-form-field>
-                <mat-form-field>
-                  <mat-label>Taller</mat-label>
-                  <input matInput formControlName="taller" />
-                  <mat-error>{{ textoError(nuevo.controls.taller) }}</mat-error>
-                </mat-form-field>
-              </div>
-              <mat-form-field class="ancho">
-                <mat-label>Descripción</mat-label>
-                <input matInput formControlName="descripcion" />
-                <mat-error>{{ textoError(nuevo.controls.descripcion) }}</mat-error>
+        <cc-panel class="formulario" id="programar" titulo="Programar mantenimiento">
+          <form [formGroup]="nuevo" (ngSubmit)="programar(u.unidadId, formProgramar)" #formProgramar novalidate>
+            <div class="fila-acciones">
+              <mat-form-field>
+                <mat-label>Tipo</mat-label>
+                <mat-select formControlName="tipo" #primerCampo>
+                  @for (t of tiposMantenimiento; track t) {
+                    <mat-option [value]="t">{{ t | etiqueta: 'TipoMantenimiento' }}</mat-option>
+                  }
+                </mat-select>
               </mat-form-field>
-              <mat-form-field class="ancho">
-                <mat-label>Checklist (una línea por ítem)</mat-label>
-                <textarea matInput rows="4" formControlName="checklist"></textarea>
-                <mat-error>{{ textoError(nuevo.controls.checklist) }}</mat-error>
+              <mat-form-field>
+                <mat-label>Fecha</mat-label>
+                <input matInput type="date" formControlName="fechaProgramada" [min]="hoy" />
+                <mat-error>{{ textoError(nuevo.controls.fechaProgramada) }}</mat-error>
               </mat-form-field>
-              <div class="fila-acciones">
-                <button mat-flat-button type="submit" [disabled]="enviando()" disabledInteractive>Programar</button>
-                <button mat-button type="button" (click)="cerrarPanel()" [disabled]="enviando()">Cancelar</button>
-              </div>
-            </form>
-          </mat-card-content>
-        </mat-card>
+              <mat-form-field>
+                <mat-label>Taller</mat-label>
+                <input matInput formControlName="taller" />
+                <mat-error>{{ textoError(nuevo.controls.taller) }}</mat-error>
+              </mat-form-field>
+            </div>
+            <mat-form-field class="ancho">
+              <mat-label>Descripción</mat-label>
+              <input matInput formControlName="descripcion" />
+              <mat-error>{{ textoError(nuevo.controls.descripcion) }}</mat-error>
+            </mat-form-field>
+            <mat-form-field class="ancho">
+              <mat-label>Checklist (una línea por ítem)</mat-label>
+              <textarea matInput rows="4" formControlName="checklist"></textarea>
+              <mat-error>{{ textoError(nuevo.controls.checklist) }}</mat-error>
+            </mat-form-field>
+            <div class="fila-acciones">
+              <button mat-flat-button type="submit" [disabled]="enviando()" disabledInteractive>Programar</button>
+              <button mat-button type="button" (click)="cerrarPanel()" [disabled]="enviando()">Cancelar</button>
+            </div>
+          </form>
+        </cc-panel>
       }
 
       <h2>Mantenimientos</h2>
       @for (m of mantenimientos(); track m.mantenimientoId) {
-        <mat-card class="mantenimiento">
-          <mat-card-header>
-            <mat-card-title>{{ m.tipo | etiqueta: 'TipoMantenimiento' }} · {{ m.fechaProgramada | fecha }} · {{ m.taller }}</mat-card-title>
-            <mat-card-subtitle><cc-estado grupo="EstadoMantenimiento" [valor]="m.estado" /> {{ m.descripcion }}</mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content>
-            @if (m.estado === 'EN_CURSO' && sesion.tiene('jefe_flota') && formsCierre[m.mantenimientoId]; as fc) {
-              @for (i of cierres[m.mantenimientoId] ?? []; track i.item) {
-                <mat-checkbox [checked]="i.ok" (change)="i.ok = $event.checked" [disabled]="cerrando() === m.mantenimientoId">{{
-                  i.item
-                }}</mat-checkbox>
-              }
-              @if (faltanItems() === m.mantenimientoId) {
-                <p class="no-disponible" role="alert">
-                  Marca todos los ítems; si alguno no se hizo, deja el mantenimiento abierto y anótalo en observaciones.
-                </p>
-              }
-              <div class="fila-acciones" [formGroup]="fc" #zonaCierre>
-                @if (u.tipoUnidad === 'TRACTO') {
-                  <mat-form-field>
-                    <mat-label>Kilometraje</mat-label>
-                    <input matInput type="number" min="0" inputmode="numeric" formControlName="kilometraje" />
-                    <mat-error>{{ textoError(fc.controls.kilometraje) }}</mat-error>
-                  </mat-form-field>
-                }
-                <mat-form-field class="ancho">
-                  <mat-label>Observaciones</mat-label>
-                  <input matInput formControlName="observaciones" />
-                  <mat-error>{{ textoError(fc.controls.observaciones) }}</mat-error>
-                </mat-form-field>
-                @if (cerrando() !== m.mantenimientoId) {
-                  <button
-                    mat-stroked-button
-                    [id]="'cerrar-' + m.mantenimientoId"
-                    (click)="pedirCierre(m.mantenimientoId, zonaCierre)"
-                    [disabled]="enviando()"
-                  >
-                    <mat-icon>lock</mat-icon>Cerrar mantenimiento
-                  </button>
-                }
-              </div>
-              @if (cerrando() === m.mantenimientoId) {
-                <cc-confirmacion
-                  [resumen]="resumenCierre(m, u.placa)"
-                  accion="Sí, cerrar el mantenimiento"
-                  icono="lock"
-                  [enviando]="enviando()"
-                  (confirmar)="cerrar(m.mantenimientoId)"
-                  (volver)="volverDelCierre(m.mantenimientoId)"
-                />
-              }
-            } @else {
-              @for (i of m.checklist; track i.item) {
-                <span class="secundario">{{ i.ok ? '✔' : i.ok === false ? '✘' : '·' }} {{ i.item }} </span>
-              }
-              @if (m.cerradoEn) {
-                <p class="secundario">Cerrado {{ m.cerradoEn | fecha: true }} {{ m.observaciones ?? '' }}</p>
-              }
+        <cc-panel
+          class="mantenimiento"
+          titulo="{{ m.tipo | etiqueta: 'TipoMantenimiento' }} · {{ m.fechaProgramada | fecha }} · {{ m.taller }}"
+        >
+          <span panel-detalle><cc-estado grupo="EstadoMantenimiento" [valor]="m.estado" /> {{ m.descripcion }}</span>
+
+          @if (m.estado === 'EN_CURSO' && sesion.tiene('jefe_flota') && formsCierre[m.mantenimientoId]; as fc) {
+            @for (i of cierres[m.mantenimientoId] ?? []; track i.item) {
+              <mat-checkbox [checked]="i.ok" (change)="i.ok = $event.checked" [disabled]="cerrando() === m.mantenimientoId">{{
+                i.item
+              }}</mat-checkbox>
             }
-          </mat-card-content>
-        </mat-card>
+            @if (faltanItems() === m.mantenimientoId) {
+              <p class="no-disponible" role="alert">
+                Marca todos los ítems; si alguno no se hizo, deja el mantenimiento abierto y anótalo en observaciones.
+              </p>
+            }
+            <div class="fila-acciones" [formGroup]="fc" #zonaCierre>
+              @if (u.tipoUnidad === 'TRACTO') {
+                <mat-form-field>
+                  <mat-label>Kilometraje</mat-label>
+                  <input matInput type="number" min="0" inputmode="numeric" formControlName="kilometraje" />
+                  <mat-error>{{ textoError(fc.controls.kilometraje) }}</mat-error>
+                </mat-form-field>
+              }
+              <mat-form-field class="ancho">
+                <mat-label>Observaciones</mat-label>
+                <input matInput formControlName="observaciones" />
+                <mat-error>{{ textoError(fc.controls.observaciones) }}</mat-error>
+              </mat-form-field>
+              @if (cerrando() !== m.mantenimientoId) {
+                <button
+                  mat-stroked-button
+                  [id]="'cerrar-' + m.mantenimientoId"
+                  (click)="pedirCierre(m.mantenimientoId, zonaCierre)"
+                  [disabled]="enviando()"
+                >
+                  <mat-icon>lock</mat-icon>Cerrar mantenimiento
+                </button>
+              }
+            </div>
+            @if (cerrando() === m.mantenimientoId) {
+              <cc-confirmacion
+                [resumen]="resumenCierre(m, u.placa)"
+                accion="Sí, cerrar el mantenimiento"
+                icono="lock"
+                [enviando]="enviando()"
+                (confirmar)="cerrar(m.mantenimientoId)"
+                (volver)="volverDelCierre(m.mantenimientoId)"
+              />
+            }
+          } @else {
+            @for (i of m.checklist; track i.item) {
+              <span class="secundario">{{ i.ok ? '✔' : i.ok === false ? '✘' : '·' }} {{ i.item }} </span>
+            }
+            @if (m.cerradoEn) {
+              <p class="secundario">Cerrado {{ m.cerradoEn | fecha: true }} {{ m.observaciones ?? '' }}</p>
+            }
+          }
+        </cc-panel>
       } @empty {
         <p class="secundario">Sin mantenimientos.</p>
       }
@@ -370,7 +362,7 @@ export class UnidadPagina {
   readonly avisoKm = AVISO_KM;
   readonly kmMantenimiento = KM_MANTENIMIENTO;
   /** El formulario abierto (programar, editar o dar de baja) se abre desde su acción del encabezado. */
-  readonly panel = signal<Panel | null>(null);
+  readonly panel = signal<PanelAbierto | null>(null);
   readonly programando = computed(() => this.panel() === 'programar');
   readonly clase = computed(() => {
     const u = this.unidad();
@@ -428,7 +420,7 @@ export class UnidadPagina {
   }
 
   /** Abre el panel de editar o de dar de baja con el foco en su primer campo; abrir otro cierra el anterior. */
-  abrirPanel(panel: Panel): void {
+  abrirPanel(panel: PanelAbierto): void {
     this.volverDeBaja(false);
     this.motivoBaja.reset();
     this.panel.set(panel);
