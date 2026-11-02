@@ -28,11 +28,13 @@ import { type Factura, getListarFacturasQueryKey, listarFacturas } from '../../a
 import { compararMontos, dinero, fecha } from '../../compartido/formato/formato';
 import { Antiguedad } from '../../compartido/offline/Antiguedad';
 import { useClienteActivo } from '../../compartido/sesion/ClienteActivo';
+import { BotonEnlace } from '../../compartido/ui/BotonEnlace';
 import { desdeEnlace, Enlace } from '../../compartido/ui/Enlace';
 import { EstadoFactura } from '../../compartido/ui/EstadoServicio';
 import { Problema } from '../../compartido/ui/Problema';
 import { Credito } from './Credito';
 import { Cargando } from '../../compartido/ui/Cargando';
+import { alinear, TABLA_SX } from '../../compartido/ui/tabla';
 
 const col = createColumnHelper<Factura>();
 
@@ -134,19 +136,31 @@ export function PaginaFacturas() {
       {paginas.data && <Antiguedad actualizadoEn={paginas.dataUpdatedAt} fallo={paginas.isError} />}
       {paginas.isPending && paginas.fetchStatus === 'fetching' && <Cargando />}
       {paginas.isError && !paginas.data && <Problema error={paginas.error} reintentar={paginas.refetch} />}
-      {paginas.data && datos.length === 0 && <Typography color="text.secondary">No hay facturas.</Typography>}
+      {/* Vacío con salida: con el filtro puesto, quitarlo; sin filtro, ir a los servicios, que son los que facturan. */}
+      {paginas.data && datos.length === 0 && (
+        <Paper variant="outlined" sx={{ p: 3 }}>
+          <Typography gutterBottom>
+            {conSaldo ? 'No hay facturas con saldo pendiente.' : 'Todavía no hay facturas. Cada servicio entregado genera la suya.'}
+          </Typography>
+          {conSaldo ? (
+            <Button onClick={() => setConSaldo(false)}>Ver todas las facturas</Button>
+          ) : (
+            <BotonEnlace to="/servicios">Ver servicios</BotonEnlace>
+          )}
+        </Paper>
+      )}
       {falta && paginas.data && !paginas.hasNextPage && <Alert severity="info">No encontramos la factura del enlace en esta lista.</Alert>}
       {falta && paginas.hasNextPage && paginasLeidas >= PAGINAS_PARA_BUSCAR && (
         <Alert severity="info">La factura del enlace está más abajo: usa «Ver más» al final de la lista.</Alert>
       )}
       {datos.length > 0 && (
         <Paper variant="outlined" sx={{ overflowX: 'auto' }}>
-          <Table size="small">
+          <Table size="small" sx={TABLA_SX}>
             <TableHead>
               {tabla.getHeaderGroups().map((g) => (
                 <TableRow key={g.id}>
                   {g.headers.map((h) => (
-                    <TableCell key={h.id} sortDirection={h.column.getIsSorted() || false}>
+                    <TableCell key={h.id} align={alinear(h.column.id)} sortDirection={h.column.getIsSorted() || false}>
                       {h.column.getCanSort() ? (
                         <TableSortLabel
                           active={!!h.column.getIsSorted()}
@@ -189,7 +203,9 @@ export function PaginaFacturas() {
                     }}
                   >
                     {f.getVisibleCells().map((c) => (
-                      <TableCell key={c.id}>{flexRender(c.column.columnDef.cell, c.getContext())}</TableCell>
+                      <TableCell key={c.id} align={alinear(c.column.id)}>
+                        {flexRender(c.column.columnDef.cell, c.getContext())}
+                      </TableCell>
                     ))}
                   </TableRow>
                 );

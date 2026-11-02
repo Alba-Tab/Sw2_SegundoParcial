@@ -20,6 +20,7 @@ import { EstadoServicio } from '../../compartido/ui/EstadoServicio';
 import { desdeEnlace, Enlace } from '../../compartido/ui/Enlace';
 import { Problema } from '../../compartido/ui/Problema';
 import { Cargando } from '../../compartido/ui/Cargando';
+import { alinear, TABLA_SX } from '../../compartido/ui/tabla';
 
 const col = createColumnHelper<Servicio>();
 
@@ -78,12 +79,14 @@ export function PaginaServicios() {
         </Paper>
       ) : (
         <Paper variant="outlined" sx={{ overflowX: 'auto' }}>
-          <Table size="small">
+          <Table size="small" sx={TABLA_SX}>
             <TableHead>
               {tabla.getHeaderGroups().map((g) => (
                 <TableRow key={g.id}>
                   {g.headers.map((h) => (
-                    <TableCell key={h.id}>{flexRender(h.column.columnDef.header, h.getContext())}</TableCell>
+                    <TableCell key={h.id} align={alinear(h.column.id)}>
+                      {flexRender(h.column.columnDef.header, h.getContext())}
+                    </TableCell>
                   ))}
                 </TableRow>
               ))}
@@ -99,7 +102,9 @@ export function PaginaServicios() {
                   }}
                 >
                   {f.getVisibleCells().map((c) => (
-                    <TableCell key={c.id}>{flexRender(c.column.columnDef.cell, c.getContext())}</TableCell>
+                    <TableCell key={c.id} align={alinear(c.column.id)}>
+                      {flexRender(c.column.columnDef.cell, c.getContext())}
+                    </TableCell>
                   ))}
                 </TableRow>
               ))}

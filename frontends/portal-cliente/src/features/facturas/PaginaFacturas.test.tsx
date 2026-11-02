@@ -143,7 +143,7 @@ describe('Facturas y crédito (specs 006 y 008)', () => {
       return original(u, i);
     });
     conConsultas(<PaginaFacturas />);
-    expect(await screen.findByText('No hay facturas.')).toBeTruthy();
+    expect(await screen.findByText('Todavía no hay facturas. Cada servicio entregado genera la suya.')).toBeTruthy();
     expect(pedidas.some((u) => u.endsWith('/api/v1/facturas?clienteId=c1'))).toBe(true);
     expect(pedidas.some((u) => u.endsWith('/api/v1/lineas-credito/c1'))).toBe(true);
     clienteActivo.actual = { modoComercial: false, clienteId: undefined };

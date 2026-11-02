@@ -57,17 +57,22 @@ export function PaginaServicio() {
           </Typography>
           <EstadoServicio estado={s.estado} etapa={s.etapa} />
         </Stack>
-        {/* Solo lo que llegó: sin «undefined t» ni separadores sueltos. */}
-        <Typography color="text.secondary">
-          {[
-            s.tipoCarga && TIPOS_CARGA[s.tipoCarga],
-            s.toneladas && `${numero(s.toneladas)} t`,
-            s.fechaViaje && fecha(s.fechaViaje),
-            s.monto && dinero(s.monto),
-          ]
-            .filter(Boolean)
-            .join(' · ')}
-        </Typography>
+        {/* Ficha con etiqueta y valor, como `dl.datos` del Centro de Control; lo que falta dice «Sin dato» una vez. */}
+        <Box component="dl" sx={DATOS}>
+          {(
+            [
+              ['Carga', s.tipoCarga ? TIPOS_CARGA[s.tipoCarga] : 'Sin dato'],
+              ['Toneladas', numero(s.toneladas)],
+              ['Fecha del viaje', s.fechaViaje ? fecha(s.fechaViaje) : 'Sin dato'],
+              ['Monto', s.monto ? dinero(s.monto) : 'Sin dato'],
+            ] as const
+          ).map(([etiqueta, valor]) => (
+            <div key={etiqueta}>
+              <dt>{etiqueta}</dt>
+              <dd>{valor}</dd>
+            </div>
+          ))}
+        </Box>
 
         {s.estado === 'PROGRAMANDO' && (
           <Stack spacing={1}>
@@ -164,6 +169,15 @@ function conVolver(contenido: ReactNode) {
     </Stack>
   );
 }
+
+const DATOS = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))',
+  gap: 2,
+  m: 0,
+  '& dt': { typography: 'body2', color: 'text.secondary' },
+  '& dd': { m: 0, mt: 0.5, fontVariantNumeric: 'tabular-nums' },
+} as const;
 
 /** Solo para el lector de pantalla (el mismo recorte que `cdk-visually-hidden`). */
 const OCULTO = {

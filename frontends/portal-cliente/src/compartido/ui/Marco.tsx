@@ -77,29 +77,48 @@ export function Marco() {
       <Box sx={{ display: { xs: 'contents', md: 'block' }, position: { md: 'sticky' }, top: 0, zIndex: (t) => t.zIndex.appBar }}>
         <AppBar position="static" elevation={0}>
           <Toolbar sx={{ gap: 1, flexWrap: 'wrap' }}>
-            <Typography variant="h6" component="span" sx={{ mr: 2 }}>
+            <Typography variant="h6" component="span" sx={{ mr: 2, fontSize: { xs: '1rem', md: undefined } }}>
               Transporte de carga
             </Typography>
-            {menu.map((m) => (
-              <BotonEnlace
-                key={m.a}
-                color="inherit"
-                to={m.a}
-                startIcon={m.icono}
-                activeProps={{ 'aria-current': 'page' }}
-                // La página actual se marca con fondo y peso (I6), no con subrayado.
-                sx={{
-                  minHeight: 44,
-                  '&[aria-current="page"]': { bgcolor: (t) => alpha(t.palette.common.white, 0.18), fontWeight: 700 },
-                }}
+            {/* Bajo md, el menú baja a su propia fila con el ícono sobre el texto, repartida a lo ancho: no se parte en
+                varias filas desparejas ni esconde los nombres. */}
+            {menu.length > 0 && (
+              <Box
+                component="nav"
+                aria-label="Menú"
+                sx={{ display: 'flex', gap: 1, order: { xs: 1, md: 0 }, width: { xs: '100%', md: 'auto' }, pb: { xs: 1, md: 0 } }}
               >
-                {m.texto}
-              </BotonEnlace>
-            ))}
+                {menu.map((m) => (
+                  <BotonEnlace
+                    key={m.a}
+                    color="inherit"
+                    to={m.a}
+                    startIcon={m.icono}
+                    activeProps={{ 'aria-current': 'page' }}
+                    // La página actual se marca con fondo y peso (I6), no con subrayado.
+                    sx={{
+                      minHeight: 44,
+                      flex: { xs: '1 1 0', md: 'none' },
+                      flexDirection: { xs: 'column', md: 'row' },
+                      fontSize: { xs: '0.75rem', md: undefined },
+                      lineHeight: 1.2,
+                      px: { xs: 0.5, md: undefined },
+                      whiteSpace: 'nowrap',
+                      '& .MuiButton-startIcon': { m: { xs: 0, md: '0 8px 0 -4px' } },
+                      '&[aria-current="page"]': { bgcolor: (t) => alpha(t.palette.common.white, 0.18), fontWeight: 700 },
+                    }}
+                  >
+                    {m.texto}
+                  </BotonEnlace>
+                ))}
+              </Box>
+            )}
             <Box sx={{ flexGrow: 1 }} />
             {s.autenticado && (
               <>
-                <Typography variant="body2">{s.nombre}</Typography>
+                <Typography variant="body2" sx={{ display: { xs: 'none', md: 'block' } }}>
+                  {s.nombre}
+                </Typography>
                 <Button
                   color="inherit"
                   startIcon={<Logout />}
