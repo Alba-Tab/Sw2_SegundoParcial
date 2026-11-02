@@ -55,6 +55,11 @@ query Catalogo($verClientes: Boolean!) {
     roles
     maxDias
     parametros
+    columnas {
+      clave
+      titulo
+      tipo
+    }
   }
   # E5-1: la primera página de 100 para el selector (la búsqueda por nombre en el selector queda pendiente).
   clientes(limite: 100) @include(if: $verClientes) {
@@ -86,8 +91,8 @@ query Reporte($id: ReporteId!, $params: ReporteParams) {
   }
 }
 
-mutation ExportarReporte($id: ReporteId!, $params: ReporteParams, $clave: ID!) {
-  exportarReporte(id: $id, params: $params, claveIdempotencia: $clave) {
+mutation ExportarReporte($id: ReporteId!, $params: ReporteParams, $formato: FormatoExportacion, $clave: ID!) {
+  exportarReporte(id: $id, params: $params, formato: $formato, claveIdempotencia: $clave) {
     url
     nombreArchivo
     expiraEn
@@ -101,6 +106,7 @@ mutation Preguntar($texto: String!) {
     reporteId
     parametros
     exportable
+    formato
     resultado {
       reporteId
       titulo

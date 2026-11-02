@@ -3,7 +3,7 @@ import { CombinedGraphQLErrors } from '@apollo/client/errors';
 import { defer, of, Subject, throwError, type Observable } from 'rxjs';
 import { Sesion } from 'ui-comun';
 import { ReportesRepositorio } from './data/reportes.repositorio';
-import { ReportesFachada } from './reportes.fachada';
+import { ConsultaReportes, ReportesFachada } from './reportes.fachada';
 
 function fachada(catalogo: Observable<unknown>, roles: string[] = ['gerente'], pedidos: boolean[] = []) {
   TestBed.configureTestingModule({
@@ -65,5 +65,25 @@ describe('ReportesFachada: el catálogo no se traga el error', () => {
     const pedidos: boolean[] = [];
     fachada(of({ data: { catalogoReportes: [], rutas: [] } }), ['jefe_flota'], pedidos);
     expect(pedidos).toEqual([false]);
+  });
+});
+
+describe('ConsultaReportes: exportar en Excel o PDF (D110)', () => {
+  it('manda el formato y el PDF no reusa la clave de un Excel que falló por la red', async () => {
+    const pedidos: { formato: string; clave: string }[] = [];
+    let fallar = true;
+    const repo = {
+      exportar: (_id: unknown, _params: unknown, formato: string, clave: string) => {
+        pedidos.push({ formato, clave });
+        if (fallar) return throwError(() => new TypeError('Failed to fetch'));
+        return of({ data: { exportarReporte: { url: `/exportaciones/${formato}` } } });
+      },
+    } as unknown as ReportesRepositorio;
+    const c = new ConsultaReportes(repo);
+    await expect(c.exportar('CUENTAS_POR_COBRAR', {}, 'EXCEL')).rejects.toThrow();
+    fallar = false;
+    expect(await c.exportar('CUENTAS_POR_COBRAR', {}, 'PDF')).toBe('/exportaciones/PDF');
+    expect(pedidos.map((p) => p.formato)).toEqual(['EXCEL', 'PDF']);
+    expect(pedidos[1].clave).not.toBe(pedidos[0].clave);
   });
 });

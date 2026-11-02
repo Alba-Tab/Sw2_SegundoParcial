@@ -20,13 +20,14 @@ import {
   textoError,
   type Resultado,
 } from 'ui-comun';
-import type { ReporteId, ReporteParams } from '../../graphql/generado';
+import type { FormatoExportacion, ReporteId, ReporteParams } from '../../graphql/generado';
 import { paramsLimpios, paramsPorDefecto, usaParametro } from '../domain/reporte';
 import { ReportesFachada } from '../reportes.fachada';
 
 /**
  * Los 5 reportes del catálogo con botones (spec 015): sin LLM ni MCP, `reporte(id, params)` va directo a Analítica.
- * "Exportar a Excel" pide un enlace HMAC al Gateway (D21) con una clave nueva por clic. La página abre con el primer
+ * Se pueden elegir las columnas (D111; sin elegir, salen todas). "Exportar a Excel" o "a PDF" (D110) pide un enlace HMAC
+ * al Gateway (D21) con una clave nueva por clic. La página abre con el primer
  * reporte que el rol puede ver (el catálogo pone primero lo que pide acción: cobranza, riesgo), no con un lienzo vacío (JV-5).
  */
 @Component({
@@ -133,10 +134,22 @@ import { ReportesFachada } from '../reportes.fachada';
                 >
               </mat-form-field>
             }
+            <mat-form-field class="columnas">
+              <mat-label>Columnas</mat-label>
+              <mat-select formControlName="columnas" multiple placeholder="Todas">
+                @for (c of definicion()?.columnas ?? []; track c.clave) {
+                  <mat-option [value]="c.clave">{{ c.titulo }}</mat-option>
+                }
+              </mat-select>
+              <mat-hint>Sin elegir, salen todas</mat-hint>
+            </mat-form-field>
             <button mat-flat-button type="submit">Ver</button>
             @if (mostrado) {
-              <button mat-stroked-button type="button" (click)="exportar()" [disabled]="exportando()">
+              <button mat-stroked-button type="button" (click)="exportar('EXCEL')" [disabled]="exportando()">
                 <mat-icon>download</mat-icon>Exportar a Excel
+              </button>
+              <button mat-stroked-button type="button" (click)="exportar('PDF')" [disabled]="exportando()">
+                <mat-icon>download</mat-icon>Exportar a PDF
               </button>
             }
           </form>
@@ -167,6 +180,9 @@ import { ReportesFachada } from '../reportes.fachada';
     }
     .parametros {
       margin-bottom: 16px;
+    }
+    .columnas {
+      min-width: 220px;
     }
   `,
 })
@@ -204,6 +220,8 @@ export class ReportesPagina {
     agrupar: new FormControl<string | null>(null),
     /** Sin campo en pantalla: cuentas por cobrar siempre incluye lo vencido (NG-2), aunque se cambien las fechas. */
     incluirVencidas: new FormControl<boolean | null>(null),
+    /** D111: en el orden del catálogo; vacío = todas. */
+    columnas: new FormControl<string[] | null>(null),
   });
   /** El reporte y los parámetros del resultado que se ve: "Exportar" usa estos, no lo que se editó después sin "Ver". */
   mostrado: { id: ReporteId; params: ReporteParams } | null = null;
@@ -230,6 +248,7 @@ export class ReportesPagina {
       umbral: p.umbral ?? null,
       agrupar: p.agrupar ?? null,
       incluirVencidas: p.incluirVencidas ?? null,
+      columnas: null,
     });
     void this.ver();
   }
@@ -255,12 +274,12 @@ export class ReportesPagina {
     }
   }
 
-  async exportar(): Promise<void> {
+  async exportar(formato: FormatoExportacion): Promise<void> {
     if (!this.mostrado) return;
     const { id, params } = this.mostrado;
     this.exportando.set(true);
     try {
-      const url = await this.fachada.exportar(id, params);
+      const url = await this.fachada.exportar(id, params, formato);
       if (url) window.location.assign(url);
     } catch (e) {
       this.avisos.open(mensajeDe(e), 'Cerrar');

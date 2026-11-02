@@ -35,6 +35,8 @@ export type ReporteId = 'CONSUMO_COMBUSTIBLE' | 'CUENTAS_POR_COBRAR' | 'FACTURAC
 export type ReporteParams = {
   agrupar?: string | null | undefined;
   clienteId?: string | number | null | undefined;
+  /** Subconjunto de las columnas del catálogo, en ese orden (D111); vacío o nulo = todas. */
+  columnas?: Array<string> | null | undefined;
   desde?: string | null | undefined;
   hasta?: string | null | undefined;
   incluirVencidas?: boolean | null | undefined;
