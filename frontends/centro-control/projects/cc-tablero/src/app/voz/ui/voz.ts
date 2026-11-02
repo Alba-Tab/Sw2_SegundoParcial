@@ -1,12 +1,22 @@
 import { Component, inject, OnDestroy, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
-import { Campo, codigoDe, Encabezado, largoEntre, listoParaEnviar, mensajeDe, TablaReporte, textoError, type Resultado } from 'ui-comun';
+import {
+  Campo,
+  codigoDe,
+  Encabezado,
+  largoEntre,
+  listoParaEnviar,
+  mensajeDe,
+  TablaReporte,
+  textoError,
+  type Resultado,
+  Panel,
+} from 'ui-comun';
 import type { ReporteId } from '../../graphql/generado';
 import { mensajePregunta, mostrarCatalogo, REPORTES_CATALOGO, type Respuesta } from '../domain/voz';
 import { VozFachada } from '../voz.fachada';
@@ -21,10 +31,10 @@ import { Grabadora } from './grabadora';
   selector: 'app-voz',
   providers: [VozFachada],
   imports: [
+    Panel,
     Encabezado,
     ReactiveFormsModule,
     Campo,
-    MatCardModule,
     MatButtonModule,
     MatIconModule,
     MatFormFieldModule,
@@ -82,14 +92,12 @@ import { Grabadora } from './grabadora';
       </div>
     }
     @if (respuesta(); as r) {
-      <mat-card class="respuesta">
-        <mat-card-content>
-          <p class="texto">{{ r.texto }}</p>
-          @for (o of r.opciones ?? []; track o.etiqueta) {
-            <button mat-stroked-button (click)="correr(o.reporteId, o.parametros)">{{ o.etiqueta }}</button>
-          }
-        </mat-card-content>
-      </mat-card>
+      <cc-panel class="respuesta" titulo="Respuesta">
+        <p class="texto">{{ r.texto }}</p>
+        @for (o of r.opciones ?? []; track o.etiqueta) {
+          <button mat-stroked-button (click)="correr(o.reporteId, o.parametros)">{{ o.etiqueta }}</button>
+        }
+      </cc-panel>
     }
     @if (resultado(); as res) {
       <div class="fila-acciones">
