@@ -40,6 +40,8 @@ export const MENSAJES_ERROR: Record<string, string> = {
 
 export const ERROR_GENERICO = 'No se pudo completar la operación. Intenta de nuevo.';
 export const SIN_CONEXION = 'No se pudo hablar con el servidor. Revisa la conexión e intenta de nuevo.';
+/** El servidor respondió, pero no con datos (un 400 o 500 sin cuerpo GraphQL): la red está bien, no se manda a revisarla. */
+export const SIN_RESPUESTA_VALIDA = 'El servidor no pudo atender la consulta. Intenta de nuevo en un momento.';
 
 /** La frase de un código; uno que la pantalla no conoce sale con el texto genérico, nunca crudo. */
 export const mensajeCodigo = (codigo?: string | null): string => (codigo && MENSAJES_ERROR[codigo]) || ERROR_GENERICO;

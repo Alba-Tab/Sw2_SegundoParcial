@@ -177,7 +177,11 @@ export function columnasConEstado(columnas: readonly string[]): Signal<string[]>
   return computed(() => (angosto() ? estadoSegunda(columnas) : [...columnas]));
 }
 
-/** Búsqueda, filtro por estado y el número de resultados (anunciado con `role="status"`). Proyecta filtros propios. */
+/**
+ * Barra de lista (DS4): búsqueda, filtro por estado, filtros propios (contenido proyectado), el número de resultados
+ * (anunciado con `role="status"`) y las acciones de la lista a la derecha (`[lista-acciones]`: exportar, nuevo). Seguida de
+ * su `.tabla-ancha`, las dos se dibujan como un solo bloque (`base.css`).
+ */
 @Component({
   selector: 'cc-filtros-lista',
   imports: [MatFormFieldModule, MatInputModule, MatSelectModule, MatIconModule],
@@ -200,6 +204,7 @@ export function columnasConEstado(columnas: readonly string[]): Signal<string[]>
     }
     <ng-content />
     <p class="conteo" role="status">{{ conteo() }}</p>
+    <div class="acciones"><ng-content select="[lista-acciones]" /></div>
     @if (tope(); as t) {
       <p class="tope">{{ t }}</p>
     }
@@ -209,8 +214,16 @@ export function columnasConEstado(columnas: readonly string[]): Signal<string[]>
       display: flex;
       flex-wrap: wrap;
       align-items: center;
-      gap: 8px 16px;
-      margin-bottom: 8px;
+      gap: var(--tc-espacio-2) var(--tc-espacio-3);
+      margin-bottom: var(--tc-espacio-2);
+      padding: var(--tc-espacio-3) var(--tc-espacio-4);
+      background: var(--mat-sys-surface-container-lowest);
+      border: var(--tc-borde-fino) solid var(--mat-sys-outline-variant);
+      border-radius: var(--tc-radio-md);
+      box-shadow: var(--tc-elevacion-1);
+      /* Campos compactos de barra: 40 px de alto, como un control de ERP. */
+      --mat-form-field-container-height: var(--tc-alto-control);
+      --mat-form-field-container-vertical-padding: 8px;
     }
     .busqueda {
       flex: 1 1 260px;
@@ -218,6 +231,21 @@ export function columnasConEstado(columnas: readonly string[]): Signal<string[]>
     }
     .estado {
       flex: 0 1 240px;
+    }
+    /* En el teléfono cada campo ocupa su fila entera; el contador y las acciones van debajo. */
+    @media (max-width: 599px) {
+      .busqueda,
+      .estado {
+        flex: 1 1 100%;
+        max-width: none;
+      }
+    }
+    .acciones {
+      display: flex;
+      gap: var(--tc-espacio-2);
+    }
+    .acciones:empty {
+      display: none;
     }
     .conteo {
       margin: 0 0 0 auto;
@@ -318,7 +346,11 @@ export function textoTope(n: number, nombre: string, corte: CorteServidor, conEs
           <button mat-button (click)="c.limpiar()"><mat-icon>filter_alt_off</mat-icon>Limpiar filtros</button>
         </div>
       } @else if (!error() && vacio()) {
-        <p class="secundario vacio">{{ vacio() }}</p>
+        <!-- Una lista vacía dice qué pasa y, si la página lo da ([vacio-accion]), el siguiente paso: nunca un callejón. -->
+        <div class="vacio">
+          <p>{{ vacio() }}</p>
+          <ng-content select="[vacio-accion]" />
+        </div>
       }
     } @else if (c.total() > minimo) {
       <mat-paginator
