@@ -525,6 +525,14 @@ input ReporteParams {
   umbral: Float
   agrupar: String
   incluirVencidas: Boolean
+  "Subconjunto de las columnas del catálogo, en ese orden (D111); vacío o nulo = todas."
+  columnas: [String!]
+}
+
+"Formato del archivo exportado (D110)."
+enum FormatoExportacion {
+  EXCEL
+  PDF
 }
 
 type DescripcionReporte {
@@ -534,6 +542,8 @@ type DescripcionReporte {
   roles: [Rol!]!
   maxDias: Int
   parametros: JSON!
+  "Columnas que se pueden elegir en ReporteParams.columnas (D111)."
+  columnas: [ColumnaReporte!]!
 }
 
 type ColumnaReporte {
@@ -574,6 +584,8 @@ type RespuestaVoz {
   resultado: ReporteResultado
   opciones: [OpcionVoz!]
   exportable: Boolean
+  "Formato que pidió el usuario en la pregunta (D110); nulo si no lo dijo."
+  formato: FormatoExportacion
 }
 
 enum EstadoAccion {
@@ -828,7 +840,7 @@ type Mutation {
   dispararMision(claveIdempotencia: ID!): MisionDisparada! @roles(permitidos: [gerente, despachador])
   aprobarAccion(id: ID!, mensaje: String!, claveIdempotencia: ID!): AccionPropuesta! @roles(permitidos: [despachador])
   rechazarAccion(id: ID!, motivo: String, claveIdempotencia: ID!): AccionPropuesta! @roles(permitidos: [despachador])
-  exportarReporte(id: ReporteId!, params: ReporteParams, claveIdempotencia: ID!): UrlDescarga!
+  exportarReporte(id: ReporteId!, params: ReporteParams, formato: FormatoExportacion = EXCEL, claveIdempotencia: ID!): UrlDescarga!
     @roles(permitidos: [gerente, despachador, jefe_flota, administracion])
   crearRuta(input: RutaInput!): Ruta! @roles(permitidos: [gerente, despachador])
   editarRuta(rutaId: ID!, input: RutaInput!): Ruta! @roles(permitidos: [gerente, despachador])

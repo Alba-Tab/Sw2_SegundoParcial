@@ -74,6 +74,43 @@ def test_fm4_cuentas_por_cobrar_esta_semana_y_excel(cliente):
     assert filas[0][:2] == ("Cliente", "Factura") and filas[-1][0] == "Total" and float(filas[-1][3]) == 10400
 
 
+def test_columnas_elegidas_y_pdf(cliente):
+    """D110 y D111: solo las columnas pedidas, en ese orden, y el mismo reporte en PDF."""
+    facturas()
+    h = hoy()
+    rango = f"desde={h}&hasta={h + timedelta(days=6)}"
+    gerente = token("gerente", sub="g1")
+    r = cliente.get(f"/api/v1/reportes/CUENTAS_POR_COBRAR?{rango}&columnas=saldo,cliente", headers=gerente).json()
+    assert [c["clave"] for c in r["columnas"]] == ["saldo", "cliente"]
+    assert r["parametros"]["columnas"] == ["saldo", "cliente"] and r["grafico"]["datos"]
+    malo = cliente.get(f"/api/v1/reportes/CUENTAS_POR_COBRAR?{rango}&columnas=saldo,inventada", headers=gerente)
+    assert malo.status_code == 400 and malo.json()["errores"][0]["campo"] == "columnas"
+    catalogo = cliente.get("/api/v1/reportes", headers=gerente).json()["reportes"]
+    assert "saldo" in [c["clave"] for c in catalogo[0]["columnas"]]
+
+    pedido = {
+        "reporteId": "CUENTAS_POR_COBRAR",
+        "parametros": {"desde": str(h), "hasta": str(h + timedelta(days=6)), "columnas": ["cliente", "saldo"]},
+        "formato": "PDF",
+    }
+    creada = cliente.post("/api/v1/exportaciones", json=pedido, headers={**gerente, "Idempotency-Key": str(uuid4())})
+    assert creada.status_code == 201, creada.text
+    assert creada.json()["nombreArchivo"] == f"cuentas-por-cobrar-{h}.pdf"
+    archivo = cliente.get(
+        f"/api/v1/exportaciones/{creada.json()['exportacionId']}/archivo",
+        headers={**token(azp="gateway"), "X-Solicitante-Sub": "g1"},
+    )
+    assert archivo.headers["content-type"] == "application/pdf" and archivo.content.startswith(b"%PDF")
+
+    pedido |= {"formato": "EXCEL"}
+    xlsx = cliente.post("/api/v1/exportaciones", json=pedido, headers={**gerente, "Idempotency-Key": str(uuid4())})
+    libro = cliente.get(
+        f"/api/v1/exportaciones/{xlsx.json()['exportacionId']}/archivo",
+        headers={**token(azp="gateway"), "X-Solicitante-Sub": "g1"},
+    )
+    assert next(load_workbook(BytesIO(libro.content))["Datos"].values) == ("Cliente", "Saldo")
+
+
 def test_rangos_y_vencidas(cliente):
     facturas()
     h = hoy()
@@ -215,6 +252,14 @@ def test_excel_no_escribe_formulas_de_un_texto_del_cliente():
     assert [c.value for c in celdas] == [malicioso, "+591 7000", "@SUM(A1)", "Agroexport"]
     assert all(c.data_type == "s" for c in celdas)
     assert [c.quotePrefix for c in celdas] == [True, True, True, False]
+
+
+def test_pdf_formatea_como_la_pantalla():
+    from app.infraestructura.pdf import _texto
+
+    assert [_texto("2800.00", "MONTO"), _texto("1234567.5", "MONTO")] == ["2.800,00", "1.234.567,50"]
+    assert [_texto(0.123, "PORCENTAJE"), _texto(2.5, "NUMERO"), _texto(1000, "NUMERO")] == ["12,3 %", "2,5", "1.000"]
+    assert [_texto("2026-11-03", "FECHA"), _texto(None, "TEXTO"), _texto(True, "BOOLEANO")] == ["03/11/2026", "—", "Sí"]
 
 
 def test_riesgo_sin_modelo_o_sin_ruta_es_503_dependencia(cliente, monkeypatch):

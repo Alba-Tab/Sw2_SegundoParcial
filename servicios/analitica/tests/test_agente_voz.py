@@ -145,7 +145,21 @@ def test_intencion_de_voz_validada_en_codigo():
         "tipo": "INTENCION",
         "reporteId": "CUENTAS_POR_COBRAR",
         "parametros": {"desde": "2026-11-03", "hasta": "2026-11-09"},
+        "formato": None,
     }
+    # D110 y D111: el formato y las columnas también se validan en código; una clave ajena se descarta.
+    pdf = voz.validar_intencion(
+        Intencion(
+            "CUENTAS_POR_COBRAR", "ESTA_SEMANA", formato="PDF", columnas=("saldo", "inventada", "cliente", "saldo")
+        ),
+        gerente,
+        hoy,
+    )
+    assert (pdf["formato"], pdf["parametros"]["columnas"]) == ("PDF", ["saldo", "cliente"])
+    otro = voz.validar_intencion(
+        Intencion("CUENTAS_POR_COBRAR", "ESTA_SEMANA", formato="WORD", columnas=("x",)), gerente, hoy
+    )
+    assert otro["formato"] is None and "columnas" not in otro["parametros"]
     ambigua = voz.validar_intencion(Intencion("FACTURACION_POR_CLIENTE", "MES", mes=10, cliente="agro"), gerente, hoy)
     assert ambigua["tipo"] == "ACLARACION" and sorted(o["etiqueta"] for o in ambigua["opciones"]) == [
         "Agro Moroso",

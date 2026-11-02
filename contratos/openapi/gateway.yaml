@@ -113,7 +113,7 @@ paths:
     get:
       tags: [exportaciones]
       operationId: descargarExportacion
-      summary: Descarga el Excel sin Authorization; cualquier instancia valida el HMAC y el vencimiento (D21).
+      summary: Descarga el Excel o el PDF sin Authorization; cualquier instancia valida el HMAC y el vencimiento (D21).
       security: []
       parameters:
         - name: token
@@ -125,9 +125,13 @@ paths:
             maxLength: 400
       responses:
         '200':
-          description: 'Libro de Excel con Content-Disposition attachment y Cache-Control no-store.'
+          description: 'Libro de Excel o documento PDF (D110), con el Content-Type de Analítica, Content-Disposition attachment y Cache-Control no-store.'
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+            application/pdf:
               schema:
                 type: string
                 format: binary

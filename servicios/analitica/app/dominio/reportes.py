@@ -10,6 +10,8 @@ from app.dominio.errores import ErrorDeDominio
 
 MAX_FILAS_PANTALLA = 500
 MAX_FILAS_EXCEL = 10_000
+MAX_FILAS_PDF = 1_000  # D110: un PDF de 10.000 filas no se lee
+MAX_COLUMNAS = 20
 PLACA = re.compile(r"^[0-9]{3,4}[A-Z]{3}$")
 
 
@@ -19,6 +21,21 @@ class ReporteId(StrEnum):
     FACTURACION_POR_CLIENTE = "FACTURACION_POR_CLIENTE"
     CONSUMO_COMBUSTIBLE = "CONSUMO_COMBUSTIBLE"
     RENTABILIDAD = "RENTABILIDAD"
+
+
+class Formato(StrEnum):
+    """Formato del archivo exportado (D110)."""
+
+    EXCEL = "EXCEL"
+    PDF = "PDF"
+
+    @property
+    def extension(self) -> str:
+        return "xlsx" if self is Formato.EXCEL else "pdf"
+
+    @property
+    def max_filas(self) -> int:
+        return MAX_FILAS_EXCEL if self is Formato.EXCEL else MAX_FILAS_PDF
 
 
 @dataclass(frozen=True)
@@ -158,6 +175,7 @@ class Parametros:
     umbral: float = 0.70
     agrupar: str = "VIAJE"
     incluir_vencidas: bool = True
+    columnas: tuple[str, ...] = ()  # D111: vacío = todas
 
     def a_json(self, reporte: ReporteId) -> dict[str, Any]:
         """Solo los parámetros que aplican a ese reporte, con los nombres del contrato."""
@@ -177,7 +195,17 @@ class Parametros:
             "incluirVencidas": self.incluir_vencidas,
         }
         salida |= {k: valores[k] for k in d.filtros if valores[k] is not None}
+        if self.columnas:
+            salida["columnas"] = list(self.columnas)
         return salida
+
+
+def columnas_elegidas(reporte: ReporteId, p: Parametros) -> tuple[Columna, ...]:
+    """Las columnas que salen, en el orden pedido (D111); sin selección, todas las del catálogo."""
+    if not p.columnas:
+        return CATALOGO[reporte].columnas
+    por_clave = {c.clave: c for c in CATALOGO[reporte].columnas}
+    return tuple(por_clave[k] for k in p.columnas)
 
 
 def validar(reporte: ReporteId, p: Parametros, roles: set[str] | frozenset[str]) -> None:
@@ -200,6 +228,11 @@ def validar(reporte: ReporteId, p: Parametros, roles: set[str] | frozenset[str])
         raise ErrorDeDominio("VALIDACION", "agrupar es VIAJE o RUTA", "agrupar")
     if p.placa is not None and not PLACA.match(p.placa):
         raise ErrorDeDominio("VALIDACION", "La placa no tiene el formato 1234ABC", "placa")
+    claves = {c.clave for c in d.columnas}
+    if len(p.columnas) > MAX_COLUMNAS or len(set(p.columnas)) != len(p.columnas):
+        raise ErrorDeDominio("VALIDACION", "Las columnas no se pueden repetir", "columnas")
+    if desconocidas := [k for k in p.columnas if k not in claves]:
+        raise ErrorDeDominio("VALIDACION", f"El reporte no tiene la columna {desconocidas[0]}", "columnas")
 
 
 def esquema_parametros(reporte: ReporteId) -> dict[str, Any]:
@@ -223,8 +256,14 @@ def esquema_parametros(reporte: ReporteId) -> dict[str, Any]:
         },
     }
     propiedades |= {f: tipos[f] for f in d.filtros}
+    propiedades["columnas"] = {
+        "type": "array",
+        "items": {"type": "string", "enum": [c.clave for c in d.columnas]},
+        "uniqueItems": True,
+        "description": "Columnas que salen, en ese orden; vacío = todas",
+    }
     return {"type": "object", "additionalProperties": False, "properties": propiedades, "required": requeridos}
 
 
-def nombre_archivo(reporte: ReporteId, hoy: date) -> str:
-    return f"{reporte.value.lower().replace('_', '-')}-{hoy.isoformat()}.xlsx"
+def nombre_archivo(reporte: ReporteId, hoy: date, formato: Formato = Formato.EXCEL) -> str:
+    return f"{reporte.value.lower().replace('_', '-')}-{hoy.isoformat()}.{formato.extension}"
