@@ -1,4 +1,4 @@
-import { Component, effect, inject } from '@angular/core';
+import { Component, computed, effect, inject } from '@angular/core';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
@@ -15,6 +15,7 @@ import {
   FiltrosLista,
   PieLista,
   posicionEstado,
+  sumarMontos,
 } from 'ui-comun';
 import { FacturasFachada } from '../facturas.fachada';
 
@@ -69,24 +70,29 @@ import { cambioDeSaldo, ESTADOS_CON_SALDO, textoVencida } from '../domain/filtro
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Factura</th>
           <td mat-cell *matCellDef="let f">
             <a class="sin-corte" [routerLink]="['/facturas', f.facturaId]">{{ f.numero }}</a>
-          </td></ng-container
+          </td>
+          <td mat-footer-cell *matFooterCellDef>Total ({{ lista.total() }})</td></ng-container
         >
         <ng-container matColumnDef="cliente"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Cliente</th>
-          <td mat-cell *matCellDef="let f">{{ f.razonSocial }}</td></ng-container
-        >
+          <td mat-cell *matCellDef="let f">{{ f.razonSocial }}</td>
+          <td mat-footer-cell *matFooterCellDef></td
+        ></ng-container>
         <ng-container matColumnDef="monto"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Monto</th>
-          <td mat-cell *matCellDef="let f">{{ f.monto | bob }}</td></ng-container
+          <td mat-cell *matCellDef="let f">{{ f.monto | bob }}</td>
+          <td mat-footer-cell *matFooterCellDef>{{ totalMonto() | bob }}</td></ng-container
         >
         <ng-container matColumnDef="saldo"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Saldo</th>
-          <td mat-cell *matCellDef="let f">{{ f.saldo | bob }}</td></ng-container
+          <td mat-cell *matCellDef="let f">{{ f.saldo | bob }}</td>
+          <td mat-footer-cell *matFooterCellDef>{{ totalSaldo() | bob }}</td></ng-container
         >
         <ng-container matColumnDef="vence"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Vence</th>
-          <td mat-cell *matCellDef="let f">{{ f.venceEl | fecha }}</td></ng-container
-        >
+          <td mat-cell *matCellDef="let f">{{ f.venceEl | fecha }}</td>
+          <td mat-footer-cell *matFooterCellDef></td
+        ></ng-container>
         <ng-container matColumnDef="estado"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Estado</th>
           <td mat-cell *matCellDef="let f">
@@ -96,10 +102,14 @@ import { cambioDeSaldo, ESTADOS_CON_SALDO, textoVencida } from '../domain/filtro
             }
             @if (!f.vencida || f.estado !== 'EMITIDA') {
               <cc-estado grupo="EstadoFactura" [valor]="f.estado" />
-            }</td
+            }
+          </td>
+          <td mat-footer-cell *matFooterCellDef></td
         ></ng-container>
         <tr mat-header-row *matHeaderRowDef="columnas()"></tr>
         <tr mat-row *matRowDef="let f; columns: columnas()"></tr>
+        <!-- P6: el total es de todo lo filtrado, no solo de la página. -->
+        <tr mat-footer-row *matFooterRowDef="columnas()" [hidden]="lista.total() < 2"></tr>
       </table>
     </div>
     <cc-pie-lista
@@ -138,6 +148,8 @@ export class FacturasPagina {
   readonly estadosConSaldo = ESTADOS_CON_SALDO;
   readonly cambioDeSaldo = cambioDeSaldo;
   readonly textoVencida = textoVencida;
+  readonly totalMonto = computed(() => sumarMontos(this.lista.filtradas().map((f) => f.monto)));
+  readonly totalSaldo = computed(() => sumarMontos(this.lista.filtradas().map((f) => f.saldo)));
 
   constructor() {
     effect(() => this.fachada.conSaldo.set(this.saldo() === 'todas' ? null : true));

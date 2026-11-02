@@ -21,7 +21,7 @@ import { filtrarCuentas } from '../domain/cobranza';
     }
     <cc-aviso-servicios [error]="error()" [campos]="campos" [sinDatos]="!resultado()" />
     @if (visibles(); as r) {
-      <mat-form-field class="busqueda">
+      <mat-form-field class="busqueda" subscriptSizing="dynamic">
         <mat-label>Buscar por cliente o factura</mat-label>
         <mat-icon matPrefix aria-hidden="true">search</mat-icon>
         <input matInput type="search" [value]="busqueda()" (input)="busqueda.set($any($event.target).value)" />

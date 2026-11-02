@@ -1,13 +1,13 @@
 import { afterNextRender, Component, computed, effect, ElementRef, inject, Injector, input, signal, viewChild } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButton, MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTableModule } from '@angular/material/table';
+import { RouterLink } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   AvisoServicios,
@@ -20,6 +20,9 @@ import {
   Esqueleto,
   Estado,
   EtiquetaPipe,
+  Panel,
+  Resumen,
+  Cifra,
   fechaEntre,
   fechaLaPaz,
   FechaPipe,
@@ -47,13 +50,16 @@ import { textoVencida } from '../domain/filtro';
   selector: 'app-factura',
   providers: [FacturaFachada],
   imports: [
+    RouterLink,
     Esqueleto,
     Encabezado,
+    Panel,
+    Resumen,
+    Cifra,
     ReactiveFormsModule,
     Campo,
     Confirmacion,
     MatTableModule,
-    MatCardModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -94,158 +100,141 @@ import { textoVencida } from '../domain/filtro';
     }
     <cc-aviso-servicios buscado="esta factura" [error]="error()" [campos]="campos" [sinDatos]="!factura()" [reintentar]="recargar" />
     @if (factura(); as f) {
-      <dl class="datos">
-        <div>
-          <dt>Cliente</dt>
-          <dd>{{ f.razonSocial }}</dd>
-        </div>
-        <div>
-          <dt>Emitida</dt>
-          <dd>{{ f.emitidaEl | fecha }}</dd>
-        </div>
-        <div>
-          <dt>Monto</dt>
-          <dd>{{ f.monto | bob }}</dd>
-        </div>
-        <div>
-          <dt>Saldo</dt>
-          <dd>{{ f.saldo | bob }}</dd>
-        </div>
-        <div>
-          <dt>Vence</dt>
-          <dd>{{ f.venceEl | fecha }}</dd>
-        </div>
-      </dl>
+      <!-- DS3: lo que se cobra va en la franja de arriba; el saldo de una factura vencida se tinta en error. -->
+      <cc-resumen>
+        <cc-cifra etiqueta="Cliente">
+          <!-- P10: el cliente lleva a su línea de crédito (la dueña de ese dato en Finanzas), no es un callejón. -->
+          <a routerLink="/lineas-credito" [queryParams]="{ q: f.razonSocial }">{{ f.razonSocial }}</a>
+        </cc-cifra>
+        <cc-cifra etiqueta="Monto" [detalle]="'Emitida el ' + (f.emitidaEl | fecha)">{{ f.monto | bob }}</cc-cifra>
+        <cc-cifra etiqueta="Saldo" [tono]="f.vencida && f.saldo !== '0.00' ? 'error' : null">{{ f.saldo | bob }}</cc-cifra>
+        <cc-cifra etiqueta="Vence" [detalle]="f.vencida ? textoVencida(f.diasVencida) : undefined">{{ f.venceEl | fecha }}</cc-cifra>
+      </cc-resumen>
       @if (!sesion.tiene('administracion') && f.saldo !== '0.00') {
         <!-- R2F-3: el gerente ve el saldo, pero el pago lo registra administración (spec 008). -->
         <p class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>El pago lo registra administración.</p>
       }
 
       @if (registrando() && puedeRegistrar()) {
-        <mat-card class="pago" id="registrar-pago">
-          <mat-card-header><mat-card-title>Registrar pago</mat-card-title></mat-card-header>
-          <mat-card-content>
-            <div class="fila-acciones">
-              <!-- Un botón de verdad (no un label) para que se alcance con el teclado; abre el selector de archivo. -->
-              <button mat-stroked-button type="button" (click)="archivo.click()" [disabled]="leyendo() || confirmando()">
-                <mat-icon>document_scanner</mat-icon>Leer el recibo de la foto
-              </button>
-              <input #archivo type="file" accept="image/*" (change)="ocr($event)" hidden />
-              @if (leyendo()) {
-                <span class="secundario">Leyendo el recibo en el navegador…</span>
-              }
-            </div>
+        <cc-panel titulo="Registrar pago" id="registrar-pago">
+          <div class="fila-acciones">
+            <!-- Un botón de verdad (no un label) para que se alcance con el teclado; abre el selector de archivo. -->
+            <button mat-stroked-button type="button" (click)="archivo.click()" [disabled]="leyendo() || confirmando()">
+              <mat-icon>document_scanner</mat-icon>Leer el recibo de la foto
+            </button>
+            <input #archivo type="file" accept="image/*" (change)="ocr($event)" hidden />
             @if (leyendo()) {
-              <mat-progress-bar mode="indeterminate" />
+              <span class="secundario">Leyendo el recibo en el navegador…</span>
             }
-            <form [formGroup]="form" (ngSubmit)="revisar(formPago)" #formPago novalidate>
-              <div class="fila-acciones">
-                <mat-form-field>
-                  <mat-label>Monto (BOB)</mat-label>
-                  <input matInput #primerCampo formControlName="monto" inputmode="decimal" placeholder="2800.50" autocomplete="off" />
-                  <mat-hint>Con punto decimal</mat-hint>
-                  <mat-error>{{ textoError(form.controls.monto) }}</mat-error>
-                </mat-form-field>
-                <mat-form-field>
-                  <mat-label>Fecha</mat-label>
-                  <input matInput type="date" formControlName="fecha" [min]="f.emitidaEl.slice(0, 10)" [max]="hoy" />
-                  <mat-error>{{ textoError(form.controls.fecha) }}</mat-error>
-                </mat-form-field>
-                <mat-form-field>
-                  <mat-label>Medio</mat-label>
-                  <mat-select formControlName="medio">
-                    @for (m of medios; track m) {
-                      <mat-option [value]="m">{{ m | etiqueta: 'MedioPago' }}</mat-option>
-                    }
-                  </mat-select>
-                </mat-form-field>
-                <mat-form-field>
-                  <mat-label>Referencia</mat-label>
-                  <input matInput formControlName="referencia" autocomplete="off" />
-                  <mat-error>{{ textoError(form.controls.referencia) }}</mat-error>
-                </mat-form-field>
-              </div>
-              <mat-form-field class="nota">
-                <mat-label>Nota (opcional)</mat-label>
-                <input matInput formControlName="nota" autocomplete="off" />
-                <mat-hint>Hasta 300 caracteres</mat-hint>
-                <mat-error>{{ textoError(form.controls.nota) }}</mat-error>
+          </div>
+          @if (leyendo()) {
+            <mat-progress-bar mode="indeterminate" />
+          }
+          <form [formGroup]="form" (ngSubmit)="revisar(formPago)" #formPago novalidate>
+            <div class="fila-acciones">
+              <mat-form-field>
+                <mat-label>Monto (BOB)</mat-label>
+                <input matInput #primerCampo formControlName="monto" inputmode="decimal" placeholder="2800.50" autocomplete="off" />
+                <mat-hint>Con punto decimal</mat-hint>
+                <mat-error>{{ textoError(form.controls.monto) }}</mat-error>
               </mat-form-field>
-              @if (confirmando()) {
-                <cc-confirmacion
-                  [resumen]="resumen(f)"
-                  accion="Sí, registrar el pago"
-                  icono="price_check"
-                  [enviando]="enviando()"
-                  (confirmar)="registrar(f.facturaId)"
-                  (volver)="volver()"
-                />
-              } @else {
-                <div class="fila-acciones">
-                  <!-- Mientras se relee la factura tras un rechazo no se puede volver a guardar (V4-2); sigue enfocable. -->
-                  <button
-                    mat-flat-button
-                    type="submit"
-                    id="guardar-pago"
-                    [disabled]="releyendo()"
-                    disabledInteractive
-                    aria-describedby="estado-relectura"
-                  >
-                    <mat-icon>price_check</mat-icon>Guardar el pago
-                  </button>
-                  <button mat-button type="button" (click)="cerrar()">Cancelar</button>
-                </div>
-                <p id="estado-relectura" class="secundario" [class.sin-margen]="!releyendo()" role="status">
-                  {{ releyendo() ? 'Comprobando el saldo actual de la factura; espera un momento para volver a guardar.' : '' }}
-                </p>
-              }
-            </form>
-          </mat-card-content>
-        </mat-card>
+              <mat-form-field>
+                <mat-label>Fecha</mat-label>
+                <input matInput type="date" formControlName="fecha" [min]="f.emitidaEl.slice(0, 10)" [max]="hoy" />
+                <mat-error>{{ textoError(form.controls.fecha) }}</mat-error>
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Medio</mat-label>
+                <mat-select formControlName="medio">
+                  @for (m of medios; track m) {
+                    <mat-option [value]="m">{{ m | etiqueta: 'MedioPago' }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Referencia</mat-label>
+                <input matInput formControlName="referencia" autocomplete="off" />
+                <mat-error>{{ textoError(form.controls.referencia) }}</mat-error>
+              </mat-form-field>
+            </div>
+            <mat-form-field class="nota">
+              <mat-label>Nota (opcional)</mat-label>
+              <input matInput formControlName="nota" autocomplete="off" />
+              <mat-hint>Hasta 300 caracteres</mat-hint>
+              <mat-error>{{ textoError(form.controls.nota) }}</mat-error>
+            </mat-form-field>
+            @if (confirmando()) {
+              <cc-confirmacion
+                [resumen]="resumen(f)"
+                accion="Sí, registrar el pago"
+                icono="price_check"
+                [enviando]="enviando()"
+                (confirmar)="registrar(f.facturaId)"
+                (volver)="volver()"
+              />
+            } @else {
+              <div class="fila-acciones">
+                <!-- Mientras se relee la factura tras un rechazo no se puede volver a guardar (V4-2); sigue enfocable. -->
+                <button
+                  mat-flat-button
+                  type="submit"
+                  id="guardar-pago"
+                  [disabled]="releyendo()"
+                  disabledInteractive
+                  aria-describedby="estado-relectura"
+                >
+                  <mat-icon>price_check</mat-icon>Guardar el pago
+                </button>
+                <button mat-button type="button" (click)="cerrar()">Cancelar</button>
+              </div>
+              <p id="estado-relectura" class="secundario" [class.sin-margen]="!releyendo()" role="status">
+                {{ releyendo() ? 'Comprobando el saldo actual de la factura; espera un momento para volver a guardar.' : '' }}
+              </p>
+            }
+          </form>
+        </cc-panel>
       }
 
-      <h2 id="titulo-pagos" tabindex="-1">Pagos</h2>
-      @if (f.pagos?.length) {
-        <div class="tabla-ancha" role="region" aria-labelledby="titulo-pagos" tabindex="0">
-          <table mat-table [dataSource]="f.pagos!" aria-labelledby="titulo-pagos">
-            <ng-container matColumnDef="fecha"
-              ><th mat-header-cell *matHeaderCellDef>Fecha</th>
-              <td mat-cell *matCellDef="let p">{{ p.fecha | fecha }}</td></ng-container
-            >
-            <ng-container matColumnDef="monto"
-              ><th mat-header-cell *matHeaderCellDef>Monto</th>
-              <td mat-cell *matCellDef="let p">{{ p.monto | bob }}</td></ng-container
-            >
-            <ng-container matColumnDef="medio"
-              ><th mat-header-cell *matHeaderCellDef>Medio</th>
-              <td mat-cell *matCellDef="let p">{{ p.medio | etiqueta: 'MedioPago' }}</td></ng-container
-            >
-            <ng-container matColumnDef="referencia"
-              ><th mat-header-cell *matHeaderCellDef>Referencia</th>
-              <td mat-cell *matCellDef="let p">
-                {{ p.referencia }}
-                @if (p.pagoId === repetido()) {
-                  <span class="cdk-visually-hidden"> (ya registrado)</span>
-                }
-              </td></ng-container
-            >
-            <ng-container matColumnDef="nota"
-              ><th mat-header-cell *matHeaderCellDef>Nota</th>
-              <td mat-cell *matCellDef="let p" class="secundario">{{ p.nota ?? '' }}</td></ng-container
-            >
-            <tr mat-header-row *matHeaderRowDef="columnasPagos"></tr>
-            <tr mat-row *matRowDef="let p; columns: columnasPagos" [class.repetido]="p.pagoId === repetido()"></tr>
-          </table>
-        </div>
-      } @else {
-        <p class="secundario">Sin pagos.</p>
-      }
+      <cc-panel titulo="Pagos" idTitulo="titulo-pagos" [ras]="!!f.pagos?.length">
+        @if (f.pagos?.length) {
+          <div class="tabla-ancha" role="region" aria-labelledby="titulo-pagos" tabindex="0">
+            <table mat-table [dataSource]="f.pagos!" aria-labelledby="titulo-pagos">
+              <ng-container matColumnDef="fecha"
+                ><th mat-header-cell *matHeaderCellDef>Fecha</th>
+                <td mat-cell *matCellDef="let p">{{ p.fecha | fecha }}</td></ng-container
+              >
+              <ng-container matColumnDef="monto"
+                ><th mat-header-cell *matHeaderCellDef>Monto</th>
+                <td mat-cell *matCellDef="let p">{{ p.monto | bob }}</td></ng-container
+              >
+              <ng-container matColumnDef="medio"
+                ><th mat-header-cell *matHeaderCellDef>Medio</th>
+                <td mat-cell *matCellDef="let p">{{ p.medio | etiqueta: 'MedioPago' }}</td></ng-container
+              >
+              <ng-container matColumnDef="referencia"
+                ><th mat-header-cell *matHeaderCellDef>Referencia</th>
+                <td mat-cell *matCellDef="let p">
+                  {{ p.referencia }}
+                  @if (p.pagoId === repetido()) {
+                    <span class="cdk-visually-hidden"> (ya registrado)</span>
+                  }
+                </td></ng-container
+              >
+              <ng-container matColumnDef="nota"
+                ><th mat-header-cell *matHeaderCellDef>Nota</th>
+                <td mat-cell *matCellDef="let p" class="secundario">{{ p.nota ?? '' }}</td></ng-container
+              >
+              <tr mat-header-row *matHeaderRowDef="columnasPagos"></tr>
+              <tr mat-row *matRowDef="let p; columns: columnasPagos" [class.repetido]="p.pagoId === repetido()"></tr>
+            </table>
+          </div>
+        } @else {
+          <p class="secundario">Sin pagos.</p>
+        }
+      </cc-panel>
     }
   `,
   styles: `
-    .pago {
-      margin: 16px 0;
-    }
     .nota {
       width: 100%;
     }
