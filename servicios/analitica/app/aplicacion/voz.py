@@ -239,7 +239,7 @@ class Voz:
             f'Responde en español, en hasta 3 oraciones, la pregunta "{pregunta}" usando SOLO los datos del reporte '
             f"{reporte.value}.\nCada número que escribas debe aparecer en las filas o los totales, con formato boliviano "
             f"(2.800,00). No agregues datos que no estén.\nResultado del reporte (JSON):\n"
-            f"{json.dumps({'filas': filas[:30], 'totales': totales}, ensure_ascii=False)}"
+            f"{json.dumps({'filas': filas[:30], 'totales': totales}, ensure_ascii=False, default=str)}"
         )
         try:
             r = await self.llm.chat([{"role": "user", "content": prompt}])
