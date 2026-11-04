@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.aplicacion.consultas import datos_al, hoy
 from app.configuracion import ZONA
 from app.dominio.errores import ErrorDeDominio
-from app.dominio.reportes import CATALOGO, MAX_FILAS_PANTALLA, Parametros, ReporteId, validar
+from app.dominio.reportes import CATALOGO, MAX_FILAS_PANTALLA, Parametros, ReporteId, columnas_elegidas, validar
 from app.infraestructura.bd import (
     CaidaCombustible,
     Cliente,
@@ -299,7 +299,8 @@ def ejecutar(
         "reporteId": reporte.value,
         "titulo": d.titulo,
         "parametros": p.a_json(reporte),
-        "columnas": [asdict(c) for c in d.columnas],
+        # D111: las filas conservan todas las claves; el gráfico las usa aunque su columna no se haya elegido.
+        "columnas": [asdict(c) for c in columnas_elegidas(reporte, p)],
         "filas": filas,
         "totales": totales,
         "grafico": grafico,
@@ -319,6 +320,7 @@ def catalogo() -> list[dict[str, Any]]:
             "roles": list(d.roles),
             "maxDias": d.max_dias,
             "parametros": esquema_parametros(d.reporte_id),
+            "columnas": [asdict(c) for c in d.columnas],
         }
         for d in CATALOGO.values()
     ]

@@ -7,7 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { Campo, codigoDe, Encabezado, largoEntre, listoParaEnviar, mensajeDe, TablaReporte, textoError, type Resultado } from 'ui-comun';
-import type { ReporteId } from '../../graphql/generado';
+import type { FormatoExportacion, ReporteId } from '../../graphql/generado';
 import { mensajePregunta, mostrarCatalogo, REPORTES_CATALOGO, type Respuesta } from '../domain/voz';
 import { VozFachada } from '../voz.fachada';
 import { Grabadora } from './grabadora';
@@ -94,7 +94,8 @@ import { Grabadora } from './grabadora';
     @if (resultado(); as res) {
       <div class="fila-acciones">
         <h2>{{ res.titulo }}</h2>
-        <button mat-stroked-button (click)="exportar()"><mat-icon>download</mat-icon>Exportar a Excel</button>
+        <button mat-stroked-button (click)="exportar('EXCEL')"><mat-icon>download</mat-icon>Exportar a Excel</button>
+        <button mat-stroked-button (click)="exportar('PDF')"><mat-icon>download</mat-icon>Exportar a PDF</button>
       </div>
       <cc-tabla-reporte [resultado]="res" />
     }
@@ -208,6 +209,8 @@ export class VozPagina implements OnDestroy {
       if (p?.resultado && p.reporteId) {
         this.resultado.set(p.resultado as Resultado);
         this.ultimo = { id: p.reporteId, params: p.parametros ?? {} };
+        // D110: si la pregunta dijo "en PDF" o "en Excel", el archivo se descarga sin otro clic.
+        if (p.formato) await this.exportar(p.formato);
       }
     } catch (e) {
       const codigo = codigoDe(e);
@@ -232,11 +235,11 @@ export class VozPagina implements OnDestroy {
     }
   }
 
-  async exportar(): Promise<void> {
+  async exportar(formato: FormatoExportacion): Promise<void> {
     if (!this.ultimo) return;
     try {
       const { id, params } = this.ultimo;
-      const url = await this.fachada.exportar(id, params);
+      const url = await this.fachada.exportar(id, params, formato);
       if (url) window.location.assign(url);
     } catch (e) {
       this.error.set(mensajeDe(e));

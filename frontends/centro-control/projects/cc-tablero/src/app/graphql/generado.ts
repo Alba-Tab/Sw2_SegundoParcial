@@ -5,6 +5,9 @@ export type Incremental<T> = T | { [P in keyof T]?: P extends ' $fragmentName' |
 import { gql } from 'apollo-angular';
 import { Injectable } from '@angular/core';
 import * as Apollo from 'apollo-angular';
+/** Formato del archivo exportado (D110). */
+export type FormatoExportacion = 'EXCEL' | 'PDF';
+
 export type Periodo = 'ESTA_SEMANA' | 'ESTE_MES' | 'HOY';
 
 export type ReporteId = 'CONSUMO_COMBUSTIBLE' | 'CUENTAS_POR_COBRAR' | 'FACTURACION_POR_CLIENTE' | 'RENTABILIDAD' | 'VIAJES_EN_RIESGO';
@@ -12,6 +15,8 @@ export type ReporteId = 'CONSUMO_COMBUSTIBLE' | 'CUENTAS_POR_COBRAR' | 'FACTURAC
 export type ReporteParams = {
   agrupar?: string | null | undefined;
   clienteId?: string | number | null | undefined;
+  /** Subconjunto de las columnas del catálogo, en ese orden (D111); vacío o nulo = todas. */
+  columnas?: Array<string> | null | undefined;
   desde?: string | null | undefined;
   hasta?: string | null | undefined;
   incluirVencidas?: boolean | null | undefined;
@@ -66,6 +71,7 @@ export type CatalogoQuery = {
     roles: Array<Rol>;
     maxDias: number | null;
     parametros: any;
+    columnas: Array<{ clave: string; titulo: string; tipo: string }>;
   }> | null;
   clientes?: { items: Array<{ clienteId: string; razonSocial: string }> } | null;
   rutas: Array<{ rutaId: string; nombre: string }> | null;
@@ -92,6 +98,7 @@ export type ReporteQuery = {
 export type ExportarReporteMutationVariables = Exact<{
   id: ReporteId;
   params?: ReporteParams | null | undefined;
+  formato?: FormatoExportacion | null | undefined;
   clave: string | number;
 }>;
 
@@ -108,6 +115,7 @@ export type PreguntarMutation = {
     reporteId: ReporteId | null;
     parametros: any;
     exportable: boolean | null;
+    formato: FormatoExportacion | null;
     resultado: {
       reporteId: ReporteId;
       titulo: string;
@@ -213,6 +221,11 @@ export const CatalogoDocument = gql`
       roles
       maxDias
       parametros
+      columnas {
+        clave
+        titulo
+        tipo
+      }
     }
     clientes(limite: 100) @include(if: $verClientes) {
       items {
@@ -267,8 +280,8 @@ export class ReporteGQL extends Apollo.Query<ReporteQuery, ReporteQueryVariables
   }
 }
 export const ExportarReporteDocument = gql`
-  mutation ExportarReporte($id: ReporteId!, $params: ReporteParams, $clave: ID!) {
-    exportarReporte(id: $id, params: $params, claveIdempotencia: $clave) {
+  mutation ExportarReporte($id: ReporteId!, $params: ReporteParams, $formato: FormatoExportacion, $clave: ID!) {
+    exportarReporte(id: $id, params: $params, formato: $formato, claveIdempotencia: $clave) {
       url
       nombreArchivo
       expiraEn
@@ -294,6 +307,7 @@ export const PreguntarDocument = gql`
       reporteId
       parametros
       exportable
+      formato
       resultado {
         reporteId
         titulo

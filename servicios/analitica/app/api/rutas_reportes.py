@@ -1,4 +1,4 @@
-"""Catálogo, reportes y exportaciones a Excel (spec 015)."""
+"""Catálogo, reportes y exportaciones a Excel o PDF (spec 015, D110, D111)."""
 
 from datetime import date
 from typing import Annotated, Any
@@ -6,7 +6,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Header, Query, Request
 from fastapi.responses import JSONResponse, Response
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.api.seguridad import Usuario, exigir, usuario_actual
 from app.aplicacion import exportaciones, reportes
@@ -14,13 +14,14 @@ from app.aplicacion.auditoria import auditar
 from app.aplicacion.idempotencia import una_vez
 from app.dominio.alertas import ROLES_INTERNOS
 from app.dominio.errores import ErrorDeDominio
-from app.dominio.reportes import Parametros, ReporteId
-from app.infraestructura import excel
+from app.dominio.reportes import MAX_COLUMNAS, Formato, Parametros, ReporteId
+from app.infraestructura import excel, pdf
 from app.infraestructura.bd import transaccion
 
 rutas = APIRouter(prefix="/api/v1")
 UsuarioActual = Annotated[Usuario, Depends(usuario_actual)]
 UUID_TEXTO = r"^[0-9a-fA-F-]{36}$"
+TIPOS = {"xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "pdf": "application/pdf"}
 
 
 class ParametrosReporte(BaseModel):
@@ -33,6 +34,17 @@ class ParametrosReporte(BaseModel):
     umbral: float = Field(default=0.70, ge=0.5, le=0.95)
     agrupar: str = Field(default="VIAJE", pattern="^(VIAJE|RUTA)$")
     incluirVencidas: bool = True
+    columnas: list[str] = Field(default_factory=list, max_length=MAX_COLUMNAS)
+
+    @field_validator("columnas", mode="before")
+    @classmethod
+    def _separar(cls, v: object) -> object:
+        """En la consulta llegan separadas por coma (`columnas=cliente,saldo`); en el cuerpo, como arreglo."""
+        if isinstance(v, str):
+            v = [v]
+        if isinstance(v, list):
+            return [k.strip() for x in v for k in (x.split(",") if isinstance(x, str) else [x]) if k != ""]
+        return v
 
     def dominio(self) -> Parametros:
         return Parametros(
@@ -44,6 +56,7 @@ class ParametrosReporte(BaseModel):
             umbral=self.umbral,
             agrupar=self.agrupar,
             incluir_vencidas=self.incluirVencidas,
+            columnas=tuple(self.columnas),
         )
 
 
@@ -70,6 +83,7 @@ class ExportacionNueva(BaseModel):
     model_config = ConfigDict(extra="forbid")
     reporteId: ReporteId
     parametros: ParametrosReporte = Field(default_factory=ParametrosReporte)
+    formato: Formato = Formato.EXCEL
 
 
 @rutas.post("/exportaciones")
@@ -81,10 +95,15 @@ def crear_exportacion(
 ) -> JSONResponse:
     def hacer() -> tuple[int, dict[str, Any]]:
         ahora = excel.ahora()
+        generar = pdf.documento if cuerpo.formato is Formato.PDF else excel.libro
         r = exportaciones.crear(
-            s, cuerpo.reporteId, cuerpo.parametros.dominio(), usuario.sub, usuario.roles, ahora, excel.libro
+            s, cuerpo.reporteId, cuerpo.parametros.dominio(), usuario.sub, usuario.roles, ahora, generar, cuerpo.formato
         )
-        datos = {"reporteId": cuerpo.reporteId.value, "parametros": cuerpo.parametros.model_dump(mode="json")}
+        datos = {
+            "reporteId": cuerpo.reporteId.value,
+            "parametros": cuerpo.parametros.model_dump(mode="json"),
+            "formato": cuerpo.formato.value,
+        }
         auditar(s, usuario.sub, usuario.rol, "reporte.exportar", r["exportacionId"], request, datos)
         return 201, r
 
@@ -108,6 +127,7 @@ def obtener_archivo(
         e = exportaciones.archivo(s, exportacion_id, solicitante, excel.ahora())
         return Response(
             e.archivo,
-            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            # El formato va en la extensión del nombre (D110): sin columna nueva ni migración.
+            media_type=TIPOS[e.nombre_archivo.rsplit(".", 1)[-1]],
             headers={"Content-Disposition": f'attachment; filename="{e.nombre_archivo}"', "Cache-Control": "no-store"},
         )

@@ -43,6 +43,8 @@ class Intencion:
     ruta: str | None = None
     agrupar: str | None = None
     aclaracion: str | None = None
+    formato: str | None = None  # D110
+    columnas: tuple[str, ...] = ()  # D111
 
 
 def _fin_de_mes(d: date) -> date:

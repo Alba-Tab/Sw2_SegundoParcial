@@ -27,6 +27,7 @@ dependencies = [
   "opentelemetry-instrumentation-fastapi==0.66b2",
   "opentelemetry-instrumentation-httpx==0.66b2",
   "opentelemetry-instrumentation-sqlalchemy==0.66b2",
+  "fpdf2==2.9.0",
 ]
 
 [dependency-groups]

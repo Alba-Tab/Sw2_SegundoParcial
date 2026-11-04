@@ -47,14 +47,32 @@ ESQUEMA = {
             "required": ["clienteNombre", "placa", "rutaNombre", "agrupar"],
         },
         "aclaracion": {"type": ["string", "null"], "maxLength": 160},
+        "formato": {"type": ["string", "null"], "enum": ["EXCEL", "PDF", None]},
+        "columnas": {
+            "type": ["array", "null"],
+            "items": {"type": "string", "enum": sorted({c.clave for d in CATALOGO.values() for c in d.columnas})},
+        },
     },
-    "required": ["reporteId", "periodo", "mes", "anio", "desde", "hasta", "filtros", "aclaracion"],
+    # Siempre el esquema completo con todo requerido: con campos opcionales el modelo los omitía (PoC-3).
+    "required": [
+        "reporteId",
+        "periodo",
+        "mes",
+        "anio",
+        "desde",
+        "hasta",
+        "filtros",
+        "aclaracion",
+        "formato",
+        "columnas",
+    ],
 }
 
 
 def _sistema(vocabulario: str, hoy_: date) -> str:
     catalogo = "\n".join(
-        f"- {d.reporte_id.value}: {d.titulo}. {d.descripcion} Parámetros: {', '.join(d.filtros) or 'ninguno'}."
+        f"- {d.reporte_id.value}: {d.titulo}. {d.descripcion} Parámetros: {', '.join(d.filtros) or 'ninguno'}. "
+        f"Columnas: {', '.join(c.clave for c in d.columnas)}."
         for d in CATALOGO.values()
     )
     return f"""Convierte la pregunta de un usuario de una empresa de transporte en una intención JSON. Hoy es {hoy_.isoformat()} (America/La_Paz).
@@ -66,6 +84,8 @@ Reglas:
 - Copia en filtros solo nombres que el usuario dijo (cliente, placa, ruta). Deja en null todo lo que el usuario no dijo.
 - aclaracion es null casi siempre. Úsala solo si la pregunta podría ser de dos reportes distintos y no se puede decidir; entonces escribe una pregunta corta para el usuario. Nunca expliques tu razonamiento ni repitas los datos en aclaracion.
 - Si no dijo un cliente, una placa o una ruta, no es ambigua: el reporte se corre para todos.
+- formato es PDF o EXCEL solo si el usuario pidió el archivo en ese formato ("en PDF", "en Excel"); si no, null.
+- columnas solo si el usuario pidió columnas concretas ("solo cliente y saldo"): usa las claves de Columnas de ese reporte, en el orden que las dijo; si no, null.
 {vocabulario}"""
 
 
@@ -83,6 +103,8 @@ def _intencion(datos: dict[str, Any]) -> Intencion:
         ruta=f.get("rutaNombre"),
         agrupar=f.get("agrupar"),
         aclaracion=datos.get("aclaracion"),
+        formato=datos.get("formato"),
+        columnas=tuple(c for c in (datos.get("columnas") or []) if isinstance(c, str)),
     )
 
 
@@ -187,6 +209,10 @@ def validar_intencion(i: Intencion, roles: set[str], hoy_: date) -> dict[str, An
         parametros["placa"] = placa
     if i.agrupar in ("VIAJE", "RUTA") and "agrupar" in d.filtros:
         parametros["agrupar"] = i.agrupar
+    # D111: solo las claves de este reporte, sin repetir; si el LLM no acierta ninguna, salen todas.
+    claves = {c.clave for c in d.columnas}
+    if columnas := list(dict.fromkeys(k for k in i.columnas if k in claves)):
+        parametros["columnas"] = columnas
     if d.max_dias is not None:
         try:
             desde, hasta = fechas(reporte, i, hoy_)
@@ -194,7 +220,8 @@ def validar_intencion(i: Intencion, roles: set[str], hoy_: date) -> dict[str, An
         except ErrorDeDominio as e:
             return _con_periodo_por_defecto(e.mensaje, reporte, parametros, hoy_)
         parametros |= {"desde": desde.isoformat(), "hasta": hasta.isoformat()}
-    return {"tipo": "INTENCION", "reporteId": reporte.value, "parametros": parametros}
+    formato = i.formato if i.formato in ("EXCEL", "PDF") else None
+    return {"tipo": "INTENCION", "reporteId": reporte.value, "parametros": parametros, "formato": formato}
 
 
 def _parametros(p: dict[str, Any]) -> Parametros:
@@ -206,6 +233,7 @@ def _parametros(p: dict[str, Any]) -> Parametros:
         ruta_id=p.get("rutaId"),
         placa=p.get("placa"),
         agrupar=p.get("agrupar", "VIAJE"),
+        columnas=tuple(p.get("columnas") or ()),
     )
 
 
@@ -268,4 +296,5 @@ class Voz:
             "parametros": interpretacion["parametros"],
             "resultado": datos,
             "exportable": True,
+            "formato": interpretacion.get("formato"),
         }

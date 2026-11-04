@@ -9,7 +9,7 @@ import viajes from '../../../../../../contratos/openapi/viajes.yaml' with { load
 import { Estado, EtiquetaPipe } from './estado';
 
 // Enums que no se muestran crudos: tienen su propio texto en la pantalla que los usa.
-const SIN_ETIQUETA = ['Periodo', 'ReporteId', 'OpcionIntervencion'];
+const SIN_ETIQUETA = ['Periodo', 'ReporteId', 'OpcionIntervencion', 'FormatoExportacion'];
 
 const enums = [...esquema.matchAll(/^enum (\w+) \{([^}]*)\}/gm)].map(([, nombre, cuerpo]) => ({
   nombre,
