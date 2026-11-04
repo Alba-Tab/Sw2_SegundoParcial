@@ -469,6 +469,21 @@ describe('revisión del Gateway', () => {
     expect(pesada.body.errors[0].extensions.codigo).toBe('CONSULTA_DEMASIADO_COMPLEJA');
   });
 
+  it('D109: choferes y mantenimientos son páginas `…Pagina` que también cuentan el limite en la complejidad', async () => {
+    const alias = (campo: string) =>
+      'abcdefghijk'
+        .split('')
+        .map((a) => `${a}: ${campo}`)
+        .join(' ');
+    for (const consulta of [
+      `{ choferes(limite: 100) { items { ${alias('choferId')} } } }`,
+      `{ mantenimientos(limite: 100) { items { ${alias('mantenimientoId')} } } }`,
+    ]) {
+      const r = await gql(['jefe_flota'], consulta);
+      expect(r.body.errors[0].extensions.codigo).toBe('CONSULTA_DEMASIADO_COMPLEJA');
+    }
+  });
+
   it('E2-8: la razón social de servicios y cotizaciones sale de Viajes en un lote de ids, una vez por cliente', async () => {
     const [c1, c9] = ['0193b000-0000-7000-8000-0000000000c1', '0193b000-0000-7000-8000-0000000000c9'];
     rutas.set('GET /viajes/api/v1/servicios', () => ({
