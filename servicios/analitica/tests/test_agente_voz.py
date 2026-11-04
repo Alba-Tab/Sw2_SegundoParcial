@@ -297,7 +297,10 @@ INTENCION_RIESGO = '{"reporteId": "VIAJES_EN_RIESGO", "periodo": null, "filtros"
 
 
 def test_la_voz_corre_el_reporte_en_analitica_sin_pasar_por_el_mcp(cliente):
-    en_ruta(str(uuid4()))
+    viaje = str(uuid4())
+    en_ruta(viaje)
+    # Con posición, la fila lleva ultimaPosicionEn (datetime): la redacción tiene que poder serializarla.
+    procesar(ejemplo("PosicionActualizada", viajeId=viaje))
     gerente = token("gerente")
     cliente.app.state.voz = voz.Voz(LlmIntencion(INTENCION_RIESGO))
     r = cliente.post("/api/v1/voz/preguntas", json={"texto": "¿Qué viajes van atrasados?"}, headers=gerente)
