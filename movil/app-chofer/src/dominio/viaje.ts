@@ -61,3 +61,28 @@ export function viajesQueSobran(locales: string[], delServidor: string[], conPen
   const quedan = new Set([...delServidor, ...conPendientes]);
   return locales.filter((id) => !quedan.has(id));
 }
+
+export type Aviso = { viajeId: string; titulo: string; cuerpo: string };
+
+/**
+ * D112: en iPhone no hay push; al bajar `GET /viajes/mios` se comparan los estados del servidor con los del celular y
+ * se avisa lo mismo que el push de Viajes (`AvisosPush`). Solo la decisión del despachador sobre una entrega observada:
+ * la entrega o el rechazo del propio chofer no se avisa. Sin viajes guardados (primer inicio de sesión) no hay avisos.
+ */
+export function avisosNuevos(antes: ViajeLocal[], despues: ViajeLocal[]): Aviso[] {
+  if (antes.length === 0) return [];
+  const previos = new Map(antes.map((v) => [v.viajeId, v.estado]));
+  return despues.flatMap((v): Aviso[] => {
+    const previo = previos.get(v.viajeId);
+    if (previo === v.estado) return [];
+    const aviso = (titulo: string, cuerpo: string) => [{ viajeId: v.viajeId, titulo, cuerpo }];
+    if (v.estado === 'CONFIRMADO' && (previo === undefined || previo === 'PROGRAMANDO'))
+      return aviso('Viaje asignado', `Tienes un viaje nuevo con la unidad ${v.placa}`);
+    if (previo === undefined) return [];
+    if (v.estado === 'CANCELADO') return aviso('Viaje cancelado', 'El cliente canceló el viaje; no salgas');
+    if (previo !== 'ENTREGA_OBSERVADA') return [];
+    if (v.estado === 'ENTREGADO' || v.estado === 'CERRADO') return aviso('Entrega aprobada', 'El despachador aprobó tu entrega observada');
+    if (v.estado === 'ENTREGA_RECHAZADA') return aviso('Entrega rechazada', 'El despachador rechazó la entrega');
+    return [];
+  });
+}

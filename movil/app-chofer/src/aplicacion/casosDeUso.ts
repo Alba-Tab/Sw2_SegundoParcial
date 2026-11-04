@@ -4,9 +4,10 @@ import type { TipoEvidencia } from '../dominio/evidencia';
 import { descripcionValida, type OrigenHito, type TipoHito } from '../dominio/hito';
 import { agregarLectura, kmh, type Lectura, MuestreoGps, velocidadEstimada } from '../dominio/muestreo';
 import type { TipoOperacion } from '../dominio/operacion';
-import { estadoVisible, inicioRechazado, puedeIniciar, type ViajeLocal } from '../dominio/viaje';
+import { avisosNuevos, estadoVisible, inicioRechazado, puedeIniciar, type ViajeLocal } from '../dominio/viaje';
 import type {
   Api,
+  Avisador,
   Archivos,
   Cola,
   Dispositivo,
@@ -52,11 +53,16 @@ export class CasosDeUso {
     private readonly posicionGuardada: PosicionGuardada | null = null,
     private readonly enTransaccion: EnTransaccion = (fn) => fn(),
     private readonly fatigasSinPosicion: FatigasSinPosicion | null = null,
+    private readonly avisador: Avisador | null = null,
   ) {}
 
-  /** Paso 1 (con señal): `GET /viajes/mios` a SQLite para operar sin red. */
+  /** Paso 1 (con señal): `GET /viajes/mios` a SQLite para operar sin red; avisa lo que cambió (D112). */
   async descargarViajes(): Promise<void> {
-    guardarViajesDelServidor(this.viajes, this.cola, await this.api.misViajes(await this.sesion.tokenVigente()));
+    const delServidor = await this.api.misViajes(await this.sesion.tokenVigente());
+    // Se lee después del await: dos descargas a la vez no comparan contra el mismo estado ni avisan dos veces.
+    const antes = this.viajes.todos();
+    guardarViajesDelServidor(this.viajes, this.cola, delServidor);
+    for (const a of avisosNuevos(antes, delServidor)) this.avisador?.avisar(a);
     this.encolarFatigasSinPosicion(null);
   }
 

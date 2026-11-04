@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { PuntoGps } from '../dominio/gps';
 import type { Operacion } from '../dominio/operacion';
 import type { Respuesta } from '../dominio/reintento';
-import { estadoVisible, type ViajeLocal } from '../dominio/viaje';
+import { type Aviso, estadoVisible, type ViajeLocal } from '../dominio/viaje';
 import type { EvidenciaLocal, Parte } from '../dominio/evidencia';
 import { CasosDeUso } from './casosDeUso';
 import { MotorSincronizacion } from './motorSincronizacion';
@@ -194,6 +194,7 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
   let evidencias: EvidenciasEnMemoria, apiEvidencias: ApiEvidenciasFalsa, posicion: PosicionEnMemoria, fatigas: FatigasEnMemoria;
   let motor: MotorSincronizacion, casos: CasosDeUso;
   let borrados: string[];
+  let avisos: Aviso[];
 
   beforeEach(() => {
     cola = new ColaEnMemoria();
@@ -230,6 +231,7 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     motor = new MotorSincronizacion(cola, puntos, viajes, api, sesion, red, reloj, ids, dispositivo, subida, () => 0.5);
     posicion = new PosicionEnMemoria();
     fatigas = new FatigasEnMemoria();
+    avisos = [];
     const enTransaccion = <T>(fn: () => T) => fn();
     casos = new CasosDeUso(
       cola,
@@ -245,6 +247,7 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
       posicion,
       enTransaccion,
       fatigas,
+      { avisar: (a) => void avisos.push(a) },
     );
     viajes.guardarDelServidor([viaje('v1')]);
   });
@@ -650,6 +653,17 @@ describe('motor de sincronización (spec 005, CU-08)', () => {
     expect(fatigas.f).toEqual([]);
     const evento = cola.ops.find((o) => o.tipo === 'EVENTO_CONDUCCION')!;
     expect(evento).toMatchObject({ viajeId: 'v1', cuerpo: { tipo: 'ALERTA_FATIGA', posicion: { lat: -17.75, lng: -63.17 } } });
+  });
+
+  it('D112: al bajar los viajes avisa la asignación y la cancelación una sola vez', async () => {
+    api.viajesServidor = [{ ...viaje('v1'), estado: 'CANCELADO' }, viaje('v2')];
+    await Promise.all([casos.descargarViajes(), casos.descargarViajes()]);
+    expect(avisos.map((a) => [a.viajeId, a.titulo])).toEqual([
+      ['v1', 'Viaje cancelado'],
+      ['v2', 'Viaje asignado'],
+    ]);
+    await casos.descargarViajes();
+    expect(avisos).toHaveLength(2);
   });
 
   it('cada lectura del GPS queda guardada como última posición; olvidar limpia la memoria', () => {

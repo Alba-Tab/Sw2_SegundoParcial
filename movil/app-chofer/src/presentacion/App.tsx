@@ -3,7 +3,7 @@ import { useMigrations } from 'drizzle-orm/expo-sqlite/migrator';
 import { useFonts } from 'expo-font';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useState } from 'react';
-import { BackHandler, useColorScheme, View } from 'react-native';
+import { BackHandler, Platform, useColorScheme, View } from 'react-native';
 import { ActivityIndicator, Appbar, Button, Dialog, Menu, PaperProvider, Portal, Snackbar, Text } from 'react-native-paper';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import migraciones from '../../drizzle/migrations';
@@ -135,7 +135,8 @@ function Principal({ alVencerSesion, salir }: { alVencerSesion: () => void; sali
           void casos.descargarViajes().catch(() => {});
           setPantalla({ nombre: 'viaje', viajeId });
         },
-        () => void casos.descargarViajes().catch(() => {}),
+        // En iPhone el aviso es local y sale de la propia descarga (D112): volver a bajar sería repetirla.
+        () => Platform.OS === 'android' && void casos.descargarViajes().catch(() => {}),
         (token) => void casos.registrarDispositivo(token).catch(() => {}),
       ),
     [],
