@@ -72,7 +72,7 @@ P3 salvo los marcados.
 
 ## 4. Despliegue y ensayo
 
-Nada desplegado todavía: no hay `plataforma/vm/`, `plataforma/llm/` ni workflows de despliegue (solo `ci.yml`). Falta F3b (esqueleto en AWS y GCP, T3b.1–T3b.5), F11 (Azure y el resto, T11.1–T11.12) y F12 (guion de fallos en la nube, grabaciones, README final, cambios para ICONIX). Qué va a cada nube: `plan-despliegue.md` §2. Cómo hacerlo, paso a paso (cuentas, recursos, dominio de name.com, CI/CD y monitoreo): `guia-despliegue.md`.
+Nada desplegado todavía: no hay `plataforma/vm/`, `plataforma/llm/` ni workflows de despliegue (solo `ci.yml`), y **ningún servicio se conecta todavía por TLS a Temporal ni a RabbitMQ** (B1 y B2 de la guía), que es obligatorio entre nubes. Reparto por nube: D113 (GCP solo en su capa gratis; Gateway y MCP en Azure). FCM no corre en local: falta `FCM_PROYECTO` (en iPhone no hace falta, D112). Falta F3b (esqueleto en AWS y GCP, T3b.1–T3b.5), F11 (Azure y el resto, T11.1–T11.12) y F12 (guion de fallos en la nube, grabaciones, README final, cambios para ICONIX). Qué va a cada nube: `plan-despliegue.md` §2. Cómo hacerlo, paso a paso (cuentas, recursos, dominio de name.com, CI/CD y monitoreo): `guia-despliegue.md`.
 
 ## 5. Para ICONIX
 
