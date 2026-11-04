@@ -45,7 +45,12 @@ StyleDictionary.registerFormat({
   format: ({ dictionary }) => {
     const g = agrupar(dictionary);
     const radios = { '--mat-sys-corner-small': g.base['radio-sm'], '--mat-sys-corner-medium': g.base['radio-md'], '--mat-sys-corner-large': g.base['radio-lg'] };
-    return cssPorTema(conPrefijo('--mat-sys-', g.claro), conPrefijo('--mat-sys-', g.oscuro), { ...radios, '--mat-sys-body-large-font': g.base['fuente-base'] });
+    // DS1: el Centro de Control también lee espacio, alto, borde y elevación como --tc-*, del mismo origen.
+    return cssPorTema(conPrefijo('--mat-sys-', g.claro), conPrefijo('--mat-sys-', g.oscuro), {
+      ...radios,
+      '--mat-sys-body-large-font': g.base['fuente-base'],
+      ...conPrefijo('--tc-', g.base),
+    });
   },
 });
 

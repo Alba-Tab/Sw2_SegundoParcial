@@ -1,7 +1,6 @@
 import { Component, computed, inject, input, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -27,6 +26,8 @@ import {
   Sesion,
   textoError,
   urlEnApp,
+  Panel,
+  EtiquetaPipe,
 } from 'ui-comun';
 import { AccionesFachada } from '../acciones.fachada';
 import { conLaElegidaPrimero, type Accion } from '../domain/accion';
@@ -39,11 +40,12 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
   selector: 'app-acciones',
   providers: [AccionesFachada],
   imports: [
+    EtiquetaPipe,
+    Panel,
     Encabezado,
     ReactiveFormsModule,
     Campo,
     Confirmacion,
-    MatCardModule,
     MatButtonModule,
     MatIconModule,
     MatFormFieldModule,
@@ -71,85 +73,81 @@ import { conLaElegidaPrimero, type Accion } from '../domain/accion';
     />
     <div class="lista">
       @for (a of lista.visibles(); track a.accionId) {
-        <mat-card [class.elegida]="a.accionId === id()">
-          <mat-card-header>
-            <mat-card-title>Avisar retraso a {{ a.razonSocial }}</mat-card-title>
-            <mat-card-subtitle>
-              <cc-estado grupo="EstadoAccion" [valor]="a.estado" />
-              · {{ a.creadaEn | fecha: true }} · {{ a.viaje?.placa ?? 'Sin unidad' }}
-              {{ a.viaje?.ruta.destino ? 'hacia ' + a.viaje.ruta.destino : '' }} ·
-              <!-- El enlace dice adónde lleva; la placa (o su falta) va fuera (V3-13). -->
-              <a [routerLink]="['/viajes', a.viajeId]" [queryParams]="{ de: 'acciones' }">Ver viaje</a>
-              @if (a.misionId && urlMision(a.misionId); as url) {
-                · <a [href]="url">Ver la misión del agente</a>
-              }
-            </mat-card-subtitle>
-          </mat-card-header>
-          <mat-card-content>
-            <h3>Evidencia</h3>
-            @for (e of a.evidencia; track $index) {
-              <p class="evidencia">
-                <b>{{ e.fuente }}</b> ({{ e.referencia }}): {{ e.resumen }}
-              </p>
+        <cc-panel [class.elegida]="a.accionId === id()" titulo="Avisar retraso a {{ a.razonSocial }}">
+          <span panel-detalle
+            ><cc-estado grupo="EstadoAccion" [valor]="a.estado" /> · {{ a.creadaEn | fecha: true }} · {{ a.viaje?.placa ?? 'Sin unidad' }}
+            {{ a.viaje?.ruta.destino ? 'hacia ' + a.viaje.ruta.destino : '' }} ·
+            <!-- El enlace dice adónde lleva; la placa (o su falta) va fuera (V3-13). -->
+            <a [routerLink]="['/viajes', a.viajeId]" [queryParams]="{ de: 'acciones' }">Ver viaje</a>
+            @if (a.misionId && urlMision(a.misionId); as url) {
+              · <a [href]="url">Ver la misión del agente</a>
             }
-            @if (a.estado === 'PENDIENTE' && sesion.tiene('despachador')) {
-              @let f = formDe(a);
-              <div [formGroup]="f" #zona>
-                <mat-form-field class="mensaje">
-                  <mat-label>Mensaje al cliente</mat-label>
-                  <textarea matInput rows="3" formControlName="mensaje"></textarea>
-                  <mat-hint>De 10 a 1.000 caracteres</mat-hint>
-                  <mat-error>{{ textoError(f.controls.mensaje) }}</mat-error>
+          </span>
+
+          <h3>Evidencia</h3>
+          @for (e of a.evidencia; track $index) {
+            <p class="evidencia">
+              <!-- Sin jerga: la fuente con su nombre y sin el id interno de la referencia (PRODUCT.md, tono). -->
+              <b>{{ e.fuente | etiqueta: 'FuenteEvidencia' }}:</b> {{ e.resumen }}
+            </p>
+          }
+          @if (a.estado === 'PENDIENTE' && sesion.tiene('despachador')) {
+            @let f = formDe(a);
+            <div [formGroup]="f" #zona>
+              <mat-form-field class="mensaje">
+                <mat-label>Mensaje al cliente</mat-label>
+                <textarea matInput rows="3" formControlName="mensaje"></textarea>
+                <mat-hint>De 10 a 1.000 caracteres</mat-hint>
+                <mat-error>{{ textoError(f.controls.mensaje) }}</mat-error>
+              </mat-form-field>
+              <div class="fila-acciones">
+                <!-- Mientras se confirma el rechazo, aprobar no aplica: se oculta como en crédito (V2-4). -->
+                @if (rechazando() !== a.accionId) {
+                  <button mat-flat-button (click)="aprobar(a.accionId, zona)" [disabled]="enviando()" disabledInteractive>
+                    <mat-icon>send</mat-icon>Aprobar y enviar
+                  </button>
+                }
+                <mat-form-field>
+                  <mat-label>Motivo del rechazo</mat-label>
+                  <input matInput formControlName="motivo" />
+                  <mat-error>{{ textoError(f.controls.motivo) }}</mat-error>
                 </mat-form-field>
-                <div class="fila-acciones">
-                  <!-- Mientras se confirma el rechazo, aprobar no aplica: se oculta como en crédito (V2-4). -->
-                  @if (rechazando() !== a.accionId) {
-                    <button mat-flat-button (click)="aprobar(a.accionId, zona)" [disabled]="enviando()" disabledInteractive>
-                      <mat-icon>send</mat-icon>Aprobar y enviar
-                    </button>
-                  }
-                  <mat-form-field>
-                    <mat-label>Motivo del rechazo</mat-label>
-                    <input matInput formControlName="motivo" />
-                    <mat-error>{{ textoError(f.controls.motivo) }}</mat-error>
-                  </mat-form-field>
-                  @if (rechazando() !== a.accionId) {
-                    <button
-                      mat-stroked-button
-                      [id]="'rechazar-' + a.accionId"
-                      (click)="pedirRechazo(a.accionId, zona)"
-                      [disabled]="enviando()"
-                    >
-                      <mat-icon>block</mat-icon>Rechazar
-                    </button>
-                  }
-                </div>
-                @if (rechazando() === a.accionId) {
-                  <cc-confirmacion
-                    [resumen]="'Se rechaza el aviso de retraso a ' + a.razonSocial + ': no se envía ningún correo. No se puede deshacer.'"
-                    accion="Sí, rechazar la acción"
-                    icono="block"
-                    [enviando]="enviando()"
-                    (confirmar)="rechazar(a.accionId)"
-                    (volver)="volver(a.accionId)"
-                  />
+                @if (rechazando() !== a.accionId) {
+                  <button
+                    mat-stroked-button
+                    [id]="'rechazar-' + a.accionId"
+                    (click)="pedirRechazo(a.accionId, zona)"
+                    [disabled]="enviando()"
+                  >
+                    <mat-icon>block</mat-icon>Rechazar
+                  </button>
                 }
               </div>
-            } @else if (a.estado === 'PENDIENTE') {
-              <!-- R2F-3: el gerente ve el borrador sin enviar y quién lo decide (spec 014: solo el despachador). -->
-              <h3>Borrador del mensaje</h3>
-              <p>{{ a.mensaje }}</p>
-              <p class="secundario">
-                <mat-icon class="icono-en-linea">lock_person</mat-icon>La aprueba o rechaza el despachador; el correo todavía no sale.
-              </p>
-            } @else {
-              <p class="mensaje-final">“{{ a.mensaje }}”</p>
-              @if (a.decididaPor) {
-                <p class="secundario">Decidida {{ a.decididaEn | fecha: true }}{{ a.motivoRechazo ? ' · ' + a.motivoRechazo : '' }}</p>
+              @if (rechazando() === a.accionId) {
+                <cc-confirmacion
+                  [resumen]="'Se rechaza el aviso de retraso a ' + a.razonSocial + ': no se envía ningún correo. No se puede deshacer.'"
+                  accion="Sí, rechazar la acción"
+                  icono="block"
+                  [enviando]="enviando()"
+                  (confirmar)="rechazar(a.accionId)"
+                  (volver)="volver(a.accionId)"
+                />
               }
+            </div>
+          } @else if (a.estado === 'PENDIENTE') {
+            <!-- R2F-3: el gerente ve el borrador sin enviar y quién lo decide (spec 014: solo el despachador). -->
+            <h3>Borrador del mensaje</h3>
+            <p>{{ a.mensaje }}</p>
+            <p class="secundario">
+              <mat-icon class="icono-en-linea">lock_person</mat-icon>La aprueba o rechaza el despachador; el correo todavía no sale.
+            </p>
+          } @else {
+            <p class="mensaje-final">“{{ a.mensaje }}”</p>
+            @if (a.decididaPor) {
+              <p class="secundario">Decidida {{ a.decididaEn | fecha: true }}{{ a.motivoRechazo ? ' · ' + a.motivoRechazo : '' }}</p>
             }
-          </mat-card-content>
-        </mat-card>
+          }
+        </cc-panel>
       }
     </div>
     <cc-pie-lista [control]="lista" nombre="acciones" vacio="El agente no propuso acciones." [error]="error()" [cargando]="cargando()" />

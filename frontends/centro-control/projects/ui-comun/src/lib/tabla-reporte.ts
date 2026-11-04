@@ -58,7 +58,7 @@ export function ordenarFilas(filas: readonly Record<string, unknown>[], columna:
         }
       </svg>
     }
-    <div class="tabla" role="region" tabindex="0" [attr.aria-label]="r.titulo">
+    <div class="tabla-ancha" role="region" tabindex="0" [attr.aria-label]="r.titulo">
       <!-- Ordenar es local y no toca los totales: siguen siendo los de todas las filas. -->
       <table mat-table [dataSource]="filas()" matSort (matSortChange)="orden.set($event)">
         @for (c of r.columnas; track c.clave) {
@@ -102,10 +102,12 @@ export function ordenarFilas(filas: readonly Record<string, unknown>[], columna:
     </div>
   `,
   styles: `
+    /* El SVG se dibuja a su tamaño (720 de ancho lógico): estirado a 1440 px las barras y el texto se duplicaban. */
     .grafico {
+      display: block;
       width: 100%;
-      max-height: 360px;
-      margin-bottom: 16px;
+      max-width: 720px;
+      margin-bottom: var(--tc-espacio-4);
     }
     .etiqueta,
     .valor {
@@ -117,9 +119,6 @@ export function ordenarFilas(filas: readonly Record<string, unknown>[], columna:
     }
     .serie-1 {
       fill: var(--mat-sys-tertiary);
-    }
-    .tabla {
-      overflow-x: auto;
     }
     .numero {
       text-align: right;

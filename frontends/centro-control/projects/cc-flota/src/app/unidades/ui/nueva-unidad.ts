@@ -2,7 +2,6 @@ import { afterNextRender, Component, inject, signal, viewChild } from '@angular/
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -10,7 +9,7 @@ import { MatSelect, MatSelectModule } from '@angular/material/select';
 import { MatSnackBar } from '@angular/material/snack-bar';
 import { Router, RouterLink } from '@angular/router';
 import { merge } from 'rxjs';
-import { Campo, Encabezado, EtiquetaPipe, listoParaEnviar, mensajeDe } from 'ui-comun';
+import { Campo, Encabezado, EtiquetaPipe, listoParaEnviar, mensajeDe, Panel } from 'ui-comun';
 import { claseUnidad, mensajeUnidad, nuevaUnidadDesde, type ClaseUnidad } from '../domain/unidad';
 import { AltaUnidadFachada } from '../unidades.fachada';
 import { ajustarCampos, CamposUnidad, formularioCampos, validarPlaca } from './campos-unidad';
@@ -20,11 +19,11 @@ import { ajustarCampos, CamposUnidad, formularioCampos, validarPlaca } from './c
   selector: 'app-nueva-unidad',
   providers: [AltaUnidadFachada],
   imports: [
+    Panel,
     Encabezado,
     ReactiveFormsModule,
     Campo,
     CamposUnidad,
-    MatCardModule,
     MatButtonModule,
     MatFormFieldModule,
     MatInputModule,
@@ -35,59 +34,57 @@ import { ajustarCampos, CamposUnidad, formularioCampos, validarPlaca } from './c
   ],
   template: `
     <cc-encabezado titulo="Nueva unidad" [migas]="[{ texto: 'Unidades', ruta: '/unidades' }, { texto: 'Nueva unidad' }]" />
-    <mat-card>
-      <mat-card-content>
-        <form [formGroup]="form" (ngSubmit)="guardar(raiz)" #raiz novalidate>
-          <div class="fila-acciones">
+    <cc-panel titulo="Datos de la unidad">
+      <form [formGroup]="form" (ngSubmit)="guardar(raiz)" #raiz novalidate>
+        <div class="fila-acciones">
+          <mat-form-field>
+            <mat-label>Tipo</mat-label>
+            <mat-select formControlName="tipoUnidad" #primerCampo>
+              @for (t of tipos; track t) {
+                <mat-option [value]="t">{{ t | etiqueta: 'TipoUnidad' }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+          @if (clase() !== 'TRACTO') {
             <mat-form-field>
-              <mat-label>Tipo</mat-label>
-              <mat-select formControlName="tipoUnidad" #primerCampo>
-                @for (t of tipos; track t) {
-                  <mat-option [value]="t">{{ t | etiqueta: 'TipoUnidad' }}</mat-option>
+              <mat-label>Tipo de remolque</mat-label>
+              <mat-select formControlName="tipoRemolque">
+                @for (t of remolques; track t) {
+                  <mat-option [value]="t">{{ t | etiqueta: 'TipoRemolque' }}</mat-option>
                 }
               </mat-select>
             </mat-form-field>
-            @if (clase() !== 'TRACTO') {
-              <mat-form-field>
-                <mat-label>Tipo de remolque</mat-label>
-                <mat-select formControlName="tipoRemolque">
-                  @for (t of remolques; track t) {
-                    <mat-option [value]="t">{{ t | etiqueta: 'TipoRemolque' }}</mat-option>
-                  }
-                </mat-select>
-              </mat-form-field>
-            }
+          }
+          <mat-form-field>
+            <mat-label>Placa</mat-label>
+            <input matInput formControlName="placa" autocomplete="off" class="mayusculas" />
+            <mat-hint>Por ejemplo 4521KTR</mat-hint>
+            <mat-error>{{ error(form.controls.placa) }}</mat-error>
+          </mat-form-field>
+        </div>
+        <div class="fila-acciones">
+          @if (clase() === 'TRACTO') {
             <mat-form-field>
-              <mat-label>Placa</mat-label>
-              <input matInput formControlName="placa" autocomplete="off" class="mayusculas" />
-              <mat-hint>Por ejemplo 4521KTR</mat-hint>
-              <mat-error>{{ error(form.controls.placa) }}</mat-error>
+              <mat-label>Odómetro (km)</mat-label>
+              <input matInput type="number" min="0" inputmode="numeric" formControlName="kilometraje" />
+              <mat-error>{{ error(form.controls.kilometraje) }}</mat-error>
             </mat-form-field>
-          </div>
-          <div class="fila-acciones">
-            @if (clase() === 'TRACTO') {
-              <mat-form-field>
-                <mat-label>Odómetro (km)</mat-label>
-                <input matInput type="number" min="0" inputmode="numeric" formControlName="kilometraje" />
-                <mat-error>{{ error(form.controls.kilometraje) }}</mat-error>
-              </mat-form-field>
-            }
-            <mat-form-field>
-              <mat-label>Km desde el último mantenimiento</mat-label>
-              <input matInput type="number" min="0" inputmode="numeric" formControlName="kmDesdeUltimoMantenimiento" />
-              <mat-error>{{ error(form.controls.kmDesdeUltimoMantenimiento) }}</mat-error>
-            </mat-form-field>
-          </div>
-          <app-campos-unidad [form]="form.controls.campos" [clase]="clase()" />
-          <div class="fila-acciones">
-            <button mat-flat-button type="submit" [disabled]="enviando()" disabledInteractive>
-              <mat-icon>local_shipping</mat-icon>Registrar unidad
-            </button>
-            <a mat-button routerLink="/unidades">Cancelar</a>
-          </div>
-        </form>
-      </mat-card-content>
-    </mat-card>
+          }
+          <mat-form-field>
+            <mat-label>Km desde el último mantenimiento</mat-label>
+            <input matInput type="number" min="0" inputmode="numeric" formControlName="kmDesdeUltimoMantenimiento" />
+            <mat-error>{{ error(form.controls.kmDesdeUltimoMantenimiento) }}</mat-error>
+          </mat-form-field>
+        </div>
+        <app-campos-unidad [form]="form.controls.campos" [clase]="clase()" />
+        <div class="fila-acciones">
+          <button mat-flat-button type="submit" [disabled]="enviando()" disabledInteractive>
+            <mat-icon>local_shipping</mat-icon>Registrar unidad
+          </button>
+          <a mat-button routerLink="/unidades">Cancelar</a>
+        </div>
+      </form>
+    </cc-panel>
   `,
   styles: `
     .mayusculas {

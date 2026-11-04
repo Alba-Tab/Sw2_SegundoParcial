@@ -1,7 +1,6 @@
 import { Component, computed, effect, inject, signal, untracked } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -19,6 +18,7 @@ import {
   TablaReporte,
   textoError,
   type Resultado,
+  Panel,
 } from 'ui-comun';
 import type { FormatoExportacion, ReporteId, ReporteParams } from '../../graphql/generado';
 import { paramsLimpios, paramsPorDefecto, usaParametro } from '../domain/reporte';
@@ -34,11 +34,11 @@ import { ReportesFachada } from '../reportes.fachada';
   selector: 'app-reportes',
   providers: [ReportesFachada],
   imports: [
+    Panel,
     Encabezado,
     ReactiveFormsModule,
     Campo,
     Esqueleto,
-    MatCardModule,
     MatButtonModule,
     MatIconModule,
     MatFormFieldModule,
@@ -75,86 +75,84 @@ import { ReportesFachada } from '../reportes.fachada';
       <p class="secundario">{{ d.descripcion }}</p>
     }
     @if (elegido(); as id) {
-      <mat-card class="parametros">
-        <mat-card-content>
-          <form class="fila-acciones" [formGroup]="params" (ngSubmit)="ver(formParams)" #formParams novalidate>
-            @if (definicion()?.maxDias) {
-              <mat-form-field>
-                <mat-label>Desde</mat-label>
-                <input matInput type="date" formControlName="desde" />
-                <mat-error>{{ textoError(params.controls.desde) }}</mat-error>
-              </mat-form-field>
-              <mat-form-field>
-                <mat-label>Hasta</mat-label>
-                <input matInput type="date" formControlName="hasta" />
-                <mat-error>{{ textoError(params.controls.hasta) }}</mat-error>
-              </mat-form-field>
-            }
-            @if (usa('clienteId')) {
-              <mat-form-field>
-                <mat-label>Cliente</mat-label>
-                <mat-select formControlName="clienteId">
-                  <mat-option [value]="null">Todos</mat-option>
-                  @for (c of catalogo()?.clientes?.items ?? []; track c.clienteId) {
-                    <mat-option [value]="c.clienteId">{{ c.razonSocial }}</mat-option>
-                  }
-                </mat-select>
-              </mat-form-field>
-            }
-            @if (usa('rutaId')) {
-              <mat-form-field>
-                <mat-label>Ruta</mat-label>
-                <mat-select formControlName="rutaId">
-                  <mat-option [value]="null">Todas</mat-option>
-                  @for (r of catalogo()?.rutas ?? []; track r.rutaId) {
-                    <mat-option [value]="r.rutaId">{{ r.nombre }}</mat-option>
-                  }
-                </mat-select>
-              </mat-form-field>
-            }
-            @if (usa('placa')) {
-              <mat-form-field>
-                <mat-label>Placa</mat-label>
-                <input matInput formControlName="placa" placeholder="4521KTR" />
-              </mat-form-field>
-            }
-            @if (usa('umbral')) {
-              <mat-form-field>
-                <mat-label>Umbral</mat-label>
-                <input matInput type="number" min="0.5" max="0.95" step="0.05" formControlName="umbral" />
-                <mat-hint>De 0,5 a 0,95</mat-hint>
-                <mat-error>{{ textoError(params.controls.umbral) }}</mat-error>
-              </mat-form-field>
-            }
-            @if (usa('agrupar')) {
-              <mat-form-field>
-                <mat-label>Agrupar</mat-label>
-                <mat-select formControlName="agrupar"
-                  ><mat-option value="VIAJE">Por viaje</mat-option><mat-option value="RUTA">Por ruta</mat-option></mat-select
-                >
-              </mat-form-field>
-            }
-            <mat-form-field class="columnas">
-              <mat-label>Columnas</mat-label>
-              <mat-select formControlName="columnas" multiple placeholder="Todas">
-                @for (c of definicion()?.columnas ?? []; track c.clave) {
-                  <mat-option [value]="c.clave">{{ c.titulo }}</mat-option>
+      <cc-panel class="parametros">
+        <form class="fila-acciones" [formGroup]="params" (ngSubmit)="ver(formParams)" #formParams novalidate>
+          @if (definicion()?.maxDias) {
+            <mat-form-field>
+              <mat-label>Desde</mat-label>
+              <input matInput type="date" formControlName="desde" />
+              <mat-error>{{ textoError(params.controls.desde) }}</mat-error>
+            </mat-form-field>
+            <mat-form-field>
+              <mat-label>Hasta</mat-label>
+              <input matInput type="date" formControlName="hasta" />
+              <mat-error>{{ textoError(params.controls.hasta) }}</mat-error>
+            </mat-form-field>
+          }
+          @if (usa('clienteId')) {
+            <mat-form-field>
+              <mat-label>Cliente</mat-label>
+              <mat-select formControlName="clienteId">
+                <mat-option [value]="null">Todos</mat-option>
+                @for (c of catalogo()?.clientes?.items ?? []; track c.clienteId) {
+                  <mat-option [value]="c.clienteId">{{ c.razonSocial }}</mat-option>
                 }
               </mat-select>
-              <mat-hint>Sin elegir, salen todas</mat-hint>
             </mat-form-field>
-            <button mat-flat-button type="submit">Ver</button>
-            @if (mostrado) {
-              <button mat-stroked-button type="button" (click)="exportar('EXCEL')" [disabled]="exportando()">
-                <mat-icon>download</mat-icon>Exportar a Excel
-              </button>
-              <button mat-stroked-button type="button" (click)="exportar('PDF')" [disabled]="exportando()">
-                <mat-icon>download</mat-icon>Exportar a PDF
-              </button>
-            }
-          </form>
-        </mat-card-content>
-      </mat-card>
+          }
+          @if (usa('rutaId')) {
+            <mat-form-field>
+              <mat-label>Ruta</mat-label>
+              <mat-select formControlName="rutaId">
+                <mat-option [value]="null">Todas</mat-option>
+                @for (r of catalogo()?.rutas ?? []; track r.rutaId) {
+                  <mat-option [value]="r.rutaId">{{ r.nombre }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          }
+          @if (usa('placa')) {
+            <mat-form-field>
+              <mat-label>Placa</mat-label>
+              <input matInput formControlName="placa" placeholder="4521KTR" />
+            </mat-form-field>
+          }
+          @if (usa('umbral')) {
+            <mat-form-field>
+              <mat-label>Umbral</mat-label>
+              <input matInput type="number" min="0.5" max="0.95" step="0.05" formControlName="umbral" />
+              <mat-hint>De 0,5 a 0,95</mat-hint>
+              <mat-error>{{ textoError(params.controls.umbral) }}</mat-error>
+            </mat-form-field>
+          }
+          @if (usa('agrupar')) {
+            <mat-form-field>
+              <mat-label>Agrupar</mat-label>
+              <mat-select formControlName="agrupar"
+                ><mat-option value="VIAJE">Por viaje</mat-option><mat-option value="RUTA">Por ruta</mat-option></mat-select
+              >
+            </mat-form-field>
+          }
+          <mat-form-field class="columnas">
+            <mat-label>Columnas</mat-label>
+            <mat-select formControlName="columnas" multiple placeholder="Todas">
+              @for (c of definicion()?.columnas ?? []; track c.clave) {
+                <mat-option [value]="c.clave">{{ c.titulo }}</mat-option>
+              }
+            </mat-select>
+            <mat-hint>Sin elegir, salen todas</mat-hint>
+          </mat-form-field>
+          <button mat-flat-button type="submit">Ver</button>
+          @if (mostrado) {
+            <button mat-stroked-button type="button" (click)="exportar('EXCEL')" [disabled]="exportando()">
+              <mat-icon>download</mat-icon>Exportar a Excel
+            </button>
+            <button mat-stroked-button type="button" (click)="exportar('PDF')" [disabled]="exportando()">
+              <mat-icon>download</mat-icon>Exportar a PDF
+            </button>
+          }
+        </form>
+      </cc-panel>
     }
     @if (cargando()) {
       <cc-esqueleto [filas]="6" />
@@ -174,6 +172,18 @@ import { ReportesFachada } from '../reportes.fachada';
       gap: 8px;
       flex-wrap: wrap;
       margin-bottom: 16px;
+    }
+    /* P12: en el teléfono los reportes van en una fila que se desplaza, no cinco filas antes de los parámetros. */
+    @media (max-width: 599px) {
+      .catalogo {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        padding-bottom: 4px;
+      }
+      .catalogo button {
+        flex: none;
+      }
     }
     .elegido {
       background: var(--mat-sys-secondary-container);

@@ -2,6 +2,7 @@ import { type ApplicationConfig, provideAppInitializer, inject, provideBrowserGl
 import { provideHttpClient } from '@angular/common/http';
 import { provideRouter, type Routes, withComponentInputBinding } from '@angular/router';
 import { MAT_DATE_LOCALE } from '@angular/material/core';
+import { MAT_FORM_FIELD_DEFAULT_OPTIONS } from '@angular/material/form-field';
 import { MAT_ICON_DEFAULT_OPTIONS } from '@angular/material/icon';
 import { MatPaginatorIntl } from '@angular/material/paginator';
 import { MAT_TABS_CONFIG } from '@angular/material/tabs';
@@ -22,6 +23,8 @@ export function configurarApp(config: ConfigCentro, rutas: Routes): ApplicationC
       { provide: MatPaginatorIntl, useClass: PaginadorEs },
       // Pestañas de sección con su ancho y alineadas a la izquierda, no estiradas a todo el ancho (JV-4).
       { provide: MAT_TABS_CONFIG, useValue: { stretchTabs: false } },
+      // DS: todos los campos con contorno, como la barra de lista; el relleno gris se leía como deshabilitado.
+      { provide: MAT_FORM_FIELD_DEFAULT_OPTIONS, useValue: { appearance: 'outline' } },
       provideHttpClient(),
       provideAppInitializer(() => inject(Sesion).iniciar()),
       ...proveerApollo(),

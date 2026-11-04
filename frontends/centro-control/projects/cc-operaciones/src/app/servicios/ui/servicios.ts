@@ -98,7 +98,14 @@ import { ServiciosFachada } from '../servicios.fachada';
         ></ng-container>
         <ng-container matColumnDef="carga"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Carga</th>
-          <td mat-cell *matCellDef="let s">{{ s.tipoCarga | etiqueta: 'TipoCarga' }} · {{ s.toneladas | numero }} t</td></ng-container
+          <td mat-cell *matCellDef="let s">
+            <!-- P11: un servicio rechazado antes de cotizar no trae carga; un solo «Sin dato», no «Sin dato · Sin dato t». -->
+            @if (s.tipoCarga) {
+              {{ s.tipoCarga | etiqueta: 'TipoCarga' }} · {{ s.toneladas | numero }} t
+            } @else {
+              <span class="secundario">Sin dato</span>
+            }
+          </td></ng-container
         >
         <ng-container matColumnDef="fecha"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Fecha</th>
@@ -106,7 +113,13 @@ import { ServiciosFachada } from '../servicios.fachada';
         >
         <ng-container matColumnDef="unidad"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Unidad</th>
-          <td mat-cell *matCellDef="let s">{{ s.placa }} · {{ s.choferNombre }}</td></ng-container
+          <td mat-cell *matCellDef="let s">
+            @if (s.placa || s.choferNombre) {
+              {{ s.placa ?? '' }}{{ s.placa && s.choferNombre ? ' · ' : '' }}{{ s.choferNombre ?? '' }}
+            } @else {
+              <span class="secundario">Sin dato</span>
+            }
+          </td></ng-container
         >
         <ng-container matColumnDef="monto"
           ><th mat-header-cell *matHeaderCellDef mat-sort-header>Monto</th>

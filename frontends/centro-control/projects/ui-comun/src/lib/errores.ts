@@ -1,5 +1,5 @@
-import { CombinedGraphQLErrors } from '@apollo/client/errors';
-import { mensajeCodigo, SIN_CONEXION } from 'ui-comun/dominio';
+import { CombinedGraphQLErrors, ServerError, ServerParseError } from '@apollo/client/errors';
+import { mensajeCodigo, SIN_CONEXION, SIN_RESPUESTA_VALIDA } from 'ui-comun/dominio';
 
 /** El `codigo` de 000 §5 que el Gateway pone en `extensions`: las pantallas deciden por él, no por el texto. */
 export function codigoDe(error: unknown): string | undefined {
@@ -9,10 +9,12 @@ export function codigoDe(error: unknown): string | undefined {
 
 /**
  * Lo que se dice en pantalla por un error (PRODUCT.md, "Tono"): la frase del `codigo` (ui-comun/dominio, errores.ts),
- * nunca el `message` del servidor. Sin respuesta GraphQL (red caída, Gateway sin responder), que no hay conexión.
+ * nunca el `message` del servidor. Si el servidor respondió sin datos (P7), que no pudo atender; si ni respondió (red caída,
+ * Gateway apagado), que no hay conexión.
  */
 export function mensajeDe(error: unknown): string {
-  return CombinedGraphQLErrors.is(error) ? mensajeCodigo(codigoDe(error)) : SIN_CONEXION;
+  if (CombinedGraphQLErrors.is(error)) return mensajeCodigo(codigoDe(error));
+  return ServerError.is(error) || ServerParseError.is(error) ? SIN_RESPUESTA_VALIDA : SIN_CONEXION;
 }
 
 /** Mientras no llega la primera respuesta, la página muestra el esqueleto (no "no hay datos"). */

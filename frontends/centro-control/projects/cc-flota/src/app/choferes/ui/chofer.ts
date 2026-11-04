@@ -1,7 +1,6 @@
 import { afterNextRender, Component, computed, effect, inject, Injector, input, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -23,23 +22,24 @@ import {
   NumeroPipe,
   Sesion,
   textoError,
+  Panel,
 } from 'ui-comun';
 import { PUNTAJE_BAJO } from '../../conduccion/domain/conduccion';
 import { ChoferFachada } from '../choferes.fachada';
 import { CATEGORIAS_LICENCIA, estadoChofer, puedeInhabilitar, vigenciaLicencia, type DetalleChofer } from '../domain/chofer';
 
-type Panel = 'editar' | 'inhabilitar';
+type PanelAbierto = 'editar' | 'inhabilitar';
 
 /** Ficha de un chofer (G3): licencia, estado y su conducción de la semana (D84); el jefe de flota la edita (D104). */
 @Component({
   selector: 'app-chofer',
   providers: [ChoferFachada],
   imports: [
+    Panel,
     ReactiveFormsModule,
     Campo,
     Confirmacion,
     MatButtonModule,
-    MatCardModule,
     MatFormFieldModule,
     MatIconModule,
     MatInputModule,
@@ -120,43 +120,39 @@ type Panel = 'editar' | 'inhabilitar';
       }
 
       @if (panel() === 'editar' && sesion.tiene('jefe_flota')) {
-        <mat-card class="formulario" id="editar">
-          <mat-card-header><mat-card-title>Editar chofer</mat-card-title></mat-card-header>
-          <mat-card-content>
-            <form [formGroup]="edicion" (ngSubmit)="editar(c.choferId, formEditar)" #formEditar novalidate>
-              <div class="fila-acciones">
-                <mat-form-field>
-                  <mat-label>Nombre</mat-label>
-                  <input matInput formControlName="nombre" />
-                  <mat-error>{{ textoError(edicion.controls.nombre) }}</mat-error>
-                </mat-form-field>
-                <mat-form-field>
-                  <mat-label>Categoría de licencia</mat-label>
-                  <mat-select formControlName="licenciaCategoria">
-                    @for (cat of categorias; track cat) {
-                      <mat-option [value]="cat">{{ cat }}</mat-option>
-                    }
-                  </mat-select>
-                </mat-form-field>
-                <mat-form-field>
-                  <mat-label>Licencia vence</mat-label>
-                  <input matInput type="date" formControlName="licenciaVenceEl" />
-                  <mat-error>{{ textoError(edicion.controls.licenciaVenceEl) }}</mat-error>
-                </mat-form-field>
-              </div>
-              <div class="fila-acciones">
-                <button mat-flat-button type="submit" [disabled]="enviando()" disabledInteractive>Guardar</button>
-                <button mat-button type="button" (click)="cerrarPanel()" [disabled]="enviando()">Cancelar</button>
-              </div>
-            </form>
-          </mat-card-content>
-        </mat-card>
+        <cc-panel class="formulario" id="editar" titulo="Editar chofer">
+          <form [formGroup]="edicion" (ngSubmit)="editar(c.choferId, formEditar)" #formEditar novalidate>
+            <div class="fila-acciones">
+              <mat-form-field>
+                <mat-label>Nombre</mat-label>
+                <input matInput formControlName="nombre" />
+                <mat-error>{{ textoError(edicion.controls.nombre) }}</mat-error>
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Categoría de licencia</mat-label>
+                <mat-select formControlName="licenciaCategoria">
+                  @for (cat of categorias; track cat) {
+                    <mat-option [value]="cat">{{ cat }}</mat-option>
+                  }
+                </mat-select>
+              </mat-form-field>
+              <mat-form-field>
+                <mat-label>Licencia vence</mat-label>
+                <input matInput type="date" formControlName="licenciaVenceEl" />
+                <mat-error>{{ textoError(edicion.controls.licenciaVenceEl) }}</mat-error>
+              </mat-form-field>
+            </div>
+            <div class="fila-acciones">
+              <button mat-flat-button type="submit" [disabled]="enviando()" disabledInteractive>Guardar</button>
+              <button mat-button type="button" (click)="cerrarPanel()" [disabled]="enviando()">Cancelar</button>
+            </div>
+          </form>
+        </cc-panel>
       }
 
       @if (panel() === 'inhabilitar' && sesion.tiene('jefe_flota') && puedeInhabilitar(c)) {
-        <mat-card class="formulario" id="inhabilitar">
-          <mat-card-header><mat-card-title>Inhabilitar chofer</mat-card-title></mat-card-header>
-          <mat-card-content #zona>
+        <cc-panel class="formulario" id="inhabilitar" titulo="Inhabilitar chofer">
+          <div #zona>
             <mat-form-field class="ancho">
               <mat-label>Motivo</mat-label>
               <input matInput [formControl]="motivo" />
@@ -178,54 +174,55 @@ type Panel = 'editar' | 'inhabilitar';
                 <button mat-button type="button" (click)="cerrarPanel()">Cancelar</button>
               </div>
             }
-          </mat-card-content>
-        </mat-card>
+          </div>
+        </cc-panel>
       }
 
-      <h2>Conducción de la semana</h2>
-      @if (puntajes(); as p) {
-        @if (resumen(); as r) {
-          <dl class="datos">
-            <div>
-              <dt>Puntaje (0 a 100)</dt>
-              <dd [class.no-disponible]="r.puntaje < puntajeBajo">
-                @if (r.puntaje < puntajeBajo) {
-                  <mat-icon class="icono-en-linea">warning</mat-icon>
-                }
-                {{ r.puntaje | numero: 1 }}
-                @if (r.puntaje < puntajeBajo) {
-                  <span class="cdk-visually-hidden">, bajo {{ puntajeBajo }}</span>
-                }
-              </dd>
-            </div>
-            <div>
-              <dt>Kilómetros</dt>
-              <dd>{{ r.km | numero: 0 }} km</dd>
-            </div>
-            <div>
-              <dt>Frenadas bruscas</dt>
-              <dd>{{ r.frenadas }}</dd>
-            </div>
-            <div>
-              <dt>Alertas de fatiga</dt>
-              <dd>{{ r.fatigas }}</dd>
-            </div>
-          </dl>
-          <h3>Viajes</h3>
-          <ul>
-            @for (v of p.viajes; track v.viajeId) {
-              <li>
-                Viaje {{ $index + 1 }}: puntaje {{ v.puntaje | numero: 1 }}, {{ v.km | numero: 0 }} km, {{ v.frenadas }}
-                {{ v.frenadas === 1 ? 'frenada brusca' : 'frenadas bruscas' }}
-              </li>
-            } @empty {
-              <li class="secundario">Sin viajes en el periodo.</li>
-            }
-          </ul>
-        } @else {
-          <p class="secundario">Sin viajes del {{ p.desde | fecha }} al {{ p.hasta | fecha }}.</p>
+      <cc-panel titulo="Conducción de la semana">
+        @if (puntajes(); as p) {
+          @if (resumen(); as r) {
+            <dl class="datos">
+              <div>
+                <dt>Puntaje (0 a 100)</dt>
+                <dd [class.no-disponible]="r.puntaje < puntajeBajo">
+                  @if (r.puntaje < puntajeBajo) {
+                    <mat-icon class="icono-en-linea">warning</mat-icon>
+                  }
+                  {{ r.puntaje | numero: 1 }}
+                  @if (r.puntaje < puntajeBajo) {
+                    <span class="cdk-visually-hidden">, bajo {{ puntajeBajo }}</span>
+                  }
+                </dd>
+              </div>
+              <div>
+                <dt>Kilómetros</dt>
+                <dd>{{ r.km | numero: 0 }} km</dd>
+              </div>
+              <div>
+                <dt>Frenadas bruscas</dt>
+                <dd>{{ r.frenadas }}</dd>
+              </div>
+              <div>
+                <dt>Alertas de fatiga</dt>
+                <dd>{{ r.fatigas }}</dd>
+              </div>
+            </dl>
+            <h3>Viajes</h3>
+            <ul>
+              @for (v of p.viajes; track v.viajeId) {
+                <li>
+                  Viaje {{ $index + 1 }}: puntaje {{ v.puntaje | numero: 1 }}, {{ v.km | numero: 0 }} km, {{ v.frenadas }}
+                  {{ v.frenadas === 1 ? 'frenada brusca' : 'frenadas bruscas' }}
+                </li>
+              } @empty {
+                <li class="secundario">Sin viajes en el periodo.</li>
+              }
+            </ul>
+          } @else {
+            <p class="secundario">Sin viajes del {{ p.desde | fecha }} al {{ p.hasta | fecha }}.</p>
+          }
         }
-      }
+      </cc-panel>
     }
   `,
   styles: `
@@ -260,7 +257,7 @@ export class ChoferPagina {
     return c ? vigenciaLicencia(c) : undefined;
   });
   readonly resumen = computed(() => this.puntajes()?.choferes.find((x) => x.choferId === this.id()));
-  readonly panel = signal<Panel | null>(null);
+  readonly panel = signal<PanelAbierto | null>(null);
   readonly enviando = signal(false);
   /** Inhabilitar saca al chofer de las reservas: con el motivo escrito se pide un segundo clic. */
   readonly confirmando = signal(false);
@@ -277,7 +274,7 @@ export class ChoferPagina {
   }
 
   /** Abre un panel con el foco en su primer campo; abrir otro cierra el anterior. */
-  abrirPanel(panel: Panel): void {
+  abrirPanel(panel: PanelAbierto): void {
     this.volverDeConfirmar(false);
     this.motivo.reset();
     this.panel.set(panel);

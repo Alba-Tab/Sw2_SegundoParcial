@@ -28,7 +28,7 @@ const ENLACES: { ruta: '' | Pagina; titulo: string; icono: Icono }[] = [
           #a="routerLinkActive"
           [active]="a.isActive"
           ><mat-icon>{{ e.icono }}</mat-icon
-          >{{ e.titulo }}</a
+          ><span class="texto-pestana">{{ e.titulo }}</span></a
         >
       }
     </nav>

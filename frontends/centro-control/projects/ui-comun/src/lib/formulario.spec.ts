@@ -1,7 +1,7 @@
 import { Component } from '@angular/core';
 import { TestBed } from '@angular/core/testing';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
-import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { CombinedGraphQLErrors, ServerError } from '@apollo/client/errors';
 import { errorPeriodo, ETIQUETAS, ICONOS, MENSAJES_ERROR, mensajeCampo, montoConDecimales } from 'ui-comun/dominio';
 import { cargandoDe, mensajeDe } from './errores';
 import {
@@ -180,6 +180,9 @@ describe('errores en pantalla (000 §5)', () => {
     expect(mensajeDe(conCodigo('PAGO_EXCEDE_SALDO'))).toBe('El monto supera el saldo de la factura.');
     expect(mensajeDe(conCodigo('CODIGO_NUEVO'))).toBe('No se pudo completar la operación. Intenta de nuevo.');
     expect(mensajeDe(new TypeError('Failed to fetch'))).toContain('No se pudo hablar con el servidor');
+    // P7: un 400 responde el servidor; no se manda a revisar la conexión.
+    const respuesta400 = new ServerError('400', { response: new Response(null, { status: 400 }), bodyText: '' });
+    expect(mensajeDe(respuesta400)).toBe('El servidor no pudo atender la consulta. Intenta de nuevo en un momento.');
     for (const texto of Object.values(MENSAJES_ERROR)) expect(texto).not.toMatch(/[A-Z]{2,}_[A-Z]/);
   });
 

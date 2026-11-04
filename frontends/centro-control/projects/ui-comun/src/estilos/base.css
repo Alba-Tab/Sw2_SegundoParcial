@@ -57,6 +57,10 @@ li {
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 16px;
 }
+/* En una grilla de paneles (aprobaciones, acciones del agente) el espacio lo da el gap, no el margen del panel. */
+.tarjetas > cc-panel {
+  margin: 0;
+}
 .fila-acciones {
   display: flex;
   gap: 8px;
@@ -83,18 +87,138 @@ li {
   font: var(--mat-sys-body-medium);
   color: var(--mat-sys-on-surface-variant);
 }
+/*
+ * Listas con densidad de escritorio (P4): filas de 44 px, encabezado con fondo y la tabla en un panel con borde, como
+ * en un ERP. En táctil las filas vuelven a 52 px para el dedo.
+ */
+:root {
+  --mat-table-row-item-container-height: var(--tc-alto-fila);
+  --mat-table-header-container-height: var(--tc-alto-fila);
+  --mat-table-background-color: var(--mat-sys-surface-container-lowest);
+  --mat-table-header-headline-color: var(--mat-sys-on-surface-variant);
+}
+@media (pointer: coarse) {
+  :root {
+    --mat-table-row-item-container-height: var(--tc-alto-fila-tactil);
+  }
+}
 .tabla-ancha {
   width: 100%;
   overflow-x: auto;
+  border: var(--tc-borde-fino) solid var(--mat-sys-outline-variant);
+  border-radius: var(--tc-radio-md);
+  background: var(--mat-sys-surface-container-lowest);
+  box-shadow: var(--tc-elevacion-1);
 }
 table {
   width: 100%;
 }
+.tabla-ancha .mat-mdc-header-row {
+  background: var(--mat-sys-surface-container);
+}
+.tabla-ancha .mat-mdc-row:last-child .mat-mdc-cell {
+  border-bottom: 0;
+}
+/* DS4: la barra de lista y su tabla forman un solo bloque, con la barra como cabecera. */
+cc-filtros-lista:has(+ .tabla-ancha) {
+  margin-bottom: 0;
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  box-shadow: none;
+}
+cc-filtros-lista + .tabla-ancha {
+  border-top: 0;
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+/* Fila de totales (P6): separada por una línea y en negrita, como el pie de un listado contable. */
+.tabla-ancha .mat-mdc-footer-row {
+  background: var(--mat-sys-surface-container-low);
+}
+.tabla-ancha .mat-mdc-footer-cell {
+  font-weight: 600;
+  border-top: var(--tc-borde-fino) solid var(--mat-sys-outline-variant);
+}
+.tabla-ancha .mat-mdc-row:hover {
+  background: var(--mat-sys-surface-container-low);
+}
+/*
+ * Una celda corta no se parte (P1): «Remolque Cisterna» o una fecha quedan en una línea y la tabla se desplaza dentro de
+ * su caja. Las columnas de texto libre sí ajustan, con un ancho mínimo para no quedar en una palabra por línea.
+ */
+.tabla-ancha td {
+  white-space: nowrap;
+}
+.tabla-ancha td:is(.mat-column-observacion, .mat-column-nota, .mat-column-accion, .ajustar) {
+  white-space: normal;
+  min-width: 240px;
+}
+/* Al desplazar a lo ancho, la primera columna (la que enlaza al detalle) queda fija para no perder la fila. */
+@media (max-width: 899px) {
+  .tabla-ancha :is(th, td):first-child {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: inherit;
+    box-shadow: inset -1px 0 0 var(--mat-sys-outline-variant);
+  }
+  .tabla-ancha .mat-mdc-row,
+  .tabla-ancha td:first-child {
+    background: var(--mat-sys-surface-container-lowest);
+  }
+  .tabla-ancha th:first-child {
+    background: var(--mat-sys-surface-container);
+  }
+}
+/*
+ * Cifras a la derecha con dígitos de ancho fijo (P3): montos, km y litros se comparan de un vistazo. Va por el nombre de
+ * la columna, así toda tabla nueva con esos nombres lo hereda; `.num` para otra columna numérica.
+ */
+.mat-mdc-table
+  :is(
+    .mat-column-monto,
+    .mat-column-saldo,
+    .mat-column-limite,
+    .mat-column-utilizado,
+    .mat-column-reservado,
+    .mat-column-disponible,
+    .mat-column-km,
+    .mat-column-litros,
+    .mat-column-kmPorLitro,
+    .mat-column-distancia,
+    .mat-column-puntaje,
+    .mat-column-frenadas,
+    .mat-column-fatigas,
+    .num
+  ) {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.mat-mdc-table
+  th:is(
+    .mat-column-monto,
+    .mat-column-saldo,
+    .mat-column-limite,
+    .mat-column-utilizado,
+    .mat-column-reservado,
+    .mat-column-disponible,
+    .mat-column-km,
+    .mat-column-litros,
+    .mat-column-kmPorLitro,
+    .mat-column-distancia,
+    .mat-column-puntaje,
+    .mat-column-frenadas,
+    .mat-column-fatigas,
+    .num
+  )
+  .mat-sort-header-container {
+  justify-content: flex-end;
+}
 
-/* Detalle (U2): lista de definiciones en dos columnas que pasa a una en pantallas angostas. Sin tarjetas. */
+/* Detalle (U2, P5): lista de definiciones en columnas de 240 px como mínimo (3 o 4 en escritorio, 1 en móvil). Sin tarjetas. */
 .datos {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
   gap: 16px 32px;
   margin: 0 0 24px;
 }
@@ -122,6 +246,28 @@ table {
 /* Icono dentro de una pestaña de sección: acompaña al texto. */
 .mat-mdc-tab-link mat-icon {
   margin-right: 8px;
+}
+/*
+ * Bajo 600 px las pestañas quedan solo con su ícono (P9): todas caben sin flechas ni texto cortado («Mantenimie»). El
+ * nombre sigue para el lector de pantalla y el `h1` de la página dice lo mismo que la pestaña activa.
+ */
+@media (max-width: 599px) {
+  .mat-mdc-tab-nav-bar .mat-mdc-tab-link.mdc-tab {
+    min-width: 48px;
+    padding-inline: 12px;
+    flex-grow: 1;
+  }
+  .mat-mdc-tab-link mat-icon {
+    margin-right: 0;
+  }
+  .texto-pestana {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
 }
 
 /* Fila marcada al llegar desde una alerta (`/combustible/:id`). */

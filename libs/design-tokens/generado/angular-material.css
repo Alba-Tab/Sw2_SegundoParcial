@@ -50,6 +50,36 @@
   --mat-sys-corner-medium: 12px;
   --mat-sys-corner-large: 16px;
   --mat-sys-body-large-font: Roboto, "Helvetica Neue", Arial, sans-serif;
+  --tc-fuente-base: Roboto, "Helvetica Neue", Arial, sans-serif;
+  --tc-fuente-mono: "Roboto Mono", ui-monospace, monospace;
+  --tc-tamano-xs: 12px;
+  --tc-tamano-sm: 14px;
+  --tc-tamano-md: 16px;
+  --tc-tamano-lg: 20px;
+  --tc-tamano-xl: 24px;
+  --tc-tamano-xxl: 32px;
+  --tc-espacio-1: 4px;
+  --tc-espacio-2: 8px;
+  --tc-espacio-3: 12px;
+  --tc-espacio-4: 16px;
+  --tc-espacio-5: 20px;
+  --tc-espacio-6: 24px;
+  --tc-espacio-8: 32px;
+  --tc-espacio-10: 40px;
+  --tc-espacio-12: 48px;
+  --tc-espacio-unidad: 8px;
+  --tc-radio-sm: 8px;
+  --tc-radio-md: 12px;
+  --tc-radio-lg: 16px;
+  --tc-radio-completo: 999px;
+  --tc-alto-fila: 44px;
+  --tc-alto-fila-tactil: 52px;
+  --tc-alto-control: 40px;
+  --tc-alto-barra: 56px;
+  --tc-borde-fino: 1px;
+  --tc-elevacion-0: none;
+  --tc-elevacion-1: 0 1px 2px rgb(16 24 40 / 0.06);
+  --tc-elevacion-2: 0 4px 12px rgb(16 24 40 / 0.08), 0 1px 3px rgb(16 24 40 / 0.06);
 }
 
 [data-tema="dark"] {

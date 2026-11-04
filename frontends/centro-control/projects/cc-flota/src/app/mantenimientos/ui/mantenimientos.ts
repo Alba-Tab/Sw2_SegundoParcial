@@ -109,7 +109,11 @@ import { MantenimientosFachada } from '../mantenimientos.fachada';
       vacio="No hay mantenimientos registrados."
       [error]="error()"
       [cargando]="cargando()"
-    />
+    >
+      <a mat-button vacio-accion routerLink="/unidades" [queryParams]="{ estado: 'MANTENIMIENTO_PENDIENTE' }"
+        ><mat-icon>build</mat-icon>Ver unidades con mantenimiento pendiente</a
+      >
+    </cc-pie-lista>
     @if (paginas.siguienteCursor()) {
       @if (paginas.error(); as e) {
         <p class="aviso-lista" role="alert">No se pudieron cargar más mantenimientos. {{ mensaje(e) }}</p>

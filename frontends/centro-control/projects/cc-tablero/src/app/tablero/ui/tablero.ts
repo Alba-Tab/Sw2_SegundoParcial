@@ -1,7 +1,22 @@
 import { Component, computed, inject } from '@angular/core';
 import { MatButtonToggleModule } from '@angular/material/button-toggle';
 import { MatIconModule } from '@angular/material/icon';
-import { AvisoServicios, BobPipe, CONFIG_CENTRO, DatosAl, Encabezado, Esqueleto, Estado, FechaPipe, pct, Sesion, urlEnApp } from 'ui-comun';
+import {
+  AvisoServicios,
+  BobPipe,
+  CONFIG_CENTRO,
+  Cifra,
+  DatosAl,
+  Encabezado,
+  Esqueleto,
+  Estado,
+  FechaPipe,
+  pct,
+  Panel,
+  Resumen,
+  Sesion,
+  urlEnApp,
+} from 'ui-comun';
 import { conPendientes, pendientes, type EstadoTarjeta, type Pendiente } from '../domain/tablero';
 import { TableroFachada } from '../tablero.fachada';
 
@@ -13,7 +28,20 @@ import { TableroFachada } from '../tablero.fachada';
 @Component({
   selector: 'app-tablero',
   providers: [TableroFachada],
-  imports: [MatButtonToggleModule, MatIconModule, Encabezado, Esqueleto, BobPipe, FechaPipe, Estado, AvisoServicios, DatosAl],
+  imports: [
+    Panel,
+    Resumen,
+    Cifra,
+    MatButtonToggleModule,
+    MatIconModule,
+    Encabezado,
+    Esqueleto,
+    BobPipe,
+    FechaPipe,
+    Estado,
+    AvisoServicios,
+    DatosAl,
+  ],
   template: `
     <cc-encabezado titulo="Tablero">
       <mat-button-toggle-group [value]="periodo()" (change)="periodo.set($event.value)" aria-label="Periodo de las cifras">
@@ -66,132 +94,122 @@ import { TableroFachada } from '../tablero.fachada';
 
       <section aria-labelledby="titulo-cifras">
         <h2 id="titulo-cifras">Cifras del periodo</h2>
-        <dl class="cifras">
+        <cc-resumen>
           @if (bloques.verViajes) {
-            <div>
-              <dt>Viajes en curso</dt>
-              <dd>
-                @switch (estado('viajesEnCurso')) {
-                  @case ('no-disponible') {
-                    <span class="no-disponible">Viajes no disponible</span>
-                  }
-                  @case ('sin-acceso') {
-                    <span class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>Sin acceso</span>
-                  }
-                  @default {
-                    {{ t.viajesEnCurso?.length ?? 'Sin dato' }}
-                  }
+            <cc-cifra etiqueta="Viajes en curso">
+              @switch (estado('viajesEnCurso')) {
+                @case ('no-disponible') {
+                  <span class="no-disponible">Viajes no disponible</span>
                 }
-              </dd>
-            </div>
+                @case ('sin-acceso') {
+                  <span class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>Sin acceso</span>
+                }
+                @default {
+                  {{ t.viajesEnCurso?.length ?? 'Sin dato' }}
+                }
+              }
+            </cc-cifra>
           }
           @if (bloques.verAlertas) {
-            <div>
-              <dt>Alertas abiertas</dt>
-              <dd>
-                @switch (estado('alertasAbiertas')) {
-                  @case ('no-disponible') {
-                    <span class="no-disponible">Analítica no disponible</span>
-                  }
-                  @case ('sin-acceso') {
-                    <span class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>Sin acceso</span>
-                  }
-                  @default {
-                    {{ t.alertasAbiertas ?? 'Sin dato' }}
-                  }
+            <cc-cifra etiqueta="Alertas abiertas">
+              @switch (estado('alertasAbiertas')) {
+                @case ('no-disponible') {
+                  <span class="no-disponible">Analítica no disponible</span>
                 }
-              </dd>
-            </div>
+                @case ('sin-acceso') {
+                  <span class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>Sin acceso</span>
+                }
+                @default {
+                  {{ t.alertasAbiertas ?? 'Sin dato' }}
+                }
+              }
+            </cc-cifra>
           }
           @if (bloques.verCobranza) {
-            <div>
-              <dt>Cuentas por cobrar</dt>
-              <dd>
-                @switch (estado('cuentasPorCobrar')) {
-                  @case ('no-disponible') {
-                    <span class="no-disponible">Finanzas no disponible</span>
-                  }
-                  @case ('sin-acceso') {
-                    <span class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>Sin acceso</span>
-                  }
-                  @default {
-                    @if (t.cuentasPorCobrar; as c) {
-                      {{ c.saldoTotal | bob }}
-                      <span class="secundario">· {{ c.facturasPorVencer }} por vencer · {{ c.facturasVencidas }} vencidas</span>
-                    } @else {
-                      Sin dato
-                    }
+            <cc-cifra etiqueta="Cuentas por cobrar">
+              @switch (estado('cuentasPorCobrar')) {
+                @case ('no-disponible') {
+                  <span class="no-disponible">Finanzas no disponible</span>
+                }
+                @case ('sin-acceso') {
+                  <span class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>Sin acceso</span>
+                }
+                @default {
+                  @if (t.cuentasPorCobrar; as c) {
+                    {{ c.saldoTotal | bob }}
+                    <span class="secundario"
+                      >{{ c.facturasPorVencer }} por vencer · {{ c.facturasVencidas }}
+                      {{ c.facturasVencidas === 1 ? 'vencida' : 'vencidas' }}</span
+                    >
+                  } @else {
+                    Sin dato
                   }
                 }
-              </dd>
-            </div>
+              }
+            </cc-cifra>
           }
           @if (bloques.verUnidades) {
-            <div class="completo">
-              <!-- JV-6: un viaje ocupa un tracto y un remolque; «En viaje 2» junto a «Viajes en curso 1» no es un error. -->
-              <dt>Unidades por estado (tractos y remolques)</dt>
-              <dd class="unidades">
-                @switch (estado('unidadesPorEstado')) {
-                  @case ('no-disponible') {
-                    <span class="no-disponible">Flota no disponible</span>
-                  }
-                  @case ('sin-acceso') {
-                    <span class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>Sin acceso</span>
-                  }
-                  @default {
-                    @for (u of t.unidadesPorEstado ?? []; track u.estado) {
-                      <span><cc-estado grupo="EstadoUnidad" [valor]="u.estado" /> {{ u.cantidad }}</span>
-                    }
+            <!-- JV-6: un viaje ocupa un tracto y un remolque; «En viaje 2» junto a «Viajes en curso 1» no es un error. -->
+            <cc-cifra etiqueta="Unidades por estado (tractos y remolques)" [completa]="true">
+              @switch (estado('unidadesPorEstado')) {
+                @case ('no-disponible') {
+                  <span class="no-disponible">Flota no disponible</span>
+                }
+                @case ('sin-acceso') {
+                  <span class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>Sin acceso</span>
+                }
+                @default {
+                  @for (u of t.unidadesPorEstado ?? []; track u.estado) {
+                    <span><cc-estado grupo="EstadoUnidad" [valor]="u.estado" /> {{ u.cantidad }}</span>
                   }
                 }
-              </dd>
-            </div>
+              }
+            </cc-cifra>
           }
-        </dl>
+        </cc-resumen>
       </section>
 
       @if (bloques.verViajes && !estado('viajesEnCurso') && t.viajesEnCurso?.length) {
-        <h2>Viajes en curso</h2>
-        <ul class="lineas">
-          @for (v of t.viajesEnCurso; track v.viajeId) {
-            <li>
-              @if (enlaceViaje(v.viajeId); as url) {
-                <a [href]="url">{{ v.placa ?? 'Sin unidad' }}</a>
-              } @else {
-                {{ v.placa ?? 'Sin unidad' }}
-              }
-              @if (detalleViaje(v); as d) {
-                · {{ d }}
-              }
-              @if (v.riesgo?.enRiesgo) {
-                <cc-estado grupo="Riesgo" valor="EN_RIESGO" /> {{ pct(v.riesgo.probabilidad) }}
-              }
-            </li>
-          }
-        </ul>
+        <cc-panel titulo="Viajes en curso">
+          <ul class="lineas">
+            @for (v of t.viajesEnCurso; track v.viajeId) {
+              <li>
+                @if (enlaceViaje(v.viajeId); as url) {
+                  <a [href]="url">{{ v.placa ?? 'Sin unidad' }}</a>
+                } @else {
+                  {{ v.placa ?? 'Sin unidad' }}
+                }
+                @if (detalleViaje(v); as d) {
+                  · {{ d }}
+                }
+                @if (v.riesgo?.enRiesgo) {
+                  <cc-estado grupo="Riesgo" valor="EN_RIESGO" /> {{ pct(v.riesgo.probabilidad) }}
+                }
+              </li>
+            }
+          </ul>
+        </cc-panel>
       }
       @if (bloques.verCobranza && !estado('cuentasPorCobrar') && t.cuentasPorCobrar?.proximas?.length) {
-        <h2>Próximas a vencer</h2>
-        <ul class="lineas">
-          @for (f of t.cuentasPorCobrar.proximas; track f.facturaId) {
-            <li>
-              @if (enlaceFactura(f.facturaId); as url) {
-                <a class="sin-corte" [href]="url">{{ f.numero }}</a>
-              } @else {
-                <span class="sin-corte">{{ f.numero }}</span>
-              }
-              · {{ f.razonSocial }} · {{ f.saldo | bob }} · vence
-              {{ f.venceEl | fecha }}
-            </li>
-          }
-        </ul>
+        <cc-panel titulo="Próximas a vencer">
+          <ul class="lineas">
+            @for (f of t.cuentasPorCobrar.proximas; track f.facturaId) {
+              <li>
+                @if (enlaceFactura(f.facturaId); as url) {
+                  <a class="sin-corte" [href]="url">{{ f.numero }}</a>
+                } @else {
+                  <span class="sin-corte">{{ f.numero }}</span>
+                }
+                · {{ f.razonSocial }} · {{ f.saldo | bob }} · vence
+                {{ f.venceEl | fecha }}
+              </li>
+            }
+          </ul>
+        </cc-panel>
       }
     }
   `,
   styles: `
-    h2 {
-      margin-top: 24px;
-    }
     .pendientes,
     .lineas {
       list-style: none;
@@ -241,29 +259,6 @@ import { TableroFachada } from '../tablero.fachada';
     }
     .pendientes .detalle {
       font: var(--mat-sys-body-medium);
-    }
-    .cifras {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 16px 40px;
-      margin: 0;
-    }
-    .cifras dt {
-      font: var(--mat-sys-label-large);
-      color: var(--mat-sys-on-surface-variant);
-    }
-    .cifras dd {
-      margin: 4px 0 0;
-      font: var(--mat-sys-title-large);
-    }
-    .cifras .completo {
-      flex-basis: 100%;
-    }
-    .cifras .unidades {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px 16px;
-      font: var(--mat-sys-body-large);
     }
     .lineas li {
       padding: 6px 0;

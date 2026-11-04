@@ -1,7 +1,6 @@
 import { Component, inject, signal } from '@angular/core';
 import { FormControl, ReactiveFormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -26,6 +25,7 @@ import {
   PieLista,
   Sesion,
   textoError,
+  Panel,
 } from 'ui-comun';
 import { CreditoFachada } from '../credito.fachada';
 
@@ -34,11 +34,11 @@ import { CreditoFachada } from '../credito.fachada';
   selector: 'app-aprobaciones',
   providers: [CreditoFachada],
   imports: [
+    Panel,
     Encabezado,
     ReactiveFormsModule,
     Campo,
     Confirmacion,
-    MatCardModule,
     MatButtonModule,
     MatIconModule,
     MatFormFieldModule,
@@ -70,79 +70,73 @@ import { CreditoFachada } from '../credito.fachada';
     />
     <div class="tarjetas">
       @for (s of lista.visibles(); track s.servicioId) {
-        <mat-card>
-          <mat-card-header>
-            <mat-card-title>{{ s.razonSocial }} · {{ s.monto | bob }}</mat-card-title>
-            <mat-card-subtitle
-              ><cc-estado grupo="EstadoAprobacion" [valor]="s.estado" /> · vence {{ s.venceEn | fecha: true }}</mat-card-subtitle
-            >
-          </mat-card-header>
-          <mat-card-content>
-            <p>
-              Motivos:
-              @for (m of s.motivos; track m) {
-                {{ m | etiqueta: 'MotivoAprobacion' }}{{ $last ? '' : ', ' }}
-              }
-            </p>
-            @for (f of s.facturasVencidas ?? []; track f.facturaId) {
-              <p class="secundario">{{ f.numero }} · {{ f.saldo | bob }} · vencida hace {{ f.diasVencida }} días</p>
+        <cc-panel titulo="{{ s.razonSocial }} · {{ s.monto | bob }}">
+          <span panel-detalle><cc-estado grupo="EstadoAprobacion" [valor]="s.estado" /> · vence {{ s.venceEn | fecha: true }}</span>
+
+          <p>
+            Motivos:
+            @for (m of s.motivos; track m) {
+              {{ m | etiqueta: 'MotivoAprobacion' }}{{ $last ? '' : ', ' }}
             }
-            @if (s.estado === 'PENDIENTE' && sesion.tiene('administracion')) {
-              @let motivo = motivoDe(s.servicioId);
-              <div #zona>
-                <mat-form-field class="ancho">
-                  <mat-label>Motivo</mat-label>
-                  <input matInput [formControl]="motivo" />
-                  <mat-hint>Obligatorio para rechazar (3 a 300 caracteres)</mat-hint>
-                  <mat-error>{{ textoError(motivo) }}</mat-error>
-                </mat-form-field>
-                @if (rechazando() === s.servicioId) {
-                  <cc-confirmacion
-                    [resumen]="
-                      'Se rechaza el crédito de ' +
-                      s.razonSocial +
-                      ' por ' +
-                      (s.monto | bob) +
-                      ' con el motivo «' +
-                      motivo.value.trim() +
-                      '»: el servicio se cancela. No se puede deshacer.'
-                    "
-                    accion="Sí, rechazar el crédito"
-                    icono="block"
-                    [enviando]="enviando()"
-                    (confirmar)="decidir(s.servicioId, false, zona)"
-                    (volver)="volver(s.servicioId)"
-                  />
-                } @else {
-                  <div class="fila-acciones">
-                    <button mat-flat-button (click)="decidir(s.servicioId, true, zona)" [disabled]="enviando()" disabledInteractive>
-                      <mat-icon>thumb_up</mat-icon>Aprobar
-                    </button>
-                    <button
-                      mat-stroked-button
-                      [id]="'rechazar-' + s.servicioId"
-                      (click)="pedirRechazo(s.servicioId, zona)"
-                      [disabled]="enviando()"
-                    >
-                      <mat-icon>block</mat-icon>Rechazar
-                    </button>
-                  </div>
-                }
-              </div>
-            } @else if (s.estado === 'PENDIENTE') {
-              <!-- R2F-3: solo administración decide (spec 012). -->
-              <p class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>La decide administración.</p>
-            } @else {
-              <!-- R2F-4: decididaPor es el sub (o «sistema» si venció); no se muestra. Solo administración decide. -->
-              @if (s.decididaPor && s.decididaPor !== 'sistema') {
-                <p class="secundario">Decidida por administración</p>
+          </p>
+          @for (f of s.facturasVencidas ?? []; track f.facturaId) {
+            <p class="secundario">{{ f.numero }} · {{ f.saldo | bob }} · vencida hace {{ f.diasVencida }} días</p>
+          }
+          @if (s.estado === 'PENDIENTE' && sesion.tiene('administracion')) {
+            @let motivo = motivoDe(s.servicioId);
+            <div #zona>
+              <mat-form-field class="ancho">
+                <mat-label>Motivo</mat-label>
+                <input matInput [formControl]="motivo" />
+                <mat-hint>Obligatorio para rechazar (3 a 300 caracteres)</mat-hint>
+                <mat-error>{{ textoError(motivo) }}</mat-error>
+              </mat-form-field>
+              @if (rechazando() === s.servicioId) {
+                <cc-confirmacion
+                  [resumen]="
+                    'Se rechaza el crédito de ' +
+                    s.razonSocial +
+                    ' por ' +
+                    (s.monto | bob) +
+                    ' con el motivo «' +
+                    motivo.value.trim() +
+                    '»: el servicio se cancela. No se puede deshacer.'
+                  "
+                  accion="Sí, rechazar el crédito"
+                  icono="block"
+                  [enviando]="enviando()"
+                  (confirmar)="decidir(s.servicioId, false, zona)"
+                  (volver)="volver(s.servicioId)"
+                />
+              } @else {
+                <div class="fila-acciones">
+                  <button mat-flat-button (click)="decidir(s.servicioId, true, zona)" [disabled]="enviando()" disabledInteractive>
+                    <mat-icon>thumb_up</mat-icon>Aprobar
+                  </button>
+                  <button
+                    mat-stroked-button
+                    [id]="'rechazar-' + s.servicioId"
+                    (click)="pedirRechazo(s.servicioId, zona)"
+                    [disabled]="enviando()"
+                  >
+                    <mat-icon>block</mat-icon>Rechazar
+                  </button>
+                </div>
               }
-              @if (s.motivoDecision) {
-                <p class="secundario">Motivo: {{ s.motivoDecision }}</p>
-              }
+            </div>
+          } @else if (s.estado === 'PENDIENTE') {
+            <!-- R2F-3: solo administración decide (spec 012). -->
+            <p class="secundario"><mat-icon class="icono-en-linea">lock_person</mat-icon>La decide administración.</p>
+          } @else {
+            <!-- R2F-4: decididaPor es el sub (o «sistema» si venció); no se muestra. Solo administración decide. -->
+            @if (s.decididaPor && s.decididaPor !== 'sistema') {
+              <p class="secundario">Decidida por administración</p>
             }
-          </mat-card-content>
-        </mat-card>
+            @if (s.motivoDecision) {
+              <p class="secundario">Motivo: {{ s.motivoDecision }}</p>
+            }
+          }
+        </cc-panel>
       }
     </div>
     <cc-pie-lista

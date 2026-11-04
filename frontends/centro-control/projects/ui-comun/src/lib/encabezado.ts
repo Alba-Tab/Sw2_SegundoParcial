@@ -48,9 +48,12 @@ import { MemoriaListas } from './lista';
     }
   `,
   styles: `
+    /* DS5: el encabezado es una banda separada del contenido por una línea, como la cabecera de un documento. */
     :host {
       display: block;
-      margin-bottom: 16px;
+      margin-bottom: var(--tc-espacio-6);
+      padding-bottom: var(--tc-espacio-4);
+      border-bottom: var(--tc-borde-fino) solid var(--mat-sys-outline-variant);
     }
     .origen {
       margin-bottom: 4px;
@@ -68,16 +71,21 @@ import { MemoriaListas } from './lista';
       content: '›' / '';
       padding: 0 8px;
     }
-    .migas a {
-      display: inline-flex;
-      align-items: center;
-      min-height: 44px;
-      color: var(--mat-sys-primary);
-    }
+    .migas a,
     .migas span {
       display: inline-flex;
       align-items: center;
-      min-height: 44px;
+      min-height: 28px;
+    }
+    .migas a {
+      color: var(--mat-sys-primary);
+    }
+    /* En táctil, 44 px para el dedo (CA-5); con mouse las migas son una línea discreta sobre el título. */
+    @media (pointer: coarse) {
+      .migas a,
+      .migas span {
+        min-height: 44px;
+      }
     }
     .fila {
       display: flex;

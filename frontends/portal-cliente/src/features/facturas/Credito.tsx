@@ -34,7 +34,8 @@ export function Credito() {
         <Antiguedad actualizadoEn={linea.dataUpdatedAt} fallo={linea.isError} />
         <Typography variant="h4" component="p">
           {dinero(l.disponible)}
-          <Typography component="span" color="text.secondary">
+          {/* En el teléfono, «disponible de …» va en su línea: no se corta entre la cifra y el límite. */}
+          <Typography component="span" color="text.secondary" sx={{ display: { xs: 'block', sm: 'inline' } }}>
             {' '}
             disponible de {dinero(l.limite)}
           </Typography>

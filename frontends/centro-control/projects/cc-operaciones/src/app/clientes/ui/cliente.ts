@@ -1,7 +1,6 @@
 import { afterNextRender, Component, effect, type ElementRef, inject, Injector, input, signal, viewChild } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButton, MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -27,6 +26,7 @@ import {
   Sesion,
   urlEnApp,
   NumeroPipe,
+  Panel,
 } from 'ui-comun';
 import { ClienteFachada } from '../clientes.fachada';
 import { CORREO, mensajeCampoCliente, NIT, nombreRuta, ROLES_EDICION_CLIENTE, type DatosCliente } from '../domain/cliente';
@@ -39,6 +39,7 @@ import { CORREO, mensajeCampoCliente, NIT, nombreRuta, ROLES_EDICION_CLIENTE, ty
   selector: 'app-cliente',
   providers: [ClienteFachada],
   imports: [
+    Panel,
     NumeroPipe,
     Esqueleto,
     Encabezado,
@@ -53,7 +54,6 @@ import { CORREO, mensajeCampoCliente, NIT, nombreRuta, ROLES_EDICION_CLIENTE, ty
     AvisoServicios,
     ReactiveFormsModule,
     Campo,
-    MatCardModule,
     MatFormFieldModule,
     MatInputModule,
   ],
@@ -94,35 +94,32 @@ import { CORREO, mensajeCampoCliente, NIT, nombreRuta, ROLES_EDICION_CLIENTE, ty
     />
     @if (cliente(); as c) {
       @if (editando()) {
-        <mat-card class="formulario" id="editar-cliente">
-          <mat-card-header><mat-card-title>Editar datos del cliente</mat-card-title></mat-card-header>
-          <mat-card-content>
-            <form [formGroup]="form" (ngSubmit)="guardar(c.clienteId, raiz)" #raiz novalidate>
-              <mat-form-field class="ancho">
-                <mat-label>Razón social</mat-label>
-                <input matInput formControlName="razonSocial" #primerCampo />
-                <mat-error>{{ texto('razonSocial') }}</mat-error>
+        <cc-panel class="formulario" id="editar-cliente" titulo="Editar datos del cliente">
+          <form [formGroup]="form" (ngSubmit)="guardar(c.clienteId, raiz)" #raiz novalidate>
+            <mat-form-field class="ancho">
+              <mat-label>Razón social</mat-label>
+              <input matInput formControlName="razonSocial" #primerCampo />
+              <mat-error>{{ texto('razonSocial') }}</mat-error>
+            </mat-form-field>
+            <div class="fila-acciones">
+              <mat-form-field>
+                <mat-label>NIT</mat-label>
+                <input matInput formControlName="nit" inputmode="numeric" />
+                <mat-error>{{ texto('nit') }}</mat-error>
               </mat-form-field>
-              <div class="fila-acciones">
-                <mat-form-field>
-                  <mat-label>NIT</mat-label>
-                  <input matInput formControlName="nit" inputmode="numeric" />
-                  <mat-error>{{ texto('nit') }}</mat-error>
-                </mat-form-field>
-                <mat-form-field>
-                  <mat-label>Correo de facturación</mat-label>
-                  <input matInput type="email" formControlName="correo" />
-                  <mat-hint>A él se envían los avisos</mat-hint>
-                  <mat-error>{{ texto('correo') }}</mat-error>
-                </mat-form-field>
-              </div>
-              <div class="fila-acciones">
-                <button mat-flat-button type="submit" [disabled]="enviando()" disabledInteractive>Guardar cambios</button>
-                <button mat-button type="button" (click)="cerrar()" [disabled]="enviando()">Cancelar</button>
-              </div>
-            </form>
-          </mat-card-content>
-        </mat-card>
+              <mat-form-field>
+                <mat-label>Correo de facturación</mat-label>
+                <input matInput type="email" formControlName="correo" />
+                <mat-hint>A él se envían los avisos</mat-hint>
+                <mat-error>{{ texto('correo') }}</mat-error>
+              </mat-form-field>
+            </div>
+            <div class="fila-acciones">
+              <button mat-flat-button type="submit" [disabled]="enviando()" disabledInteractive>Guardar cambios</button>
+              <button mat-button type="button" (click)="cerrar()" [disabled]="enviando()">Cancelar</button>
+            </div>
+          </form>
+        </cc-panel>
       }
       <dl class="datos">
         <div>
@@ -140,74 +137,88 @@ import { CORREO, mensajeCampoCliente, NIT, nombreRuta, ROLES_EDICION_CLIENTE, ty
       </dl>
 
       @if (verCredito) {
-        <h2>Línea de crédito</h2>
-        @if (linea(); as l) {
-          <!-- FL-2: la línea es de Finanzas; aquí se resume y se enlaza a la dueña del dato. -->
-          <dl class="datos">
-            <div>
-              <dt>Estado</dt>
-              <dd><cc-estado grupo="EstadoLineaCredito" [valor]="estadoLinea(l)" /></dd>
-            </div>
-            <div>
-              <dt>Disponible</dt>
-              <dd>
-                {{ l.disponible | bob }} <span class="secundario">de {{ l.limite | bob }}</span>
-              </dd>
-            </div>
-          </dl>
-          @if (urlLinea(c); as url) {
-            <a mat-button [href]="url"><mat-icon>open_in_new</mat-icon>Ver la línea en Finanzas</a>
-          } @else {
-            <p class="secundario">El detalle de la línea (reservado y utilizado) lo lleva Finanzas.</p>
+        <cc-panel titulo="Línea de crédito">
+          @if (linea() && urlLinea(c); as url) {
+            <a mat-button panel-acciones [href]="url"><mat-icon>open_in_new</mat-icon>Ver la línea en Finanzas</a>
           }
-        } @else if (!error()) {
-          <p class="secundario">El cliente no tiene línea de crédito.</p>
-        }
+          @if (linea(); as l) {
+            <!-- FL-2: la línea es de Finanzas; aquí se resume y se enlaza a la dueña del dato. -->
+            <dl class="datos">
+              <div>
+                <dt>Estado</dt>
+                <dd><cc-estado grupo="EstadoLineaCredito" [valor]="estadoLinea(l)" /></dd>
+              </div>
+              <div>
+                <dt>Disponible</dt>
+                <dd>
+                  {{ l.disponible | bob }} <span class="secundario">de {{ l.limite | bob }}</span>
+                </dd>
+              </div>
+            </dl>
+            @if (!urlLinea(c)) {
+              <p class="secundario">El detalle de la línea (reservado y utilizado) lo lleva Finanzas.</p>
+            }
+          } @else if (!error()) {
+            <p class="secundario">El cliente no tiene línea de crédito.</p>
+          }
+        </cc-panel>
       }
 
-      <h2>Servicios</h2>
-      @if (servicios().length) {
-        <div class="tabla-ancha" role="region" tabindex="0" aria-label="Servicios del cliente">
-          <table mat-table [dataSource]="servicios()">
-            <ng-container matColumnDef="fecha"
-              ><th mat-header-cell *matHeaderCellDef>Fecha</th>
-              <td mat-cell *matCellDef="let s">
-                @if (s.viajeId) {
-                  <a [routerLink]="['/viajes', s.viajeId]">{{ s.fechaViaje | fecha }}</a>
-                } @else {
-                  {{ s.fechaViaje | fecha }}
-                }
-              </td></ng-container
-            >
-            <ng-container matColumnDef="estado"
-              ><th mat-header-cell *matHeaderCellDef>Estado</th>
-              <td mat-cell *matCellDef="let s"><cc-estado grupo="EstadoServicio" [valor]="s.estado" /></td
-            ></ng-container>
-            <ng-container matColumnDef="carga"
-              ><th mat-header-cell *matHeaderCellDef>Ruta y carga</th>
-              <td mat-cell *matCellDef="let s">
-                {{ ruta(s.rutaId) }}
-                <span class="secundario">{{ s.tipoCarga | etiqueta: 'TipoCarga' }} · {{ s.toneladas | numero }} t</span>
-              </td></ng-container
-            >
-            <ng-container matColumnDef="placa"
-              ><th mat-header-cell *matHeaderCellDef>Unidad</th>
-              <td mat-cell *matCellDef="let s">{{ s.placa ?? 'Sin dato' }}</td></ng-container
-            >
-            <ng-container matColumnDef="monto"
-              ><th mat-header-cell *matHeaderCellDef>Monto</th>
-              <td mat-cell *matCellDef="let s">{{ s.monto | bob }}</td></ng-container
-            >
-            <tr mat-header-row *matHeaderRowDef="columnas"></tr>
-            <tr mat-row *matRowDef="let s; columns: columnas"></tr>
-          </table>
-        </div>
-        @if (servicios().length >= limiteServicios) {
-          <p class="secundario">Se muestran los últimos {{ limiteServicios }}.</p>
+      <cc-panel
+        titulo="Servicios"
+        [ras]="servicios().length > 0"
+        [detalle]="servicios().length >= limiteServicios ? 'Se muestran los últimos ' + limiteServicios : ''"
+      >
+        @if (servicios().length) {
+          <div class="tabla-ancha" role="region" tabindex="0" aria-label="Servicios del cliente">
+            <table mat-table [dataSource]="servicios()">
+              <ng-container matColumnDef="fecha"
+                ><th mat-header-cell *matHeaderCellDef>Fecha</th>
+                <td mat-cell *matCellDef="let s">
+                  <!-- P11: un enlace siempre dice a dónde va, aunque falte la fecha. -->
+                  @if (s.viajeId) {
+                    <a [routerLink]="['/viajes', s.viajeId]">{{ s.fechaViaje ? (s.fechaViaje | fecha) : 'Ver viaje' }}</a>
+                  } @else {
+                    {{ s.fechaViaje | fecha }}
+                  }
+                </td></ng-container
+              >
+              <ng-container matColumnDef="estado"
+                ><th mat-header-cell *matHeaderCellDef>Estado</th>
+                <td mat-cell *matCellDef="let s"><cc-estado grupo="EstadoServicio" [valor]="s.estado" /></td
+              ></ng-container>
+              <ng-container matColumnDef="carga"
+                ><th mat-header-cell *matHeaderCellDef>Ruta y carga</th>
+                <td mat-cell *matCellDef="let s">
+                  <!-- P11: lo que no llega se omite; si no llega nada, un solo «Sin dato». -->
+                  @if (s.rutaId || s.tipoCarga) {
+                    @if (s.rutaId) {
+                      {{ ruta(s.rutaId) }}
+                    }
+                    @if (s.tipoCarga) {
+                      <span class="secundario">{{ s.tipoCarga | etiqueta: 'TipoCarga' }} · {{ s.toneladas | numero }} t</span>
+                    }
+                  } @else {
+                    <span class="secundario">Sin dato</span>
+                  }
+                </td></ng-container
+              >
+              <ng-container matColumnDef="placa"
+                ><th mat-header-cell *matHeaderCellDef>Unidad</th>
+                <td mat-cell *matCellDef="let s">{{ s.placa ?? 'Sin dato' }}</td></ng-container
+              >
+              <ng-container matColumnDef="monto"
+                ><th mat-header-cell *matHeaderCellDef>Monto</th>
+                <td mat-cell *matCellDef="let s">{{ s.monto | bob }}</td></ng-container
+              >
+              <tr mat-header-row *matHeaderRowDef="columnas"></tr>
+              <tr mat-row *matRowDef="let s; columns: columnas"></tr>
+            </table>
+          </div>
+        } @else if (!error()) {
+          <p class="secundario">El cliente aún no tiene servicios.</p>
         }
-      } @else if (!error()) {
-        <p class="secundario">El cliente aún no tiene servicios.</p>
-      }
+      </cc-panel>
     }
   `,
   styles: `

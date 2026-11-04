@@ -1,7 +1,6 @@
 import { afterNextRender, Component, computed, type ElementRef, inject, input, output, signal, viewChild } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
@@ -20,6 +19,7 @@ import {
   montoMinimo,
   textoError,
   validarMonto,
+  Panel,
 } from 'ui-comun';
 import type { Icono } from 'ui-comun/dominio';
 import { disponibleCon, usadoDe, type AccionLinea, type ClienteConLinea, type Linea } from '../domain/linea';
@@ -37,67 +37,48 @@ const BOTON: Record<AccionLinea, { texto: string; icono: Icono }> = {
  */
 @Component({
   selector: 'app-gestion-linea',
-  imports: [
-    ReactiveFormsModule,
-    Campo,
-    Confirmacion,
-    MatCardModule,
-    MatButtonModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatIconModule,
-    BobPipe,
-  ],
+  imports: [Panel, ReactiveFormsModule, Campo, Confirmacion, MatButtonModule, MatFormFieldModule, MatInputModule, MatIconModule, BobPipe],
   template: `
     @let l = cliente().lineaCredito;
-    <mat-card class="gestion" id="gestion-linea">
-      <mat-card-header>
-        <mat-card-title>Línea de {{ cliente().razonSocial }}</mat-card-title>
-        <mat-card-subtitle>Usado {{ usado() | bob }} de {{ l.limite | bob }}{{ l.suspendida ? ' · suspendida' : '' }}</mat-card-subtitle>
-      </mat-card-header>
-      <mat-card-content>
-        <form [formGroup]="form" (ngSubmit)="pedir('ajustar', formLinea)" #formLinea novalidate>
+    <cc-panel class="gestion" id="gestion-linea" titulo="Línea de {{ cliente().razonSocial }}">
+      <span panel-detalle>Usado {{ usado() | bob }} de {{ l.limite | bob }}{{ l.suspendida ? ' · suspendida' : '' }}</span>
+
+      <form [formGroup]="form" (ngSubmit)="pedir('ajustar', formLinea)" #formLinea novalidate>
+        <div class="fila-acciones">
+          <mat-form-field>
+            <mat-label>Límite nuevo (BOB)</mat-label>
+            <input matInput #primerCampo formControlName="limite" inputmode="decimal" placeholder="50000.00" autocomplete="off" />
+            <mat-hint>No menos que lo usado ({{ usado() | bob }})</mat-hint>
+            <mat-error>{{ textoError(form.controls.limite) }}</mat-error>
+          </mat-form-field>
+          <mat-form-field class="motivo">
+            <mat-label>Motivo</mat-label>
+            <input matInput formControlName="motivo" autocomplete="off" />
+            <mat-hint>De 3 a 300 caracteres; queda en la auditoría</mat-hint>
+            <mat-error>{{ textoError(form.controls.motivo) }}</mat-error>
+          </mat-form-field>
+        </div>
+        @if (accion(); as a) {
+          <cc-confirmacion
+            [resumen]="resumen(a, l)"
+            [accion]="boton[a].texto"
+            [icono]="boton[a].icono"
+            [enviando]="enviando()"
+            (confirmar)="enviar(a)"
+            (volver)="volver()"
+          />
+        } @else {
           <div class="fila-acciones">
-            <mat-form-field>
-              <mat-label>Límite nuevo (BOB)</mat-label>
-              <input matInput #primerCampo formControlName="limite" inputmode="decimal" placeholder="50000.00" autocomplete="off" />
-              <mat-hint>No menos que lo usado ({{ usado() | bob }})</mat-hint>
-              <mat-error>{{ textoError(form.controls.limite) }}</mat-error>
-            </mat-form-field>
-            <mat-form-field class="motivo">
-              <mat-label>Motivo</mat-label>
-              <input matInput formControlName="motivo" autocomplete="off" />
-              <mat-hint>De 3 a 300 caracteres; queda en la auditoría</mat-hint>
-              <mat-error>{{ textoError(form.controls.motivo) }}</mat-error>
-            </mat-form-field>
+            <button mat-flat-button type="submit" id="ajustar-linea"><mat-icon>credit_score</mat-icon>Cambiar el límite</button>
+            <button mat-stroked-button type="button" id="estado-linea" (click)="pedir(l.suspendida ? 'reactivar' : 'suspender', formLinea)">
+              <mat-icon>{{ l.suspendida ? 'replay' : 'block' }}</mat-icon
+              >{{ l.suspendida ? 'Reactivar la línea' : 'Suspender la línea' }}
+            </button>
+            <button mat-button type="button" (click)="cerrar.emit()">Cancelar</button>
           </div>
-          @if (accion(); as a) {
-            <cc-confirmacion
-              [resumen]="resumen(a, l)"
-              [accion]="boton[a].texto"
-              [icono]="boton[a].icono"
-              [enviando]="enviando()"
-              (confirmar)="enviar(a)"
-              (volver)="volver()"
-            />
-          } @else {
-            <div class="fila-acciones">
-              <button mat-flat-button type="submit" id="ajustar-linea"><mat-icon>credit_score</mat-icon>Cambiar el límite</button>
-              <button
-                mat-stroked-button
-                type="button"
-                id="estado-linea"
-                (click)="pedir(l.suspendida ? 'reactivar' : 'suspender', formLinea)"
-              >
-                <mat-icon>{{ l.suspendida ? 'replay' : 'block' }}</mat-icon
-                >{{ l.suspendida ? 'Reactivar la línea' : 'Suspender la línea' }}
-              </button>
-              <button mat-button type="button" (click)="cerrar.emit()">Cancelar</button>
-            </div>
-          }
-        </form>
-      </mat-card-content>
-    </mat-card>
+        }
+      </form>
+    </cc-panel>
   `,
   styles: `
     .gestion {

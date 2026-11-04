@@ -8,6 +8,7 @@ import { MatSnackBar } from '@angular/material/snack-bar';
 import {
   AvisoServicios,
   BobPipe,
+  Panel,
   Campo,
   CONFIG_CENTRO,
   cargandoDe,
@@ -38,6 +39,7 @@ import { ViajeFachada } from '../viajes.fachada';
   selector: 'app-viaje',
   providers: [ViajeFachada],
   imports: [
+    Panel,
     Encabezado,
     ReactiveFormsModule,
     Campo,
@@ -82,8 +84,7 @@ import { ViajeFachada } from '../viajes.fachada';
     @if (r?.data?.viaje; as v) {
       <!-- Lo que pide una decisión va primero (PRODUCT.md, principio 1). -->
       @if (sesion.tiene('despachador') && v.estado === 'ENTREGA_OBSERVADA') {
-        <section class="decision" aria-labelledby="titulo-decision">
-          <h2 id="titulo-decision">Decidir la entrega observada</h2>
+        <cc-panel class="decision" titulo="Decidir la entrega observada" idTitulo="titulo-decision" tono="aviso">
           <div class="fila-acciones" #zonaEntrega>
             <mat-form-field class="ancho">
               <mat-label>Nota o motivo</mat-label>
@@ -116,11 +117,10 @@ import { ViajeFachada } from '../viajes.fachada';
               (volver)="volver()"
             />
           }
-        </section>
+        </cc-panel>
       }
       @if (sesion.tiene('despachador') && v.estado === 'REQUIERE_INTERVENCION') {
-        <section class="decision" aria-labelledby="titulo-intervencion">
-          <h2 id="titulo-intervencion">Resolver la intervención</h2>
+        <cc-panel class="decision" titulo="Resolver la intervención" idTitulo="titulo-intervencion" tono="error">
           <!-- R2F-5: v.motivo es el código de cancelación (viajes.yaml), no la causa; la causa es esta. -->
           <p>La cancelación automática no terminó: quedó una reserva o el crédito sin liberar.</p>
           <div class="fila-acciones" #zonaIntervencion>
@@ -156,7 +156,7 @@ import { ViajeFachada } from '../viajes.fachada';
               (volver)="volver()"
             />
           }
-        </section>
+        </cc-panel>
       }
 
       @if (!sesion.tiene('despachador') && (v.estado === 'ENTREGA_OBSERVADA' || v.estado === 'REQUIERE_INTERVENCION')) {
@@ -245,70 +245,74 @@ import { ViajeFachada } from '../viajes.fachada';
       </dl>
 
       @if (v.riesgo; as riesgo) {
-        <h2>Riesgo de retraso: {{ pct(riesgo.probabilidad) }}</h2>
-        <dl class="datos">
-          @for (f of riesgo.factores; track f.nombre) {
-            <div>
-              <dt>{{ f.nombre }}</dt>
-              <dd>+{{ pct(f.aporte) }}</dd>
-            </div>
-          }
-        </dl>
-        <p class="secundario">Calculado {{ riesgo.calculadaEn | fecha: true }} · umbral {{ pct(riesgo.umbral) }}</p>
+        <cc-panel titulo="Riesgo de retraso: {{ pct(riesgo.probabilidad) }}">
+          <dl class="datos">
+            @for (f of riesgo.factores; track f.nombre) {
+              <div>
+                <dt>{{ f.nombre }}</dt>
+                <dd>+{{ pct(f.aporte) }}</dd>
+              </div>
+            }
+          </dl>
+          <p class="secundario">Calculado {{ riesgo.calculadaEn | fecha: true }} · umbral {{ pct(riesgo.umbral) }}</p>
+        </cc-panel>
       } @else if (verRiesgo && v.estado === 'EN_RUTA') {
-        <h2>Riesgo de retraso</h2>
-        @if (errorRiesgo()) {
-          <p class="secundario">Riesgo no disponible. Reintenta en unos minutos.</p>
-        } @else {
-          <p class="secundario">Aún no hay datos para estimar el retraso.</p>
-        }
+        <cc-panel titulo="Riesgo de retraso">
+          @if (errorRiesgo()) {
+            <p class="secundario">Riesgo no disponible. Reintenta en unos minutos.</p>
+          } @else {
+            <p class="secundario">Aún no hay datos para estimar el retraso.</p>
+          }
+        </cc-panel>
       }
 
       @if (v.entrega; as e) {
-        <h2>{{ e.tipo | etiqueta: 'TipoEntrega' }}</h2>
-        <dl class="datos">
-          <div>
-            <dt>Registrada</dt>
-            <dd>{{ e.registradaEn | fecha: true }}</dd>
-          </div>
-          <div>
-            <dt>Geocerca</dt>
-            <dd>{{ e.dentroGeocerca ? 'Dentro' : 'Fuera' }} ({{ e.distanciaMetros | numero: 0 }} m del destino)</dd>
-          </div>
-          <div>
-            <dt>Firma</dt>
-            <dd>{{ e.conFirma ? 'Con firma de ' + e.nombreReceptor : 'Sin firma' }}</dd>
-          </div>
-          @if (e.razones?.length) {
+        <cc-panel titulo="{{ e.tipo | etiqueta: 'TipoEntrega' }}">
+          <dl class="datos">
             <div>
-              <dt>Razones</dt>
-              <dd>
-                @for (razon of e.razones; track razon) {
-                  {{ razon | etiqueta: 'RazonObservacion' }}{{ $last ? '' : ', ' }}
-                }
-              </dd>
+              <dt>Registrada</dt>
+              <dd>{{ e.registradaEn | fecha: true }}</dd>
             </div>
-          }
-          @if (e.motivo) {
-            <div class="completo">
-              <dt>Motivo</dt>
-              <dd>{{ e.motivo }}</dd>
+            <div>
+              <dt>Geocerca</dt>
+              <dd>{{ e.dentroGeocerca ? 'Dentro' : 'Fuera' }} ({{ e.distanciaMetros | numero: 0 }} m del destino)</dd>
             </div>
-          }
-        </dl>
+            <div>
+              <dt>Firma</dt>
+              <dd>{{ e.conFirma ? 'Con firma de ' + e.nombreReceptor : 'Sin firma' }}</dd>
+            </div>
+            @if (e.razones?.length) {
+              <div>
+                <dt>Razones</dt>
+                <dd>
+                  @for (razon of e.razones; track razon) {
+                    {{ razon | etiqueta: 'RazonObservacion' }}{{ $last ? '' : ', ' }}
+                  }
+                </dd>
+              </div>
+            }
+            @if (e.motivo) {
+              <div class="completo">
+                <dt>Motivo</dt>
+                <dd>{{ e.motivo }}</dd>
+              </div>
+            }
+          </dl>
+        </cc-panel>
       }
 
-      <h2>Bitácora</h2>
-      @for (h of v.hitos ?? []; track h.hitoId) {
-        <p class="hito">
-          <cc-estado grupo="TipoHito" [valor]="h.tipo" /> {{ h.registradoEn | fecha: true }} · {{ h.descripcion }}
-          @if (h.origen) {
-            <span class="secundario">({{ h.origen | etiqueta: 'OrigenHito' }})</span>
-          }
-        </p>
-      } @empty {
-        <p class="secundario">Sin hitos.</p>
-      }
+      <cc-panel titulo="Bitácora">
+        @for (h of v.hitos ?? []; track h.hitoId) {
+          <p class="hito">
+            <cc-estado grupo="TipoHito" [valor]="h.tipo" /> {{ h.registradoEn | fecha: true }} · {{ h.descripcion }}
+            @if (h.origen) {
+              <span class="secundario">({{ h.origen | etiqueta: 'OrigenHito' }})</span>
+            }
+          </p>
+        } @empty {
+          <p class="secundario">Sin hitos.</p>
+        }
+      </cc-panel>
     } @else if (r && !r.loading && !r.error) {
       <p class="no-disponible">El viaje no existe</p>
     }
@@ -318,9 +322,6 @@ import { ViajeFachada } from '../viajes.fachada';
       min-width: min(320px, 100%);
     }
     .decision {
-      margin-bottom: 24px;
-    }
-    .decision h2 {
       margin-top: 0;
     }
     .hito {

@@ -192,6 +192,15 @@ export const ETIQUETAS = {
     OCUPADO: e('Ocupado', 'assignment_ind', 'info'),
     INACTIVO: e('Inhabilitado', 'person_off', 'neutro'),
   },
+  /** Ruta de Viajes: `activa` es un booleano; la pantalla lo pasa a este grupo para decirlo con ícono y tono. */
+  EstadoRuta: {
+    ACTIVA: e('Activa', 'check_circle', 'exito'),
+    INACTIVA: e('Inactiva', 'do_not_disturb_on', 'neutro'),
+  },
+  /** De dónde sacó el agente una evidencia (contratos/mcp/herramientas.md); una fuente nueva sale legible, nunca cruda. */
+  FuenteEvidencia: {
+    bitacora_chofer: e('Bitácora del chofer', 'more_horiz'),
+  },
 } satisfies Record<string, Record<string, Etiqueta>>;
 
 export type GrupoEtiqueta = keyof typeof ETIQUETAS;
