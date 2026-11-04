@@ -45,6 +45,13 @@ export function limiteValido(valor: unknown, porDefecto: number): number {
   return valor;
 }
 
+/** `ReporteParams` como consulta REST: las columnas elegidas (D111) viajan separadas por coma. */
+export function consultaReporte(params: Record<string, unknown> | null | undefined): NonNullable<Llamada['query']> {
+  const { columnas, ...resto } = params ?? {};
+  const lista = Array.isArray(columnas) && columnas.length ? columnas.join(',') : undefined;
+  return { ...(resto as NonNullable<Llamada['query']>), columnas: lista };
+}
+
 /** Páginas de 100 que se piden para un resumen; más que eso no se resume en el Gateway. */
 export const MAX_PAGINAS = 20;
 
@@ -214,7 +221,7 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
       catalogoReportes: async (_: unknown, __: Args, ctx: Ctx) =>
         (await s.get<Json>(ctx, 'analitica', rutaRest`/api/v1/reportes`))['reportes'],
       reporte: (_: unknown, { id, params }: Args, ctx: Ctx) =>
-        s.get<Json>(ctx, 'analitica', rutaRest`/api/v1/reportes/${id}`, { query: params ?? {}, tiempoMs: ESPERA.mutacion }),
+        s.get<Json>(ctx, 'analitica', rutaRest`/api/v1/reportes/${id}`, { query: consultaReporte(params), tiempoMs: ESPERA.mutacion }),
       alertasPendientes: (_: unknown, { desde, limite }: Args, ctx: Ctx) =>
         s.get<Json>(ctx, 'analitica', rutaRest`/api/v1/alertas`, { query: { cursor: desde, limite: limiteValido(limite, 50) } }),
       misionesAgente: async (_: unknown, { limite }: Args, ctx: Ctx) =>
@@ -365,10 +372,10 @@ export function crearResolvers({ servicios: s, hmacSecreto, gatewayUrl }: Opcion
             clave: claveIdempotencia,
           }),
         ),
-      exportarReporte: async (_: unknown, { id, params, claveIdempotencia }: Args, ctx: Ctx) => {
+      exportarReporte: async (_: unknown, { id, params, formato, claveIdempotencia }: Args, ctx: Ctx) => {
         if (!hmacSecreto) throw errorGraphql('DEPENDENCIA_NO_DISPONIBLE', 'EXPORTACION_HMAC_SECRETO no está configurado', 503);
         const e = await s.post<Json>(ctx, 'analitica', rutaRest`/api/v1/exportaciones`, {
-          cuerpo: { reporteId: id, parametros: params ?? {} },
+          cuerpo: { reporteId: id, parametros: params ?? {}, formato: formato ?? 'EXCEL' },
           clave: claveIdempotencia,
           tiempoMs: ESPERA.exportar,
         });

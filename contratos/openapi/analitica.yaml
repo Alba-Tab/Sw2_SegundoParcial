@@ -290,6 +290,7 @@ paths:
           schema:
             type: boolean
             default: true
+        - $ref: '#/components/parameters/Columnas'
       responses:
         '200':
           description: Resultado del reporte (máximo 500 filas, D93).
@@ -359,14 +360,18 @@ paths:
             $ref: './comun.yaml#/components/schemas/Sub'
       responses:
         '200':
-          description: Libro de Excel.
+          description: Libro de Excel o documento PDF, según el formato con que se creó (D110).
           headers:
             Content-Disposition:
-              description: '`attachment; filename="<reporte>-<fecha>.xlsx"`'
+              description: '`attachment; filename="<reporte>-<fecha>.xlsx"` o `.pdf`'
               schema:
                 type: string
           content:
             application/vnd.openxmlformats-officedocument.spreadsheetml.sheet:
+              schema:
+                type: string
+                format: binary
+            application/pdf:
               schema:
                 type: string
                 format: binary
@@ -709,6 +714,15 @@ components:
       description: Obligatorio salvo en VIAJES_EN_RIESGO. Rango ≤ 92 días (≤ 366 en facturación y rentabilidad).
       schema:
         $ref: './comun.yaml#/components/schemas/Fecha'
+    Columnas:
+      name: columnas
+      in: query
+      required: false
+      description: Claves separadas por coma (`columnas=cliente,saldo`), ver `ColumnasElegidas` (D111).
+      style: form
+      explode: false
+      schema:
+        $ref: '#/components/schemas/ColumnasElegidas'
 
   schemas:
     Rol:
@@ -928,9 +942,23 @@ components:
         incluirVencidas:
           type: boolean
           description: Dentro del rango de vencimiento; con false, solo las que todavía no vencieron.
+        columnas:
+          $ref: '#/components/schemas/ColumnasElegidas'
+    ColumnasElegidas:
+      type: array
+      description: >-
+        Subconjunto de las claves de `DescripcionReporte.columnas`, sin repetir y en el orden en que salen (D111).
+        Vacío o ausente = todas. Una clave fuera del catálogo responde 422 VALIDACION.
+      maxItems: 20
+      items:
+        type: string
+    FormatoExportacion:
+      type: string
+      enum: [EXCEL, PDF]
+      description: D110. El PDF lleva como máximo 1.000 filas; el Excel, 10.000 (D93).
     DescripcionReporte:
       type: object
-      required: [reporteId, titulo, descripcion, roles, parametros]
+      required: [reporteId, titulo, descripcion, roles, parametros, columnas]
       properties:
         reporteId:
           $ref: '#/components/schemas/ReporteId'
@@ -948,6 +976,11 @@ components:
         parametros:
           type: object
           description: JSON Schema de los parámetros.
+        columnas:
+          type: array
+          description: Columnas que se pueden elegir (D111).
+          items:
+            $ref: '#/components/schemas/Columna'
     Columna:
       type: object
       required: [clave, titulo, tipo]
@@ -1014,6 +1047,8 @@ components:
           $ref: '#/components/schemas/ReporteId'
         parametros:
           $ref: '#/components/schemas/ParametrosReporte'
+        formato:
+          $ref: '#/components/schemas/FormatoExportacion'
     Exportacion:
       type: object
       required: [exportacionId, nombreArchivo, expiraEn]
@@ -1069,6 +1104,11 @@ components:
         exportable:
           type: boolean
           description: false en `redactarRespuesta`, cuyo resultado lo manda quien llama.
+        formato:
+          allOf:
+            - $ref: '#/components/schemas/FormatoExportacion'
+          nullable: true
+          description: Formato que el usuario pidió en la pregunta (D110); nulo si no lo dijo. Quien llama exporta.
 
     # --- acciones y agente
     EstadoAccion:

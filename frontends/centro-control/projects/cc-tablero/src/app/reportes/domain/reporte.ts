@@ -12,9 +12,11 @@ export function paramsPorDefecto(id: ReporteId, ahora = new Date()): ReportePara
   return id === 'RENTABILIDAD' ? { desde: dia(-30), hasta: dia(0), agrupar: 'RUTA' } : { desde: dia(-30), hasta: dia(0) };
 }
 
-/** Sin los campos vacíos: Analítica rechaza un parámetro que el reporte no usa. */
+/** Sin los campos vacíos: Analítica rechaza un parámetro que el reporte no usa (sin columnas elegidas salen todas). */
 export const paramsLimpios = (params: ReporteParams): ReporteParams =>
-  Object.fromEntries(Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '')) as ReporteParams;
+  Object.fromEntries(
+    Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '' && !(Array.isArray(v) && !v.length)),
+  ) as ReporteParams;
 
 /** ¿El esquema JSON de parámetros del reporte tiene ese campo? */
 export const usaParametro = (parametros: unknown, campo: string): boolean =>

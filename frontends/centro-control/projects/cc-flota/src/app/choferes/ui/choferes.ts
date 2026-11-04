@@ -1,6 +1,5 @@
 import { Component, inject } from '@angular/core';
 import { MatButtonModule } from '@angular/material/button';
-import { MatSnackBar } from '@angular/material/snack-bar';
 import { MatSortModule } from '@angular/material/sort';
 import { MatTableModule } from '@angular/material/table';
 import { RouterLink } from '@angular/router';
@@ -82,9 +81,14 @@ import { estadoChofer, textoChofer, vigenciaLicencia, type Chofer } from '../dom
       </table>
     </div>
     <cc-pie-lista [control]="lista" nombre="choferes" vacio="No hay choferes registrados." [error]="error()" [cargando]="cargando()" />
-    @if (siguienteCursor()) {
+    @if (paginas.siguienteCursor()) {
+      @if (paginas.error(); as e) {
+        <p class="aviso-lista" role="alert">No se pudieron cargar más choferes. {{ mensaje(e) }}</p>
+      }
       <div class="fila-acciones">
-        <button mat-stroked-button (click)="cargarMas()" [disabled]="cargandoMas()" disabledInteractive>Cargar más choferes</button>
+        <button mat-stroked-button (click)="paginas.cargarMas()" [disabled]="paginas.cargandoMas()" disabledInteractive>
+          {{ paginas.error() ? 'Reintentar' : 'Cargar más choferes' }}
+        </button>
       </div>
     }
   `,
@@ -96,17 +100,8 @@ export class ChoferesPagina {
   readonly datosAl = this.fachada.datosAl;
   readonly cargando = this.fachada.cargando;
   readonly campos = { choferes: 'Flota' };
-  readonly siguienteCursor = this.fachada.siguienteCursor;
-  readonly cargandoMas = this.fachada.cargandoMas;
-  private readonly avisos = inject(MatSnackBar);
-
-  async cargarMas(): Promise<void> {
-    try {
-      await this.fachada.cargarMas();
-    } catch (e) {
-      this.avisos.open(mensajeDe(e), 'Cerrar');
-    }
-  }
+  readonly paginas = this.fachada.paginas;
+  readonly mensaje = mensajeDe;
   readonly columnas = columnasConEstado(['nombre', 'licencia', 'vence', 'estado']);
   readonly estado = estadoChofer;
   readonly vigencia = (c: Chofer) => vigenciaLicencia(c);

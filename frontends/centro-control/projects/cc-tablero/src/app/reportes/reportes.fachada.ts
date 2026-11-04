@@ -3,12 +3,13 @@ import { toSignal } from '@angular/core/rxjs-interop';
 import { BehaviorSubject, catchError, firstValueFrom, of, Subject, switchMap, tap } from 'rxjs';
 import { completo, Intentos, Sesion, type Resultado } from 'ui-comun';
 import { puedeVer } from 'ui-comun/dominio';
-import type { CatalogoQuery, ReporteId } from '../graphql/generado';
+import type { CatalogoQuery, FormatoExportacion, ReporteId } from '../graphql/generado';
 import { ReportesRepositorio } from './data/reportes.repositorio';
 
 /**
  * Consultar y exportar un reporte (spec 015), compartido por la página de reportes y la de voz: `reporte(id, params)`
- * va directo a Analítica sin LLM ni MCP; "Exportar a Excel" pide un enlace HMAC (D21) con una clave por intento.
+ * va directo a Analítica sin LLM ni MCP; "Exportar a Excel" o "a PDF" (D110) pide un enlace HMAC (D21) con una clave por
+ * intento: el formato es parte del intento, así el PDF no reusa la clave del Excel.
  */
 export class ConsultaReportes {
   private readonly intentos = new Intentos();
@@ -21,8 +22,10 @@ export class ConsultaReportes {
     return (r.data?.reporte as Resultado | undefined) ?? null;
   }
 
-  async exportar(id: ReporteId, params: Record<string, unknown>): Promise<string | undefined> {
-    const r = await this.intentos.enviar('exportarReporte', { id, params }, (clave) => this.repo.exportar(id, params, clave));
+  async exportar(id: ReporteId, params: Record<string, unknown>, formato: FormatoExportacion = 'EXCEL'): Promise<string | undefined> {
+    const r = await this.intentos.enviar('exportarReporte', { id, params, formato }, (clave) =>
+      this.repo.exportar(id, params, formato, clave),
+    );
     return r.data?.exportarReporte.url;
   }
 }

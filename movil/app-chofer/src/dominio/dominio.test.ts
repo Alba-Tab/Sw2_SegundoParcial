@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { enOrden, type Operacion, siguiente } from './operacion';
 import { decidir, espera, ESPERA_MAXIMA_MS } from './reintento';
 import { esPositivo, normalizarMonto } from './dinero';
-import { estadoVisible, puedeIniciar, type ViajeLocal, viajesQueSobran } from './viaje';
+import { avisosNuevos, estadoVisible, puedeIniciar, type ViajeLocal, viajesQueSobran } from './viaje';
 
 const op = (o: Partial<Operacion>): Operacion => ({
   opId: o.opId ?? 'x',
@@ -91,6 +91,37 @@ describe('viaje local', () => {
     expect(puedeIniciar(v({ viajeId: 'b' }), [a])).toBe(false);
     expect(puedeIniciar(v({ viajeId: 'b' }), [v({ viajeId: 'c', estado: 'CERRADO' })])).toBe(true);
     expect(estadoVisible(v({ canceladoAlSincronizar: true, iniciadoLocal: true }))).toBe('CANCELADO');
+  });
+
+  it('D112: avisa lo que avisaría el push de Viajes al comparar con lo que había en el celular', () => {
+    const antes = [
+      v({ viajeId: 'a' }),
+      v({ viajeId: 'b', estado: 'PROGRAMANDO' }),
+      v({ viajeId: 'c', estado: 'ENTREGA_OBSERVADA' }),
+      v({ viajeId: 'd', estado: 'ENTREGA_OBSERVADA' }),
+      v({ viajeId: 'e', estado: 'EN_RUTA' }),
+      v({ viajeId: 'f', estado: 'EN_RUTA' }),
+    ];
+    const despues = [
+      v({ viajeId: 'a', estado: 'CANCELADO' }),
+      v({ viajeId: 'b' }),
+      v({ viajeId: 'c', estado: 'CERRADO' }),
+      v({ viajeId: 'd', estado: 'ENTREGA_RECHAZADA' }),
+      v({ viajeId: 'e', estado: 'ENTREGADO' }),
+      v({ viajeId: 'f', estado: 'ENTREGA_RECHAZADA' }),
+      v({ viajeId: 'g', placa: '1234ABC' }),
+      v({ viajeId: 'h', estado: 'EN_RUTA' }),
+    ];
+    expect(avisosNuevos(antes, despues).map((a) => [a.viajeId, a.titulo])).toEqual([
+      ['a', 'Viaje cancelado'],
+      ['b', 'Viaje asignado'],
+      ['c', 'Entrega aprobada'],
+      ['d', 'Entrega rechazada'],
+      ['g', 'Viaje asignado'],
+    ]);
+    expect(avisosNuevos(antes, despues).find((a) => a.viajeId === 'g')?.cuerpo).toBe('Tienes un viaje nuevo con la unidad 1234ABC');
+    expect(avisosNuevos(antes, antes)).toEqual([]);
+    expect(avisosNuevos([], despues)).toEqual([]);
   });
 });
 

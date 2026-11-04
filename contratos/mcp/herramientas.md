@@ -12,7 +12,7 @@ Contrato del servidor MCP (`servicios/mcp-server`): especificación **2026-07-28
 | `buscar_bitacora` | `{viajeId: uuid, texto?: 2–60, ^[\p{L}\p{N} ]+$}` | `{viajeId, entradas: [{hitoId, tipo, registradoEn, posicion, contenido: {tipo: "dato_no_confiable", fuente: "bitacora_chofer", texto}}] ≤ 20, truncado?}` | Viajes `listarHitos` | sí | sí | sí | — | — |
 | `obtener_estado_unidad` | `{placa: ^[0-9]{3,4}[A-Z]{3}$}` | `{unidadId, tipoUnidad, placa, estado, kmDesdeUltimoMantenimiento, documentos: [{tipo, venceEl, diasRestantes}]}` | Flota `listarUnidades?placa=` | sí | sí | sí | sí | — |
 | `cuentas_por_cobrar` | `{rango: {desde, hasta} ≤ 92 d, clienteId?: uuid}` | `{facturas ≤ 50: [{facturaId, numero, clienteId, razonSocial, saldo: Monto, venceEl, diasParaVencer, vencida}], total: Monto}` | Finanzas `listarFacturas?conSaldo=true` | — | sí | — | — | sí |
-| `ejecutar_reporte` | `{nombre: CUENTAS_POR_COBRAR \| VIAJES_EN_RIESGO \| FACTURACION_POR_CLIENTE \| CONSUMO_COMBUSTIBLE \| RENTABILIDAD, parametros}` | `{reporteId, titulo, parametros, columnas, filas ≤ 500, totales, grafico, datosAl, truncado?}` | Analítica `ejecutarReporte` | — | sí | sí | sí | sí |
+| `ejecutar_reporte` | `{nombre: CUENTAS_POR_COBRAR \| VIAJES_EN_RIESGO \| FACTURACION_POR_CLIENTE \| CONSUMO_COMBUSTIBLE \| RENTABILIDAD, parametros}`; `parametros.columnas` (opcional, D111) es un subconjunto de las claves de columnas del catálogo | `{reporteId, titulo, parametros, columnas, filas ≤ 500, totales, grafico, datosAl, truncado?}` | Analítica `ejecutarReporte` | — | sí | sí | sí | sí |
 | `proponer_accion` | `{tipo: "AVISAR_CLIENTE_RETRASO", viajeId, destinatario: {clienteId}, mensaje: 20–600, evidencia: [{fuente, referencia ≤ 100, resumen ≤ 300}] 1–5}` | `{accionId, estado, creada, alertaId?}` | Analítica `crearAccionPropuesta` | sí | — | — | — | — |
 
 Con el token del agente `tools/list` devuelve 6 herramientas; con el de un gerente, 7. Una herramienta desconocida **u oculta** responde el error JSON-RPC `-32602` (no revela que existe). Argumentos inválidos (incluida una fecha que no existe, como `2026-13-45`) → resultado con `isError: true` y `structuredContent: {codigo: "VALIDACION", mensaje}`. Falla del servicio detrás (15 s, D90) → `isError: true` con su `codigo` (000 §5). Si la salida no cabe en 16 KB, `buscar_bitacora` quita las entradas más viejas y `ejecutar_reporte` recorta filas, y marcan `truncado: true`.
@@ -21,7 +21,7 @@ Con el token del agente `tools/list` devuelve 6 herramientas; con el de un geren
 
 | URI | Contenido |
 |---|---|
-| `catalogo://reportes` | Los 5 reportes con sus parámetros en JSON Schema y roles (spec 015) |
+| `catalogo://reportes` | Los 5 reportes con sus parámetros en JSON Schema, sus columnas elegibles (D111) y roles (spec 015) |
 | `catalogo://rutas` | Rutas activas con destino y `distanciaKm` (Viajes) |
 | `vocabulario://negocio` | Estados del viaje, "mora", "cuentas por cobrar", periodos ("esta semana" = 7 días con hoy incluido), America/La_Paz y BOB |
 

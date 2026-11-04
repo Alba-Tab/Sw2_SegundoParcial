@@ -48,6 +48,11 @@ def _celda(valor: Any, tipo: str) -> Any:
     return valor
 
 
+def parametro(valor: Any) -> str:
+    """Una lista (las columnas elegidas, D111) se escribe separada por comas."""
+    return ", ".join(map(str, valor)) if isinstance(valor, list) else str(valor)
+
+
 def libro(resultado: dict[str, Any], sub: str, ahora: datetime) -> bytes:
     wb = Workbook()
     datos = wb.active
@@ -78,7 +83,7 @@ def libro(resultado: dict[str, Any], sub: str, ahora: datetime) -> bytes:
     datos_al = resultado.get("datosAl")
     for clave, valor in [
         ("Reporte", resultado["titulo"]),
-        *((f"Parámetro {k}", str(v)) for k, v in resultado["parametros"].items()),
+        *((f"Parámetro {k}", parametro(v)) for k, v in resultado["parametros"].items()),
         ("Generado en", ahora.astimezone(ZONA).replace(tzinfo=None)),
         ("Generado por", sub),
         ("Datos al", _celda(datos_al, "INSTANTE") if datos_al else "Sin eventos procesados"),

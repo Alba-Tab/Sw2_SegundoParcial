@@ -265,6 +265,18 @@ describe('Gateway (spec 016)', () => {
     const { firmarDescarga } = await import('../src/graphql/resolvers');
     const vencido = firmarDescarga('hmac-de-prueba', 'e1', 'u1', Math.floor(Date.now() / 1000) - 1);
     expect((await request(app.getHttpServer()).get(`/exportaciones/${vencido}`)).body.codigo).toBe('EXPORTACION_VENCIDA');
+
+    // D110 y D111: el formato va en el cuerpo (EXCEL si no se dice) y las columnas, como arreglo o separadas por coma.
+    const exportar = () => pedidos.filter((p) => p.ruta === '/analitica/api/v1/exportaciones').map((p) => JSON.parse(p.cuerpo));
+    expect(exportar()[0].formato).toBe('EXCEL');
+    await gql(
+      ['gerente'],
+      'mutation { exportarReporte(id: CUENTAS_POR_COBRAR, params: { columnas: ["saldo", "cliente"] }, formato: PDF, claveIdempotencia: "k2") { url } }',
+    );
+    expect(exportar().at(-1)).toMatchObject({ formato: 'PDF', parametros: { columnas: ['saldo', 'cliente'] } });
+    rutas.set('GET /analitica/api/v1/reportes/CUENTAS_POR_COBRAR', () => ({ json: { titulo: 'Cuentas por cobrar' } }));
+    await gql(['gerente'], '{ reporte(id: CUENTAS_POR_COBRAR, params: { columnas: ["saldo", "cliente"] }) { titulo } }');
+    expect(pedidos.at(-1)!.ruta).toBe('/analitica/api/v1/reportes/CUENTAS_POR_COBRAR?columnas=saldo%2Ccliente');
   });
 
   it('suscripción: 4401 sin token válido, 4403 para clientes y alertas nuevas para el despachador', async () => {
@@ -467,6 +479,21 @@ describe('revisión del Gateway', () => {
     const campos = 'clienteId razonSocial nit correo canal a: nit b: nit c: nit d: nit e: nit';
     const pesada = await gql(['comercial'], `{ clientes(limite: 100) { items { ${campos} } } }`);
     expect(pesada.body.errors[0].extensions.codigo).toBe('CONSULTA_DEMASIADO_COMPLEJA');
+  });
+
+  it('D109: choferes y mantenimientos son páginas `…Pagina` que también cuentan el limite en la complejidad', async () => {
+    const alias = (campo: string) =>
+      'abcdefghijk'
+        .split('')
+        .map((a) => `${a}: ${campo}`)
+        .join(' ');
+    for (const consulta of [
+      `{ choferes(limite: 100) { items { ${alias('choferId')} } } }`,
+      `{ mantenimientos(limite: 100) { items { ${alias('mantenimientoId')} } } }`,
+    ]) {
+      const r = await gql(['jefe_flota'], consulta);
+      expect(r.body.errors[0].extensions.codigo).toBe('CONSULTA_DEMASIADO_COMPLEJA');
+    }
   });
 
   it('E2-8: la razón social de servicios y cotizaciones sale de Viajes en un lote de ids, una vez por cliente', async () => {

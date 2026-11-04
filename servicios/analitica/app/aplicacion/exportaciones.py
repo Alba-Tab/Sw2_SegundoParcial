@@ -1,4 +1,4 @@
-"""Exportaciones a Excel (spec 015, B; D21): 10 min de vida, solo las descarga el Gateway en nombre de quien la creó."""
+"""Exportaciones a Excel o PDF (spec 015, B; D21, D110): 10 min de vida, solo las descarga el Gateway en nombre de quien la creó."""
 
 from collections.abc import Callable
 from datetime import datetime, timedelta
@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.aplicacion import reportes
 from app.dominio.errores import ErrorDeDominio
-from app.dominio.reportes import MAX_FILAS_EXCEL, Parametros, ReporteId, nombre_archivo
+from app.dominio.reportes import Formato, Parametros, ReporteId, nombre_archivo
 from app.infraestructura.bd import Exportacion
 
 VIDA = timedelta(minutes=10)
@@ -25,8 +25,9 @@ def crear(
     roles: frozenset[str],
     ahora: datetime,
     generar: Callable[[dict[str, Any], str, datetime], bytes],
+    formato: Formato = Formato.EXCEL,
 ) -> dict[str, Any]:
-    resultado = reportes.ejecutar(s, reporte, p, roles, max_filas=MAX_FILAS_EXCEL)
+    resultado = reportes.ejecutar(s, reporte, p, roles, max_filas=formato.max_filas)
     archivo = generar(resultado, sub, ahora)
     if len(archivo) > MAX_BYTES:
         raise ErrorDeDominio("VALIDACION", "El archivo pasa de 5 MB: acorta el rango", "desde")
@@ -34,7 +35,7 @@ def crear(
         exportacion_id=uuid4(),
         sub=sub,
         reporte_id=reporte.value,
-        nombre_archivo=nombre_archivo(reporte, reportes.hoy_la_paz()),
+        nombre_archivo=nombre_archivo(reporte, reportes.hoy_la_paz(), formato),
         archivo=archivo,
         creada_en=ahora,
         expira_en=ahora + VIDA,

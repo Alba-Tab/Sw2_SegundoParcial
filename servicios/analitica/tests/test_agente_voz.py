@@ -145,7 +145,21 @@ def test_intencion_de_voz_validada_en_codigo():
         "tipo": "INTENCION",
         "reporteId": "CUENTAS_POR_COBRAR",
         "parametros": {"desde": "2026-11-03", "hasta": "2026-11-09"},
+        "formato": None,
     }
+    # D110 y D111: el formato y las columnas también se validan en código; una clave ajena se descarta.
+    pdf = voz.validar_intencion(
+        Intencion(
+            "CUENTAS_POR_COBRAR", "ESTA_SEMANA", formato="PDF", columnas=("saldo", "inventada", "cliente", "saldo")
+        ),
+        gerente,
+        hoy,
+    )
+    assert (pdf["formato"], pdf["parametros"]["columnas"]) == ("PDF", ["saldo", "cliente"])
+    otro = voz.validar_intencion(
+        Intencion("CUENTAS_POR_COBRAR", "ESTA_SEMANA", formato="WORD", columnas=("x",)), gerente, hoy
+    )
+    assert otro["formato"] is None and "columnas" not in otro["parametros"]
     ambigua = voz.validar_intencion(Intencion("FACTURACION_POR_CLIENTE", "MES", mes=10, cliente="agro"), gerente, hoy)
     assert ambigua["tipo"] == "ACLARACION" and sorted(o["etiqueta"] for o in ambigua["opciones"]) == [
         "Agro Moroso",
@@ -297,7 +311,10 @@ INTENCION_RIESGO = '{"reporteId": "VIAJES_EN_RIESGO", "periodo": null, "filtros"
 
 
 def test_la_voz_corre_el_reporte_en_analitica_sin_pasar_por_el_mcp(cliente):
-    en_ruta(str(uuid4()))
+    viaje = str(uuid4())
+    en_ruta(viaje)
+    # Con posición, la fila lleva ultimaPosicionEn (datetime): la redacción tiene que poder serializarla.
+    procesar(ejemplo("PosicionActualizada", viajeId=viaje))
     gerente = token("gerente")
     cliente.app.state.voz = voz.Voz(LlmIntencion(INTENCION_RIESGO))
     r = cliente.post("/api/v1/voz/preguntas", json={"texto": "¿Qué viajes van atrasados?"}, headers=gerente)
