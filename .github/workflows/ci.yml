@@ -93,6 +93,7 @@ jobs:
             compose:
               - *ci
               - plataforma/compose/**
+              - plataforma/vm/**
             simulador:
               - *ci
               - contratos/eventos/flota/LecturaSensorCombustible.v1.schema.json
@@ -265,6 +266,9 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: cp .env.example .env && docker compose --profile core --profile plataforma --profile trazas --profile demo --profile simulador config -q
+      - name: Compose de la VM (B3) y su prueba local (B12)
+        working-directory: plataforma/vm
+        run: cp .env.example .env && docker compose config -q && docker compose -f compose.yaml -f prueba/vm.yaml config -q
 
   simulador:
     needs: cambios

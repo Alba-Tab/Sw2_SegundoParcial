@@ -1,0 +1,199 @@
+# VM de AWS (B3, D113): Viajes, su PostgreSQL, Temporal con mTLS, RabbitMQ con AMQPS y MQTTS, y Caddy.
+# En la EC2: ./cargar-secretos.sh && docker compose up -d   (el .env y certs/ los arma cargar-secretos.sh).
+# Prueba en la Mac (B12): ver README.md, con compose.prueba.yaml encima de este archivo.
+# Los scripts de inicio y la topología se reusan de ../compose: la VM tiene el repo clonado.
+
+x-comun: &comun
+  restart: unless-stopped
+  logging: &logs
+    driver: awslogs
+    options: { awslogs-region: "${AWS_REGION:-us-east-1}", awslogs-group: /transporte/vm, tag: "{{.Name}}" }
+
+# Herramientas de administración de Temporal con el certificado cliente-admin.
+x-temporal-admin: &temporal-admin
+  TEMPORAL_ADDRESS: temporal:7233
+  TEMPORAL_TLS_SERVER_CA_CERT_PATH: /certs/ca.pem
+  TEMPORAL_TLS_CLIENT_CERT_PATH: /certs/cliente-admin.pem
+  TEMPORAL_TLS_CLIENT_KEY_PATH: /certs/cliente-admin.key
+
+x-certs-admin: &certs-admin
+  - ./certs/ca.pem:/certs/ca.pem:ro
+  - ./certs/cliente-admin.pem:/certs/cliente-admin.pem:ro
+  - ./certs/cliente-admin.key:/certs/cliente-admin.key:ro
+
+services:
+  # Sin puerto publicado: solo Viajes y Temporal, por la red de docker.
+  postgres:
+    <<: *comun
+    image: postgres:17
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_CLAVE:?}
+      BASES: "viajes temporal temporal:temporal_visibility"
+      CLAVE_VIAJES: ${CLAVE_VIAJES:?}
+      CLAVE_TEMPORAL: ${CLAVE_TEMPORAL:?}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+      - ../compose/postgres/crear-bases.sh:/docker-entrypoint-initdb.d/crear-bases.sh:ro
+    healthcheck: { test: ["CMD", "pg_isready", "-U", "postgres", "-h", "127.0.0.1"], interval: 3s, retries: 30 }
+
+  temporal-esquema:
+    image: temporalio/admin-tools:1.32.1
+    depends_on: { postgres: { condition: service_healthy } }
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        T="temporal-sql-tool --plugin postgres12 --ep postgres -p 5432 -u temporal --pw $${CLAVE_TEMPORAL}"
+        S=/etc/temporal/schema/postgresql/v12
+        $$T --db temporal setup-schema -v 0.0 || true
+        $$T --db temporal update-schema -d $$S/temporal/versioned
+        $$T --db temporal_visibility setup-schema -v 0.0 || true
+        $$T --db temporal_visibility update-schema -d $$S/visibility/versioned
+    environment: { CLAVE_TEMPORAL: "${CLAVE_TEMPORAL}" }
+    restart: "no"
+
+  # mTLS en el frontend y entre los servicios internos (requireClientAuth): solo entra un certificado de la CA propia.
+  # Variables de la plantilla embebida en temporal-server 1.32.1.
+  temporal:
+    <<: *comun
+    image: temporalio/server:1.32.1
+    depends_on: { temporal-esquema: { condition: service_completed_successfully } }
+    environment:
+      DB: postgres12
+      DB_PORT: "5432"
+      POSTGRES_USER: temporal
+      POSTGRES_PWD: ${CLAVE_TEMPORAL}
+      POSTGRES_SEEDS: postgres
+      TEMPORAL_TLS_REQUIRE_CLIENT_AUTH: "true"
+      TEMPORAL_TLS_FRONTEND_CERT: /certs/servidor.pem
+      TEMPORAL_TLS_FRONTEND_KEY: /certs/servidor.key
+      TEMPORAL_TLS_CLIENT1_CA_CERT: /certs/ca.pem
+      TEMPORAL_TLS_SERVER_CERT: /certs/servidor.pem
+      TEMPORAL_TLS_SERVER_KEY: /certs/servidor.key
+      TEMPORAL_TLS_SERVER_CA_CERT: /certs/ca.pem
+      # Los servicios internos se llaman por IP: verifican el nombre `temporal` del certificado.
+      TEMPORAL_TLS_FRONTEND_SERVER_NAME: temporal
+      TEMPORAL_TLS_INTERNODE_SERVER_NAME: temporal
+    volumes:
+      - ../compose/temporal:/etc/temporal/config/dynamicconfig:ro
+      - ./certs/ca.pem:/certs/ca.pem:ro
+      - ./certs/servidor.pem:/certs/servidor.pem:ro
+      - ./certs/servidor.key:/certs/servidor.key:ro
+    ports: ["7233:7233"]
+
+  temporal-namespace:
+    image: temporalio/admin-tools:1.32.1
+    depends_on: [temporal]
+    environment: *temporal-admin
+    volumes: *certs-admin
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        n=0; until temporal operator cluster health >/dev/null 2>&1; do n=$$((n+1)); [ $$n -gt 60 ] && exit 1; sleep 2; done
+        temporal operator namespace describe -n transporte >/dev/null 2>&1 \
+          || temporal operator namespace create -n transporte --retention 30d
+        temporal operator namespace describe -n transporte | grep -i retention
+    restart: "no"
+
+  # Solo en 127.0.0.1: se entra por túnel de SSM (guía §10, paso 12).
+  temporal-ui:
+    <<: *comun
+    image: temporalio/ui:2.57.0
+    depends_on: [temporal]
+    environment:
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_DEFAULT_NAMESPACE: transporte
+      TEMPORAL_TLS_CA: /certs/ca.pem
+      TEMPORAL_TLS_CERT: /certs/cliente-temporal-ui.pem
+      TEMPORAL_TLS_KEY: /certs/cliente-temporal-ui.key
+      TEMPORAL_TLS_SERVER_NAME: temporal
+      TEMPORAL_TLS_ENABLE_HOST_VERIFICATION: "true"
+    volumes:
+      - ./certs/ca.pem:/certs/ca.pem:ro
+      - ./certs/cliente-temporal-ui.pem:/certs/cliente-temporal-ui.pem:ro
+      - ./certs/cliente-temporal-ui.key:/certs/cliente-temporal-ui.key:ro
+    ports: ["127.0.0.1:8233:8080"]
+
+  # AMQPS 5671 y MQTTS 8883 hacia afuera; 5672 solo en la red de docker (Viajes); consola por túnel.
+  # Sin guest: el administrador sale de RABBITMQ_ADMIN y cada servicio tiene su usuario (rabbitmq-usuarios).
+  rabbitmq:
+    <<: *comun
+    image: rabbitmq:4.4.0-management
+    # El nodo (rabbit@<hostname>) guarda usuarios y colas en el volumen: con un hostname fijo, recrear el contenedor
+    # en un despliegue no los pierde.
+    hostname: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_ADMIN:?}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_ADMIN_CLAVE:?}
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+      - ../compose/rabbitmq/rabbitmq.conf:/etc/rabbitmq/conf.d/20-transporte.conf:ro
+      - ./rabbitmq/tls.conf:/etc/rabbitmq/conf.d/30-tls.conf:ro
+      - ../compose/rabbitmq/enabled_plugins:/etc/rabbitmq/enabled_plugins:ro
+      - ./certs/ca.pem:/certs/ca.pem:ro
+      - ./certs/servidor.pem:/certs/servidor.pem:ro
+      - ./certs/servidor.key:/certs/servidor.key:ro
+    ports: ["5671:5671", "8883:8883", "127.0.0.1:15672:15672"]
+    healthcheck: { test: ["CMD", "rabbitmq-diagnostics", "-q", "check_port_connectivity"], interval: 5s, retries: 30 }
+
+  rabbitmq-usuarios:
+    image: alpine:3.24
+    depends_on: { rabbitmq: { condition: service_healthy } }
+    entrypoint: ["sh", "-c", "apk add --no-cache -q bash curl jq >/dev/null && bash /iniciar/rabbitmq-usuarios.sh"]
+    env_file: [.env]
+    volumes: ["../compose/iniciar:/iniciar:ro", "../compose/rabbitmq:/rabbitmq:ro"]
+    restart: "no"
+
+  # Imagen de ECR por SHA (la pone el despliegue en VIAJES_IMAGEN). DynamoDB y S3 con el rol de la EC2, sin claves.
+  viajes:
+    <<: *comun
+    image: ${VIAJES_IMAGEN:?}
+    depends_on:
+      postgres: { condition: service_healthy }
+      rabbitmq-usuarios: { condition: service_completed_successfully }
+      temporal-namespace: { condition: service_completed_successfully }
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/viajes
+      DB_USUARIO: viajes
+      DB_CLAVE: ${CLAVE_VIAJES}
+      AMQP_HOST: rabbitmq
+      AMQP_USUARIO: viajes
+      AMQP_CLAVE: ${RABBITMQ_CLAVE_VIAJES:?}
+      OIDC_ISSUER: ${OIDC_ISSUER:?}
+      KC_SECRETO_VIAJES: ${KC_SECRETO_VIAJES:?}
+      TEMPORAL_ADDRESS: temporal:7233
+      TEMPORAL_TLS_CA: /certs/ca.pem
+      TEMPORAL_TLS_CERT: /certs/cliente-viajes.pem
+      TEMPORAL_TLS_KEY: /certs/cliente-viajes.key
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      S3_BUCKET: ${S3_BUCKET:?}
+      CORS_ORIGENES: ${CORS_ORIGENES:?}
+      # Push al chofer (D45, guía §6.3): sin FCM_PROYECTO se omite.
+      FCM_PROYECTO: ${FCM_PROYECTO:-}
+      GOOGLE_APPLICATION_CREDENTIALS: /secretos/fcm.json
+      SAGA_ESPERA_APROBACION: ${SAGA_ESPERA_APROBACION:-PT24H}
+      SAGA_COMPENSACION_SCHEDULE_TO_CLOSE: ${SAGA_COMPENSACION_SCHEDULE_TO_CLOSE:-PT10M}
+      SAGA_COMPENSACION_MAXIMO_INTENTOS: ${SAGA_COMPENSACION_MAXIMO_INTENTOS:-8}
+    volumes:
+      - ./certs/ca.pem:/certs/ca.pem:ro
+      - ./certs/cliente-viajes.pem:/certs/cliente-viajes.pem:ro
+      - ./certs/cliente-viajes.key:/certs/cliente-viajes.key:ro
+      - ${FCM_CREDENCIAL:-/dev/null}:/secretos/fcm.json:ro
+
+  # HTTPS de Viajes con Let's Encrypt (CADDY_TLS = correo de ACME); en la Mac, CADDY_TLS=internal.
+  caddy:
+    <<: *comun
+    image: caddy:2.11.8
+    depends_on: [viajes]
+    environment:
+      DOMINIO: ${DOMINIO:?}
+      CADDY_TLS: ${CADDY_TLS:?}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy:/data
+    ports: ["80:80", "443:443"]
+
+volumes:
+  postgres:
+  rabbitmq:
+  caddy:
