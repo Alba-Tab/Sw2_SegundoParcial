@@ -1,6 +1,12 @@
 import { Injectable, Logger, OnModuleDestroy } from '@nestjs/common';
 import * as amqp from 'amqplib';
-import { entorno } from '../configuracion/entorno';
+import { readFileSync } from 'node:fs';
+import { entorno, type Entorno } from '../configuracion/entorno';
+
+/** AMQPS (B2): con AMQP_CA, el socket TLS confía en la CA propia; sin ella, las opciones por defecto. */
+export function opcionesAmqp(e: Entorno, leer: (ruta: string) => Buffer = readFileSync): { ca: Buffer[] } | undefined {
+  return e.AMQP_CA ? { ca: [leer(e.AMQP_CA)] } : undefined;
+}
 
 /**
  * Una conexión y un canal con confirmaciones (publisher confirms), creados al primer uso y recreados si se caen. La
@@ -23,7 +29,7 @@ export class ConexionAmqp implements OnModuleDestroy {
   }
 
   private async abrir(): Promise<amqp.ConfirmChannel> {
-    const conexion = await amqp.connect(entorno().AMQP_URL);
+    const conexion = await amqp.connect(entorno().AMQP_URL, opcionesAmqp(entorno()));
     this.conexion = conexion;
     conexion.on('error', (e) => this.log.warn(`Error en la conexión AMQP: ${String(e)}`));
     conexion.once('close', () => {
