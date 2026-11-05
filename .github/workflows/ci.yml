@@ -251,9 +251,11 @@ jobs:
         run: |
           docker run -d --name kc -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak:26.8 start-dev
           timeout 180 bash -c 'until curl -sf localhost:8080/realms/master >/dev/null; do sleep 3; done'
-      - name: Aplicar el realm (keycloak-config-cli + configurar-api.sh) y probarlo
+      - name: Aplicar el realm con la imagen del Job (B5), otra vez con docker run (idempotente) y probarlo
         run: |
           cp .env.example .env
+          docker build -q -f Dockerfile.config -t keycloak-config .
+          docker run --rm --network host --env-file .env keycloak-config
           ./aplicar-realm.sh .env
           ./probar-realm.sh .env
 
