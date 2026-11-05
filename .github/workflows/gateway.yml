@@ -1,0 +1,19 @@
+name: gateway
+on:
+  push:
+    branches: [main]
+    paths: ['servicios/gateway/**', 'libs/intercambio-token/**', 'contratos/graphql/**', 'contratos/openapi/**']
+  workflow_dispatch:
+permissions: { contents: read, packages: write, id-token: write }
+jobs:
+  imagen:
+    uses: ./.github/workflows/_build-push-image.yml
+    with: { nombre: gateway, dockerfile: servicios/gateway/Dockerfile, registro: ghcr, environment: azure }
+  desplegar:
+    needs: imagen
+    uses: ./.github/workflows/_deploy-containerapp.yml
+    with: { imagen: '${{ needs.imagen.outputs.imagen }}', apps: gateway }
+  smoke:
+    needs: desplegar
+    uses: ./.github/workflows/_smoke.yml
+    with: { url: 'https://api.${{ vars.DOMINIO }}/health/ready' }

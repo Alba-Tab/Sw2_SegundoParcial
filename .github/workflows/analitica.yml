@@ -1,0 +1,19 @@
+name: analitica
+on:
+  push:
+    branches: [main]
+    paths: ['servicios/analitica/**', 'contratos/openapi/analitica.yaml', 'contratos/openapi/comun.yaml', 'contratos/eventos/**', 'plataforma/semilla/**', 'plataforma/datos-sinteticos/**']
+  workflow_dispatch:
+permissions: { contents: read, packages: write, id-token: write }
+jobs:
+  imagen:
+    uses: ./.github/workflows/_build-push-image.yml
+    with: { nombre: analitica, dockerfile: servicios/analitica/Dockerfile, registro: ghcr, environment: azure }
+  desplegar:
+    needs: imagen
+    uses: ./.github/workflows/_deploy-containerapp.yml
+    with: { imagen: '${{ needs.imagen.outputs.imagen }}', apps: analitica }
+  smoke:
+    needs: desplegar
+    uses: ./.github/workflows/_smoke.yml
+    with: { url: 'https://${{ needs.desplegar.outputs.fqdn }}/health/ready' }

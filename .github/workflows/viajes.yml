@@ -1,0 +1,19 @@
+name: viajes
+on:
+  push:
+    branches: [main]
+    paths: ['servicios/viajes/**', 'contratos/openapi/viajes.yaml', 'contratos/openapi/comun.yaml', 'contratos/eventos/**', 'contratos/temporal/**', 'plataforma/semilla/**']
+  workflow_dispatch:
+permissions: { contents: read, packages: write, id-token: write }
+jobs:
+  imagen:
+    uses: ./.github/workflows/_build-push-image.yml
+    with: { nombre: transporte/viajes, dockerfile: servicios/viajes/Dockerfile, registro: ecr, environment: aws }
+  desplegar:
+    needs: imagen
+    uses: ./.github/workflows/_deploy-ec2.yml
+    with: { imagen: '${{ needs.imagen.outputs.imagen }}', servicios: viajes }
+  smoke:
+    needs: desplegar
+    uses: ./.github/workflows/_smoke.yml
+    with: { url: 'https://viajes.${{ vars.DOMINIO }}/health/ready' }
