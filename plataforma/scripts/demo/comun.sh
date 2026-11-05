@@ -1,9 +1,19 @@
-# Ayudas de los scripts de demo (local). Se cargan con: . "$(dirname "$0")/comun.sh"
-# Tokens con direct grant de demo-cli (D39, solo local) y la clave de la semilla de plataforma/compose/.env.
+# Ayudas de los scripts de demo. Se cargan con: . "$(dirname "$0")/comun.sh"
+# Local: tokens con direct grant de demo-cli y la clave de la semilla de plataforma/compose/.env (D39).
+# Nube (NUBE=1, lo pone --nube): URLs de DOMINIO y tokens por device grant, con el refresh_token guardado por usuario
+# en ~/.cache/transporte-demo para no iniciar sesión en cada corrida (D39). FLOTA_URL y ANALITICA_URL no tienen dominio
+# propio: van en el entorno (run.app y azurecontainerapps.io).
 set -euo pipefail
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 COMPOSE="$RAIZ/plataforma/compose"
-set -a; . "$COMPOSE/.env"; set +a
+if [ -n "${NUBE:-}" ]; then
+  : "${DOMINIO:?falta DOMINIO}" "${FLOTA_URL:?falta FLOTA_URL (run.app)}" "${ANALITICA_URL:?falta ANALITICA_URL}"
+  OIDC_ISSUER="https://auth.$DOMINIO/realms/transporte"
+  VIAJES_URL="https://viajes.$DOMINIO"; FINANZAS_URL="https://finanzas.$DOMINIO"
+  export OIDC_ISSUER VIAJES_URL FINANZAS_URL
+else
+  set -a; . "$COMPOSE/.env"; set +a
+fi
 VIAJES="${VIAJES_URL:-http://localhost:8101}"
 FINANZAS="${FINANZAS_URL:-http://localhost:8103}"
 
@@ -21,8 +31,31 @@ paso() { printf '\n\033[1m== %s\033[0m\n' "$*"; }
 json() { python3 -c "import sys,json; d=json.load(sys.stdin); print(eval(sys.argv[1], {}, {'d': d}))" "$1"; }
 
 token() { # token <usuario>
+  [ -n "${NUBE:-}" ] && { token_nube "$1"; return; }
   curl -sf -X POST "$OIDC_ISSUER/protocol/openid-connect/token" -d grant_type=password -d client_id=demo-cli \
     -d username="$1" -d password="$KC_CLAVE_SEMILLA" -d 'scope=openid aud-viajes aud-finanzas' | json "d['access_token']"
+}
+
+token_nube() { # token_nube <usuario>: refresh_token guardado o, si no sirve, device grant (D39)
+  local dir="${XDG_CACHE_HOME:-$HOME/.cache}/transporte-demo" r d fin
+  mkdir -p "$dir" && chmod 700 "$dir"
+  if [ -f "$dir/$1" ]; then
+    r=$(curl -s -X POST "$OIDC_ISSUER/protocol/openid-connect/token" -d grant_type=refresh_token -d client_id=demo-cli \
+      --data-urlencode "refresh_token=$(cat "$dir/$1")")
+  fi
+  if ! echo "${r:-}" | json "'access_token' in d" 2>/dev/null | grep -q True; then
+    d=$(curl -sf -X POST "$OIDC_ISSUER/protocol/openid-connect/auth/device" -d client_id=demo-cli -d 'scope=openid aud-viajes aud-finanzas')
+    echo "Entra como $1 en $(echo "$d" | json "d['verification_uri_complete']")" >&2
+    fin=$((SECONDS + $(echo "$d" | json "d.get('expires_in', 600)")))
+    while [ $SECONDS -lt $fin ]; do
+      sleep "$(echo "$d" | json "d.get('interval', 5)")"
+      r=$(curl -s -X POST "$OIDC_ISSUER/protocol/openid-connect/token" -d client_id=demo-cli \
+        -d grant_type=urn:ietf:params:oauth:grant-type:device_code -d device_code="$(echo "$d" | json "d['device_code']")")
+      echo "$r" | json "'access_token' in d" | grep -q True && break
+    done
+  fi
+  (umask 077; echo "$r" | json "d['refresh_token']" > "$dir/$1"); chmod 600 "$dir/$1"
+  echo "$r" | json "d['access_token']"
 }
 
 hoy() { TZ=America/La_Paz date +%F; }
