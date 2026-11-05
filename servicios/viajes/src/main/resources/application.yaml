@@ -50,6 +50,11 @@ temporal:
   direccion: ${TEMPORAL_ADDRESS:localhost:7233}
   namespace: transporte
   worker.habilitado: ${TEMPORAL_WORKER:true}
+  # mTLS hacia Temporal en la nube (B1): rutas a ca.pem y al par cliente-viajes. Vacías = sin TLS.
+  tls:
+    ca: ${TEMPORAL_TLS_CA:}
+    cert: ${TEMPORAL_TLS_CERT:}
+    key: ${TEMPORAL_TLS_KEY:}
 
 # parametrosSaga (spec 003). Normal: PT24H, PT10M, 8. Demo (.env.demo): PT3M, PT2M, 4.
 saga:
