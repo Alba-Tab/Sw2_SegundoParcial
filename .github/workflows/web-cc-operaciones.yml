@@ -1,0 +1,11 @@
+name: web-cc-operaciones
+on:
+  push:
+    branches: [main]
+    paths: ['frontends/centro-control/projects/cc-operaciones/**', 'frontends/centro-control/projects/ui-comun/**', 'libs/design-tokens/**', 'contratos/graphql/**']
+  workflow_dispatch:
+permissions: { contents: read }
+jobs:
+  desplegar:
+    uses: ./.github/workflows/_deploy-web.yml
+    with: { app: cc-operaciones }
