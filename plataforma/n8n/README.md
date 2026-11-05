@@ -11,7 +11,7 @@ Avisos por correo sin reglas de negocio: todo lo que el correo necesita viene en
 - **Topología:** no declara la cola (`assertQueue: false`). La cola es de quórum y la crea la topología de `plataforma/compose/rabbitmq`. El usuario `n8n` no tiene permiso de `configure`.
 - **Arranque en el compose:**
   - `n8n-inbox` crea la tabla `n8n_inbox`.
-  - `n8n-importar` (`importar.sh`) importa las credenciales y los flujos, y los publica. Las credenciales se arman desde el entorno, así que no hay secretos en el repo. Las tres son RabbitMQ (usuario `n8n`), PostgreSQL y SMTP (Mailpit en local; D37 en la nube).
+  - `n8n-importar` (`importar.sh`) importa las credenciales y los flujos, y los publica. Las credenciales se arman desde el entorno, así que no hay secretos en el repo. Las tres son RabbitMQ (usuario `n8n`), PostgreSQL y SMTP (Mailpit en local; D37 en la nube). Con `DB_POSTGRESDB_SSL_ENABLED=true` (la B1MS de la nube exige TLS), la credencial de PostgreSQL usa `ssl: require` (B11).
   - Recién después arranca `n8n`.
 - **Limitación conocida (encontrada con FC5):** si RabbitMQ se cae, el disparador de RabbitMQ de n8n 2.46 no se reconecta y n8n despublica el flujo. Los mensajes esperan en `n8n.eventos`; `scripts/fallos/encender-rabbitmq.sh` vuelve a publicar con el importador y reinicia n8n, que procesa lo pendiente. En la nube el broker no se reinicia salvo un despliegue, y ese despliegue reinicia también n8n.
 - **Por qué un solo consumidor:** dos flujos con disparador sobre `n8n.eventos` se reparten los mensajes, y cada uno descartaría los del otro.
