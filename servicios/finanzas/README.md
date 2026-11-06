@@ -13,6 +13,7 @@ Cotizaciones, líneas de crédito, reservas de la saga, facturas y pagos. Larave
 | Logs JSON de 000 §10; trazas con la extensión `opentelemetry` solo si `OTEL_PHP_AUTOLOAD_ENABLED=true` | `app/Infraestructura/Log/FormatoJson.php`, Dockerfile |
 | Tablas comunes (igual que Viajes) | `database/migrations/2026_10_29_000001_crear_tablas_comunes.php` |
 | API: Octane con 4 workers (`.rr.octane.yaml`). Worker: `.rr.yaml` con Temporal (cola `finanzas`) y el plugin `service` (D29) | raíz del servicio |
+| Worker en la nube (B1): `.rr.nube.yaml` incluye `.rr.yaml` y `.rr.tls.yaml`, que agrega mTLS hacia Temporal con `TEMPORAL_TLS_CA`, `TEMPORAL_TLS_CERT` y `TEMPORAL_TLS_KEY` (rutas a los PEM). Se elige con `RR_CONFIG=.rr.nube.yaml`. La API no usa Temporal, pero abre un TCP a `TEMPORAL_ADDRESS` en `/health/ready`, así que también lleva esa variable | raíz del servicio |
 
 ```bash
 ./probar.sh                       # Pint, Pest, Deptrac y Larastan (necesita el compose levantado)

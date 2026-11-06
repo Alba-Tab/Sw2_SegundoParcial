@@ -207,7 +207,8 @@ services:
     image: transporte/finanzas:local
     pull_policy: never
     profiles: [core]
-    command: ["sh", "-c", "php artisan migrate --force && rr serve -c .rr.yaml"]
+    # En la nube, RR_CONFIG=.rr.nube.yaml agrega mTLS hacia Temporal (B1).
+    command: ["sh", "-c", "php artisan migrate --force && rr serve -c $${RR_CONFIG:-.rr.yaml}"]
     depends_on:
       finanzas-api: { condition: service_started }
       rabbitmq-usuarios: { condition: service_completed_successfully, required: false }
