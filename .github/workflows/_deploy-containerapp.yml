@@ -1,0 +1,51 @@
+# Despliegue en Azure Container Apps (B8). Solo cambia la imagen: lo demás se fija al crear cada app (guía §7).
+# Los Jobs (keycloak-config, n8n-importar) se actualizan y, con `iniciar`, se corren y se espera su resultado.
+name: _deploy-containerapp
+
+on:
+  workflow_call:
+    inputs:
+      imagen: { type: string, required: true }
+      apps: { type: string, default: '', description: 'Container Apps separadas por espacio' }
+      jobs: { type: string, default: '', description: 'Jobs separados por espacio' }
+      iniciar: { type: boolean, default: false }
+      reiniciar: { type: string, default: '', description: 'Apps que se reinician al terminar (p. ej. n8n tras importar)' }
+    outputs:
+      fqdn: { value: '${{ jobs.containerapp.outputs.fqdn }}' }
+
+permissions: { contents: read, id-token: write }
+
+jobs:
+  containerapp:
+    runs-on: ubuntu-latest
+    environment: azure
+    outputs: { fqdn: '${{ steps.desplegar.outputs.fqdn }}' }
+    env:
+      RG: ${{ vars.AZURE_RG }}
+      IMAGEN: ${{ inputs.imagen }}
+      APPS: ${{ inputs.apps }}
+      JOBS: ${{ inputs.jobs }}
+      INICIAR: ${{ inputs.iniciar }}
+      REINICIAR: ${{ inputs.reiniciar }}
+    steps:
+      - uses: azure/login@v3
+        with: { client-id: '${{ vars.AZURE_CLIENT_ID }}', tenant-id: '${{ vars.AZURE_TENANT_ID }}', subscription-id: '${{ vars.AZURE_SUBSCRIPTION_ID }}' }
+      - id: desplegar
+        run: |
+          for app in $APPS; do az containerapp update -g "$RG" -n "$app" --image "$IMAGEN" --output none; echo "app $app"; done
+          for job in $JOBS; do
+            az containerapp job update -g "$RG" -n "$job" --image "$IMAGEN" --output none
+            [ "$INICIAR" = true ] || continue
+            ej=$(az containerapp job start -g "$RG" -n "$job" --query name -o tsv)
+            for _ in $(seq 1 60); do
+              estado=$(az containerapp job execution show -g "$RG" -n "$job" --job-execution-name "$ej" --query properties.status -o tsv)
+              case "$estado" in Succeeded) echo "job $job: $estado"; break ;; Failed|Stopped|Degraded) echo "::error::job $job: $estado"; exit 1 ;; esac
+              sleep 10
+            done
+            [ "$estado" = Succeeded ] || { echo "::error::job $job no terminó en 10 min"; exit 1; }
+          done
+          for app in $REINICIAR; do
+            az containerapp revision restart -g "$RG" -n "$app" \
+              --revision "$(az containerapp show -g "$RG" -n "$app" --query properties.latestRevisionName -o tsv)" --output none
+          done
+          [ -z "$APPS" ] || echo "fqdn=$(az containerapp show -g "$RG" -n "${APPS%% *}" --query properties.configuration.ingress.fqdn -o tsv)" >> "$GITHUB_OUTPUT"

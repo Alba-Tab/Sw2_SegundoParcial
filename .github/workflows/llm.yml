@@ -1,0 +1,15 @@
+name: llm
+on:
+  push:
+    branches: [main]
+    paths: ['plataforma/llm/**']
+  workflow_dispatch:
+permissions: { contents: read, packages: write, id-token: write }
+jobs:
+  imagen:
+    uses: ./.github/workflows/_build-push-image.yml
+    with: { nombre: llm, dockerfile: plataforma/llm/Dockerfile, registro: ghcr, environment: azure, contexto: plataforma/llm }
+  desplegar:
+    needs: imagen
+    uses: ./.github/workflows/_deploy-containerapp.yml
+    with: { imagen: '${{ needs.imagen.outputs.imagen }}', apps: llm }

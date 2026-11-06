@@ -1,0 +1,16 @@
+# Smoke al terminar cada despliegue (B8): la salud de la pieza responde 2xx (hasta 2 min, por el arranque en frío).
+name: _smoke
+
+on:
+  workflow_call:
+    inputs:
+      url: { type: string, required: true }
+
+permissions: { contents: read }
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - env: { URL: '${{ inputs.url }}' }
+        run: curl -fsS --retry 20 --retry-delay 6 --retry-all-errors --max-time 10 "$URL"

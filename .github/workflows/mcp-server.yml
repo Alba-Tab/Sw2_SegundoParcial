@@ -1,0 +1,19 @@
+name: mcp-server
+on:
+  push:
+    branches: [main]
+    paths: ['servicios/mcp-server/**', 'libs/intercambio-token/**', 'contratos/mcp/**', 'contratos/openapi/**']
+  workflow_dispatch:
+permissions: { contents: read, packages: write, id-token: write }
+jobs:
+  imagen:
+    uses: ./.github/workflows/_build-push-image.yml
+    with: { nombre: mcp-server, dockerfile: servicios/mcp-server/Dockerfile, registro: ghcr, environment: azure }
+  desplegar:
+    needs: imagen
+    uses: ./.github/workflows/_deploy-containerapp.yml
+    with: { imagen: '${{ needs.imagen.outputs.imagen }}', apps: mcp-server }
+  smoke:
+    needs: desplegar
+    uses: ./.github/workflows/_smoke.yml
+    with: { url: 'https://mcp.${{ vars.DOMINIO }}/health' }

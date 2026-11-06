@@ -1,0 +1,19 @@
+name: keycloak
+on:
+  push:
+    branches: [main]
+    paths: ['plataforma/keycloak/**']
+  workflow_dispatch:
+permissions: { contents: read, packages: write, id-token: write }
+jobs:
+  imagen:
+    uses: ./.github/workflows/_build-push-image.yml
+    with: { nombre: keycloak-config, dockerfile: plataforma/keycloak/Dockerfile.config, registro: ghcr, environment: azure, contexto: plataforma/keycloak }
+  desplegar:
+    needs: imagen
+    uses: ./.github/workflows/_deploy-containerapp.yml
+    with: { imagen: '${{ needs.imagen.outputs.imagen }}', jobs: keycloak-config, iniciar: true }
+  smoke:
+    needs: desplegar
+    uses: ./.github/workflows/_smoke.yml
+    with: { url: 'https://auth.${{ vars.DOMINIO }}/realms/transporte/.well-known/openid-configuration' }
