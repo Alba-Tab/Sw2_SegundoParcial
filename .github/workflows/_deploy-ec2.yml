@@ -28,7 +28,7 @@ jobs:
           SCRIPT=$(cat <<SH
           set -eu
           cd /opt/transporte && git fetch --quiet origin && git checkout --quiet --detach $GITHUB_SHA
-          cd plataforma/vm && ./cargar-secretos.sh
+          cd plataforma/vm && AWS_REGION=$AWS_REGION bash cargar-secretos.sh
           [ -z "$IMAGEN" ] || echo "VIAJES_IMAGEN=$IMAGEN" > .env.imagen
           I=\$(sed -n 's/^VIAJES_IMAGEN=//p' .env.imagen)
           aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin "\${I%%/*}"
