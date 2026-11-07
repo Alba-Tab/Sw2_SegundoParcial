@@ -1,0 +1,64 @@
+# Build de una web para la nube (B7). Reutilizable: lo llaman web-<app>.yml al hacer push a main.
+# Las URLs salen de la variable de repositorio DOMINIO (guía §7): <KC> = https://auth.<dominio>/realms/transporte.
+#   - 4 apps del Centro de Control: configuracion.json de nube sobre el de la app (oidcIssuer, gatewayUrl, urls; sin jaegerUrl).
+#   - Portal: VITE_* en el build (sin ellas, Vite dejaría las de localhost).
+# Ruteo de SPA en el hosting: toda ruta devuelve index.html, menos configuracion.json, salud.json y modelos/.
+name: _deploy-web
+
+on:
+  workflow_call:
+    inputs:
+      app: { type: string, required: true, description: 'cc-tablero, cc-operaciones, cc-flota, cc-finanzas o portal-cliente' }
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    env:
+      APP: ${{ inputs.app }}
+      DOMINIO: ${{ vars.DOMINIO }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: URLs de la nube
+        run: |
+          : "${DOMINIO:?falta la variable de repositorio DOMINIO}"
+          {
+            echo "OIDC_ISSUER=https://auth.$DOMINIO/realms/transporte"
+            echo "GATEWAY_URL=https://api.$DOMINIO"
+            echo "URLS={\"cc-tablero\":\"https://tablero.$DOMINIO\",\"cc-operaciones\":\"https://operaciones.$DOMINIO\",\"cc-flota\":\"https://flota-cc.$DOMINIO\",\"cc-finanzas\":\"https://finanzas-cc.$DOMINIO\",\"portal-cliente\":\"https://portal.$DOMINIO\"}"
+          } >> "$GITHUB_ENV"
+
+      - name: Centro de Control
+        if: inputs.app != 'portal-cliente'
+        working-directory: frontends/centro-control
+        run: |
+          npm ci
+          npx ng build "$APP"
+          jq --arg oidc "$OIDC_ISSUER" --arg gw "$GATEWAY_URL" --argjson urls "$URLS" \
+            '.oidcIssuer = $oidc | .gatewayUrl = $gw | .urls = $urls | del(.jaegerUrl)' \
+            "projects/$APP/public/configuracion.json" > "dist/$APP/browser/configuracion.json"
+          cat "dist/$APP/browser/configuracion.json"
+          echo "SALIDA=frontends/centro-control/dist/$APP/browser" >> "$GITHUB_ENV"
+
+      - name: Portal
+        if: inputs.app == 'portal-cliente'
+        working-directory: frontends/portal-cliente
+        run: |
+          npm ci
+          VITE_OIDC_ISSUER="$OIDC_ISSUER" VITE_VIAJES_URL="https://viajes.$DOMINIO" \
+          VITE_FINANZAS_URL="https://finanzas.$DOMINIO" VITE_CENTRO_URL="https://tablero.$DOMINIO" npm run build
+          # Vite incrusta las URLs en el código: si quedó localhost, falta una variable.
+          if grep -rl 'localhost:' dist/assets; then echo "::error::quedó una URL de localhost en el build"; exit 1; fi
+          echo "SALIDA=frontends/portal-cliente/dist" >> "$GITHUB_ENV"
+
+      - uses: actions/upload-artifact@v7
+        with: { name: 'web-${{ inputs.app }}', path: '${{ env.SALIDA }}' }
+
+      # TODO(hosting): falta decidir dónde van las webs: Firebase Hosting (D113) o Azure Static Web Apps (D114, propuesta).
+      # Cuando se decida: el login de esa nube (OIDC, environment gcp o azure), el archivo de ruteo de SPA
+      # (firebase.json con rewrites o staticwebapp.config.json con navigationFallback, excluyendo configuracion.json,
+      # salud.json y modelos/), el deploy de $SALIDA y un smoke a la portada.
+      - name: Desplegar (pendiente de decidir el hosting)
+        run: echo "::warning::Hosting de las webs sin decidir (D113 o D114); el build queda como artefacto web-$APP"
