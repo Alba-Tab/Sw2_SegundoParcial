@@ -10,6 +10,10 @@ const esquema = z.object({
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default(''),
   OUTBOX_INTERVALO_MS: z.coerce.number().default(1000),
   TEMPORAL_ADDRESS: z.string().default('localhost:7233'),
+  /** mTLS hacia Temporal en la nube (B1): rutas a los PEM montados como secreto. Vacías = sin TLS (compose local). */
+  TEMPORAL_TLS_CA: z.string().default(''),
+  TEMPORAL_TLS_CERT: z.string().default(''),
+  TEMPORAL_TLS_KEY: z.string().default(''),
   /** contratos/eventos y contratos/comun copiados en la imagen: el Outbox valida cada evento (000 §6). */
   CONTRATOS_DIR: z.string().default('/app/contratos'),
   /** plataforma/semilla copiada en la imagen (D102). */
