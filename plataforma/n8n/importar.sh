@@ -2,13 +2,15 @@
 # Importa las credenciales (desde el entorno, nunca del repo) y los flujos de plataforma/n8n/flujos, y los publica.
 # Corre una vez antes de n8n, con su misma base y su clave de cifrado. Idempotente: reimportar reemplaza por id.
 set -eu
+# TLS hacia PostgreSQL (B11): la misma variable con la que n8n abre su propia base. En la nube (B1MS) es obligatorio.
+PG_SSL=disable; [ "${DB_POSTGRESDB_SSL_ENABLED:-false}" = true ] && PG_SSL=require
 cat > /tmp/credenciales.json <<JSON
 [
   {"id": "rabbitN8nLocal01", "name": "RabbitMQ n8n", "type": "rabbitmq",
    "data": {"hostname": "${AMQP_HOST}", "port": ${AMQP_PORT}, "username": "n8n", "password": "${RABBITMQ_CLAVE_N8N}", "vhost": "/", "ssl": false}},
   {"id": "postgresN8nLoc01", "name": "PostgreSQL n8n", "type": "postgres",
    "data": {"host": "${DB_POSTGRESDB_HOST}", "port": 5432, "database": "${DB_POSTGRESDB_DATABASE}", "user": "${DB_POSTGRESDB_USER}",
-            "password": "${DB_POSTGRESDB_PASSWORD}", "ssl": "disable"}},
+            "password": "${DB_POSTGRESDB_PASSWORD}", "ssl": "${PG_SSL}"}},
   {"id": "smtpMailpitLoc01", "name": "SMTP", "type": "smtp",
    "data": {"host": "${N8N_SMTP_HOST}", "port": ${N8N_SMTP_PORT}, "secure": false, "disableStartTls": true, "user": "${N8N_SMTP_USER:-}",
             "password": "${N8N_SMTP_PASS:-}"}}
