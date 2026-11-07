@@ -1,0 +1,5 @@
+# Worker de Finanzas en la nube (B1): .rr.yaml más mTLS hacia Temporal (mq.<dominio>:7233, requireClientAuth).
+# Se elige con RR_CONFIG=.rr.nube.yaml. RoadRunner no acepta una sección tls vacía, por eso va aparte; y con include
+# las secciones del archivo principal se pisan con las de los incluidos: la sección temporal con TLS va en .rr.tls.yaml.
+version: "3"
+include: [.rr.yaml, .rr.tls.yaml]
