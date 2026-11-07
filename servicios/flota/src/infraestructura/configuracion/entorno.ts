@@ -5,6 +5,8 @@ const esquema = z.object({
   PORT: z.coerce.number().default(8102),
   MONGO_URI: z.string().default('mongodb://localhost:27017/flota?replicaSet=rs0&directConnection=true'),
   AMQP_URL: z.string().default('amqp://flota:flota@localhost:5672'),
+  /** AMQPS en la nube (B2): ruta a la CA propia, con AMQP_URL=amqps://…:5671. Vacía = como hoy. */
+  AMQP_CA: z.string().default(''),
   OIDC_ISSUER: z.string().default(''),
   CORS_ORIGENES: z.string().default(''),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().default(''),
