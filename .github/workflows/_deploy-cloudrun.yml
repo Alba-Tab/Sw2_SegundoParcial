@@ -24,6 +24,6 @@ jobs:
         env: { IMAGEN: '${{ inputs.imagen }}', PROYECTO: '${{ vars.GCP_PROYECTO }}' }
         run: |
           gcloud run deploy flota --project "$PROYECTO" --region us-central1 --image "$IMAGEN" --quiet
-          # Worker pool (guía §6.2): comando beta de gcloud; si el worker pasa a la EC2 (plan B de D113), sale de aquí.
-          gcloud beta run worker-pools deploy flota-worker --project "$PROYECTO" --region us-central1 --image "$IMAGEN" --quiet
+          # Worker pool (guía §6.2): si el worker pasa a la EC2 (plan B de D113), sale de aquí.
+          gcloud run worker-pools deploy flota-worker --project "$PROYECTO" --region us-central1 --image "$IMAGEN" --quiet
           echo "url=$(gcloud run services describe flota --project "$PROYECTO" --region us-central1 --format 'value(status.url)')" >> "$GITHUB_OUTPUT"
