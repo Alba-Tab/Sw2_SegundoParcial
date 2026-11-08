@@ -1,0 +1,29 @@
+# Despliegue de Flota en Cloud Run (B8): servicio `flota` y worker pool `flota-worker`, misma imagen.
+# Solo cambia la imagen: variables, secretos, réplicas y cuenta de servicio se fijan al crear los recursos (guía §6.2).
+name: _deploy-cloudrun
+
+on:
+  workflow_call:
+    inputs:
+      imagen: { type: string, required: true }
+    outputs:
+      url: { value: '${{ jobs.cloudrun.outputs.url }}' }
+
+permissions: { contents: read, id-token: write }
+
+jobs:
+  cloudrun:
+    runs-on: ubuntu-latest
+    environment: gcp
+    outputs: { url: '${{ steps.desplegar.outputs.url }}' }
+    steps:
+      - uses: google-github-actions/auth@v3
+        with: { workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}', service_account: '${{ vars.GCP_SA }}' }
+      - uses: google-github-actions/setup-gcloud@v3
+      - id: desplegar
+        env: { IMAGEN: '${{ inputs.imagen }}', PROYECTO: '${{ vars.GCP_PROYECTO }}' }
+        run: |
+          gcloud run deploy flota --project "$PROYECTO" --region us-central1 --image "$IMAGEN" --quiet
+          # Worker pool (guía §6.2): comando beta de gcloud; si el worker pasa a la EC2 (plan B de D113), sale de aquí.
+          gcloud beta run worker-pools deploy flota-worker --project "$PROYECTO" --region us-central1 --image "$IMAGEN" --quiet
+          echo "url=$(gcloud run services describe flota --project "$PROYECTO" --region us-central1 --format 'value(status.url)')" >> "$GITHUB_OUTPUT"

@@ -1,0 +1,19 @@
+name: finanzas
+on:
+  push:
+    branches: [main]
+    paths: ['servicios/finanzas/**', 'contratos/openapi/finanzas.yaml', 'contratos/openapi/comun.yaml', 'contratos/eventos/**', 'contratos/temporal/**', 'plataforma/semilla/**']
+  workflow_dispatch:
+permissions: { contents: read, packages: write, id-token: write }
+jobs:
+  imagen:
+    uses: ./.github/workflows/_build-push-image.yml
+    with: { nombre: finanzas, dockerfile: servicios/finanzas/Dockerfile, registro: ghcr, environment: azure, target: app }
+  desplegar:
+    needs: imagen
+    uses: ./.github/workflows/_deploy-containerapp.yml
+    with: { imagen: '${{ needs.imagen.outputs.imagen }}', apps: finanzas-api finanzas-worker }
+  smoke:
+    needs: desplegar
+    uses: ./.github/workflows/_smoke.yml
+    with: { url: 'https://finanzas.${{ vars.DOMINIO }}/health/ready' }

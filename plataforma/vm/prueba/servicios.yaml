@@ -1,0 +1,75 @@
+# B12: los servicios del compose local contra la VM de prueba, como en la nube: mq.localhost es la Mac (está en el
+# SAN del certificado), Temporal con mTLS y RabbitMQ por AMQPS. Imágenes :b12 con B1 y B2.
+#   cd plataforma/compose && docker compose -f compose.yaml -f ../vm/prueba/servicios.yaml up -d --no-deps <servicios>
+x-mq: &mq ["mq.localhost:host-gateway"]
+
+services:
+  flota-api:
+    image: transporte/flota:b12
+    extra_hosts: *mq
+    environment:
+      AMQP_URL: amqps://flota:${RABBITMQ_CLAVE_FLOTA}@mq.localhost:5671
+      AMQP_CA: /certs/ca.pem
+    volumes: ["../vm/certs/ca.pem:/certs/ca.pem:ro"]
+
+  flota-worker:
+    image: transporte/flota:b12
+    extra_hosts: *mq
+    environment:
+      AMQP_URL: amqps://flota:${RABBITMQ_CLAVE_FLOTA}@mq.localhost:5671
+      AMQP_CA: /certs/ca.pem
+      TEMPORAL_ADDRESS: mq.localhost:7233
+      TEMPORAL_TLS_CA: /certs/ca.pem
+      TEMPORAL_TLS_CERT: /certs/cliente.pem
+      TEMPORAL_TLS_KEY: /certs/cliente.key
+    volumes:
+      - ../vm/certs/ca.pem:/certs/ca.pem:ro
+      - ../vm/certs/cliente-flota-worker.pem:/certs/cliente.pem:ro
+      - ../vm/certs/cliente-flota-worker.key:/certs/cliente.key:ro
+
+  finanzas-api:
+    image: transporte/finanzas:b12
+    extra_hosts: *mq
+    environment:
+      AMQP_HOST: mq.localhost
+      AMQP_PORT: "5671"
+      AMQP_CA: /certs/ca.pem
+      TEMPORAL_ADDRESS: mq.localhost:7233
+    volumes: ["../vm/certs/ca.pem:/certs/ca.pem:ro"]
+
+  finanzas-worker:
+    image: transporte/finanzas:b12
+    extra_hosts: *mq
+    environment:
+      AMQP_HOST: mq.localhost
+      AMQP_PORT: "5671"
+      AMQP_CA: /certs/ca.pem
+      TEMPORAL_ADDRESS: mq.localhost:7233
+      RR_CONFIG: .rr.nube.yaml
+      TEMPORAL_TLS_CA: /certs/ca.pem
+      TEMPORAL_TLS_CERT: /certs/cliente.pem
+      TEMPORAL_TLS_KEY: /certs/cliente.key
+    volumes:
+      - ../vm/certs/ca.pem:/certs/ca.pem:ro
+      - ../vm/certs/cliente-finanzas-worker.pem:/certs/cliente.pem:ro
+      - ../vm/certs/cliente-finanzas-worker.key:/certs/cliente.key:ro
+
+  analitica:
+    image: transporte/analitica:b12
+    extra_hosts: *mq
+    environment:
+      AMQP_URL: amqps://analitica:${RABBITMQ_CLAVE_ANALITICA}@mq.localhost:5671/?cafile=/certs/ca.pem
+    volumes: ["../vm/certs/ca.pem:/certs/ca.pem:ro"]
+
+  n8n-importar:
+    extra_hosts: *mq
+    environment:
+      AMQP_HOST: mq.localhost
+      AMQP_PORT: "5671"
+      AMQP_CA: /certs/ca.pem
+    volumes: ["../vm/certs/ca.pem:/certs/ca.pem:ro"]
+
+
+  # El flujo se conecta desde n8n (la credencial ya trae la CA); solo necesita resolver mq.localhost.
+  n8n:
+    extra_hosts: *mq

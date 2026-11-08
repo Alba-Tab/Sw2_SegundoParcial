@@ -1,0 +1,15 @@
+name: n8n
+on:
+  push:
+    branches: [main]
+    paths: ['plataforma/n8n/**']
+  workflow_dispatch:
+permissions: { contents: read, packages: write, id-token: write }
+jobs:
+  imagen:
+    uses: ./.github/workflows/_build-push-image.yml
+    with: { nombre: n8n-importar, dockerfile: plataforma/n8n/Dockerfile, registro: ghcr, environment: azure, contexto: plataforma/n8n }
+  desplegar:
+    needs: imagen
+    uses: ./.github/workflows/_deploy-containerapp.yml
+    with: { imagen: '${{ needs.imagen.outputs.imagen }}', jobs: n8n-importar, iniciar: true, reiniciar: n8n }

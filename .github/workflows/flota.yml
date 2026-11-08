@@ -1,0 +1,19 @@
+name: flota
+on:
+  push:
+    branches: [main]
+    paths: ['servicios/flota/**', 'contratos/openapi/flota.yaml', 'contratos/openapi/comun.yaml', 'contratos/eventos/**', 'contratos/temporal/**', 'plataforma/semilla/**']
+  workflow_dispatch:
+permissions: { contents: read, packages: write, id-token: write }
+jobs:
+  imagen:
+    uses: ./.github/workflows/_build-push-image.yml
+    with: { nombre: flota, dockerfile: servicios/flota/Dockerfile, registro: gar, environment: gcp }
+  desplegar:
+    needs: imagen
+    uses: ./.github/workflows/_deploy-cloudrun.yml
+    with: { imagen: '${{ needs.imagen.outputs.imagen }}' }
+  smoke:
+    needs: desplegar
+    uses: ./.github/workflows/_smoke.yml
+    with: { url: '${{ needs.desplegar.outputs.url }}/health/ready' }
