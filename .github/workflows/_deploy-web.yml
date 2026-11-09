@@ -1,0 +1,113 @@
+# Build y publicación de una web en Azure Static Web Apps (D114). Reutilizable: lo llaman web-<app>.yml.
+# Las URLs salen de la variable de repositorio DOMINIO (guía §7): <KC> = https://auth.<dominio>/realms/transporte.
+#   - 4 apps del Centro de Control: configuracion.json de nube sobre el de la app (oidcIssuer, gatewayUrl, urls; sin jaegerUrl).
+#   - Portal: VITE_* en el build (sin ellas, Vite dejaría las de localhost).
+# Ruteo de SPA en el hosting: toda ruta devuelve index.html, menos configuracion.json, salud.json y modelos/.
+name: _deploy-web
+
+on:
+  workflow_call:
+    inputs:
+      app: { type: string, required: true, description: 'cc-tablero, cc-operaciones, cc-flota, cc-finanzas o portal-cliente' }
+      entorno: { type: string, default: '', description: 'Vacío publica en producción; con nombre, en un entorno de ensayo de la web' }
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    environment: azure
+    env:
+      APP: ${{ inputs.app }}
+      DOMINIO: ${{ vars.DOMINIO }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24 }
+      - name: URLs de la nube
+        run: |
+          : "${DOMINIO:?falta la variable de repositorio DOMINIO}"
+          {
+            echo "OIDC_ISSUER=https://auth.$DOMINIO/realms/transporte"
+            echo "GATEWAY_URL=https://api.$DOMINIO"
+            echo "URLS={\"cc-tablero\":\"https://tablero.$DOMINIO\",\"cc-operaciones\":\"https://operaciones.$DOMINIO\",\"cc-flota\":\"https://flota-cc.$DOMINIO\",\"cc-finanzas\":\"https://finanzas-cc.$DOMINIO\",\"portal-cliente\":\"https://portal.$DOMINIO\"}"
+          } >> "$GITHUB_ENV"
+
+      - name: Centro de Control
+        if: inputs.app != 'portal-cliente'
+        working-directory: frontends/centro-control
+        run: |
+          # Los modelos no se versionan: sin este paso la web saldría sin voz o sin OCR (D38).
+          [ "$APP" != cc-tablero ] || sh scripts/descargar-whisper.sh
+          [ "$APP" != cc-finanzas ] || sh scripts/descargar-tesseract.sh
+          npm ci
+          npx ng build "$APP"
+          if [ "$APP" = cc-tablero ]; then test -s "dist/$APP/browser/modelos/whisper-tiny/onnx/encoder_model_quantized.onnx"; fi
+          if [ "$APP" = cc-finanzas ]; then test -s "dist/$APP/browser/tesseract/spa.traineddata.gz"; fi
+          jq --arg oidc "$OIDC_ISSUER" --arg gw "$GATEWAY_URL" --argjson urls "$URLS" \
+            '.oidcIssuer = $oidc | .gatewayUrl = $gw | .urls = $urls | del(.jaegerUrl)' \
+            "projects/$APP/public/configuracion.json" > "dist/$APP/browser/configuracion.json"
+          cat "dist/$APP/browser/configuracion.json"
+          echo "SALIDA=frontends/centro-control/dist/$APP/browser" >> "$GITHUB_ENV"
+
+      - name: Portal
+        if: inputs.app == 'portal-cliente'
+        working-directory: frontends/portal-cliente
+        run: |
+          npm ci
+          VITE_OIDC_ISSUER="$OIDC_ISSUER" VITE_VIAJES_URL="https://viajes.$DOMINIO" \
+          VITE_FINANZAS_URL="https://finanzas.$DOMINIO" VITE_CENTRO_URL="https://tablero.$DOMINIO" npm run build
+          # Vite incrusta las URLs en el código: si quedó localhost, falta una variable.
+          if grep -rl 'localhost:' dist/assets; then echo "::error::quedó una URL de localhost en el build"; exit 1; fi
+          echo "SALIDA=frontends/portal-cliente/dist" >> "$GITHUB_ENV"
+
+      # Toda ruta devuelve index.html, menos los archivos que el código pide por su nombre: sin esta exclusión, uno que
+      # falte respondería 200 con la portada y fallaría más adelante, sin decir por qué.
+      - name: Ruteo de SPA
+        run: |
+          cat > "$SALIDA/staticwebapp.config.json" <<'JSON'
+          { "navigationFallback": { "rewrite": "/index.html", "exclude": ["/configuracion.json", "/salud.json", "/modelos/*", "/tesseract/*"] } }
+          JSON
+
+      - uses: azure/login@v3
+        with: { client-id: '${{ vars.AZURE_CLIENT_ID }}', tenant-id: '${{ vars.AZURE_TENANT_ID }}', subscription-id: '${{ vars.AZURE_SUBSCRIPTION_ID }}' }
+
+      - name: Token de publicación
+        id: token
+        env: { RG: '${{ vars.AZURE_RG }}' }
+        run: |
+          case "$APP" in
+            cc-tablero) SWA=swa-tablero ;;
+            cc-operaciones) SWA=swa-operaciones ;;
+            cc-flota) SWA=swa-flota-cc ;;
+            cc-finanzas) SWA=swa-finanzas-cc ;;
+            portal-cliente) SWA=swa-portal ;;
+            *) echo "::error::app desconocida: $APP"; exit 1 ;;
+          esac
+          T=$(az staticwebapp secrets list -g "$RG" -n "$SWA" --query properties.apiKey -o tsv)
+          echo "::add-mask::$T"
+          echo "token=$T" >> "$GITHUB_OUTPUT"
+
+      - id: publicar
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ steps.token.outputs.token }}
+          action: upload
+          app_location: ${{ env.SALIDA }}
+          output_location: ''
+          skip_app_build: true
+          skip_api_build: true
+          deployment_environment: ${{ inputs.entorno }}
+
+      - name: Prueba de humo
+        env: { URL: '${{ steps.publicar.outputs.static_web_app_url }}' }
+        run: |
+          curl -fsS --retry 10 --retry-delay 6 --retry-all-errors --max-time 20 -o /dev/null "$URL/"
+          if [ "$APP" != portal-cliente ]; then
+            curl -fsS --retry 5 --retry-delay 6 --max-time 20 "$URL/configuracion.json" | jq -e --arg oidc "$OIDC_ISSUER" '.oidcIssuer == $oidc'
+          fi
+          if [ "$APP" = cc-finanzas ]; then
+            curl -fsS --max-time 60 -o /tmp/modelo "$URL/tesseract/spa.traineddata.gz" && test "$(wc -c < /tmp/modelo)" -gt 1000000
+          fi

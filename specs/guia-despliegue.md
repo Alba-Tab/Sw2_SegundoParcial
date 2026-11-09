@@ -98,15 +98,15 @@ Un cambio entra por PR a `develop`, y `develop` pasa a `main` por PR. El push a 
 | `keycloak` | `plataforma/keycloak/**` | Job `keycloak-config` | Automático |
 | `n8n` | `plataforma/n8n/**` | Job `n8n-importar` y reinicio de n8n | Automático |
 | `llm` | Solo manual | GHCR → `llm` | Sin Container App (§8) |
-| Webs | — | **Sin workflow**: a mano (§6) | D114 |
+| `web-cc-tablero`, `web-cc-operaciones`, `web-cc-flota`, `web-cc-finanzas`, `web-portal-cliente` | Su proyecto, `ui-comun`, tokens y contratos | Static Web Apps (`_deploy-web`), con modelos de IA | Automático |
 
-Los 10 workflows de `main` pasan. Cada paquete de GHCR necesita al repo con rol Write en *Manage Actions access*.
+Los workflows de `main` pasan. Con `workflow_dispatch` y `ensayo` una web se publica en un entorno de prueba, sin tocar producción. Cada paquete de GHCR necesita al repo con rol Write en *Manage Actions access*.
 
 **Volver atrás:** desplegar el SHA anterior. Cloud Run y Container Apps guardan revisiones; en la EC2 es `docker compose up -d` con la etiqueta anterior.
 
 ## 6. Publicar lo que no tiene pipeline
 
-**Webs** (desde la Mac, con el token de `az staticwebapp secrets list -n <swa>`): compilar con la configuración de §3, escribir `staticwebapp.config.json` en la salida con `navigationFallback` a `index.html`, excluyendo `configuracion.json`, `salud.json` y `modelos/`, y publicar con `swa deploy <salida> --env production`.
+**Webs, solo como respaldo si falla su workflow** (desde la Mac, con el token de `az staticwebapp secrets list -n <swa>`): compilar con la configuración de §3, escribir `staticwebapp.config.json` en la salida con `navigationFallback` a `index.html`, excluyendo `configuracion.json`, `salud.json`, `modelos/` y `tesseract/`, con los modelos bajados antes (`npm run modelos`), y publicar con `swa deploy <salida> --env production`.
 
 **App del chofer en el iPhone** (`movil/app-chofer/ios`, con las variables de §3 en el entorno):
 
@@ -159,4 +159,3 @@ xcrun devicectl device install app --device <udid> build/Build/Products/Release-
 | **LLM** | Agente y redacción por voz | Pedir cuota T4 en el entorno, o plan C de D113: Ollama en la Mac con túnel autenticado y `LLM_BASE_URL` hacia él |
 | FCM para Android (D45) | Push en Android | Pool WIF `aws`, cuenta `sa-fcm`, `create-cred-config` y `FCM_PROYECTO`. En iPhone no hace falta (D112) |
 | Alarmas | Avisos de caídas | *Status check* de la EC2 y uptime checks. El presupuesto `transporte-100` de `rg-transporte` ya avisa a los 100 USD al mes |
-| Workflow de las webs | Publicar sin la Mac | Reusar `_deploy-web` de la rama `ci/ci/deploy-web` y completar la publicación |
