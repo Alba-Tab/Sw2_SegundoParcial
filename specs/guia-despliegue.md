@@ -95,10 +95,12 @@ Un cambio entra por PR a `develop`, y `develop` pasa a `main` por PR. El push a 
 | `finanzas` | `servicios/finanzas/**` y sus contratos | GHCR → `finanzas-api` y `finanzas-worker` | Automático |
 | `analitica` | `servicios/analitica/**` y sus contratos | GHCR → `analitica` | Automático |
 | `gateway`, `mcp-server` | Su carpeta, `libs/intercambio-token/**` y contratos | GHCR → Container App | Automático |
-| `keycloak` | `plataforma/keycloak/**` | Job `keycloak-config` | **Falla** hasta crear el Job (§8) |
-| `n8n` | `plataforma/n8n/**` | Job `n8n-importar` | **Falla** hasta crear el Job (§8) |
+| `keycloak` | `plataforma/keycloak/**` | Job `keycloak-config` | Automático |
+| `n8n` | `plataforma/n8n/**` | Job `n8n-importar` y reinicio de n8n | Automático |
 | `llm` | Solo manual | GHCR → `llm` | Sin Container App (§8) |
 | Webs | — | **Sin workflow**: a mano (§6) | D114 |
+
+Los 10 workflows de `main` pasan. Cada paquete de GHCR necesita al repo con rol Write en *Manage Actions access*.
 
 **Volver atrás:** desplegar el SHA anterior. Cloud Run y Container Apps guardan revisiones; en la EC2 es `docker compose up -d` con la etiqueta anterior.
 
@@ -120,7 +122,8 @@ xcrun devicectl device install app --device <udid> build/Build/Products/Release-
 | Tarea | Cómo |
 |---|---|
 | Encender o apagar todo | `plataforma/scripts/encender-demo.sh` y `apagar-demo.sh` (`SIMULAR=1` solo imprime) |
-| Dejar la demo limpia | `plataforma/scripts/reiniciar-demo.sh --nube`, con `DOMINIO`, `KC_ADMIN`, `KC_ADMIN_CLAVE` y `N8N_DB_URL`. **Vacía todas las bases** |
+| Dejar la demo limpia | `plataforma/scripts/reiniciar-demo.sh --nube`, con `DOMINIO`, `KC_ADMIN`, `KC_ADMIN_CLAVE` y `N8N_DB_URL`. **Vacía todas las bases, incluido el historial** |
+| Historial simulado | `plataforma/datos-sinteticos/cargar_historial.py`: 3 meses de viajes, facturas y cargas, y GPS de 30 días. Solo inserta. Las facturas son `FAC-1#####` |
 | Probar de punta a punta | `plataforma/scripts/escenario-completo.sh --nube`, con `DOMINIO`, `FLOTA_URL` y `ANALITICA_URL`. Pide cada usuario por *device grant*: usa un perfil de navegador distinto por usuario, porque las ventanas de incógnito comparten sesión |
 | Migraciones de Finanzas | `docker run` de la imagen con `php artisan migrate --force` desde la Mac |
 | Túneles a Temporal UI y RabbitMQ | Session Manager, puertos 8233 y 15672 |
@@ -146,13 +149,14 @@ xcrun devicectl device install app --device <udid> build/Build/Products/Release-
 | n8n | Tras reimportar flujos no los toma | Reiniciar la revisión |
 | AWS | La CLI lee Parameter Store en otra región | Pasar siempre `AWS_REGION=us-east-2` |
 | AWS | `aws login` usa la cuenta abierta en el navegador | Debe ser la `816026730908` |
+| GitHub OIDC | El sujeto del token trae ids (`repo:Alba-Tab@110486695/Sw2_SegundoParcial@1437938705:environment:<env>`) | AWS y Azure aceptan ese formato y el anterior |
+| Keycloak | Desde 26.8.2 la Admin API rechaza con 401 los tokens sin `kc-admin-api` | El cliente `viajes` lleva ese scope. La imagen queda fijada en 26.8.2 |
 
 ## 8. Lo que falta
 
 | Qué | Para qué | Cómo |
 |---|---|---|
 | **LLM** | Agente y redacción por voz | Pedir cuota T4 en el entorno, o plan C de D113: Ollama en la Mac con túnel autenticado y `LLM_BASE_URL` hacia él |
-| Jobs `keycloak-config` y `n8n-importar` | Que sus workflows pasen | Crearlos en Azure con sus secretos (T11.3, T11.6) |
 | FCM para Android (D45) | Push en Android | Pool WIF `aws`, cuenta `sa-fcm`, `create-cred-config` y `FCM_PROYECTO`. En iPhone no hace falta (D112) |
-| Presupuesto de Azure y alarmas | Avisos de costo y caídas | Presupuesto en `rg-transporte`, alarma de *status check* y uptime checks |
+| Alarmas | Avisos de caídas | *Status check* de la EC2 y uptime checks. El presupuesto `transporte-100` de `rg-transporte` ya avisa a los 100 USD al mes |
 | Workflow de las webs | Publicar sin la Mac | Reusar `_deploy-web` de la rama `ci/ci/deploy-web` y completar la publicación |
