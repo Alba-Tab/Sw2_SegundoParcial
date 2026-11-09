@@ -8,10 +8,15 @@
 #   Paso 7     FF2: carga exagerada (450 L con 120 km) → ANOMALIA_COMBUSTIBLE; simulador de chofer2 → RIESGO_RETRASO.
 #   Pasos 8-10 (agente, voz y pago desde la interfaz) se agregan con F9 y F10.
 set -euo pipefail
-if [ "${1:-}" = "--nube" ]; then echo "La variante --nube llega con el despliegue (F11)." >&2; exit 2; fi
+# --nube: contra la nube (DOMINIO, FLOTA_URL y ANALITICA_URL en el entorno), tokens por device grant (D39).
+[ "${1:-}" = "--nube" ] && export NUBE=1
 . "$(dirname "$0")/demo/comun.sh"
 ANALITICA="${ANALITICA_URL:-http://localhost:8104}"
 pg() { dc exec -T postgres-aws psql -U viajes -d viajes -tAc "$1"; }
+estado_viaje() { # en la nube no hay psql hacia la EC2: el estado sale de la API
+  if [ -n "${NUBE:-}" ]; then curl -sf "$VIAJES/api/v1/viajes/$1" -H "Authorization: Bearer $(token despachador1)" | json "d['estado']"
+  else pg "SELECT estado FROM viaje WHERE viaje_id = '$1'"; fi
+}
 carga() { # carga <token chofer> <viajeId> <litros> <kilometraje> -> código HTTP
   local cuerpo op
   op=$(uuidgen | tr '[:upper:]' '[:lower:]') # spec 009: la Idempotency-Key es el opId
@@ -66,15 +71,17 @@ esperado frenada "$(curl -s -o /dev/null -w '%{http_code}' -X POST "$VIAJES/api/
 esperado "carga 184.320 km (primera del tracto)" "$(carga "$C" "$V" 180.5 184320)" 201
 
 paso "Paso 6: entrega en el Aula → factura, cierre y correo"
-CORREOS=$(correos 'Factura')
+[ -n "${NUBE:-}" ] || CORREOS=$(correos 'Factura')
 esperado entrega "$(entregar_en_aula chofer1 "$V")" ENTREGADO
-esperar_que "viaje CERRADO (factura emitida)" "pg \"SELECT estado FROM viaje WHERE viaje_id = '$V'\"" CERRADO 90
-esperar_que "correo de la factura" "correos 'Factura'" "$((CORREOS + 1))" 60
+esperar_que "viaje CERRADO (factura emitida)" "estado_viaje $V" CERRADO 90
+# En la nube el correo sale por Brevo (D37), que no se puede contar como Mailpit: se revisa en el buzón.
+if [ -n "${NUBE:-}" ]; then echo "  (revisa el correo de la factura en el buzón de Agroexport)"
+else esperar_que "correo de la factura" "correos 'Factura'" "$((CORREOS + 1))" 60; fi
 
 paso "Paso 7: anomalía de diésel (FF2) y retraso del viaje de chofer2"
 esperado "carga exagerada 450 L a 184.440 km" "$(carga "$C" "$V" 450 184440)" 201
 esperar_que "ANOMALIA_COMBUSTIBLE para el jefe de flota" "alertas_de jefeflota1 ANOMALIA_COMBUSTIBLE" 1 60
 esperado "el despachador no la ve" "$(alertas_de despachador1 ANOMALIA_COMBUSTIBLE)" 0
-python3 "$RAIZ/plataforma/simulador-viaje/simular.py" ${BITACORA_MALICIOSA:+--bitacora-maliciosa}
+python3 "$RAIZ/plataforma/simulador-viaje/simular.py" ${BITACORA_MALICIOSA:+--bitacora-maliciosa} ${NUBE:+--nube}
 
 echo; echo "✔ Escenario hasta el paso 7 en verde."
