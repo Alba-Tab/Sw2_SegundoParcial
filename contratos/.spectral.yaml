@@ -1,0 +1,15 @@
+extends: [[spectral:oas, recommended]]
+rules:
+  # comun.yaml solo define componentes que usan los demás archivos.
+  oas3-unused-component: off
+  operation-tag-defined: error
+  idempotency-key-en-post:
+    description: Todo POST de negocio exige Idempotency-Key (000 §4.1).
+    severity: error
+    given: "$.paths[?(@property.startsWith('/api/'))].post"
+    then:
+      field: parameters
+      function: truthy
+  # Cada operación lleva `summary`; la explicación larga va en la spec.
+  operation-description: off
+  info-contact: off

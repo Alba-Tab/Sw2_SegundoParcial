@@ -1,0 +1,104 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/eventos/flota/CaidaCombustibleDetectada.v1.schema.json",
+  "title": "CaidaCombustibleDetectada v1",
+  "description": "El nivel del tanque cayó 8 % o más en 10 min con el camión detenido (D08): posible robo. Clave de enrutamiento: flota.caida-combustible-detectada.v1. Consumen: analitica.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../sobre.schema.json"
+    }
+  ],
+  "properties": {
+    "tipo": {
+      "const": "CaidaCombustibleDetectada"
+    },
+    "version": {
+      "const": 1
+    },
+    "productor": {
+      "const": "flota"
+    },
+    "datos": {
+      "type": "object",
+      "required": [
+        "deteccionId",
+        "tractoId",
+        "placa",
+        "nivelAnteriorPct",
+        "nivelActualPct",
+        "caidaPct",
+        "ventanaMinutos",
+        "velocidadKmh",
+        "detectadaEn"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "deteccionId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "tractoId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "placa": {
+          "type": "string",
+          "pattern": "^[0-9]{3,4}[A-Z]{3}$"
+        },
+        "viajeId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "nivelAnteriorPct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "nivelActualPct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "caidaPct": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "ventanaMinutos": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 60
+        },
+        "velocidadKmh": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 200
+        },
+        "detectadaEn": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Instante"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "01933d16-0000-7000-8000-000000000016",
+      "tipo": "CaidaCombustibleDetectada",
+      "version": 1,
+      "ocurridoEn": "2026-11-03T15:20:01Z",
+      "correlationId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8dff",
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "productor": "flota",
+      "datos": {
+        "deteccionId": "01933c70-0000-7000-8000-00000000cc01",
+        "tractoId": "01933900-0000-7000-8000-00000000a101",
+        "placa": "4521KTR",
+        "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+        "nivelAnteriorPct": 62.0,
+        "nivelActualPct": 49.5,
+        "caidaPct": 12.5,
+        "ventanaMinutos": 6,
+        "velocidadKmh": 0,
+        "detectadaEn": "2026-11-03T14:02:00Z"
+      }
+    }
+  ]
+}

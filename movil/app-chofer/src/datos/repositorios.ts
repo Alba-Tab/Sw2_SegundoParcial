@@ -1,0 +1,291 @@
+import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
+import type {
+  Cola,
+  DatosDelChofer,
+  Evidencias,
+  FatigaSinPosicion,
+  FatigasSinPosicion,
+  PosicionGuardada,
+  PuntosGps,
+  Viajes,
+} from '../aplicacion/puertos';
+import type { EvidenciaLocal } from '../dominio/evidencia';
+import type { PuntoGps } from '../dominio/gps';
+import type { EstadoOperacion, Operacion, TipoOperacion } from '../dominio/operacion';
+import { type EstadoViaje, type ViajeLocal, viajesQueSobran } from '../dominio/viaje';
+import { borrarEvidencias } from './archivos';
+import { bd } from './bd';
+import { ajuste, evidenciaLocal, operacionPendiente, puntoGps, viaje } from './esquema';
+
+/** Adaptadores SQLite (Drizzle) de los puertos de la cola, el GPS y los viajes. Síncronos: SQLite está en el celular. */
+export class ColaSqlite implements Cola {
+  todas(): Operacion[] {
+    return bd
+      .select()
+      .from(operacionPendiente)
+      .where(eq(operacionPendiente.estado, 'PENDIENTE'))
+      .orderBy(asc(operacionPendiente.creadaEn))
+      .all()
+      .map(aOperacion);
+  }
+
+  /** Para la pantalla de pendientes: todas menos las confirmadas. */
+  visibles(): Operacion[] {
+    return bd
+      .select()
+      .from(operacionPendiente)
+      .where(sql`${operacionPendiente.estado} <> 'CONFIRMADA'`)
+      .orderBy(asc(operacionPendiente.creadaEn))
+      .all()
+      .map(aOperacion);
+  }
+
+  agregar(op: Operacion): void {
+    bd.insert(operacionPendiente)
+      .values({ ...op, cuerpo: JSON.stringify(op.cuerpo), evidencias: JSON.stringify(op.evidencias) })
+      .run();
+  }
+
+  actualizar(op: Operacion): void {
+    bd.update(operacionPendiente)
+      .set({
+        intentos: op.intentos,
+        proximoIntentoEn: op.proximoIntentoEn,
+        estado: op.estado,
+        codigoError: op.codigoError,
+        cerradaEn: op.cerradaEn,
+      })
+      .where(eq(operacionPendiente.opId, op.opId))
+      .run();
+  }
+
+  descartarViaje(viajeId: string, ahora: string): void {
+    bd.update(operacionPendiente)
+      .set({ estado: 'DESCARTADA', cerradaEn: ahora })
+      .where(and(eq(operacionPendiente.viajeId, viajeId), eq(operacionPendiente.estado, 'PENDIENTE')))
+      .run();
+  }
+
+  purgar(antesDe: string): void {
+    bd.delete(operacionPendiente)
+      .where(and(inArray(operacionPendiente.estado, ['DESCARTADA', 'CONFIRMADA']), lte(operacionPendiente.cerradaEn, antesDe)))
+      .run();
+  }
+}
+
+function aOperacion(f: typeof operacionPendiente.$inferSelect): Operacion {
+  return {
+    ...f,
+    tipo: f.tipo as TipoOperacion,
+    estado: f.estado as EstadoOperacion,
+    cuerpo: JSON.parse(f.cuerpo) as Record<string, unknown>,
+    evidencias: JSON.parse(f.evidencias) as string[],
+  };
+}
+
+export class PuntosSqlite implements PuntosGps {
+  siguienteSeq(viajeId: string): number {
+    const clave = `seq:${viajeId}`;
+    const actual = Number(bd.select().from(ajuste).where(eq(ajuste.clave, clave)).get()?.valor ?? -1) + 1;
+    bd.insert(ajuste)
+      .values({ clave, valor: String(actual) })
+      .onConflictDoUpdate({ target: ajuste.clave, set: { valor: String(actual) } })
+      .run();
+    return actual;
+  }
+
+  agregar(p: PuntoGps): void {
+    bd.insert(puntoGps).values(p).onConflictDoNothing().run();
+  }
+
+  pendientes(viajeId: string, limite: number): PuntoGps[] {
+    return bd.select().from(puntoGps).where(eq(puntoGps.viajeId, viajeId)).orderBy(asc(puntoGps.seq)).limit(limite).all();
+  }
+
+  viajes(): string[] {
+    return bd
+      .selectDistinct({ viajeId: puntoGps.viajeId })
+      .from(puntoGps)
+      .all()
+      .map((f) => f.viajeId);
+  }
+
+  borrar(viajeId: string, seqs: number[]): void {
+    if (seqs.length === 0) return;
+    bd.delete(puntoGps)
+      .where(and(eq(puntoGps.viajeId, viajeId), inArray(puntoGps.seq, seqs)))
+      .run();
+  }
+
+  borrarHasta(viajeId: string, seq: number): void {
+    bd.delete(puntoGps)
+      .where(and(eq(puntoGps.viajeId, viajeId), lte(puntoGps.seq, seq)))
+      .run();
+  }
+
+  contar(viajeId?: string): number {
+    return (
+      bd
+        .select({ n: sql<number>`count(*)` })
+        .from(puntoGps)
+        .where(viajeId ? eq(puntoGps.viajeId, viajeId) : undefined)
+        .get()?.n ?? 0
+    );
+  }
+}
+
+type DatosViaje = Omit<ViajeLocal, 'viajeId' | 'estado' | 'iniciadoLocal' | 'canceladoAlSincronizar' | 'entregaLocal'>;
+
+export class ViajesSqlite implements Viajes {
+  todos(): ViajeLocal[] {
+    return bd.select().from(viaje).all().map(aViaje);
+  }
+
+  porId(viajeId: string): ViajeLocal | null {
+    const f = bd.select().from(viaje).where(eq(viaje.viajeId, viajeId)).get();
+    return f ? aViaje(f) : null;
+  }
+
+  guardarDelServidor(viajes: ViajeLocal[]): void {
+    const ahora = new Date().toISOString();
+    bd.transaction((tx) => {
+      for (const v of viajes) {
+        const { viajeId, estado, iniciadoLocal: _i, canceladoAlSincronizar: _c, entregaLocal: _e, ...datos } = v;
+        tx.insert(viaje)
+          .values({ viajeId, estado, datos: JSON.stringify(datos), actualizadoEn: ahora })
+          // El servidor manda en el estado; "iniciado sin señal" se conserva hasta que el inicio se confirme.
+          .onConflictDoUpdate({ target: viaje.viajeId, set: { estado, datos: JSON.stringify(datos), actualizadoEn: ahora } })
+          .run();
+      }
+      // La lista del servidor manda también en qué viajes hay: los que ya no vienen se borran, salvo con cola pendiente.
+      const locales = tx
+        .select({ id: viaje.viajeId })
+        .from(viaje)
+        .all()
+        .map((f) => f.id);
+      const conCola = tx
+        .selectDistinct({ id: operacionPendiente.viajeId })
+        .from(operacionPendiente)
+        .where(eq(operacionPendiente.estado, 'PENDIENTE'))
+        .all()
+        .map((f) => f.id);
+      const sobran = viajesQueSobran(
+        locales,
+        viajes.map((v) => v.viajeId),
+        conCola,
+      );
+      if (sobran.length) tx.delete(viaje).where(inArray(viaje.viajeId, sobran)).run();
+    });
+  }
+
+  marcarIniciado(viajeId: string): void {
+    bd.update(viaje).set({ iniciadoLocal: true }).where(eq(viaje.viajeId, viajeId)).run();
+  }
+
+  marcarCanceladoAlSincronizar(viajeId: string): void {
+    bd.update(viaje).set({ canceladoAlSincronizar: true }).where(eq(viaje.viajeId, viajeId)).run();
+  }
+
+  marcarEntregaLocal(viajeId: string, tipo: 'ENTREGA' | 'RECHAZO'): void {
+    bd.update(viaje).set({ entregaLocal: tipo }).where(eq(viaje.viajeId, viajeId)).run();
+  }
+
+  liberarMarca(viajeId: string, tipo: 'INICIO' | 'ENTREGA' | 'RECHAZO'): void {
+    bd.update(viaje)
+      .set(tipo === 'INICIO' ? { iniciadoLocal: false } : { entregaLocal: null })
+      .where(eq(viaje.viajeId, viajeId))
+      .run();
+  }
+}
+
+function aViaje(f: typeof viaje.$inferSelect): ViajeLocal {
+  return {
+    viajeId: f.viajeId,
+    estado: f.estado as EstadoViaje,
+    iniciadoLocal: f.iniciadoLocal,
+    canceladoAlSincronizar: f.canceladoAlSincronizar,
+    entregaLocal: f.entregaLocal as ViajeLocal['entregaLocal'],
+    ...(JSON.parse(f.datos) as DatosViaje),
+  };
+}
+
+export class EvidenciasSqlite implements Evidencias {
+  agregar(e: EvidenciaLocal): void {
+    bd.insert(evidenciaLocal).values(e).run();
+  }
+
+  porId(evidenciaId: string): EvidenciaLocal | null {
+    const f = bd.select().from(evidenciaLocal).where(eq(evidenciaLocal.evidenciaId, evidenciaId)).get();
+    return f ? (f as EvidenciaLocal) : null;
+  }
+
+  marcarCompleta(evidenciaId: string): void {
+    bd.update(evidenciaLocal).set({ estado: 'COMPLETA' }).where(eq(evidenciaLocal.evidenciaId, evidenciaId)).run();
+  }
+
+  borrar(evidenciaId: string): void {
+    bd.delete(evidenciaLocal).where(eq(evidenciaLocal.evidenciaId, evidenciaId)).run();
+  }
+}
+
+const CLAVE_POSICION = 'ultimaPosicion';
+
+/** La última posición del GPS en la tabla `ajuste` (JSON con lat y lng). */
+export class PosicionSqlite implements PosicionGuardada {
+  leer(): { lat: number; lng: number } | null {
+    try {
+      const f = bd.select().from(ajuste).where(eq(ajuste.clave, CLAVE_POSICION)).get();
+      return f ? (JSON.parse(f.valor) as { lat: number; lng: number }) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  guardar(p: { lat: number; lng: number }): void {
+    const valor = JSON.stringify({ lat: p.lat, lng: p.lng });
+    bd.insert(ajuste).values({ clave: CLAVE_POSICION, valor }).onConflictDoUpdate({ target: ajuste.clave, set: { valor } }).run();
+  }
+
+  borrar(): void {
+    bd.delete(ajuste).where(eq(ajuste.clave, CLAVE_POSICION)).run();
+  }
+}
+
+const CLAVE_FATIGAS = 'fatigasSinPosicion';
+
+/** Las alertas de fatiga sin posición, en la tabla `ajuste` (JSON con la lista). */
+export class FatigasSqlite implements FatigasSinPosicion {
+  leer(): FatigaSinPosicion[] {
+    const f = bd.select().from(ajuste).where(eq(ajuste.clave, CLAVE_FATIGAS)).get();
+    return f ? (JSON.parse(f.valor) as FatigaSinPosicion[]) : [];
+  }
+
+  guardar(fatigas: FatigaSinPosicion[]): void {
+    if (fatigas.length === 0) {
+      bd.delete(ajuste).where(eq(ajuste.clave, CLAVE_FATIGAS)).run();
+      return;
+    }
+    const valor = JSON.stringify(fatigas);
+    bd.insert(ajuste).values({ clave: CLAVE_FATIGAS, valor }).onConflictDoUpdate({ target: ajuste.clave, set: { valor } }).run();
+  }
+}
+
+/**
+ * Al cerrar sesión: viajes, cola, evidencias (filas y archivos), puntos GPS, la última posición y las alertas de fatiga
+ * que esperaban una posición. Quedan el
+ * `dispositivoId` y el `seq` de cada viaje, que son del celular (D55) y no del chofer.
+ */
+export class DatosDelChoferSqlite implements DatosDelChofer {
+  borrar(): void {
+    bd.transaction((tx) => {
+      tx.delete(operacionPendiente).run();
+      tx.delete(evidenciaLocal).run();
+      tx.delete(puntoGps).run();
+      tx.delete(viaje).run();
+      tx.delete(ajuste)
+        .where(inArray(ajuste.clave, [CLAVE_POSICION, CLAVE_FATIGAS]))
+        .run();
+    });
+    borrarEvidencias();
+  }
+}

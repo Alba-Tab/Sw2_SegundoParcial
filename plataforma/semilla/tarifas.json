@@ -1,0 +1,82 @@
+[
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000001",
+    "tipoCarga": "GRANOS",
+    "porTonelada": "250.00"
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000001",
+    "tipoCarga": "INSUMOS",
+    "porTonelada": "275.00"
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000001",
+    "tipoCarga": "INSUMOS_LIQUIDOS",
+    "porTonelada": "312.50"
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000001",
+    "tipoCarga": "CONTENEDOR",
+    "porTonelada": "300.00"
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000002",
+    "tipoCarga": "GRANOS",
+    "porTonelada": "380.00"
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000002",
+    "tipoCarga": "INSUMOS",
+    "porTonelada": "418.00"
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000002",
+    "tipoCarga": "INSUMOS_LIQUIDOS",
+    "porTonelada": "475.00"
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000002",
+    "tipoCarga": "CONTENEDOR",
+    "porTonelada": "456.00"
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000003",
+    "tipoCarga": "GRANOS",
+    "porTonelada": "650.00"
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000003",
+    "tipoCarga": "INSUMOS",
+    "porTonelada": "715.00"
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000003",
+    "tipoCarga": "INSUMOS_LIQUIDOS",
+    "porTonelada": "812.50"
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000003",
+    "tipoCarga": "CONTENEDOR",
+    "porTonelada": "780.00"
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000004",
+    "tipoCarga": "GRANOS",
+    "porTonelada": "100.00"
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000004",
+    "tipoCarga": "INSUMOS",
+    "porTonelada": "110.00"
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000004",
+    "tipoCarga": "INSUMOS_LIQUIDOS",
+    "porTonelada": "125.00"
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000004",
+    "tipoCarga": "CONTENEDOR",
+    "porTonelada": "120.00"
+  }
+]

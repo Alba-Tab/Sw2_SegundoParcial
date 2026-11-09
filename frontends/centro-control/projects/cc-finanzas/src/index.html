@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Transporte · Finanzas</title>
+    <base href="/" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/x-icon" href="favicon.ico" />
+    <!-- FB-3: mientras arranca la app y va y vuelve del inicio de sesión, la página dice qué pasa en vez de quedar en blanco. -->
+    <style>
+      .arranque {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 100vh;
+        margin: 0;
+        font: var(--mat-sys-body-large, 16px/1.5 system-ui, sans-serif);
+        color: var(--mat-sys-on-surface-variant, #43474e);
+      }
+    </style>
+  </head>
+  <body>
+    <app-root><p class="arranque" role="status">Abriendo Finanzas…</p></app-root>
+  </body>
+</html>

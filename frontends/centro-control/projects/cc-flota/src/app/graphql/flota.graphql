@@ -1,0 +1,233 @@
+query Unidades($tipo: TipoUnidad, $estado: EstadoUnidad) {
+  unidades(tipo: $tipo, estado: $estado) {
+    unidadId
+    tipoUnidad
+    placa
+    tipoRemolque
+    estado
+    kilometraje
+    kmDesdeUltimoMantenimiento
+    documentos {
+      tipo
+      venceEl
+    }
+  }
+}
+
+query Unidad($id: ID!) {
+  unidad(id: $id) {
+    unidadId
+    tipoUnidad
+    placa
+    tipoRemolque
+    capacidadToneladas
+    estado
+    kilometraje
+    kmDesdeUltimoMantenimiento
+    documentos {
+      tipo
+      venceEl
+    }
+    atributos
+  }
+  # Los 50 más recientes de la unidad; si hay más, la ficha lo dice. Con 100 la página pasa de 1.000 de complejidad (D101).
+  mantenimientos(unidadId: $id, limite: 50) {
+    items {
+      mantenimientoId
+      tipo
+      estado
+      fechaProgramada
+      taller
+      descripcion
+      checklist {
+        item
+        ok
+        nota
+      }
+      programadoEn
+      cerradoEn
+      observaciones
+    }
+    siguienteCursor
+  }
+}
+
+# Los mantenimientos (G9) por páginas de 50, del más reciente al más antiguo; «Cargar más» pide la siguiente con
+# `despuesDe`. La lista filtra y ordena en el navegador lo que ya está cargado.
+query Mantenimientos($despuesDe: Cursor) {
+  mantenimientos(limite: 50, despuesDe: $despuesDe) {
+    items {
+      mantenimientoId
+      unidadId
+      placa
+      tipo
+      estado
+      fechaProgramada
+      taller
+      descripcion
+      cerradoEn
+    }
+    siguienteCursor
+  }
+}
+
+query Choferes($despuesDe: Cursor) {
+  choferes(limite: 50, despuesDe: $despuesDe) {
+    items {
+      choferId
+      nombre
+      licenciaCategoria
+      licenciaVenceEl
+      activo
+      disponible
+    }
+    siguienteCursor
+  }
+}
+
+# La ficha: el chofer por id, con su puntaje de conducción y sus viajes.
+query Chofer($choferId: ID!) {
+  chofer(id: $choferId) {
+    choferId
+    nombre
+    licenciaCategoria
+    licenciaVenceEl
+    activo
+    disponible
+    motivoInhabilitacion
+  }
+  puntajesConduccion(choferId: $choferId) {
+    desde
+    hasta
+    choferes {
+      choferId
+      frenadas
+      fatigas
+      km
+      puntaje
+    }
+    viajes {
+      viajeId
+      frenadas
+      fatigas
+      km
+      puntaje
+    }
+  }
+}
+
+query Combustible($desde: Fecha!) {
+  anomaliasCombustible(desde: $desde) {
+    cargaId
+    placa
+    viajeId
+    litros
+    kmPorLitro
+    puntaje
+    registradaEn
+  }
+  cargasCombustible(limite: 50) {
+    cargaId
+    viajeId
+    placa
+    litros
+    monto
+    kilometraje
+    registradaEn
+  } # 5b: la placa es única y no cambia (spec 010), así que basta para llegar a la ficha sin pedir unidadId a Analítica.
+  unidades {
+    unidadId
+    placa
+  }
+}
+
+query Conduccion($desde: Fecha) {
+  puntajesConduccion(desde: $desde) {
+    desde
+    hasta
+    datosAl
+    choferes {
+      choferId
+      nombre
+      frenadas
+      fatigas
+      km
+      puntaje
+    }
+    viajes {
+      viajeId
+      choferId
+      nombre
+      frenadas
+      fatigas
+      km
+      puntaje
+    }
+  }
+}
+
+mutation ProgramarMantenimiento($input: MantenimientoInput!) {
+  programarMantenimiento(input: $input) {
+    mantenimientoId
+    estado
+  }
+}
+
+mutation CerrarMantenimiento($input: CierreMantenimientoInput!) {
+  cerrarMantenimiento(input: $input) {
+    mantenimientoId
+    estado
+  }
+}
+
+# Gestión de unidades y choferes (D104): cada mutación devuelve el recurso y Apollo refresca su caché por id.
+fragment UnidadGestionada on Unidad {
+  unidadId
+  estado
+  capacidadToneladas
+  documentos {
+    tipo
+    venceEl
+  }
+  atributos
+}
+
+mutation CrearUnidad($input: UnidadNuevaInput!) {
+  crearUnidad(input: $input) {
+    ...UnidadGestionada
+  }
+}
+
+mutation EditarUnidad($input: UnidadEdicionInput!) {
+  editarUnidad(input: $input) {
+    ...UnidadGestionada
+  }
+}
+
+mutation DarDeBajaUnidad($unidadId: ID!, $motivo: String!, $claveIdempotencia: ID!) {
+  darDeBajaUnidad(unidadId: $unidadId, motivo: $motivo, claveIdempotencia: $claveIdempotencia) {
+    ...UnidadGestionada
+  }
+}
+
+fragment ChoferGestionado on Chofer {
+  choferId
+  nombre
+  licenciaCategoria
+  licenciaVenceEl
+  activo
+  disponible
+  motivoInhabilitacion
+}
+
+mutation EditarChofer($input: ChoferEdicionInput!) {
+  editarChofer(input: $input) {
+    ...ChoferGestionado
+  }
+}
+
+mutation CambiarHabilitacionChofer($choferId: ID!, $activo: Boolean!, $motivo: String, $claveIdempotencia: ID!) {
+  cambiarHabilitacionChofer(choferId: $choferId, activo: $activo, motivo: $motivo, claveIdempotencia: $claveIdempotencia) {
+    ...ChoferGestionado
+  }
+}

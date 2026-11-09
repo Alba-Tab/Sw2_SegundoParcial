@@ -1,0 +1,30 @@
+[
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000001",
+    "nombre": "Santa Cruz – Cochabamba",
+    "origen": { "nombre": "Santa Cruz", "coordenadas": { "lat": -17.7833, "lng": -63.1821 } },
+    "destino": { "nombre": "Cochabamba", "coordenadas": { "lat": -17.3895, "lng": -66.1568 }, "radioMetros": 300 },
+    "distanciaKm": 470
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000002",
+    "nombre": "Santa Cruz – La Paz",
+    "origen": { "nombre": "Santa Cruz", "coordenadas": { "lat": -17.7833, "lng": -63.1821 } },
+    "destino": { "nombre": "La Paz", "coordenadas": { "lat": -16.4897, "lng": -68.1193 }, "radioMetros": 300 },
+    "distanciaKm": 850
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000003",
+    "nombre": "Santa Cruz – Arica",
+    "origen": { "nombre": "Santa Cruz", "coordenadas": { "lat": -17.7833, "lng": -63.1821 } },
+    "destino": { "nombre": "Arica", "coordenadas": { "lat": -18.4783, "lng": -70.3126 }, "radioMetros": 300 },
+    "distanciaKm": 1300
+  },
+  {
+    "rutaId": "01933a00-0000-7000-8000-000000000004",
+    "nombre": "Santa Cruz – Aula",
+    "origen": { "nombre": "Santa Cruz", "coordenadas": { "lat": -17.7833, "lng": -63.1821 } },
+    "destino": { "nombre": "Aula de la defensa", "coordenadas": { "lat": -17.7765, "lng": -63.1951 }, "radioMetros": 300 },
+    "distanciaKm": 120
+  }
+]

@@ -1,0 +1,258 @@
+import { Component, computed, inject, input, signal } from '@angular/core';
+import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatIconModule } from '@angular/material/icon';
+import { MatInputModule } from '@angular/material/input';
+import { MatSnackBar } from '@angular/material/snack-bar';
+import { RouterLink } from '@angular/router';
+import {
+  AvisoServicios,
+  Campo,
+  CONFIG_CENTRO,
+  Confirmacion,
+  ConfirmacionUnica,
+  controlLista,
+  Encabezado,
+  enfocar,
+  enfocarTitulo,
+  Estado,
+  FechaPipe,
+  FiltrosLista,
+  largoEntre,
+  listoParaEnviar,
+  mensajeDe,
+  PieLista,
+  Sesion,
+  textoError,
+  urlEnApp,
+  Panel,
+  EtiquetaPipe,
+} from 'ui-comun';
+import { AccionesFachada } from '../acciones.fachada';
+import { conLaElegidaPrimero, type Accion } from '../domain/accion';
+
+/**
+ * CU-18 (spec 014): el agente propone; el despachador revisa la evidencia, edita el mensaje y aprueba (sale el correo
+ * por n8n) o rechaza. El gerente solo mira (propuesta 7.2).
+ */
+@Component({
+  selector: 'app-acciones',
+  providers: [AccionesFachada],
+  imports: [
+    EtiquetaPipe,
+    Panel,
+    Encabezado,
+    ReactiveFormsModule,
+    Campo,
+    Confirmacion,
+    MatButtonModule,
+    MatIconModule,
+    MatFormFieldModule,
+    MatInputModule,
+    RouterLink,
+    FechaPipe,
+    Estado,
+    AvisoServicios,
+    FiltrosLista,
+    PieLista,
+  ],
+  template: `
+    <cc-encabezado
+      [titulo]="id() ? 'Acción propuesta' : 'Acciones del agente'"
+      [migas]="id() ? [{ texto: 'Acciones del agente', ruta: '/acciones' }, { texto: 'Acción propuesta' }] : []"
+    />
+    <cc-aviso-servicios [error]="error()" [datosAl]="datosAl()" [campos]="campos" [sinDatos]="!visibles().length" [reintentar]="recargar" />
+    <cc-filtros-lista
+      [control]="lista"
+      [cargando]="cargando()"
+      busqueda="Buscar por cliente o placa"
+      grupo="EstadoAccion"
+      nombre="acciones"
+      singular="acción"
+    />
+    <div class="lista">
+      @for (a of lista.visibles(); track a.accionId) {
+        <cc-panel [class.elegida]="a.accionId === id()" titulo="Avisar retraso a {{ a.razonSocial }}">
+          <span panel-detalle
+            ><cc-estado grupo="EstadoAccion" [valor]="a.estado" /> · {{ a.creadaEn | fecha: true }} · {{ a.viaje?.placa ?? 'Sin unidad' }}
+            {{ a.viaje?.ruta.destino ? 'hacia ' + a.viaje.ruta.destino : '' }} ·
+            <!-- El enlace dice adónde lleva; la placa (o su falta) va fuera (V3-13). -->
+            <a [routerLink]="['/viajes', a.viajeId]" [queryParams]="{ de: 'acciones' }">Ver viaje</a>
+            @if (a.misionId && urlMision(a.misionId); as url) {
+              · <a [href]="url">Ver la misión del agente</a>
+            }
+          </span>
+
+          <h3>Evidencia</h3>
+          @for (e of a.evidencia; track $index) {
+            <p class="evidencia">
+              <!-- Sin jerga: la fuente con su nombre y sin el id interno de la referencia (PRODUCT.md, tono). -->
+              <b>{{ e.fuente | etiqueta: 'FuenteEvidencia' }}:</b> {{ e.resumen }}
+            </p>
+          }
+          @if (a.estado === 'PENDIENTE' && sesion.tiene('despachador')) {
+            @let f = formDe(a);
+            <div [formGroup]="f" #zona>
+              <mat-form-field class="mensaje">
+                <mat-label>Mensaje al cliente</mat-label>
+                <textarea matInput rows="3" formControlName="mensaje"></textarea>
+                <mat-hint>De 10 a 1.000 caracteres</mat-hint>
+                <mat-error>{{ textoError(f.controls.mensaje) }}</mat-error>
+              </mat-form-field>
+              <div class="fila-acciones">
+                <!-- Mientras se confirma el rechazo, aprobar no aplica: se oculta como en crédito (V2-4). -->
+                @if (rechazando() !== a.accionId) {
+                  <button mat-flat-button (click)="aprobar(a.accionId, zona)" [disabled]="enviando()" disabledInteractive>
+                    <mat-icon>send</mat-icon>Aprobar y enviar
+                  </button>
+                }
+                <mat-form-field>
+                  <mat-label>Motivo del rechazo</mat-label>
+                  <input matInput formControlName="motivo" />
+                  <mat-error>{{ textoError(f.controls.motivo) }}</mat-error>
+                </mat-form-field>
+                @if (rechazando() !== a.accionId) {
+                  <button
+                    mat-stroked-button
+                    [id]="'rechazar-' + a.accionId"
+                    (click)="pedirRechazo(a.accionId, zona)"
+                    [disabled]="enviando()"
+                  >
+                    <mat-icon>block</mat-icon>Rechazar
+                  </button>
+                }
+              </div>
+              @if (rechazando() === a.accionId) {
+                <cc-confirmacion
+                  [resumen]="'Se rechaza el aviso de retraso a ' + a.razonSocial + ': no se envía ningún correo. No se puede deshacer.'"
+                  accion="Sí, rechazar la acción"
+                  icono="block"
+                  [enviando]="enviando()"
+                  (confirmar)="rechazar(a.accionId)"
+                  (volver)="volver(a.accionId)"
+                />
+              }
+            </div>
+          } @else if (a.estado === 'PENDIENTE') {
+            <!-- R2F-3: el gerente ve el borrador sin enviar y quién lo decide (spec 014: solo el despachador). -->
+            <h3>Borrador del mensaje</h3>
+            <p>{{ a.mensaje }}</p>
+            <p class="secundario">
+              <mat-icon class="icono-en-linea">lock_person</mat-icon>La aprueba o rechaza el despachador; el correo todavía no sale.
+            </p>
+          } @else {
+            <p class="mensaje-final">“{{ a.mensaje }}”</p>
+            @if (a.decididaPor) {
+              <p class="secundario">Decidida {{ a.decididaEn | fecha: true }}{{ a.motivoRechazo ? ' · ' + a.motivoRechazo : '' }}</p>
+            }
+          }
+        </cc-panel>
+      }
+    </div>
+    <cc-pie-lista [control]="lista" nombre="acciones" vacio="El agente no propuso acciones." [error]="error()" [cargando]="cargando()" />
+  `,
+  styles: `
+    .lista {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .elegida {
+      outline: 2px solid var(--mat-sys-primary);
+    }
+    .mensaje {
+      width: 100%;
+    }
+    .evidencia {
+      margin: 4px 0;
+    }
+    .mensaje-final {
+      font-style: italic;
+    }
+  `,
+})
+export class AccionesPagina {
+  private readonly fachada = inject(AccionesFachada);
+  private readonly avisos = inject(MatSnackBar);
+  readonly sesion = inject(Sesion);
+  readonly config = inject(CONFIG_CENTRO);
+  /** Con `?desde=` para que el panel del agente ofrezca volver aquí (R2F-10). */
+  urlMision(misionId: string): string | null {
+    return urlEnApp(this.config, this.sesion.roles(), 'cc-tablero', `/agente?mision=${encodeURIComponent(misionId)}`);
+  }
+  readonly id = input<string>();
+  readonly datos = this.fachada.datos;
+  readonly visibles = computed(() => conLaElegidaPrimero(this.fachada.acciones(), this.id()));
+  readonly error = this.fachada.error;
+  readonly datosAl = this.fachada.datosAl;
+  readonly cargando = this.fachada.cargando;
+  readonly lista = controlLista<Accion>({
+    filas: this.visibles,
+    texto: (a) => [a.razonSocial, a.viaje?.placa, a.viaje?.ruta?.destino].filter(Boolean).join(' '),
+    estado: (a) => a.estado,
+  });
+  readonly campos = { accionesPropuestas: 'Analítica', viaje: 'Viajes' };
+  readonly enviando = signal(false);
+  readonly textoError = textoError;
+  private readonly forms: Record<string, ReturnType<typeof formularioAccion>> = {};
+  /** Rechazar no se deshace: la acción que está pidiendo confirmación. Una a la vez: pedir otra libera la anterior (V2-3). */
+  private readonly confirmacion = new ConfirmacionUnica((id) => this.forms[id]);
+  readonly rechazando = this.confirmacion.abierta;
+  readonly recargar = () => this.fachada.recargar();
+
+  /** El formulario de cada acción pendiente, con el mensaje que propuso el agente para editarlo. */
+  formDe(a: Accion) {
+    return (this.forms[a.accionId] ??= formularioAccion(a.mensaje));
+  }
+
+  aprobar(id: string, zona: HTMLElement) {
+    if (this.enviando()) return;
+    const f = this.forms[id];
+    if (!listoParaEnviar(f.controls.mensaje, zona)) return;
+    const mensaje = f.controls.mensaje.value.trim();
+    return this.enviar(() => this.fachada.aprobar(id, mensaje), 'Aprobada: el correo sale por n8n');
+  }
+  /** Pide confirmar con el formulario bloqueado: el motivo no cambia después de leer el resumen (E-4). */
+  pedirRechazo(id: string, zona: HTMLElement): void {
+    if (!listoParaEnviar(this.forms[id].controls.motivo, zona)) return;
+    this.confirmacion.abrir(id);
+  }
+  /** "No, volver" o un rechazo fallido: desbloquea y el foco vuelve a "Rechazar" (E-3). */
+  volver(id: string): void {
+    this.confirmacion.cerrar(id);
+    enfocar(`rechazar-${id}`);
+  }
+  rechazar(id: string) {
+    const motivo = this.forms[id].controls.motivo.getRawValue().trim() || undefined;
+    return this.enviar(() => this.fachada.rechazar(id, motivo), 'Acción rechazada', id);
+  }
+
+  private async enviar(accion: () => Promise<unknown>, ok: string, rechazo?: string): Promise<void> {
+    // disabledInteractive: el botón enfocado sigue enfocable mientras se envía; un segundo clic no hace nada.
+    if (this.enviando()) return;
+    this.enviando.set(true);
+    try {
+      await accion();
+      // Solo cierra la confirmación de esta acción: aprobar B no deja bloqueada la de A (V2-3).
+      if (rechazo) this.confirmacion.cerrar(rechazo);
+      this.avisos.open(ok, undefined, { duration: 5000 });
+      await this.fachada.recargar();
+      // La acción queda decidida y sus botones desaparecen: el foco va al título de la página.
+      enfocarTitulo();
+    } catch (e) {
+      if (rechazo) this.volver(rechazo);
+      this.avisos.open(mensajeDe(e), 'Cerrar');
+    } finally {
+      this.enviando.set(false);
+    }
+  }
+}
+
+/** Mensaje de 10 a 1.000 caracteres (spec 014); el motivo del rechazo es opcional. */
+function formularioAccion(mensaje: string) {
+  return new FormGroup({
+    mensaje: new FormControl(mensaje, { nonNullable: true, validators: [Validators.required, largoEntre(10, 1000)] }),
+    motivo: new FormControl('', { nonNullable: true, validators: [largoEntre(0, 300)] }),
+  });
+}

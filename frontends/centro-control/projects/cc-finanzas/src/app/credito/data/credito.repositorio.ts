@@ -1,0 +1,18 @@
+import { inject, Injectable } from '@angular/core';
+import { AprobarCreditoGQL, SolicitudesGQL } from '../../graphql/generado';
+
+/** Repositorio sobre Apollo de las solicitudes de aprobación de crédito (spec 012). */
+@Injectable({ providedIn: 'root' })
+export class CreditoRepositorio {
+  private readonly solicitudesGql = inject(SolicitudesGQL);
+  private readonly decidirGql = inject(AprobarCreditoGQL);
+
+  /** Devuelve el `QueryRef`: `recargar` hace `refetch` sobre él (V4-1). */
+  observarSolicitudes(cadaMs: number) {
+    return this.solicitudesGql.watch({ pollInterval: cadaMs });
+  }
+
+  decidir(servicioId: string, aprobado: boolean, motivo: string | undefined, clave: string) {
+    return this.decidirGql.mutate({ variables: { servicioId, aprobado, motivo, clave } });
+  }
+}

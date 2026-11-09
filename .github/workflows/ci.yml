@@ -1,0 +1,386 @@
+# CI de PR (T3a.5): cada pieza corre solo si cambió (paths-filter) y ci-ok junta todo en un único check obligatorio.
+name: ci
+
+on:
+  pull_request:
+    branches: [develop, main]
+  push:
+    branches: [develop, main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cambios:
+    runs-on: ubuntu-latest
+    outputs:
+      contratos: ${{ steps.f.outputs.contratos }}
+      viajes: ${{ steps.f.outputs.viajes }}
+      flota: ${{ steps.f.outputs.flota }}
+      finanzas: ${{ steps.f.outputs.finanzas }}
+      analitica: ${{ steps.f.outputs.analitica }}
+      gateway: ${{ steps.f.outputs.gateway }}
+      mcp-server: ${{ steps.f.outputs.mcp-server }}
+      keycloak: ${{ steps.f.outputs.keycloak }}
+      compose: ${{ steps.f.outputs.compose }}
+      simulador: ${{ steps.f.outputs.simulador }}
+      tokens: ${{ steps.f.outputs.tokens }}
+      intercambio: ${{ steps.f.outputs.intercambio }}
+      portal: ${{ steps.f.outputs.portal }}
+      centro-control: ${{ steps.f.outputs.centro-control }}
+      app-chofer: ${{ steps.f.outputs.app-chofer }}
+    steps:
+      - uses: actions/checkout@v7
+      - id: f
+        uses: dorny/paths-filter@v4
+        with:
+          filters: |
+            ci: &ci
+              - .github/workflows/ci.yml
+            eventos: &eventos
+              - contratos/eventos/**
+              - contratos/temporal/**
+              - contratos/comun/**
+            contratos:
+              - *ci
+              - contratos/**
+            viajes:
+              - *ci
+              - *eventos
+              - servicios/viajes/**
+              - plataforma/semilla/**
+              - contratos/openapi/viajes.yaml
+              - contratos/openapi/comun.yaml
+            flota:
+              - *ci
+              - *eventos
+              - servicios/flota/**
+              - plataforma/semilla/**
+              - contratos/openapi/flota.yaml
+              - contratos/openapi/comun.yaml
+            finanzas:
+              - *ci
+              - *eventos
+              - servicios/finanzas/**
+              - plataforma/semilla/**
+              - contratos/openapi/finanzas.yaml
+              - contratos/openapi/comun.yaml
+            analitica:
+              - *ci
+              - *eventos
+              - servicios/analitica/**
+              - plataforma/semilla/**
+              - plataforma/datos-sinteticos/**
+              - contratos/openapi/analitica.yaml
+              - contratos/openapi/comun.yaml
+            gateway:
+              - *ci
+              - servicios/gateway/**
+              - libs/intercambio-token/**
+              - contratos/graphql/**
+            mcp-server:
+              - *ci
+              - servicios/mcp-server/**
+              - libs/intercambio-token/**
+              - contratos/mcp/**
+            keycloak:
+              - *ci
+              - plataforma/keycloak/**
+            compose:
+              - *ci
+              - plataforma/compose/**
+              - plataforma/vm/**
+            simulador:
+              - *ci
+              - contratos/eventos/flota/LecturaSensorCombustible.v1.schema.json
+              - contratos/comun/**
+              - plataforma/simulador-combustible/**
+            tokens: &tokens
+              - *ci
+              - libs/design-tokens/**
+            intercambio: &intercambio
+              - *ci
+              - libs/intercambio-token/**
+            portal:
+              - *tokens
+              - contratos/openapi/**
+              - frontends/portal-cliente/**
+            centro-control:
+              - *tokens
+              - contratos/graphql/**
+              - frontends/centro-control/**
+            app-chofer:
+              - *tokens
+              - contratos/openapi/**
+              - movil/app-chofer/**
+
+  contratos:
+    needs: cambios
+    if: needs.cambios.outputs.contratos == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: contratos } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm, cache-dependency-path: contratos/package-lock.json }
+      - run: npm ci
+      - run: npm run validar
+
+  viajes:
+    needs: cambios
+    if: needs.cambios.outputs.viajes == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: servicios/viajes } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-java@v6
+        with: { distribution: temurin, java-version: 25, cache: maven }
+      - name: Formato (Spotless)
+        run: ./mvnw -B -q spotless:check
+      - name: Pruebas, ArchUnit e integración (Testcontainers)
+        run: ./mvnw -B verify
+
+  flota:
+    needs: cambios
+    if: needs.cambios.outputs.flota == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: servicios/flota } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm, cache-dependency-path: servicios/flota/package-lock.json }
+      - run: npm ci
+      - name: El código generado coincide con contratos/openapi/flota.yaml
+        run: npm run generar:contratos:verificar
+      - name: Tipos, capas (dependency-cruiser), formato e integración (Testcontainers)
+        run: npm run verificar
+        env:
+          # MongoDB 8.0 aborta en el kernel 6.19+ del runner (SERVER-121912); 7.0 usa el tcmalloc anterior.
+          MONGO_IMAGEN_PRUEBA: mongo:7.0.45
+
+  analitica:
+    needs: cambios
+    if: needs.cambios.outputs.analitica == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: servicios/analitica } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with: { enable-cache: true, cache-dependency-glob: servicios/analitica/uv.lock }
+      - run: uv sync --locked
+      - name: Lint y formato (ruff)
+        run: uv run ruff check . && uv run ruff format --check .
+      - name: Capas (import-linter)
+        run: uv run lint-imports
+      - name: Pruebas e integración (Testcontainers)
+        run: uv run pytest -q
+
+  gateway:
+    needs: cambios
+    if: needs.cambios.outputs.gateway == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: servicios/gateway } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm, cache-dependency-path: servicios/gateway/package-lock.json }
+      - run: npm ci
+      - name: Tipos, formato y pruebas (permisos, respuesta parcial, límites, HMAC y suscripción)
+        run: npm run verificar
+
+  mcp-server:
+    needs: cambios
+    if: needs.cambios.outputs.mcp-server == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: servicios/mcp-server } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm, cache-dependency-path: servicios/mcp-server/package-lock.json }
+      - run: npm ci
+      - name: Tipos, formato y pruebas con el cliente MCP (T10.5, tools/list del agente = contratos/mcp/herramientas.md)
+        run: npm run verificar
+
+  finanzas:
+    needs: cambios
+    if: needs.cambios.outputs.finanzas == 'true'
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env: { POSTGRES_USER: finanzas, POSTGRES_PASSWORD: finanzas, POSTGRES_DB: finanzas_test }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U finanzas" --health-interval 3s --health-retries 30
+      rabbitmq:
+        image: rabbitmq:4.4.0-management
+        env: { RABBITMQ_DEFAULT_USER: admin, RABBITMQ_DEFAULT_PASS: admin }
+        ports: ["5672:5672"]
+        options: --health-cmd "rabbitmq-diagnostics -q check_port_connectivity" --health-interval 5s --health-retries 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Imagen de desarrollo (PHP 8.4)
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: servicios/finanzas/Dockerfile
+          target: dev
+          tags: transporte/finanzas-dev:ci
+          load: true
+          cache-from: type=gha,scope=finanzas
+          cache-to: type=gha,mode=max,scope=finanzas
+      - name: Pint, Pest, Deptrac y Larastan
+        run: >
+          docker run --rm --network host
+          -e DB_HOST=127.0.0.1 -e DB_PORT=5432 -e DB_USERNAME=finanzas -e DB_PASSWORD=finanzas
+          -e AMQP_HOST=127.0.0.1 -e AMQP_USUARIO=admin -e AMQP_CLAVE=admin
+          -e RABBITMQ_ADMIN=admin -e RABBITMQ_ADMIN_CLAVE=admin
+          transporte/finanzas-dev:ci sh -c 'vendor/bin/pint --test && vendor/bin/pest && vendor/bin/deptrac analyse --no-progress && vendor/bin/phpstan analyse --no-progress --memory-limit=1G'
+
+  keycloak:
+    needs: cambios
+    if: needs.cambios.outputs.keycloak == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: plataforma/keycloak } }
+    steps:
+      - uses: actions/checkout@v7
+      - name: Keycloak 26.8.2 limpio
+        run: |
+          docker run -d --name kc -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak:26.8.2 start-dev
+          timeout 180 bash -c 'until curl -sf localhost:8080/realms/master >/dev/null; do sleep 3; done'
+      - name: Aplicar el realm con la imagen del Job (B5), otra vez con docker run (idempotente) y probarlo
+        run: |
+          cp .env.example .env
+          docker build -q -f Dockerfile.config -t keycloak-config .
+          docker run --rm --network host --env-file .env keycloak-config
+          ./aplicar-realm.sh .env
+          ./probar-realm.sh .env
+
+  compose:
+    needs: cambios
+    if: needs.cambios.outputs.compose == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: plataforma/compose } }
+    steps:
+      - uses: actions/checkout@v7
+      - run: cp .env.example .env && docker compose --profile core --profile plataforma --profile trazas --profile demo --profile simulador config -q
+      - name: Compose de la VM (B3) y su prueba local (B12)
+        working-directory: plataforma/vm
+        run: cp .env.example .env && docker compose config -q && docker compose -f compose.yaml -f prueba/vm.yaml config -q
+
+  simulador:
+    needs: cambios
+    if: needs.cambios.outputs.simulador == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: plataforma/simulador-combustible } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm, cache-dependency-path: plataforma/simulador-combustible/package-lock.json }
+      - run: npm ci
+      - run: npm test
+      - run: docker build -q .
+
+  tokens:
+    needs: cambios
+    if: needs.cambios.outputs.tokens == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: libs/design-tokens } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm, cache-dependency-path: libs/design-tokens/package-lock.json }
+      - run: npm ci
+      - run: npm run construir:verificar
+
+  portal:
+    needs: cambios
+    if: needs.cambios.outputs.portal == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: frontends/portal-cliente } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm, cache-dependency-path: frontends/portal-cliente/package-lock.json }
+      - run: npm ci
+      - run: npm run generar:contratos:verificar
+      - run: npm run verificar
+      - run: npm run build
+      - run: npm run storybook:build
+
+  app-chofer:
+    needs: cambios
+    if: needs.cambios.outputs.app-chofer == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: movil/app-chofer } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm, cache-dependency-path: movil/app-chofer/package-lock.json }
+      - run: npm ci
+      - run: npm run generar:contratos:verificar
+      - run: npm run verificar
+      # Empaqueta iOS y Android: atrapa módulos que Metro no resuelve (versiones del SDK desalineadas).
+      - run: npm run empaquetar
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }
+      - name: Secretos en el historial (reglas por defecto y la del realm)
+        run: docker run --rm -v "$PWD:/repo" -w /repo ghcr.io/gitleaks/gitleaks:v8.30.1 git --no-banner --redact -c .gitleaks.toml .
+
+  commitlint:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm }
+      - run: npm ci
+      - name: Conventional Commits y sin coautoría en los commits del PR
+        run: npx --no -- commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }} --verbose
+
+  intercambio:
+    needs: cambios
+    if: needs.cambios.outputs.intercambio == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: libs/intercambio-token } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24 }
+      - run: npm test
+
+  centro-control:
+    needs: cambios
+    if: needs.cambios.outputs.centro-control == 'true'
+    runs-on: ubuntu-latest
+    defaults: { run: { working-directory: frontends/centro-control } }
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with: { node-version: 24, cache: npm, cache-dependency-path: frontends/centro-control/package-lock.json }
+      - run: npm ci
+      - name: El código generado coincide con contratos/graphql (D49)
+        run: npm run generar:verificar
+      - name: Formato, pruebas de ui-comun y build de las 4 apps
+        run: npm run verificar
+
+  ci-ok:
+    if: always()
+    needs: [cambios, contratos, viajes, flota, finanzas, analitica, gateway, mcp-server, keycloak, compose, simulador, tokens, intercambio, portal, centro-control, app-chofer, gitleaks, commitlint]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Todo en verde u omitido por no tener cambios
+        env:
+          RESULTADOS: ${{ toJSON(needs) }}
+        run: |
+          echo "$RESULTADOS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          echo "$RESULTADOS" | jq -e 'to_entries | all(.value.result == "success" or .value.result == "skipped")' > /dev/null

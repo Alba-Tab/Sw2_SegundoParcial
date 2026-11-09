@@ -1,0 +1,18 @@
+{
+  "name": "simulador-combustible",
+  "private": true,
+  "type": "module",
+  "description": "Sensor simulado de combustible por MQTT (T5.4, spec 009)",
+  "engines": { "node": ">=24" },
+  "scripts": {
+    "simular": "node simulador.mjs",
+    "test": "node --test test/*.test.mjs"
+  },
+  "dependencies": {
+    "mqtt": "5.16.0"
+  },
+  "devDependencies": {
+    "ajv": "8.17.1",
+    "ajv-formats": "3.0.1"
+  }
+}

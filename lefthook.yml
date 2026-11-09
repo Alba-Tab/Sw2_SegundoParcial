@@ -1,0 +1,5 @@
+# Hooks locales (§15.3). commitlint también corre en CI (ci-ok) porque el hook se puede saltar con --no-verify.
+commit-msg:
+  commands:
+    commitlint:
+      run: npx --no -- commitlint --edit {1}

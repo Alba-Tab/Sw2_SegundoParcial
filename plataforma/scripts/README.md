@@ -1,0 +1,88 @@
+# Scripts de demo y de fallos
+
+Escenarios de `specs/guion-fallos.md` contra el compose local. `reiniciar-demo.sh` y `escenario-completo.sh` tienen además `--nube` (ver abajo).
+
+**Antes de empezar:**
+
+```bash
+cd plataforma/compose
+docker compose --env-file .env --env-file .env.demo --profile core --profile plataforma --profile demo --profile ia up -d --build
+../semilla/cargar.sh
+```
+
+El archivo `.env.demo` hace cuatro cosas:
+
+- deja vencer las cotizaciones en `PT2M` (FS1);
+- deja vencer la espera de aprobación en `PT3M` (FS3);
+- corta las compensaciones en 4 intentos o 2 min (FS8);
+- hace pasar Finanzas por Toxiproxy (FS8).
+
+Los scripts sacan los tokens con *direct grant* de `demo-cli` (D39, solo local) y la clave `KC_CLAVE_SEMILLA` de `plataforma/compose/.env`.
+
+Cada uno imprime ✔ o ✘ por cada resultado esperado y termina con código 1 si alguno falla.
+
+**Unidades disponibles.** Cada servicio confirmado de granos ocupa uno de los 3 furgones de la semilla. `saga-doble-clic.sh` y `saga-worker-apagado.sh` cancelan su servicio al final para no ocuparlo. Para volver a empezar de cero: `reiniciar-demo.sh`.
+
+## Reinicio y escenario completo (T8.8)
+
+| Script | Qué hace |
+|---|---|
+| `reiniciar-demo.sh [--nube]` | Reinicia la demo en el orden de D102: (1) detiene relays y consumidores (los 4 servicios y n8n); (2) purga todas las colas y termina los workflows abiertos de Temporal; (3) corre `demo:reiniciar` en cada servicio y vacía `n8n_inbox`; (4) borra en Keycloak a los usuarios del grupo `registro-portal` (nunca las cuentas de servicio); (5) los vuelve a encender. `demo:reiniciar` es un comando, nunca un endpoint: `--semilla.cargar=reiniciar` (Viajes), `node dist/semilla.js --reiniciar` (Flota), `php artisan demo:reiniciar` (Finanzas), `python -m app.demo reiniciar` (Analítica, que carga además los 3 meses sintéticos) |
+| `escenario-completo.sh [--nube]` | Recorre por API los pasos que ya existen (plan-desarrollo §4): 2-3 (saga del Aula con chofer1 y, con chofer1 ocupado, La Paz con chofer2), 4-5 (inicio, GPS, hito, frenada y la primera carga de 4521KTR), 6 (entrega, factura, cierre y correo) y 7 (FF2 con la carga exagerada y el simulador de chofer2 hasta `RIESGO_RETRASO`). Con `BITACORA_MALICIOSA=1` el simulador siembra la bitácora de FM2. Crece en cada hito |
+
+Antes de cada ensayo: `reiniciar-demo.sh` y después `escenario-completo.sh`.
+
+## `demo/` (saga, spec 003)
+
+| Script | Escenario | Qué verifica |
+|---|---|---|
+| `saga-camino-feliz.sh` | Paso 3: Agroexport, Aula, 28 t | `CONFIRMADO` con 4521KTR y 2.800,00 |
+| `saga-cotizacion-vencida.sh` | FS1 | `COTIZACION_VENCIDA` sin tocar el disponible (espera 130 s) |
+| `saga-sin-credito.sh` | FS2: Ferretería, La Paz, 20 t | `CREDITO_INSUFICIENTE` |
+| `saga-mora.sh [aprobar\|rechazar\|vencer]` | FS3: Agro Moroso, La Paz, 20 t | Espera con la reserva pendiente. Después, según el argumento: `CONFIRMADO`, `CREDITO_RECHAZADO` con el disponible de vuelta, o `APROBACION_VENCIDA` |
+| `saga-sin-unidad.sh` | FS4: Cochabamba, 20 t de líquidos | `SIN_UNIDAD_COMPATIBLE` con el crédito liberado; imprime el enlace al historial en la Temporal UI |
+| `saga-worker-apagado.sh [--reiniciar-viajes]` | FS5 (y FS6) | Espera en `RESERVANDO_UNIDAD`, sigue hasta `CONFIRMADO` y deja un solo viaje |
+| `saga-doble-clic.sh` | FS7 (D43) | Dos 202 con el mismo `servicioId` y un solo servicio |
+| `saga-compensacion-agotada.sh [--resuelto]` | FS8 (spec 011) | `REQUIERE_INTERVENCION`. Después restaura la base y el despachador reintenta o marca como resuelto |
+| `saga-cancelar-en-curso.sh` | FS9 (D17) | `409 CONFIRMACION_EN_CURSO` |
+
+## `demo/` (coreografía, specs 004 y 006)
+
+| Script | Escenario | Qué verifica |
+|---|---|---|
+| `entrega-feliz.sh` | Pasos 3 a 6 (H5) | Confirma, chofer1 inicia (tracto `EN_VIAJE`), sube foto y firma por S3 firmado, entrega en el Aula y espera: factura, furgón en `MANTENIMIENTO_PENDIENTE` con 10.070 km (FF3), `CERRADO` y el correo en Mailpit |
+| `fc1-finanzas-detenida.sh` | FC1 | Con el worker de Finanzas detenido queda `ENTREGADO`; al encenderlo, factura, `CERRADO` y correo |
+| `fc2-evento-repetido.sh` | FC2 | Republicar el último `FacturaEmitida` no manda otro correo |
+| `fc3-mensaje-invalido.sh` | FC3 | Un `EntregaConfirmada` sin `viajeId` termina en `finanzas.eventos.dlq` |
+| `fc4-cancelacion.sh` | FC4 | Cancelar un `CONFIRMADO` devuelve el disponible y la unidad |
+| `ff1-robo-combustible.sh [placa]` | FF1 (hasta el evento) | Corre el simulador en escenario `robo` (1 s por lectura; `INTERVALO=10` para el ritmo real) y verifica un solo `CaidaCombustibleDetectada` con caída ≥ 8 y velocidad 0, ya publicado |
+| `fc5-broker-caido.sh` | FC5 | Sin RabbitMQ la entrega responde `200` y queda en el Outbox; al volver, `CERRADO` |
+
+## `fallos/` (interruptores)
+
+| Script | Qué hace (local) |
+|---|---|
+| `apagar-worker-flota.sh` | `docker compose stop flota-worker` |
+| `encender-worker-flota.sh` | `docker compose start flota-worker` |
+| `detener-viajes.sh` | `docker compose stop viajes` |
+| `detener-finanzas-worker.sh` | `docker compose stop finanzas-worker` |
+| `cortar-db-finanzas.sh off\|on` | Corta o restaura el proxy `finanzas-db` de Toxiproxy |
+| `caer-finanzas-api.sh`, `encender-finanzas-api.sh`, `encender-finanzas-worker.sh` | Detiene o enciende la API o el worker de Finanzas |
+| `caer-flota.sh`, `encender-flota.sh` | Detiene o enciende la API y el worker de Flota |
+| `detener-rabbitmq.sh`, `encender-rabbitmq.sh` | RabbitMQ. Al encenderlo, vuelve a publicar el flujo de n8n y reinicia n8n (su disparador no se reconecta) |
+| `republicar-evento.sh <eventId>` | Vuelve a publicar un evento tal cual quedó en el Outbox de Viajes, Finanzas o Flota |
+
+## Encender y apagar la nube (B9, guía §11)
+
+| Script | Qué hace |
+|---|---|
+| `encender-demo.sh` | Enciende la B1MS, la EC2 (el compose arranca solo), las Container Apps con sus réplicas de la guía §7 y el worker pool de Flota en 1 |
+| `apagar-demo.sh` | Al revés: Container Apps en 0 réplicas mínimas, el worker pool en 0, la EC2 detenida y la B1MS detenida |
+
+Necesitan `aws`, `az` y `gcloud` con sesión iniciada, y `PSQL_SERVIDOR` (por defecto, `psql-transporte-sw2bg-gp`). Con `SIMULAR=1` solo imprimen los comandos. La tabla de réplicas está en `demo/nube.sh`; `n8n` va fijo en 1 durante la demo porque consume de RabbitMQ sin ingress y con 0 réplicas no despertaría.
+
+## En la nube (`--nube`, B10)
+
+- **Tokens (D39):** en la nube `demo-cli` no tiene *direct grant*. `demo/comun.sh` pide cada token por *device grant* (imprime la URL en la que se entra como ese usuario) y guarda el `refresh_token` en `~/.cache/transporte-demo/<usuario>` (600), así cada usuario inicia sesión una sola vez mientras dure su sesión.
+- **`escenario-completo.sh --nube`:** necesita `DOMINIO`, `FLOTA_URL` (la `run.app`) y `ANALITICA_URL` (la `azurecontainerapps.io`). El estado del viaje sale de la API en vez de `psql`, y el correo de la factura se revisa en el buzón (Brevo no se puede contar como Mailpit).
+- **`reiniciar-demo.sh --nube`** (`demo/reiniciar-nube.sh`, T8.8): Viajes, la purga de colas y el `workflow terminate` por SSM en la EC2; `demo:reiniciar` de Finanzas y Analítica con los Container Apps Jobs `finanzas-demo` y `analitica-demo`, y de Flota con el Cloud Run Job `flota-demo` (hay que crearlos con la imagen y el comando de cada servicio); `n8n_inbox` con `psql "$N8N_DB_URL"`; Keycloak por la Admin API (`demo/keycloak-registros.sh`, el mismo paso que en local). Necesita `DOMINIO`, `KC_ADMIN`, `KC_ADMIN_CLAVE` y `N8N_DB_URL`. Con `SIMULAR=1` solo imprime los comandos.

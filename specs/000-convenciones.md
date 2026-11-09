@@ -1,8 +1,8 @@
 # 000 · Convenciones transversales
 
-Estado: **borrador** · Aplica a todos los servicios, apps y contratos.
+Estado: **revisado** · Aplica a todos los servicios, apps y contratos.
 
-Lo que dice este archivo vale para todo el monorepo. Una spec de flujo puede agregar reglas, pero no contradecir estas. Los puntos marcados **Pendiente** dependen de una decisión del equipo (sección 11 de `docs/analisis-pre-desarrollo.md`).
+Lo que dice este archivo vale para todo el monorepo. Una spec de flujo puede agregar reglas, pero no contradecir estas. Las decisiones que lo respaldan están en `specs/decisiones.md` (Dxx).
 
 ---
 
@@ -10,7 +10,7 @@ Lo que dice este archivo vale para todo el monorepo. Una spec de flujo puede agr
 
 - Todo id de entidad es un **UUIDv7** en texto (`"0192f3a4-7c1e-7b2a-9d4f-3e8a1b2c4d5e"`). Ordena por fecha de creación y sirve como llave primaria.
 - Lo genera el **servicio dueño** del dato, salvo las claves de idempotencia, que las genera el cliente (app, portal o Centro de Control).
-- `servicioId` lo genera Viajes **antes** de iniciar el workflow y lo devuelve en el `202`. **Pendiente (decisión 2):** relación `Servicio`–`Viaje`; mientras no se decida, se asume 1:1.
+- `servicioId` y `viajeId` los genera Viajes **antes** de iniciar el workflow; `servicioId` se devuelve en el `202`. La relación `Servicio`–`Viaje` es **1:1** (D03).
 - Identificadores legibles solo donde el negocio los pide: factura `FAC-000123` (correlativo propio de Finanzas), placa de la unidad.
 
 ## 2. Fechas y horas
@@ -74,7 +74,7 @@ GET /api/v1/viajes?limite=50&cursor=<opaco>
 → { "items": [...], "siguienteCursor": "<opaco>" | null }
 ```
 
-`limite` por defecto 20, máximo 100.
+`limite` por defecto 20, máximo 100. Un `cursor` que no salió de una respuesta del servicio (mal formado) da `400 VALIDACION` con `campo: cursor`.
 
 **Códigos de estado**
 
@@ -86,7 +86,7 @@ GET /api/v1/viajes?limite=50&cursor=<opaco>
 | `401` | Sin token o token inválido |
 | `403` | Token válido, pero sin permiso sobre ese recurso o esa fila |
 | `404` | No existe. Si existe pero es de otro cliente, se responde `403` (sección 6.4 de la propuesta) |
-| `409` | Conflicto de estado (bloqueo semántico, versión optimista) o la misma clave de idempotencia todavía en proceso |
+| `409` | Conflicto de estado (bloqueo semántico) o la misma clave de idempotencia todavía en proceso |
 | `422` | Regla de negocio violada, o misma `Idempotency-Key` con otro cuerpo |
 | `429` | Límite de peticiones |
 | `503` | Dependencia caída; incluir `Retry-After` |
@@ -99,6 +99,8 @@ GET /api/v1/viajes?limite=50&cursor=<opaco>
 - Misma clave, otro cuerpo: `422` con código `IDEMPOTENCIA_CUERPO_DISTINTO`.
 - Misma clave mientras la primera sigue `EN_PROCESO`: `409` con código `IDEMPOTENCIA_EN_PROCESO`.
 - Tabla en PostgreSQL: `operacion_idempotente`. En Flota (Mongo): índice único sobre `opId`.
+- **Excepción: `POST /api/v1/servicios`** (D43). Con la misma clave y el mismo hash todavía `EN_PROCESO`, Viajes vuelve a llamar `start` con el `workflowId` guardado; `WorkflowExecutionAlreadyStarted` cuenta como éxito y responde `202` con el mismo `servicioId`. Es seguro porque iniciar el workflow es idempotente. Las demás operaciones siguen respondiendo `409`.
+- **Excepción: `POST /api/v1/viajes/{viajeId}/gps/lotes`** (spec 005). La `Idempotency-Key` es obligatoria (es el `loteId` y va a los logs), pero **no** se guarda en `operacion_idempotente`: la autoridad es la llave de DynamoDB (`viajeId` + `ts#seq`), como dice la propuesta 4.3. Un reenvío vuelve a escribir los mismos puntos y responde `200`; no hay `409 IDEMPOTENCIA_EN_PROCESO` ni `422 IDEMPOTENCIA_CUERPO_DISTINTO`. `PosicionActualizada` no se duplica porque solo se publica si el lote avanzó la última posición.
 
 ## 5. Errores
 
@@ -139,6 +141,27 @@ Formato **Problem Details (RFC 9457)**, `Content-Type: application/problem+json`
 | `SIN_UNIDAD_COMPATIBLE` | 422 | No |
 | `CLIENTE_NO_REPLICADO` | 503 | Sí |
 | `DEPENDENCIA_NO_DISPONIBLE` | 503 | Sí |
+| `ERROR_INTERNO` | 500 | — (error inesperado del propio servicio; sin trazas ni mensajes internos en la respuesta, queda en el log con su `correlationId`. No se usa para una dependencia caída, que es `DEPENDENCIA_NO_DISPONIBLE`) |
+| `TONELAJE_EXCEDIDO` | 422 | No |
+| `RUTA_SIN_TARIFA` | 422 | — (al cotizar: la ruta no tiene tarifa para ese tipo de carga, spec 002) |
+| `APROBACION_VENCIDA` | 422 | No |
+| `CONFIRMACION_EN_CURSO` | 409 | — |
+| `CANCELACION_NO_PERMITIDA` | 409 | — |
+| `VINCULACION_PENDIENTE` | 503 | — |
+| `LLM_NO_DISPONIBLE` | 503 | — |
+| `PREGUNTA_FUERA_DE_ALCANCE` | 422 | — |
+| `RESUELTO_MANUALMENTE` | — | — (motivo de cancelación de la saga, no se devuelve por HTTP; spec 011) |
+| `CANCELADO_POR_USUARIO` | — | — (motivo de `ViajeCancelado` con `origen = USUARIO`; el texto del usuario va en `detalle`; spec 004) |
+| `EVIDENCIA_INCOMPLETA` | 422 | — (entrega o rechazo con una evidencia que no terminó de subir; specs 006 y 007) |
+| `PAGO_EXCEDE_SALDO` | 422 | — (spec 008) |
+| `PAGO_DUPLICADO` | 409 | — (otra clave con la misma `referencia` y el mismo `medio` en la misma factura; trae `pagoId`; spec 008) |
+| `CARGA_EXCEDE_TANQUE` | 422 | — (spec 009) |
+| `KILOMETRAJE_INVALIDO` | 422 | — (kilometraje menor que el último registrado; specs 009 y 010) |
+| `PLACA_DUPLICADA` | 409 | — (spec 010) |
+| `LIMITE_PETICIONES` | 429 | — (servidor MCP, 30 por minuto; incluye `Retry-After`; spec 014) |
+| `EXPORTACION_VENCIDA` | 404 | — (enlace de Excel de más de 10 min; spec 015) |
+| `CONSULTA_DEMASIADO_COMPLEJA` | 400 | — (consulta GraphQL que pasa los límites de profundidad o complejidad; va en `extensions.codigo`; spec 016) |
+| `LIMITE_MENOR_QUE_USADO` | 409 | — (ajuste de una línea de crédito por debajo de `reservado + utilizado`; trae `usado`; spec 012) |
 
 Cada spec agrega los suyos aquí, en la misma tabla.
 
@@ -171,11 +194,12 @@ Cada spec agrega los suyos aquí, en la misma tabla.
 
 ## 7. Temporal
 
-- Namespace: `transporte`. Retención: 30 días (**Pendiente** confirmar).
+- Namespace: `transporte`. Retención: 30 días (D14).
 - Colas de tareas: `viajes`, `finanzas`, `flota`.
 - Id del workflow: `programar-viaje-<servicioId>`, con `REJECT_DUPLICATE` y conflicto `FAIL`. La autoridad de idempotencia del endpoint sigue siendo `operacion_idempotente` (4.1).
 - Nombres de actividades explícitos, `<Contexto>.<verbo>`: `Finanzas.validarYReservarCredito`, `Flota.reservarUnidad`. Nunca el nombre por defecto que genera cada SDK.
 - Payloads: JSON con las mismas reglas de este archivo (camelCase, UUID en texto, dinero como objeto, instantes en UTC).
+- **Determinismo:** el workflow nunca lee variables de entorno ni la hora del sistema. Los valores configurables (espera de aprobación, timeouts e intentos de las compensaciones, valores de demo) llegan en la entrada como `parametrosSaga`, que arma la API de Viajes.
 - Errores de negocio: `ApplicationFailure` con `type` igual al `codigo` de la sección 5 y `nonRetryable` según esa tabla.
 - Cambios en el workflow con ejecuciones abiertas: `Workflow.getVersion`.
 - Entradas, salidas, señales, consultas, timeouts y reintentos de cada actividad: `contratos/temporal/programar-viaje.md`.
@@ -187,7 +211,7 @@ Claims que usan los servicios:
 | Claim | Uso |
 |---|---|
 | `sub` | Usuario. El chofer ve solo los viajes con su `sub` |
-| `realm_access.roles` | Roles: `chofer`, `despachador`, `jefe_flota`, `administracion`, `gerente`, `comercial`, `cliente`, `agente_lectura` |
+| `realm_access.roles` | Roles: `chofer`, `despachador`, `jefe_flota`, `administracion`, `gerente`, `comercial`, `cliente`, `agente_lectura`. También `interno`: no da permisos; marca a una cuenta interna en el token del portal; por expansión de compuestos también llega a los demás clientes y los servicios lo ignoran. Lo llevan `gerente`, `despachador`, `jefe_flota`, `administracion` y `chofer`; `comercial` no, porque abre el portal como el cliente (no es la lista `ROLES_INTERNOS` del Centro de Control) |
 | `clienteId` | Cliente del usuario con rol `cliente`. Con ese rol, se ignora cualquier `clienteId` que venga por parámetro |
 | `aud` | El servicio rechaza un token que no lo tenga en la audiencia |
 | `azp` | Qué app hizo la petición; solo para auditoría |
@@ -200,7 +224,7 @@ Claims que usan los servicios:
 - Tablas y columnas en `snake_case`, en español, sin tildes: `linea_credito`, `ultima_posicion`.
 - Colecciones de Mongo en `camelCase` plural: `cargasCombustible`.
 - Migraciones versionadas por servicio: Flyway (Viajes), migraciones de Laravel (Finanzas), Alembic (Analítica). Nunca cambiar una migración ya aplicada.
-- Bloqueo optimista con columna `version` en los agregados que lo necesitan (`LineaCredito`).
+- Bloqueo pesimista (`SELECT … FOR UPDATE`) al leer un agregado que se va a cambiar (`LineaCredito`). Sin columna `version`: con la fila bloqueada nunca podía fallar.
 - Tablas comunes con el mismo nombre en todos los servicios: `operacion_idempotente`, `outbox_eventos`, `inbox_eventos`, `auditoria`.
 
 **Esquema de auditoría** (igual en todos los servicios): `id`, `ocurridoEn`, `actorSub`, `actorRol`, `canal` (`PORTAL`, `TELEFONO`, `CENTRO_CONTROL`, `APP_CHOFER`, `SISTEMA`), `accion`, `entidad`, `entidadId`, `datos` (JSON), `correlationId`.
@@ -209,7 +233,7 @@ Claims que usan los servicios:
 
 - Logs en JSON, una línea por evento, con: `timestamp`, `nivel`, `servicio`, `correlationId`, `traceId`, `mensaje`.
 - Nunca se registran tokens, contraseñas, firmas, fotos ni el cuerpo completo de las peticiones.
-- **Pendiente (decisión 9):** OpenTelemetry Collector + Jaeger en el perfil `demo`, o solo logs con `correlationId`.
+- Trazas (D23): en local, OpenTelemetry Collector + Jaeger en el perfil `trazas` de docker compose; cada servicio exporta si `OTEL_EXPORTER_OTLP_ENDPOINT` está definido. En la nube, logs con `correlationId` y `traceparent`.
 
 ## 11. Configuración
 
@@ -223,7 +247,8 @@ Claims que usan los servicios:
 - Toda rama de trabajo sale de `develop`, se publica rastreada (`git push -u origin <rama>`) y vuelve a `develop` por PR. `develop` pasa a `main` por PR para desplegar.
 - Nombre de rama: `<tipo>/<pieza>/<que-se-hizo>`, que dice dónde se trabajó y qué se hizo: `feat/viajes/alta-cliente`, `fix/flota/liberar-reserva`, `docs/specs/programar-viaje`.
 - Commits por feature con Conventional Commits y la pieza como alcance: `feat(viajes): crea el viaje en PROGRAMANDO`, `docs(specs): agrega 003-programar-viaje`.
-- Sin coautorías ni firmas en commits ni PR (`Co-Authored-By`, "Generated with…").
+- Sin coautorías ni firmas en commits ni PR (`Co-Authored-By`, "Generated with…"). commitlint lo verifica en local y en `ci-ok`.
+- **Excepción:** las ramas de prueba de concepto `chore/<pieza>/poc-*` no se mergean; lo que sirve entra por otra rama, y se borran al cerrar el hito H2.
 - Un cambio de contrato y sus productores/consumidores van en el mismo PR.
 
 ---

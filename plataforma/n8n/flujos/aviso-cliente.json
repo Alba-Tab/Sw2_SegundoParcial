@@ -1,0 +1,87 @@
+{
+  "id": "AvisoCliente0001",
+  "name": "aviso-cliente",
+  "active": false,
+  "settings": { "executionOrder": "v1", "timezone": "America/La_Paz" },
+  "pinData": {},
+  "nodes": [
+    {
+      "id": "9a4d2b20-0000-4000-8000-000000000001",
+      "name": "Aviso aprobado",
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1,
+      "position": [0, 0],
+      "parameters": { "inputSource": "passthrough" }
+    },
+    {
+      "id": "9a4d2b20-0000-4000-8000-000000000002",
+      "name": "¿Es nuevo?",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [240, 0],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT ($2 = 'AvisoClienteAprobado' AND NOT EXISTS (SELECT 1 FROM n8n_inbox WHERE event_id = $1::uuid)) AS nuevo",
+        "options": { "queryReplacement": "={{ [$json.id, $json.tipo] }}" }
+      },
+      "credentials": { "postgres": { "id": "postgresN8nLoc01", "name": "PostgreSQL n8n" } }
+    },
+    {
+      "id": "9a4d2b20-0000-4000-8000-000000000003",
+      "name": "Nuevo",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [480, 0],
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "leftValue": "", "typeValidation": "loose" },
+          "conditions": [
+            {
+              "id": "9a4d2b20-0000-4000-8000-0000000000c1",
+              "leftValue": "={{ $json.nuevo }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "true", "singleValue": true }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      }
+    },
+    {
+      "id": "9a4d2b20-0000-4000-8000-000000000004",
+      "name": "Correo al cliente",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [720, -100],
+      "parameters": {
+        "fromEmail": "avisos@transporte.example",
+        "toEmail": "={{ $('Aviso aprobado').item.json.datos.destinatario.correo }}",
+        "subject": "={{ $('Aviso aprobado').item.json.datos.asunto }}",
+        "emailFormat": "text",
+        "text": "={{ 'Estimado cliente ' + $('Aviso aprobado').item.json.datos.destinatario.nombre + ':\\n\\n' + $('Aviso aprobado').item.json.datos.mensaje + '\\n\\nPuede seguir su servicio en ' + $('Aviso aprobado').item.json.datos.enlacePortal + '\\n\\nTransporte' }}",
+        "options": { "appendAttribution": false }
+      },
+      "credentials": { "smtp": { "id": "smtpMailpitLoc01", "name": "SMTP" } }
+    },
+    {
+      "id": "9a4d2b20-0000-4000-8000-000000000005",
+      "name": "Registrar en n8n_inbox",
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.5,
+      "position": [960, -100],
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO n8n_inbox (event_id, tipo) VALUES ($1::uuid, $2) ON CONFLICT DO NOTHING",
+        "options": { "queryReplacement": "={{ [$('Aviso aprobado').item.json.id, $('Aviso aprobado').item.json.tipo] }}" }
+      },
+      "credentials": { "postgres": { "id": "postgresN8nLoc01", "name": "PostgreSQL n8n" } }
+    }
+  ],
+  "connections": {
+    "Aviso aprobado": { "main": [[{ "node": "¿Es nuevo?", "type": "main", "index": 0 }]] },
+    "¿Es nuevo?": { "main": [[{ "node": "Nuevo", "type": "main", "index": 0 }]] },
+    "Nuevo": { "main": [[{ "node": "Correo al cliente", "type": "main", "index": 0 }], []] },
+    "Correo al cliente": { "main": [[{ "node": "Registrar en n8n_inbox", "type": "main", "index": 0 }]] }
+  }
+}

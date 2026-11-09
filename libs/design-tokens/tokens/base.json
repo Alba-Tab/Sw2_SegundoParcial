@@ -1,0 +1,141 @@
+{
+  "fuente": {
+    "base": {
+      "$value": "Roboto, \"Helvetica Neue\", Arial, sans-serif",
+      "$type": "fontFamily"
+    },
+    "mono": {
+      "$value": "\"Roboto Mono\", ui-monospace, monospace",
+      "$type": "fontFamily"
+    }
+  },
+  "tamano": {
+    "xs": {
+      "$value": "12px",
+      "$type": "dimension"
+    },
+    "sm": {
+      "$value": "14px",
+      "$type": "dimension"
+    },
+    "md": {
+      "$value": "16px",
+      "$type": "dimension"
+    },
+    "lg": {
+      "$value": "20px",
+      "$type": "dimension"
+    },
+    "xl": {
+      "$value": "24px",
+      "$type": "dimension"
+    },
+    "xxl": {
+      "$value": "32px",
+      "$type": "dimension"
+    }
+  },
+  "espacio": {
+    "unidad": {
+      "$value": "8px",
+      "$type": "dimension",
+      "$description": "Múltiplo base (MUI spacing(1))"
+    },
+    "1": {
+      "$value": "4px",
+      "$type": "dimension"
+    },
+    "2": {
+      "$value": "8px",
+      "$type": "dimension"
+    },
+    "3": {
+      "$value": "12px",
+      "$type": "dimension"
+    },
+    "4": {
+      "$value": "16px",
+      "$type": "dimension"
+    },
+    "6": {
+      "$value": "24px",
+      "$type": "dimension"
+    },
+    "8": {
+      "$value": "32px",
+      "$type": "dimension"
+    },
+    "5": {
+      "$value": "20px",
+      "$type": "dimension"
+    },
+    "10": {
+      "$value": "40px",
+      "$type": "dimension"
+    },
+    "12": {
+      "$value": "48px",
+      "$type": "dimension"
+    }
+  },
+  "radio": {
+    "sm": {
+      "$value": "8px",
+      "$type": "dimension"
+    },
+    "md": {
+      "$value": "12px",
+      "$type": "dimension"
+    },
+    "lg": {
+      "$value": "16px",
+      "$type": "dimension"
+    },
+    "completo": {
+      "$value": "999px",
+      "$type": "dimension"
+    }
+  },
+  "alto": {
+    "fila": {
+      "$value": "44px",
+      "$type": "dimension",
+      "$description": "Fila de tabla en escritorio (densidad ERP)"
+    },
+    "fila-tactil": {
+      "$value": "52px",
+      "$type": "dimension",
+      "$description": "Fila de tabla con puntero táctil"
+    },
+    "control": {
+      "$value": "40px",
+      "$type": "dimension",
+      "$description": "Botones y campos compactos"
+    },
+    "barra": {
+      "$value": "56px",
+      "$type": "dimension",
+      "$description": "Barra común del Centro de Control"
+    }
+  },
+  "borde": {
+    "fino": {
+      "$value": "1px",
+      "$type": "dimension"
+    }
+  },
+  "elevacion": {
+    "0": {
+      "$value": "none",
+      "$description": "Plano: el borde separa"
+    },
+    "1": {
+      "$value": "0 1px 2px rgb(16 24 40 / 0.06)",
+      "$description": "Paneles y tablas"
+    },
+    "2": {
+      "$value": "0 4px 12px rgb(16 24 40 / 0.08), 0 1px 3px rgb(16 24 40 / 0.06)",
+      "$description": "Menús y lo que flota"
+    }
+  }
+}

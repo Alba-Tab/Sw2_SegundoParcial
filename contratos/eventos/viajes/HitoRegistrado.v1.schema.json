@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/eventos/viajes/HitoRegistrado.v1.schema.json",
+  "title": "HitoRegistrado v1",
+  "description": "Bloqueo, parada, punto de control o falla registrados en ruta, por ejemplo desde la bitácora por voz. Clave de enrutamiento: viajes.hito-registrado.v1. Consumen: analitica.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../sobre.schema.json"
+    }
+  ],
+  "properties": {
+    "tipo": {
+      "const": "HitoRegistrado"
+    },
+    "version": {
+      "const": 1
+    },
+    "productor": {
+      "const": "viajes"
+    },
+    "datos": {
+      "type": "object",
+      "required": [
+        "viajeId",
+        "hitoId",
+        "tipo",
+        "descripcion",
+        "posicion",
+        "registradoEn"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "viajeId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "hitoId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "tipo": {
+          "type": "string",
+          "enum": [
+            "BLOQUEO",
+            "PARADA",
+            "PUNTO_CONTROL",
+            "FALLA_MECANICA",
+            "OTRO"
+          ]
+        },
+        "descripcion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "posicion": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Coordenadas"
+        },
+        "registradoEn": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Instante"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "01933d06-0000-7000-8000-000000000006",
+      "tipo": "HitoRegistrado",
+      "version": 1,
+      "ocurridoEn": "2026-11-03T15:20:01Z",
+      "correlationId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8dff",
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "productor": "viajes",
+      "datos": {
+        "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+        "hitoId": "01933c60-0000-7000-8000-00000000bb01",
+        "tipo": "BLOQUEO",
+        "descripcion": "Bloqueo de transportistas en el puente de Yapacaní",
+        "posicion": {
+          "lat": -17.4012,
+          "lng": -63.8851
+        },
+        "registradoEn": "2026-11-03T13:40:00Z"
+      }
+    }
+  ]
+}

@@ -1,0 +1,178 @@
+fragment FacturaFila on Factura {
+  facturaId
+  numero
+  clienteId
+  razonSocial
+  monto
+  saldo
+  estado
+  emitidaEl
+  venceEl
+  vencida
+  diasVencida
+}
+
+# D101 (complejidad máxima 1.000): la lista pide solo lo que muestra la tabla; 80 × 10 + 1 = 801.
+query Facturas($estado: EstadoFactura, $conSaldo: Boolean) {
+  facturas(estado: $estado, conSaldo: $conSaldo, limite: 80) {
+    facturaId
+    numero
+    razonSocial
+    monto
+    saldo
+    estado
+    venceEl
+    vencida
+    diasVencida
+  }
+}
+
+query Factura($id: ID!) {
+  factura(id: $id) {
+    ...FacturaFila
+    viajeId
+    servicioId
+    pagos {
+      pagoId
+      monto
+      fecha
+      medio
+      referencia
+      nota
+      registradoPor
+      registradoEn
+    }
+  }
+}
+
+# D101: 80 × 12 + 1 más rutas = 965. La razón social viene en cada cotización (E5-1: `clientes` es por páginas).
+query Cotizaciones {
+  cotizaciones(limite: 80) {
+    cotizacionId
+    clienteId
+    razonSocial
+    rutaId
+    tipoCarga
+    toneladas
+    monto
+    estado
+    vencida
+    canal
+    creadaEn
+  }
+  rutas {
+    rutaId
+    nombre
+  }
+}
+
+query Solicitudes($estado: String) {
+  solicitudesAprobacion(estado: $estado) {
+    servicioId
+    clienteId
+    razonSocial
+    monto
+    motivos
+    estado
+    creadaEn
+    venceEn
+    decididaPor
+    motivoDecision
+    facturasVencidas {
+      facturaId
+      numero
+      saldo
+      venceEl
+      diasVencida
+    }
+  }
+}
+
+# E2-7: la línea de un cliente de una página extra, releída tras LIMITE_MENOR_QUE_USADO o CONFLICTO_ESTADO.
+query LineaCredito($clienteId: ID!) {
+  lineaCredito(clienteId: $clienteId) {
+    limite
+    reservado
+    utilizado
+    disponible
+    enMora
+    suspendida
+  }
+}
+
+# G6: la línea de cada cliente va anidada en `clientes` (una sola petición del navegador); el Gateway pide a Finanzas
+# las líneas de la página en un lote (B5). E5-1: de a 50 clientes, con «Cargar más» por `despuesDe`; la pantalla dice
+# cuántas líneas vinieron con error (revisión D-1, E2-2).
+query LineasCredito($despuesDe: Cursor) {
+  clientes(limite: 50, despuesDe: $despuesDe) {
+    items {
+      clienteId
+      razonSocial
+      nit
+      lineaCredito {
+        limite
+        reservado
+        utilizado
+        disponible
+        enMora
+        suspendida
+      }
+    }
+    siguienteCursor
+  }
+}
+
+query Cobranza($params: ReporteParams) {
+  reporte(id: CUENTAS_POR_COBRAR, params: $params) {
+    reporteId
+    titulo
+    parametros
+    columnas {
+      clave
+      titulo
+      tipo
+    }
+    filas
+    totales
+    grafico
+    datosAl
+  }
+}
+
+mutation RegistrarPago($input: PagoInput!) {
+  registrarPago(input: $input) {
+    facturaId
+    saldo
+    estado
+  }
+}
+
+mutation AprobarCredito($servicioId: ID!, $aprobado: Boolean!, $motivo: String, $clave: ID!) {
+  aprobarCredito(servicioId: $servicioId, aprobado: $aprobado, motivo: $motivo, claveIdempotencia: $clave) {
+    servicioId
+    aprobado
+    servicio {
+      estado
+    }
+  }
+}
+
+fragment LineaGestionada on LineaCredito {
+  clienteId
+  limite
+  disponible
+  suspendida
+}
+
+# G6 (spec 012): administración y gerente. La lista se relee después (la línea no tiene id para la caché de Apollo).
+mutation AjustarLineaCredito($clienteId: ID!, $limite: Dinero!, $motivo: String!, $clave: ID!) {
+  ajustarLineaCredito(clienteId: $clienteId, limite: $limite, motivo: $motivo, claveIdempotencia: $clave) {
+    ...LineaGestionada
+  }
+}
+
+mutation CambiarEstadoLineaCredito($clienteId: ID!, $suspendida: Boolean!, $motivo: String!, $clave: ID!) {
+  cambiarEstadoLineaCredito(clienteId: $clienteId, suspendida: $suspendida, motivo: $motivo, claveIdempotencia: $clave) {
+    ...LineaGestionada
+  }
+}

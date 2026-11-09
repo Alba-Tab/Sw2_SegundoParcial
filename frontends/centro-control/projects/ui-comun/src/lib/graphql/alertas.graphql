@@ -1,0 +1,48 @@
+fragment AlertaCampos on Alerta {
+  alertaId
+  secuencia
+  tipo
+  severidad
+  titulo
+  detalle
+  entidad {
+    tipo
+    id
+  }
+  enlace
+  estado
+  creadaEn
+  origen
+}
+
+query AlertasPendientes($desde: Cursor) {
+  alertasPendientes(desde: $desde, limite: 50) {
+    alertas {
+      ...AlertaCampos
+    }
+    siguienteCursor
+    abiertas
+    datosAl
+  }
+}
+
+subscription AlertasNuevas {
+  alertas {
+    ...AlertaCampos
+  }
+}
+
+mutation AtenderAlerta($alertaId: ID!, $nota: String, $clave: ID!) {
+  atenderAlerta(alertaId: $alertaId, nota: $nota, claveIdempotencia: $clave) {
+    alertaId
+    estado
+  }
+}
+
+query Yo {
+  yo {
+    sub
+    nombre
+    roles
+  }
+}

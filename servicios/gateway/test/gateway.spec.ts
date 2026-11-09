@@ -1,0 +1,985 @@
+/**
+ * Gateway de punta a punta contra un Keycloak y 4 servicios falsos en un servidor HTTP local (spec 016): permisos por
+ * campo, respuesta parcial, tiempos de espera, límites, idempotencia, DataLoader, descarga con HMAC y suscripción.
+ */
+import type { INestApplication } from '@nestjs/common';
+import { Test } from '@nestjs/testing';
+import { exportJWK, generateKeyPair, SignJWT } from 'jose';
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import request from 'supertest';
+import WebSocket from 'ws';
+
+type Manejador = (
+  req: IncomingMessage,
+  cuerpo: string,
+  url: URL,
+) => { status?: number; json?: unknown; texto?: string; demoraMs?: number; binario?: Buffer; alTerminar?: () => void } | undefined;
+
+let servidor: Server;
+let base: string;
+let app: INestApplication;
+let gateway: string;
+let llave: CryptoKey;
+const pedidos: { metodo: string; ruta: string; cabeceras: IncomingMessage['headers']; cuerpo: string }[] = [];
+const rutas = new Map<string, Manejador>();
+
+const VIAJE = (id: string, servicioId = 's1') => ({
+  viajeId: id,
+  servicioId,
+  estado: 'EN_RUTA',
+  cliente: { clienteId: 'c1', razonSocial: 'Agroexport SRL' },
+  ruta: { rutaId: 'r1', nombre: 'Aula', origen: { nombre: 'Santa Cruz' }, destino: { nombre: 'Aula' }, distanciaKm: 120 },
+  tipoCarga: 'GRANOS',
+  toneladas: 28,
+  fechaViaje: '2026-11-03',
+  placa: '4521KTR',
+  choferNombre: 'Marco Quispe',
+  ultimaPosicion: { posicion: { lat: -17.7, lng: -63.1 }, velocidadKmh: 50, registradaEn: '2026-11-03T12:00:00Z' },
+});
+
+async function token(roles: string[], sub = 'u1', segundos = 300) {
+  return new SignJWT({ realm_access: { roles }, preferred_username: sub })
+    .setProtectedHeader({ alg: 'RS256', kid: 'k1' })
+    .setIssuer(`${base}/realms/transporte`)
+    .setAudience('gateway')
+    .setSubject(sub)
+    .setExpirationTime(Math.floor(Date.now() / 1000) + segundos)
+    .sign(llave);
+}
+
+const gql = async (roles: string[], query: string, variables?: unknown) =>
+  request(app.getHttpServer())
+    .post('/graphql')
+    .set('Authorization', `Bearer ${await token(roles)}`)
+    .send({ query, variables });
+
+beforeAll(async () => {
+  const par = await generateKeyPair('RS256');
+  llave = par.privateKey;
+  const jwks = { keys: [{ ...(await exportJWK(par.publicKey)), kid: 'k1', alg: 'RS256', use: 'sig' }] };
+  servidor = createServer((req: IncomingMessage, res: ServerResponse) => {
+    let cuerpo = '';
+    req.on('data', (c) => (cuerpo += c));
+    req.on('end', async () => {
+      const url = new URL(req.url ?? '/', base);
+      pedidos.push({ metodo: req.method ?? '', ruta: url.pathname + url.search, cabeceras: req.headers, cuerpo });
+      if (url.pathname.endsWith('/certs')) return res.end(JSON.stringify(jwks));
+      if (url.pathname.endsWith('/token')) {
+        const f = new URLSearchParams(cuerpo);
+        return res.end(JSON.stringify({ access_token: `intercambiado-${f.get('audience') ?? f.get('scope')}`, expires_in: 300 }));
+      }
+      const r = rutas.get(`${req.method} ${url.pathname}`)?.(req, cuerpo, url);
+      if (!r) return res.writeHead(404).end(JSON.stringify({ codigo: 'NO_ENCONTRADO', detail: 'no existe' }));
+      if (r.demoraMs) await new Promise((ok) => setTimeout(ok, r.demoraMs));
+      r.alTerminar?.();
+      if (r.texto !== undefined) return res.writeHead(r.status ?? 200, { 'content-type': 'application/json' }).end(r.texto);
+      if (r.binario) {
+        res.writeHead(200, {
+          'content-type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          'content-disposition': 'attachment; filename="x.xlsx"',
+        });
+        return res.end(r.binario);
+      }
+      res.writeHead(r.status ?? 200, { 'content-type': 'application/json' }).end(JSON.stringify(r.json ?? {}));
+    });
+  });
+  await new Promise<void>((ok) => servidor.listen(0, '127.0.0.1', ok));
+  base = `http://127.0.0.1:${(servidor.address() as AddressInfo).port}`;
+  Object.assign(process.env, {
+    OIDC_ISSUER: `${base}/realms/transporte`,
+    OIDC_CLIENTE_SECRETO: 'secreto',
+    VIAJES_URL: `${base}/viajes`,
+    FLOTA_URL: `${base}/flota`,
+    FINANZAS_URL: `${base}/finanzas`,
+    ANALITICA_URL: `${base}/analitica`,
+    EXPORTACION_HMAC_SECRETO: 'hmac-de-prueba',
+    GATEWAY_URL: 'http://gateway.prueba',
+    ESQUEMA_GRAPHQL: `${__dirname}/../../../contratos/graphql/centro-control.graphql`,
+  });
+  const { AppModule } = await import('../src/app.module');
+  app = (await Test.createTestingModule({ imports: [AppModule] }).compile()).createNestApplication();
+  await app.listen(0, '127.0.0.1');
+  gateway = `127.0.0.1:${(app.getHttpServer().address() as AddressInfo).port}`;
+});
+
+afterAll(async () => {
+  await app?.close();
+  servidor?.close();
+});
+
+beforeEach(() => {
+  pedidos.length = 0;
+  rutas.clear();
+  rutas.set('GET /viajes/api/v1/viajes', () => ({ json: { items: [VIAJE('v1'), VIAJE('v2'), VIAJE('v3', 's2')] } }));
+  rutas.set('GET /viajes/api/v1/servicios/s1', () => ({ json: { servicioId: 's1', monto: { monto: '2800.00', moneda: 'BOB' } } }));
+  rutas.set('GET /viajes/api/v1/servicios/s2', () => ({ json: { servicioId: 's2', monto: { monto: '7600.00', moneda: 'BOB' } } }));
+  rutas.set('GET /flota/api/v1/unidades', () => ({ json: { items: [{ unidadId: 'u1', placa: '4521KTR', estado: 'EN_VIAJE' }] } }));
+  rutas.set('GET /finanzas/api/v1/facturas/resumen', () => ({
+    json: { saldoTotal: { monto: '7600.00', moneda: 'BOB' }, facturasPorVencer: 0, facturasVencidas: 0, proximas: [] },
+  }));
+  rutas.set('GET /analitica/api/v1/alertas', () => ({
+    json: { alertas: [], abiertas: 2, datosAl: '2026-11-03T12:00:00Z', siguienteCursor: null },
+  }));
+});
+
+const TABLERO =
+  '{ tablero(periodo: ESTA_SEMANA) { viajesEnCurso { viajeId } unidadesPorEstado { estado cantidad } cuentasPorCobrar { saldoTotal } alertasAbiertas } }';
+
+describe('Gateway (spec 016)', () => {
+  it('FK1: sin token 401; cliente 403; el token se intercambia por servicio y nunca se reenvía', async () => {
+    await request(app.getHttpServer()).post('/graphql').send({ query: '{ yo { sub } }' }).expect(401);
+    const cliente = await request(app.getHttpServer())
+      .post('/graphql')
+      .set('Authorization', `Bearer ${await token(['cliente'])}`)
+      .send({ query: '{ yo { sub } }' });
+    expect(cliente.status).toBe(403);
+    expect(cliente.body.codigo).toBe('SIN_PERMISO');
+    const r = await gql(['gerente'], TABLERO);
+    expect(r.body.errors).toBeUndefined();
+    const aServicios = pedidos.filter((p) => !p.ruta.includes('openid-connect'));
+    expect(new Set(aServicios.map((p) => p.cabeceras.authorization))).toEqual(
+      new Set([
+        'Bearer intercambiado-viajes',
+        'Bearer intercambiado-flota',
+        'Bearer intercambiado-finanzas',
+        'Bearer intercambiado-analitica',
+      ]),
+    );
+    expect(aServicios.every((p) => p.cabeceras['x-correlation-id'] && /^00-[0-9a-f]{32}-/.test(String(p.cabeceras.traceparent)))).toBe(
+      true,
+    );
+  });
+
+  it('permisos por campo: el despachador no ve montos ni cuentas por cobrar', async () => {
+    const r = await gql(
+      ['despachador'],
+      '{ viajesEnCurso { viajeId monto } tablero(periodo: HOY) { cuentasPorCobrar { saldoTotal } alertasAbiertas } }',
+    );
+    expect(r.status).toBe(200);
+    expect(r.body.data.viajesEnCurso.map((v: { monto: unknown }) => v.monto)).toEqual([null, null, null]);
+    expect(r.body.data.tablero).toEqual({ cuentasPorCobrar: null, alertasAbiertas: 2 });
+    expect(new Set(r.body.errors.map((e: { extensions: { codigo: string } }) => e.extensions.codigo))).toEqual(new Set(['SIN_PERMISO']));
+    const g = await gql(['gerente'], '{ viajesEnCurso { monto } }');
+    expect(g.body.data.viajesEnCurso.map((v: { monto: string }) => v.monto)).toEqual(['2800.00', '2800.00', '7600.00']);
+    // DataLoader: s1 se pidió una sola vez para dos viajes.
+    expect(pedidos.filter((p) => p.ruta === '/viajes/api/v1/servicios/s1')).toHaveLength(1);
+  });
+
+  it('FR1: Flota caída → sus campos en null con DEPENDENCIA_NO_DISPONIBLE y el resto sale', async () => {
+    rutas.set('GET /flota/api/v1/unidades', () => ({ status: 503 }));
+    const r = await gql(['gerente'], TABLERO);
+    expect(r.status).toBe(200);
+    expect(r.body.data.tablero.unidadesPorEstado).toBeNull();
+    expect(r.body.data.tablero.viajesEnCurso).toHaveLength(3);
+    expect(r.body.data.tablero.cuentasPorCobrar.saldoTotal).toBe('7600.00');
+    expect(r.body.errors[0]).toMatchObject({
+      path: ['tablero', 'unidadesPorEstado'],
+      extensions: { codigo: 'DEPENDENCIA_NO_DISPONIBLE', servicio: 'flota' },
+    });
+  });
+
+  it('FC6: un servicio lento pasa los 3 s y no frena la respuesta', async () => {
+    rutas.set('GET /finanzas/api/v1/facturas/resumen', () => ({ demoraMs: 5000, json: {} }));
+    const inicio = Date.now();
+    const r = await gql(['gerente'], TABLERO);
+    expect(Date.now() - inicio).toBeLessThan(3500);
+    expect(r.body.data.tablero.cuentasPorCobrar).toBeNull();
+    expect(r.body.errors[0].extensions.codigo).toBe('DEPENDENCIA_NO_DISPONIBLE');
+  });
+
+  it('límites (D101): una consulta demasiado compleja no llama a ningún servicio', async () => {
+    const r = await gql(['gerente'], '{ viajes(limite: 100) { hitos(limite: 100) { tipo descripcion } } }');
+    expect(r.body.errors[0].extensions.codigo).toBe('CONSULTA_DEMASIADO_COMPLEJA');
+    expect(pedidos.filter((p) => !p.ruta.includes('openid-connect'))).toHaveLength(0);
+  });
+
+  it('mutaciones: la claveIdempotencia viaja como Idempotency-Key y el error del servicio llega con su código', async () => {
+    const facturaPagada = {
+      facturaId: 'f1',
+      numero: 'FAC-000001',
+      viajeId: 'v1',
+      servicioId: 's1',
+      clienteId: 'c1',
+      razonSocial: 'A',
+      monto: { monto: '7600.00' },
+      saldo: { monto: '0.00' },
+      estado: 'PAGADA',
+      emitidaEl: '2026-10-01',
+      venceEl: '2026-11-01',
+      vencida: false,
+    };
+    // registrarPago responde 201 con la factura actualizada (contrato): el Gateway no la relee.
+    rutas.set('POST /finanzas/api/v1/facturas/f1/pagos', () => ({ status: 201, json: facturaPagada }));
+    const pago = `mutation($i: PagoInput!) { registrarPago(input: $i) { estado saldo } }`;
+    const input = {
+      facturaId: 'f1',
+      monto: '7600.00',
+      fecha: '2026-11-03',
+      medio: 'TRANSFERENCIA',
+      referencia: 'BNB-1',
+      claveIdempotencia: 'clave-1',
+    };
+    expect((await gql(['gerente'], pago, { i: input })).body.errors[0].extensions.codigo).toBe('SIN_PERMISO');
+    const r = await gql(['administracion'], pago, { i: input });
+    expect(r.body.data.registrarPago).toEqual({ estado: 'PAGADA', saldo: '0.00' });
+    const post = pedidos.find((p) => p.metodo === 'POST' && p.ruta.endsWith('/pagos'))!;
+    expect(post.cabeceras['idempotency-key']).toBe('clave-1');
+    expect(pedidos.filter((p) => p.metodo === 'GET' && p.ruta.startsWith('/finanzas/api/v1/facturas/f1'))).toHaveLength(0);
+    expect(JSON.parse(post.cuerpo)).toEqual({
+      fecha: '2026-11-03',
+      medio: 'TRANSFERENCIA',
+      referencia: 'BNB-1',
+      monto: { monto: '7600.00', moneda: 'BOB' },
+    });
+    rutas.set('POST /viajes/api/v1/viajes/v1/entrega/aprobacion', () => ({
+      status: 409,
+      json: { codigo: 'CONFLICTO_ESTADO', detail: 'El viaje no está observado' },
+    }));
+    const c = await gql(['despachador'], 'mutation { aprobarEntregaObservada(viajeId: "v1", claveIdempotencia: "k") { estado } }');
+    expect(c.body.errors[0]).toMatchObject({
+      message: 'El viaje no está observado',
+      extensions: { codigo: 'CONFLICTO_ESTADO', status: 409 },
+    });
+  });
+
+  it('D21: exportar devuelve un enlace HMAC; la descarga valida firma y vencimiento sin Authorization', async () => {
+    const expira = new Date(Date.now() + 600_000).toISOString();
+    rutas.set('POST /analitica/api/v1/exportaciones', () => ({
+      status: 201,
+      json: { exportacionId: 'e1', nombreArchivo: 'x.xlsx', expiraEn: expira },
+    }));
+    rutas.set('GET /analitica/api/v1/exportaciones/e1/archivo', () => ({ binario: Buffer.from('PK-excel') }));
+    const r = await gql(['gerente'], 'mutation { exportarReporte(id: CUENTAS_POR_COBRAR, claveIdempotencia: "k1") { url nombreArchivo } }');
+    const url: string = r.body.data.exportarReporte.url;
+    expect(url.startsWith('http://gateway.prueba/exportaciones/')).toBe(true);
+    const ruta = url.replace('http://gateway.prueba', '');
+    const ok = await request(app.getHttpServer()).get(ruta).buffer(true);
+    expect(ok.status).toBe(200);
+    expect(ok.headers['cache-control']).toBe('no-store');
+    const archivo = pedidos.find((p) => p.ruta.endsWith('/archivo'))!;
+    expect(archivo.cabeceras['x-solicitante-sub']).toBe('u1');
+    expect(archivo.cabeceras.authorization).toBe('Bearer intercambiado-aud-analitica');
+    const alterado = ruta.slice(0, -2) + (ruta.endsWith('A') ? 'BB' : 'AA');
+    expect((await request(app.getHttpServer()).get(alterado)).status).toBe(403);
+    const { firmarDescarga } = await import('../src/graphql/resolvers');
+    const vencido = firmarDescarga('hmac-de-prueba', 'e1', 'u1', Math.floor(Date.now() / 1000) - 1);
+    expect((await request(app.getHttpServer()).get(`/exportaciones/${vencido}`)).body.codigo).toBe('EXPORTACION_VENCIDA');
+
+    // D110 y D111: el formato va en el cuerpo (EXCEL si no se dice) y las columnas, como arreglo o separadas por coma.
+    const exportar = () => pedidos.filter((p) => p.ruta === '/analitica/api/v1/exportaciones').map((p) => JSON.parse(p.cuerpo));
+    expect(exportar()[0].formato).toBe('EXCEL');
+    await gql(
+      ['gerente'],
+      'mutation { exportarReporte(id: CUENTAS_POR_COBRAR, params: { columnas: ["saldo", "cliente"] }, formato: PDF, claveIdempotencia: "k2") { url } }',
+    );
+    expect(exportar().at(-1)).toMatchObject({ formato: 'PDF', parametros: { columnas: ['saldo', 'cliente'] } });
+    rutas.set('GET /analitica/api/v1/reportes/CUENTAS_POR_COBRAR', () => ({ json: { titulo: 'Cuentas por cobrar' } }));
+    await gql(['gerente'], '{ reporte(id: CUENTAS_POR_COBRAR, params: { columnas: ["saldo", "cliente"] }) { titulo } }');
+    expect(pedidos.at(-1)!.ruta).toBe('/analitica/api/v1/reportes/CUENTAS_POR_COBRAR?columnas=saldo%2Ccliente');
+  });
+
+  it('suscripción: 4401 sin token válido, 4403 para clientes y alertas nuevas para el despachador', async () => {
+    const cerrar = (authorization: string) =>
+      new Promise<number>((ok) => {
+        const ws = new WebSocket(`ws://${gateway}/graphql`, 'graphql-transport-ws');
+        ws.on('open', () => ws.send(JSON.stringify({ type: 'connection_init', payload: { authorization } })));
+        ws.on('close', (codigo) => ok(codigo));
+      });
+    expect(await cerrar('Bearer basura')).toBe(4401);
+    expect(await cerrar(`Bearer ${await token(['cliente'])}`)).toBe(4403);
+
+    let vuelta = 0;
+    rutas.set('GET /analitica/api/v1/alertas', () => {
+      vuelta++;
+      const alerta = {
+        alertaId: 'a1',
+        secuencia: 7,
+        tipo: 'RIESGO_RETRASO',
+        severidad: 'ALTA',
+        titulo: 'Riesgo',
+        detalle: 'd',
+        entidad: { tipo: 'VIAJE', id: 'v1' },
+        enlace: '/x',
+        estado: 'ABIERTA',
+        creadaEn: '2026-11-03T12:00:00Z',
+        origen: 'modelo',
+      };
+      return { json: { alertas: vuelta === 2 ? [alerta] : [], siguienteCursor: vuelta >= 2 ? 'czo3' : null, abiertas: 1 } };
+    });
+    const t = await token(['despachador']);
+    const alerta = await new Promise<{ titulo: string }>((ok, mal) => {
+      const ws = new WebSocket(`ws://${gateway}/graphql`, 'graphql-transport-ws');
+      ws.on('open', () => ws.send(JSON.stringify({ type: 'connection_init', payload: { authorization: `Bearer ${t}` } })));
+      ws.on('message', (datos) => {
+        const m = JSON.parse(String(datos));
+        if (m.type === 'connection_ack')
+          ws.send(JSON.stringify({ id: '1', type: 'subscribe', payload: { query: 'subscription { alertas { titulo secuencia } }' } }));
+        if (m.type === 'next') {
+          ws.close();
+          ok(m.payload.data.alertas);
+        }
+      });
+      ws.on('close', (c) => c !== 1005 && c !== 1000 && mal(new Error(`cerró ${c}`)));
+    });
+    expect(alerta).toEqual({ titulo: 'Riesgo', secuencia: 7 });
+  });
+});
+
+// Sin la última vuelta de la suscripción de la prueba anterior, que puede seguir en vuelo al cerrar.
+const aServicios = () => pedidos.filter((p) => !p.ruta.includes('openid-connect') && !p.ruta.startsWith('/analitica/api/v1/alertas'));
+const B64 = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+
+describe('revisión del Gateway', () => {
+  it('limite fuera de 1–100 → VALIDACION sin llamar a Viajes; null cuenta como el valor por defecto', async () => {
+    for (const limite of [-5, 0, 101]) {
+      const r = await gql(['gerente'], `{ viajes(limite: ${limite}) { viajeId } }`);
+      expect(r.body.errors[0].extensions).toMatchObject({ codigo: 'VALIDACION', status: 400 });
+    }
+    // Antes, un limite negativo bajaba la complejidad y la consulta llegaba a Viajes con limite=-100.
+    const negativo = await gql(['gerente'], '{ viajes(limite: -100) { hitos(limite: 100) { tipo descripcion } } }');
+    expect(negativo.body.errors[0].extensions.codigo).toBe('VALIDACION');
+    const nulo = await gql(['gerente'], '{ viajes(limite: null) { hitos(limite: 100) { tipo descripcion } } }');
+    expect(nulo.body.errors[0].extensions.codigo).toBe('CONSULTA_DEMASIADO_COMPLEJA');
+    expect(aServicios()).toHaveLength(0);
+    const ok = await gql(['gerente'], '{ viajes(limite: null) { viajeId } }');
+    expect(ok.body.data.viajes).toHaveLength(3);
+    expect(aServicios().map((p) => p.ruta)).toEqual(['/viajes/api/v1/viajes?limite=50']);
+  });
+
+  it('rutas: listarRutas devuelve un arreglo plano (contrato) y el Gateway lo compone', async () => {
+    rutas.set('GET /viajes/api/v1/rutas', () => ({
+      json: [
+        {
+          rutaId: 'r1',
+          nombre: 'Santa Cruz – La Paz',
+          origen: { nombre: 'Santa Cruz', coordenadas: { lat: -17.78, lng: -63.18 } },
+          destino: { nombre: 'La Paz', coordenadas: { lat: -16.5, lng: -68.15 }, radioMetros: 300 },
+          distanciaKm: 850,
+          activa: true,
+        },
+      ],
+    }));
+    const r = await gql(['gerente'], '{ rutas { rutaId nombre origen destino distanciaKm } }');
+    expect(r.body.data.rutas).toEqual([
+      { rutaId: 'r1', nombre: 'Santa Cruz – La Paz', origen: 'Santa Cruz', destino: 'La Paz', distanciaKm: 850 },
+    ]);
+  });
+
+  // ---- gestión de datos maestros de Viajes (G4, G7, B1, B2; D104)
+  const RUTA_REST = {
+    rutaId: 'r1',
+    nombre: 'Santa Cruz – La Paz',
+    origen: { nombre: 'Santa Cruz', coordenadas: { lat: -17.78, lng: -63.18 } },
+    destino: { nombre: 'La Paz', coordenadas: { lat: -16.5, lng: -68.15 }, radioMetros: 300 },
+    distanciaKm: 850,
+    activa: false,
+  };
+  const RUTA_INPUT = {
+    nombre: 'Santa Cruz – La Paz',
+    origen: { nombre: 'Santa Cruz', coordenadas: { lat: -17.78, lng: -63.18 } },
+    destino: { nombre: 'La Paz', coordenadas: { lat: -16.5, lng: -68.15 }, radioMetros: 300 },
+    distanciaKm: 850,
+    claveIdempotencia: 'clave-ruta',
+  };
+  const CAMPOS_RUTA = 'rutaId activa radioMetros destino destinoCoordenadas { lat lng } origenCoordenadas { lat }';
+
+  it('G4: crearRuta y editarRuta van a Viajes con Idempotency-Key, solo para gerente y despachador', async () => {
+    rutas.set('POST /viajes/api/v1/rutas', () => ({ status: 201, json: RUTA_REST }));
+    rutas.set('PUT /viajes/api/v1/rutas/r1', () => ({ json: RUTA_REST }));
+    const crear = `mutation($i: RutaInput!) { crearRuta(input: $i) { ${CAMPOS_RUTA} } }`;
+    const editar = `mutation($i: RutaInput!) { editarRuta(rutaId: "r1", input: $i) { rutaId activa } }`;
+    expect((await gql(['jefe_flota'], crear, { i: RUTA_INPUT })).body.errors[0].extensions.codigo).toBe('SIN_PERMISO');
+    expect((await gql(['comercial'], editar, { i: RUTA_INPUT })).body.errors[0].extensions.codigo).toBe('SIN_PERMISO');
+    expect(pedidos.filter((p) => p.ruta.startsWith('/viajes/'))).toHaveLength(0);
+
+    const r = await gql(['gerente'], crear, { i: RUTA_INPUT });
+    expect(r.body.data.crearRuta).toEqual({
+      rutaId: 'r1',
+      activa: false,
+      radioMetros: 300,
+      destino: 'La Paz',
+      destinoCoordenadas: { lat: -16.5, lng: -68.15 },
+      origenCoordenadas: { lat: -17.78 },
+    });
+    const post = pedidos.find((p) => p.metodo === 'POST' && p.ruta === '/viajes/api/v1/rutas')!;
+    expect(post.cabeceras['idempotency-key']).toBe('clave-ruta');
+    const { claveIdempotencia: _, ...cuerpo } = RUTA_INPUT;
+    expect(JSON.parse(post.cuerpo)).toEqual(cuerpo);
+
+    expect((await gql(['despachador'], editar, { i: { ...RUTA_INPUT, activa: false } })).body.data.editarRuta).toEqual({
+      rutaId: 'r1',
+      activa: false,
+    });
+    const put = pedidos.find((p) => p.metodo === 'PUT')!;
+    expect(put.ruta).toBe('/viajes/api/v1/rutas/r1');
+    expect(JSON.parse(put.cuerpo).activa).toBe(false);
+    expect(put.cabeceras['idempotency-key']).toBe('clave-ruta');
+  });
+
+  it('G7: editarCliente hace PUT en Viajes (comercial y gerente) y el 409 del NIT llega con su código', async () => {
+    rutas.set('PUT /viajes/api/v1/clientes/c1', (_req, cuerpo) =>
+      JSON.parse(cuerpo).nit === '1000002'
+        ? { status: 409, json: { codigo: 'CONFLICTO_ESTADO', detail: 'Ya existe un cliente activo con ese NIT' } }
+        : { json: { clienteId: 'c1', razonSocial: 'Agro SRL', nit: '1000001', correo: 'a@b.example', canal: 'PORTAL' } },
+    );
+    const editar = `mutation($i: ClienteEdicionInput!) { editarCliente(clienteId: "c1", input: $i) { clienteId razonSocial nit } }`;
+    const input = { razonSocial: 'Agro SRL', nit: '1000001', correo: 'a@b.example', claveIdempotencia: 'k-cliente' };
+    expect((await gql(['despachador'], editar, { i: input })).body.errors[0].extensions.codigo).toBe('SIN_PERMISO');
+    const r = await gql(['comercial'], editar, { i: input });
+    expect(r.body.data.editarCliente).toEqual({ clienteId: 'c1', razonSocial: 'Agro SRL', nit: '1000001' });
+    const put = pedidos.find((p) => p.metodo === 'PUT')!;
+    expect(put.cabeceras['idempotency-key']).toBe('k-cliente');
+    expect(JSON.parse(put.cuerpo)).toEqual({ razonSocial: 'Agro SRL', nit: '1000001', correo: 'a@b.example' });
+    const c = await gql(['gerente'], editar, { i: { ...input, nit: '1000002' } });
+    expect(c.body.errors[0].extensions).toMatchObject({ codigo: 'CONFLICTO_ESTADO', status: 409 });
+  });
+
+  it('B1: cliente(id) y ruta(id) leen por id; rutas(incluirInactivas) lo pasa a Viajes', async () => {
+    rutas.set('GET /viajes/api/v1/clientes/c1', () => ({ json: { clienteId: 'c1', razonSocial: 'Agro SRL', nit: '1000001' } }));
+    rutas.set('GET /viajes/api/v1/rutas/r1', () => ({ json: RUTA_REST }));
+    rutas.set('GET /viajes/api/v1/rutas', () => ({ json: [RUTA_REST] }));
+    const r = await gql(['despachador'], `{ cliente(id: "c1") { razonSocial nit } ruta(id: "r1") { nombre radioMetros } }`);
+    expect(r.body.data).toEqual({
+      cliente: { razonSocial: 'Agro SRL', nit: '1000001' },
+      ruta: { nombre: 'Santa Cruz – La Paz', radioMetros: 300 },
+    });
+    await gql(['despachador'], '{ rutas(incluirInactivas: true) { rutaId activa } }');
+    expect(pedidos.some((p) => p.ruta === '/viajes/api/v1/rutas?incluirInactivas=true')).toBe(true);
+    const n = await gql(['despachador'], '{ cliente(id: "c404") { clienteId } }');
+    expect(n.body.errors[0].extensions).toMatchObject({ codigo: 'NO_ENCONTRADO', status: 404 });
+  });
+
+  it('E5-1: clientes es una página con cursor; despuesDe viaja como cursor y la complejidad cuenta el limite', async () => {
+    rutas.set('GET /viajes/api/v1/clientes', (_req, _c, url) =>
+      url.searchParams.get('cursor') === 'p2'
+        ? { json: { items: [{ clienteId: 'c3', razonSocial: 'C' }], siguienteCursor: null } }
+        : {
+            json: {
+              items: [
+                { clienteId: 'c1', razonSocial: 'A' },
+                { clienteId: 'c2', razonSocial: 'B' },
+              ],
+              siguienteCursor: 'p2',
+            },
+          },
+    );
+    const pagina = 'query($d: Cursor) { clientes(limite: 2, despuesDe: $d) { items { clienteId } siguienteCursor } }';
+    const primera = await gql(['comercial'], pagina);
+    expect(primera.body.data.clientes).toEqual({ items: [{ clienteId: 'c1' }, { clienteId: 'c2' }], siguienteCursor: 'p2' });
+    const segunda = await gql(['comercial'], pagina, { d: 'p2' });
+    expect(segunda.body.data.clientes).toEqual({ items: [{ clienteId: 'c3' }], siguienteCursor: null });
+    expect(pedidos.filter((p) => p.ruta.startsWith('/viajes/api/v1/clientes')).map((p) => p.ruta)).toEqual([
+      '/viajes/api/v1/clientes?limite=2',
+      '/viajes/api/v1/clientes?limite=2&cursor=p2',
+    ]);
+    const largo = await gql(['comercial'], '{ clientes(limite: 500) { items { clienteId } } }');
+    expect(largo.body.errors[0].extensions.codigo).toBe('VALIDACION');
+    // 100 filas × 11 campos pasan de 1.000 (D101): la página cuenta como una lista.
+    const campos = 'clienteId razonSocial nit correo canal a: nit b: nit c: nit d: nit e: nit';
+    const pesada = await gql(['comercial'], `{ clientes(limite: 100) { items { ${campos} } } }`);
+    expect(pesada.body.errors[0].extensions.codigo).toBe('CONSULTA_DEMASIADO_COMPLEJA');
+  });
+
+  it('D109: choferes y mantenimientos son páginas `…Pagina` que también cuentan el limite en la complejidad', async () => {
+    const alias = (campo: string) =>
+      'abcdefghijk'
+        .split('')
+        .map((a) => `${a}: ${campo}`)
+        .join(' ');
+    for (const consulta of [
+      `{ choferes(limite: 100) { items { ${alias('choferId')} } } }`,
+      `{ mantenimientos(limite: 100) { items { ${alias('mantenimientoId')} } } }`,
+    ]) {
+      const r = await gql(['jefe_flota'], consulta);
+      expect(r.body.errors[0].extensions.codigo).toBe('CONSULTA_DEMASIADO_COMPLEJA');
+    }
+  });
+
+  it('E2-8: la razón social de servicios y cotizaciones sale de Viajes en un lote de ids, una vez por cliente', async () => {
+    const [c1, c9] = ['0193b000-0000-7000-8000-0000000000c1', '0193b000-0000-7000-8000-0000000000c9'];
+    rutas.set('GET /viajes/api/v1/servicios', () => ({
+      json: { items: [1, 2, 3].map((i) => ({ servicioId: `s${i}`, clienteId: i === 3 ? c9 : c1, estado: 'CONFIRMADO' })) },
+    }));
+    rutas.set('GET /viajes/api/v1/clientes', () => ({
+      json: { items: [{ clienteId: c1, razonSocial: 'Agro SRL' }], siguienteCursor: null },
+    }));
+    const r = await gql(['despachador'], '{ servicios { servicioId razonSocial } }');
+    expect(r.body.data.servicios.map((s: { razonSocial: string | null }) => s.razonSocial)).toEqual(['Agro SRL', 'Agro SRL', null]);
+    expect(r.body.errors).toBeUndefined();
+    expect(pedidos.filter((p) => p.ruta.startsWith('/viajes/api/v1/clientes')).map((p) => decodeURIComponent(p.ruta))).toEqual([
+      `/viajes/api/v1/clientes?ids=${c1},${c9}`,
+    ]);
+  });
+
+  it('un id con ../, ? o / no cambia la operación REST: VALIDACION sin llamar al servicio', async () => {
+    for (const id of ['../rutas', '..', 'v1?x=1', 'v1/hitos', 'v1#a', '%2e%2e']) {
+      const r = await gql(['gerente'], 'query($id: ID!) { viaje(id: $id) { viajeId } }', { id });
+      expect(r.body.errors[0].extensions.codigo).toBe('VALIDACION');
+    }
+    const m = await gql(
+      ['despachador'],
+      'mutation { cancelarServicio(servicioId: "../../viajes/v2/hitos", motivo: "x", claveIdempotencia: "k") { estado } }',
+    );
+    expect(m.body.errors[0].extensions.codigo).toBe('VALIDACION');
+    expect(aServicios()).toHaveLength(0);
+  });
+
+  it('errores de la petición → 400 VALIDACION (no 500); un error interno se registra en JSON antes de enmascararlo', async () => {
+    const sintaxis = await gql(['gerente'], '{ viajes { ');
+    expect(sintaxis.status).toBe(400);
+    expect(sintaxis.body.errors[0].extensions).toMatchObject({ codigo: 'VALIDACION', status: 400 });
+    const sinVariable = await gql(['gerente'], 'query($l: Int!) { viajes(limite: $l) { viajeId } }');
+    expect(sinVariable.status).toBe(400);
+    expect(sinVariable.body.errors[0].extensions.codigo).toBe('VALIDACION');
+    const otroTipo = await gql(['gerente'], 'query($l: Int) { viajes(limite: $l) { viajeId } }', { l: 'muchos' });
+    expect(otroTipo.status).toBe(400);
+    expect(otroTipo.body.errors[0].extensions.codigo).toBe('VALIDACION');
+    const conToken = async (cuerpo: object) =>
+      request(app.getHttpServer())
+        .post('/graphql')
+        .set('Authorization', `Bearer ${await token(['gerente'])}`)
+        .send(cuerpo);
+    const operacion = await conToken({ query: 'query A { yo { sub } }', operationName: 'B' });
+    expect(operacion.status).toBe(400);
+    expect(operacion.body.errors[0].extensions.codigo).toBe('VALIDACION');
+    const vacio = await conToken({});
+    expect(vacio.status).toBe(400);
+    expect(vacio.body.errors[0].extensions.codigo).toBe('VALIDACION');
+    // Sin pistas del esquema en el mensaje.
+    const typo = await gql(['gerente'], '{ viajs { viajeId } }');
+    expect(typo.body.errors[0].message).not.toMatch(/Did you mean/);
+
+    rutas.set('GET /viajes/api/v1/viajes', () => ({ texto: '{roto' }));
+    const lineas: string[] = [];
+    const escribir = jest.spyOn(process.stderr, 'write').mockImplementation((t) => (lineas.push(String(t)), true));
+    const interno = await request(app.getHttpServer())
+      .post('/graphql')
+      .set('Authorization', `Bearer ${await token(['gerente'])}`)
+      .set('X-Correlation-Id', '0193a000-0000-7000-8000-00000000c0de')
+      .send({ query: '{ viajes { viajeId } }' });
+    escribir.mockRestore();
+    expect(interno.body.errors[0]).toMatchObject({ message: 'Error interno del Gateway', extensions: { codigo: 'ERROR_INTERNO' } });
+    const linea = lineas.map((l) => JSON.parse(l)).find((l) => l.mensaje === 'Error interno en una operación GraphQL');
+    expect(linea).toMatchObject({ nivel: 'ERROR', servicio: 'gateway', correlationId: '0193a000-0000-7000-8000-00000000c0de' });
+    expect(linea.traceId).toMatch(/^[0-9a-f]{32}$/);
+    expect(linea.error).toMatch(/JSON/);
+  });
+
+  it('401 como Problem Details con el type en guiones', async () => {
+    const r = await request(app.getHttpServer()).post('/graphql').send({ query: '{ yo { sub } }' });
+    expect(r.headers['content-type']).toContain('application/problem+json');
+    expect(r.body.type).toBe('https://transporte.local/errores/no-autenticado');
+  });
+
+  it('D21: variantes del enlace (último carácter, sufijo, tercer segmento, exp no numérico, largo) → 403 problem+json', async () => {
+    const { firmarDescarga } = await import('../src/graphql/resolvers');
+    const exp = Math.floor(Date.now() / 1000) + 600;
+    const bueno = firmarDescarga('hmac-de-prueba', 'e1', 'u1', exp);
+    rutas.set('GET /analitica/api/v1/exportaciones/e1/archivo', () => ({ binario: Buffer.from('PK-excel') }));
+    expect((await request(app.getHttpServer()).get(`/exportaciones/${bueno}`)).status).toBe(200);
+    const [payload, firma] = bueno.split('.');
+    // El último de los 43 caracteres solo lleva 4 bits de la firma: otro carácter con los mismos 4 bits decodifica a
+    // los mismos bytes. Como se compara el texto, tampoco pasa.
+    const ultimo = B64.indexOf(firma.at(-1)!);
+    const gemelo = B64[(ultimo & ~3) + ((ultimo + 1) & 3)];
+    const firmaDe = (p: string) => firmarDescarga('hmac-de-prueba', 'x', 'y', 1).replace(/^[^.]+/, p);
+    const variantes = [
+      `${payload}.${firma.slice(0, -1)}${gemelo}`,
+      `${payload}.${firma.slice(0, -1)}${firma.at(-1) === 'A' ? 'B' : 'A'}`,
+      `${bueno}=`,
+      `${bueno}AA`,
+      `${bueno}.extra`,
+      firmarDescarga('hmac-de-prueba', 'e1', 'u1', 'mañana' as unknown as number),
+      firmarDescarga('hmac-de-prueba', 'e1', 'u1', 'Infinity' as unknown as number),
+      firmarDescarga('hmac-de-prueba', 'e1', 'u'.repeat(400), exp),
+      firmaDe(payload),
+    ];
+    for (const v of variantes) {
+      const r = await request(app.getHttpServer()).get(`/exportaciones/${v}`);
+      expect([v, r.status]).toEqual([v, 403]);
+      expect(r.headers['content-type']).toContain('application/problem+json');
+      expect(r.body).toMatchObject({ codigo: 'SIN_PERMISO', type: 'https://transporte.local/errores/sin-permiso' });
+    }
+    const vencido = await request(app.getHttpServer()).get(`/exportaciones/${firmarDescarga('hmac-de-prueba', 'e1', 'u1', 1)}`);
+    expect(vencido.status).toBe(404);
+    expect(vencido.headers['content-type']).toContain('application/problem+json');
+    expect(vencido.body.type).toBe('https://transporte.local/errores/exportacion-vencida');
+  });
+
+  it('tablero: Finanzas resume la cobranza en una llamada y el Gateway solo le pasa la ventana del periodo', async () => {
+    rutas.set('GET /finanzas/api/v1/facturas/resumen', () => ({
+      json: {
+        saldoTotal: { monto: '300.30', moneda: 'BOB' },
+        facturasPorVencer: 1,
+        facturasVencidas: 2,
+        proximas: [{ facturaId: 'f9', saldo: { monto: '50.00', moneda: 'BOB' }, vencida: false, venceEl: '2026-11-05' }],
+      },
+    }));
+    rutas.set('GET /flota/api/v1/unidades', (_r, _c, url) =>
+      url.searchParams.get('cursor')
+        ? { json: { items: [{ unidadId: 'u3', estado: 'DISPONIBLE' }], siguienteCursor: null } }
+        : {
+            json: {
+              items: [
+                { unidadId: 'u1', estado: 'EN_VIAJE' },
+                { unidadId: 'u2', estado: 'DISPONIBLE' },
+              ],
+              siguienteCursor: 'c2',
+            },
+          },
+    );
+    const r = await gql(
+      ['gerente'],
+      '{ tablero(periodo: ESTA_SEMANA) { unidadesPorEstado { estado cantidad } cuentasPorCobrar { saldoTotal facturasPorVencer facturasVencidas proximas { facturaId } } alertasAbiertas datosAl } }',
+    );
+    expect(r.body.errors).toBeUndefined();
+    expect(r.body.data.tablero).toEqual({
+      unidadesPorEstado: [
+        { estado: 'EN_VIAJE', cantidad: 1 },
+        { estado: 'DISPONIBLE', cantidad: 2 },
+      ],
+      cuentasPorCobrar: { saldoTotal: '300.30', facturasPorVencer: 1, facturasVencidas: 2, proximas: [{ facturaId: 'f9' }] },
+      alertasAbiertas: 2,
+      datosAl: '2026-11-03T12:00:00Z',
+    });
+    const resumenes = pedidos.filter((p) => p.ruta.startsWith('/finanzas/'));
+    expect(resumenes).toHaveLength(1);
+    const ventana = new URL(resumenes[0].ruta, base).searchParams;
+    const { ventanaPorVencer } = await import('../src/graphql/resolvers');
+    expect(ventana.get('venceDesde')).toBe(ventanaPorVencer('ESTA_SEMANA').venceDesde);
+    expect(ventanaPorVencer('ESTA_SEMANA', '2026-11-03')).toEqual({ venceDesde: '2026-11-03', venceHasta: '2026-11-09' });
+    expect(ventanaPorVencer('ESTE_MES', '2026-11-03')).toEqual({ venceDesde: '2026-11-03', venceHasta: '2026-11-30' });
+    expect(ventanaPorVencer('HOY', '2026-11-03')).toEqual({ venceDesde: '2026-11-03', venceHasta: '2026-11-03' });
+    // alertasAbiertas y datosAl salen de una sola llamada.
+    expect(pedidos.filter((p) => p.ruta.startsWith('/analitica/api/v1/alertas'))).toHaveLength(1);
+  });
+
+  it('D97: hitos y entrega de una lista de viajes, como máximo 10 llamadas a la vez y sin limite hacia listarHitos', async () => {
+    const viajes = Array.from({ length: 25 }, (_, i) => VIAJE(`v${i}`));
+    rutas.set('GET /viajes/api/v1/viajes', () => ({ json: { items: viajes, siguienteCursor: null } }));
+    let enCurso = 0;
+    let maximo = 0;
+    const hitos = [1, 2, 3].map((n) => ({ hitoId: `h${n}`, tipo: 'PARADA', descripcion: 'd', registradoEn: '2026-11-03T12:00:00Z' }));
+    for (const v of viajes) {
+      rutas.set(`GET /viajes/api/v1/viajes/${v.viajeId}/hitos`, () => {
+        maximo = Math.max(maximo, ++enCurso);
+        return { demoraMs: 30, alTerminar: () => enCurso--, json: { items: hitos } };
+      });
+    }
+    const r = await gql(['gerente'], '{ viajes(limite: 25) { viajeId hitos(limite: 2) { hitoId } entrega { entregaId } } }');
+    expect(r.body.errors).toBeUndefined();
+    expect(r.body.data.viajes[0]).toEqual({ viajeId: 'v0', hitos: [{ hitoId: 'h1' }, { hitoId: 'h2' }], entrega: null });
+    expect(maximo).toBeGreaterThan(1);
+    expect(maximo).toBeLessThanOrEqual(10);
+    expect(pedidos.filter((p) => p.ruta.includes('/hitos')).every((p) => !p.ruta.includes('limite'))).toBe(true);
+  });
+
+  it('mutación aplicada cuya relectura falla: sin error, el campo en null y un aviso en extensions', async () => {
+    rutas.set('POST /viajes/api/v1/viajes/v1/intervencion', () => ({ status: 202 }));
+    rutas.set('GET /viajes/api/v1/viajes/v1', () => ({ status: 503 }));
+    const r = await gql(
+      ['despachador'],
+      'mutation { resolverIntervencion(viajeId: "v1", opcion: MARCAR_RESUELTO, claveIdempotencia: "k") { estado } }',
+    );
+    expect(r.body.errors).toBeUndefined();
+    expect(r.body.data.resolverIntervencion).toBeNull();
+    expect(r.body.extensions.avisos[0]).toMatchObject({
+      codigo: 'DEPENDENCIA_NO_DISPONIBLE',
+      servicio: 'viajes',
+      path: ['resolverIntervencion'],
+    });
+    // Las que el contrato devuelve con el recurso no releen.
+    rutas.set('POST /viajes/api/v1/viajes/v1/entrega/aprobacion', () => ({ json: { ...VIAJE('v1'), estado: 'ENTREGADO' } }));
+    const a = await gql(['despachador'], 'mutation { aprobarEntregaObservada(viajeId: "v1", claveIdempotencia: "k2") { estado } }');
+    expect(a.body.data.aprobarEntregaObservada).toEqual({ estado: 'ENTREGADO' });
+    expect(pedidos.filter((p) => p.metodo === 'GET' && p.ruta === '/viajes/api/v1/viajes/v1')).toHaveLength(1);
+  });
+});
+
+describe('suscripción al cerrar', () => {
+  it('return() corta la espera y no vuelve a consultar a Analítica', async () => {
+    const { alertasNuevas } = await import('../src/graphql/suscripcion');
+    let consultas = 0;
+    const servicios = { get: async () => (consultas++, { alertas: [], siguienteCursor: null }) } as never;
+    const it = alertasNuevas(servicios, {} as never, 50);
+    const siguiente = it.next();
+    await new Promise((ok) => setTimeout(ok, 120));
+    await it.return!();
+    await expect(siguiente).resolves.toEqual({ done: true, value: undefined });
+    const antes = consultas;
+    await new Promise((ok) => setTimeout(ok, 200));
+    expect(consultas).toBe(antes);
+  });
+});
+
+describe('revisión 2 del Gateway', () => {
+  /** La operación Tablero de cc-tablero (projects/cc-tablero/src/app/graphql/tablero.graphql), tal cual. */
+  const TABLERO_APP = `query Tablero($periodo: Periodo!) {
+    tablero(periodo: $periodo) {
+      periodo
+      viajesEnCurso { viajeId placa choferNombre cliente { razonSocial } ruta { nombre } riesgo { probabilidad enRiesgo } }
+      unidadesPorEstado { estado cantidad }
+      cuentasPorCobrar { saldoTotal facturasPorVencer facturasVencidas proximas { facturaId numero razonSocial saldo venceEl } }
+      alertasAbiertas
+      datosAl
+    }
+  }`;
+
+  /** 100 viajes en ruta, cada uno con su placa, su riesgo y su bitácora. */
+  const cienViajes = () => {
+    const viajes = Array.from({ length: 100 }, (_, i) => ({ ...VIAJE(`v${i}`, `s${i}`), placa: `${1000 + i}ABC` }));
+    rutas.set('GET /viajes/api/v1/viajes', () => ({ json: { items: viajes, siguienteCursor: null } }));
+    for (const v of viajes) {
+      rutas.set(`GET /analitica/api/v1/predicciones/retraso/${v.viajeId}`, () => ({
+        json: { viajeId: v.viajeId, probabilidad: 0.4, umbral: 0.7, enRiesgo: false, calculadaEn: '2026-11-03T12:00:00Z' },
+      }));
+      rutas.set(`GET /viajes/api/v1/viajes/${v.viajeId}/hitos`, () => ({ json: { items: [] } }));
+    }
+  };
+
+  it('presupuesto: los campos por fila de una lista sin limite no pasan de PRESUPUESTO_LLAMADAS llamadas', async () => {
+    const { PRESUPUESTO_LLAMADAS } = await import('../src/presupuesto');
+    cienViajes();
+    // Complejidad ~50 (la lista del tablero no tiene limite), pero sin tope serían 1 + 100 × 5 = 501 llamadas.
+    const r = await gql(
+      ['gerente'],
+      '{ tablero(periodo: HOY) { viajesEnCurso { viajeId riesgo { probabilidad } unidad { placa } entrega { entregaId } a: hitos(texto: "a") { tipo } b: hitos(texto: "b") { tipo } } } }',
+    );
+    expect(r.status).toBe(200);
+    expect(aServicios()).toHaveLength(PRESUPUESTO_LLAMADAS);
+    // Respuesta parcial: los 100 viajes salen; lo que ya no tenía presupuesto, en null con CONSULTA_DEMASIADO_COMPLEJA.
+    expect(r.body.data.tablero.viajesEnCurso).toHaveLength(100);
+    const codigos = new Set(r.body.errors.map((e: { extensions: { codigo: string } }) => e.extensions.codigo));
+    expect(codigos).toEqual(new Set(['CONSULTA_DEMASIADO_COMPLEJA']));
+    expect(r.body.errors[0].path.slice(0, 2)).toEqual(['tablero', 'viajesEnCurso']);
+    expect(r.body.errors[0].extensions.status).toBe(400);
+
+    // Cada petición trae su propio presupuesto, y la operación real del tablero con 100 viajes entra sin errores.
+    pedidos.length = 0;
+    rutas.set('GET /finanzas/api/v1/facturas/resumen', () => ({
+      json: {
+        saldoTotal: { monto: '10.00', moneda: 'BOB' },
+        facturasPorVencer: 1,
+        facturasVencidas: 0,
+        proximas: [
+          { facturaId: 'f1', numero: 'FAC-1', razonSocial: 'A', saldo: { monto: '10.00' }, vencida: false, venceEl: '2026-11-05' },
+        ],
+      },
+    }));
+    const t = await gql(['gerente'], TABLERO_APP, { periodo: 'ESTA_SEMANA' });
+    expect(t.body.errors).toBeUndefined();
+    expect(t.body.data.tablero.viajesEnCurso).toHaveLength(100);
+    expect(t.body.data.tablero.viajesEnCurso[99].riesgo).toEqual({ probabilidad: 0.4, enRiesgo: false });
+    // 1 de viajes, 100 de riesgo, 1 de unidades, 1 de cobranza y 1 de alertas (que aServicios() no cuenta).
+    expect(aServicios()).toHaveLength(103);
+  });
+
+  it('un JSON roto o un cuerpo de más de 100 KB en /graphql → Problem Details VALIDACION con un title para personas', async () => {
+    const roto = await request(app.getHttpServer()).post('/graphql').set('Content-Type', 'application/json').send('{roto');
+    expect(roto.status).toBe(400);
+    expect(roto.headers['content-type']).toContain('application/problem+json');
+    expect(roto.body).toEqual({
+      type: 'https://transporte.local/errores/validacion',
+      title: 'La petición no es válida',
+      status: 400,
+      codigo: 'VALIDACION',
+      detail: 'El cuerpo de la petición no es un JSON válido',
+    });
+    const grande = await request(app.getHttpServer())
+      .post('/graphql')
+      .set('Authorization', `Bearer ${await token(['gerente'])}`)
+      .set('Content-Type', 'application/json')
+      .send(JSON.stringify({ query: `{ yo { sub } }${' '.repeat(200_000)}` }));
+    expect(grande.status).toBe(413);
+    expect(grande.headers['content-type']).toContain('application/problem+json');
+    expect(grande.body).toMatchObject({ codigo: 'VALIDACION', status: 413, detail: 'El cuerpo de la petición pasa el límite de 100 KB' });
+    // Ninguno llega a GraphQL ni a los servicios.
+    expect(aServicios()).toHaveLength(0);
+    const sinToken = await request(app.getHttpServer()).post('/graphql').send({ query: '{ yo { sub } }' });
+    expect(sinToken.body).toMatchObject({ codigo: 'NO_AUTENTICADO', title: 'No autenticado' });
+  });
+
+  it('viaje(id) que no existe → null con NO_ENCONTRADO en extensions, como factura y unidad', async () => {
+    const r = await gql(['gerente'], '{ viaje(id: "v404") { viajeId } }');
+    expect(r.body.data.viaje).toBeNull();
+    expect(r.body.errors[0]).toMatchObject({
+      path: ['viaje'],
+      extensions: { codigo: 'NO_ENCONTRADO', status: 404, servicio: 'viajes' },
+    });
+    // Un 404 sin Problem Details también es NO_ENCONTRADO (antes salía VALIDACION).
+    rutas.set('GET /flota/api/v1/unidades/u9', () => ({ status: 404, texto: '' }));
+    const u = await gql(['gerente'], '{ unidad(id: "u9") { unidadId } }');
+    expect(u.body.errors[0].extensions).toMatchObject({ codigo: 'NO_ENCONTRADO', status: 404 });
+  });
+
+  it('viaje.choferId pasa tal cual de Viajes y sale en null si Viajes no lo manda', async () => {
+    rutas.set('GET /viajes/api/v1/viajes/v1', () => ({ json: { ...VIAJE('v1'), choferId: 'ch1' } }));
+    rutas.set('GET /viajes/api/v1/viajes/v2', () => ({ json: VIAJE('v2') }));
+    const r = await gql(['despachador'], '{ a: viaje(id: "v1") { choferId } b: viaje(id: "v2") { choferId } }');
+    expect(r.body.errors).toBeUndefined();
+    expect(r.body.data).toEqual({ a: { choferId: 'ch1' }, b: { choferId: null } });
+  });
+});
+
+describe('gestión de Flota desde el Centro de Control (D104)', () => {
+  const UNIDAD = { unidadId: 'u1', tipoUnidad: 'REMOLQUE', placa: '3001FUR', estado: 'DISPONIBLE', kmDesdeUltimoMantenimiento: 0 };
+  const CHOFER = {
+    choferId: 'ch1',
+    nombre: 'Juan Mamani',
+    usuarioSub: 's1',
+    licenciaCategoria: 'C',
+    licenciaVenceEl: '2029-03-15',
+    activo: true,
+    disponible: true,
+  };
+  const documentos = [
+    { tipo: 'SOAT', venceEl: '2027-05-01' },
+    { tipo: 'INSPECCION_TECNICA', venceEl: '2027-04-01' },
+  ];
+
+  it('las mutaciones de unidades llegan a Flota con su Idempotency-Key, sin nulos y con PUT al editar; solo jefe_flota', async () => {
+    rutas.set('POST /flota/api/v1/unidades', () => ({ status: 201, json: { ...UNIDAD, documentos } }));
+    rutas.set('PUT /flota/api/v1/unidades/u1', () => ({ json: { ...UNIDAD, documentos } }));
+    rutas.set('POST /flota/api/v1/unidades/u1/baja', () => ({ json: { ...UNIDAD, estado: 'INACTIVA', documentos } }));
+    const crear = `mutation($i: UnidadNuevaInput!) { crearUnidad(input: $i) { unidadId estado documentos { tipo } } }`;
+    const nueva = {
+      tipoUnidad: 'REMOLQUE',
+      placa: '3001FUR',
+      tipoRemolque: 'FURGON',
+      capacidadToneladas: 30,
+      kilometraje: null,
+      kmDesdeUltimoMantenimiento: 0,
+      documentos,
+      atributos: { volumenM3: 85 },
+      claveIdempotencia: 'k-alta',
+    };
+    expect((await gql(['despachador'], crear, { i: nueva })).body.errors[0].extensions.codigo).toBe('SIN_PERMISO');
+    expect(aServicios().filter((p) => p.metodo !== 'GET')).toHaveLength(0);
+    expect((await gql(['jefe_flota'], crear, { i: nueva })).body.data.crearUnidad).toMatchObject({ unidadId: 'u1', estado: 'DISPONIBLE' });
+    const alta = pedidos.find((p) => p.metodo === 'POST' && p.ruta === '/flota/api/v1/unidades')!;
+    expect(alta.cabeceras['idempotency-key']).toBe('k-alta');
+    const { claveIdempotencia: _c, kilometraje: _k, ...cuerpoAlta } = nueva;
+    expect(JSON.parse(alta.cuerpo)).toEqual(cuerpoAlta);
+
+    const editar = `mutation($i: UnidadEdicionInput!) { editarUnidad(input: $i) { unidadId } }`;
+    const edicion = { unidadId: 'u1', capacidadToneladas: 28, documentos, atributos: { volumenM3: 90 }, claveIdempotencia: 'k-ed' };
+    expect((await gql(['jefe_flota'], editar, { i: edicion })).body.data.editarUnidad.unidadId).toBe('u1');
+    const put = pedidos.find((p) => p.metodo === 'PUT')!;
+    expect(put.ruta).toBe('/flota/api/v1/unidades/u1');
+    expect(put.cabeceras['idempotency-key']).toBe('k-ed');
+    expect(JSON.parse(put.cuerpo)).toEqual({ capacidadToneladas: 28, documentos, atributos: { volumenM3: 90 } });
+
+    const baja = await gql(
+      ['jefe_flota'],
+      'mutation { darDeBajaUnidad(unidadId: "u1", motivo: "Vendida", claveIdempotencia: "k-b") { estado } }',
+    );
+    expect(baja.body.data.darDeBajaUnidad.estado).toBe('INACTIVA');
+    const post = pedidos.find((p) => p.ruta === '/flota/api/v1/unidades/u1/baja')!;
+    expect(post.cabeceras['idempotency-key']).toBe('k-b');
+    expect(JSON.parse(post.cuerpo)).toEqual({ motivo: 'Vendida' });
+  });
+
+  it('editar e inhabilitar un chofer; el 409 de una reserva activa llega con su código', async () => {
+    rutas.set('PUT /flota/api/v1/choferes/ch1', () => ({ json: CHOFER }));
+    const editar = `mutation($i: ChoferEdicionInput!) { editarChofer(input: $i) { choferId licenciaVenceEl } }`;
+    const input = {
+      choferId: 'ch1',
+      nombre: 'Juan Mamani',
+      licenciaCategoria: 'C',
+      licenciaVenceEl: '2029-03-15',
+      claveIdempotencia: 'k-ch',
+    };
+    expect((await gql(['jefe_flota'], editar, { i: input })).body.data.editarChofer).toEqual({
+      choferId: 'ch1',
+      licenciaVenceEl: '2029-03-15',
+    });
+    const put = pedidos.find((p) => p.metodo === 'PUT')!;
+    expect(put.cabeceras['idempotency-key']).toBe('k-ch');
+    expect(JSON.parse(put.cuerpo)).toEqual({ nombre: 'Juan Mamani', licenciaCategoria: 'C', licenciaVenceEl: '2029-03-15' });
+
+    const habilitacion =
+      'mutation($a: Boolean!, $m: String) { cambiarHabilitacionChofer(choferId: "ch1", activo: $a, motivo: $m, claveIdempotencia: "k-h") { activo motivoInhabilitacion } }';
+    rutas.set('POST /flota/api/v1/choferes/ch1/habilitacion', () => ({
+      status: 409,
+      json: { codigo: 'CONFLICTO_ESTADO', detail: 'El chofer tiene una reserva activa y no se puede inhabilitar' },
+    }));
+    const conflicto = await gql(['jefe_flota'], habilitacion, { a: false, m: 'Licencia retenida' });
+    expect(conflicto.body.errors[0].extensions).toMatchObject({ codigo: 'CONFLICTO_ESTADO', status: 409, servicio: 'flota' });
+    rutas.set('POST /flota/api/v1/choferes/ch1/habilitacion', () => ({
+      json: { ...CHOFER, activo: false, inhabilitacion: { motivo: 'Licencia retenida', desde: '2026-11-01T12:00:00Z' } },
+    }));
+    const ok = await gql(['jefe_flota'], habilitacion, { a: false, m: 'Licencia retenida' });
+    expect(ok.body.data.cambiarHabilitacionChofer).toEqual({ activo: false, motivoInhabilitacion: 'Licencia retenida' });
+    const posts = pedidos.filter((p) => p.ruta === '/flota/api/v1/choferes/ch1/habilitacion');
+    expect(posts.map((p) => p.cabeceras['idempotency-key'])).toEqual(['k-h', 'k-h']);
+    expect(JSON.parse(posts[1].cuerpo)).toEqual({ activo: false, motivo: 'Licencia retenida' });
+    // Habilitar sin motivo: no se manda `motivo: null`.
+    await gql(['jefe_flota'], habilitacion, { a: true, m: null });
+    expect(JSON.parse(pedidos.filter((p) => p.ruta.endsWith('/habilitacion')).at(-1)!.cuerpo)).toEqual({ activo: true });
+  });
+
+  it('chofer(id) lee por id; choferes y mantenimientos son páginas con despuesDe y siguienteCursor', async () => {
+    rutas.set('GET /flota/api/v1/choferes/ch1', () => ({
+      json: { ...CHOFER, activo: false, inhabilitacion: { motivo: 'Vacaciones', desde: '2026-11-01T12:00:00Z' } },
+    }));
+    rutas.set('GET /flota/api/v1/choferes/ch2', () => ({
+      json: { ...CHOFER, choferId: 'ch2', inhabilitacion: { motivo: 'Viejo', desde: '2026-10-01T12:00:00Z' } },
+    }));
+    const r = await gql(
+      ['gerente'],
+      '{ a: chofer(id: "ch1") { activo motivoInhabilitacion } b: chofer(id: "ch2") { motivoInhabilitacion } }',
+    );
+    // Un chofer habilitado no muestra un motivo viejo (E7-1).
+    expect(r.body.data).toEqual({ a: { activo: false, motivoInhabilitacion: 'Vacaciones' }, b: { motivoInhabilitacion: null } });
+
+    rutas.set('GET /flota/api/v1/choferes', (_req, _c, url) =>
+      url.searchParams.get('cursor') === 'c2'
+        ? { json: { items: [{ ...CHOFER, choferId: 'ch3' }], siguienteCursor: null } }
+        : { json: { items: [CHOFER, { ...CHOFER, choferId: 'ch2' }], siguienteCursor: 'c2' } },
+    );
+    const q = 'query($d: Cursor) { choferes(limite: 2, despuesDe: $d) { items { choferId } siguienteCursor } }';
+    expect((await gql(['gerente'], q)).body.data.choferes).toEqual({
+      items: [{ choferId: 'ch1' }, { choferId: 'ch2' }],
+      siguienteCursor: 'c2',
+    });
+    expect((await gql(['gerente'], q, { d: 'c2' })).body.data.choferes).toEqual({ items: [{ choferId: 'ch3' }], siguienteCursor: null });
+    expect(pedidos.filter((p) => p.ruta.startsWith('/flota/api/v1/choferes?')).map((p) => p.ruta)).toEqual([
+      '/flota/api/v1/choferes?limite=2',
+      '/flota/api/v1/choferes?limite=2&cursor=c2',
+    ]);
+    expect((await gql(['gerente'], '{ choferes(limite: 101) { siguienteCursor } }')).body.errors[0].extensions.codigo).toBe('VALIDACION');
+
+    rutas.set('GET /flota/api/v1/mantenimientos', () => ({
+      json: { items: [{ mantenimientoId: 'm1', unidadId: 'u1' }], siguienteCursor: null },
+    }));
+    const m = await gql(
+      ['jefe_flota'],
+      '{ mantenimientos(unidadId: "u1") { items { mantenimientoId checklist { item } } siguienteCursor } }',
+    );
+    expect(m.body.data.mantenimientos).toEqual({ items: [{ mantenimientoId: 'm1', checklist: [] }], siguienteCursor: null });
+    expect(pedidos.find((p) => p.ruta.startsWith('/flota/api/v1/mantenimientos'))!.ruta).toBe(
+      '/flota/api/v1/mantenimientos?unidadId=u1&limite=50',
+    );
+  });
+
+  it('F2-2: un despuesDe inválido llega como VALIDACION de Flota, con su campo, y no como una página vacía', async () => {
+    const invalido = () => ({
+      status: 400,
+      json: { codigo: 'VALIDACION', detail: 'cursor: no es válido', errores: [{ campo: 'cursor', mensaje: 'no es válido' }] },
+    });
+    rutas.set('GET /flota/api/v1/choferes', invalido);
+    rutas.set('GET /flota/api/v1/mantenimientos', invalido);
+    for (const q of ['{ choferes(despuesDe: "x") { siguienteCursor } }', '{ mantenimientos(despuesDe: "x") { siguienteCursor } }']) {
+      const r = await gql(['jefe_flota'], q);
+      expect(r.body.data).toEqual({ [q.includes('choferes') ? 'choferes' : 'mantenimientos']: null });
+      expect(r.body.errors[0].extensions).toMatchObject({
+        codigo: 'VALIDACION',
+        status: 400,
+        servicio: 'flota',
+        errores: [{ campo: 'cursor', mensaje: 'no es válido' }],
+      });
+    }
+    expect(pedidos.filter((p) => p.ruta.includes('cursor=x'))).toHaveLength(2);
+  });
+});

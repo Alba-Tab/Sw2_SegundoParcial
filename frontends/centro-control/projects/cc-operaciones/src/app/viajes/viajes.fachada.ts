@@ -1,0 +1,83 @@
+import { computed, inject, Injectable, signal } from '@angular/core';
+import { toObservable, toSignal } from '@angular/core/rxjs-interop';
+import { filter, switchMap } from 'rxjs';
+import { cargandoDe, completo, conservarUltimoBueno, Intentos, puedeVer, Sesion } from 'ui-comun';
+import type { EstadoViaje, MapaQuery, OpcionIntervencion } from '../graphql/generado';
+import { ViajesRepositorio } from './data/viajes.repositorio';
+
+/** Fachadas de la feature de viajes. La UI solo lee sus señales; cada una se provee por componente. */
+@Injectable()
+export class ViajesFachada {
+  private readonly repo = inject(ViajesRepositorio);
+  readonly estado = signal<EstadoViaje | null>(null);
+  readonly datos = toSignal(toObservable(this.estado).pipe(switchMap((estado) => this.repo.observarViajes(estado, 15_000))));
+}
+
+/** El detalle al que llevan las alertas y las decisiones del despachador (specs 007 y 011). */
+@Injectable()
+export class ViajeFachada {
+  private readonly repo = inject(ViajesRepositorio);
+  private readonly intentos = new Intentos();
+  /** Monto, riesgo y unidad solo al rol que los puede ver: sin un SIN_PERMISO en cada sondeo (los roles no cambian al renovar). */
+  private readonly ver = (() => {
+    const roles = inject(Sesion).roles();
+    return { verMonto: puedeVer(roles, 'monto'), verRiesgo: puedeVer(roles, 'riesgo'), verUnidad: puedeVer(roles, 'unidad') };
+  })();
+  readonly verMonto = this.ver.verMonto;
+  readonly verRiesgo = this.ver.verRiesgo;
+  readonly id = signal<string | undefined>(undefined);
+  private consulta?: ReturnType<ViajesRepositorio['observarViaje']>;
+  readonly datos = toSignal(
+    toObservable(this.id).pipe(
+      filter((id): id is string => !!id),
+      switchMap((id) => (this.consulta = this.repo.observarViaje({ id, ...this.ver }, 20_000)).valueChanges.pipe(conservarUltimoBueno())),
+    ),
+  );
+
+  aprobarEntrega(viajeId: string, nota: string | undefined) {
+    return this.intentos.enviar(`aprobarEntrega:${viajeId}`, { nota }, (clave) => this.repo.aprobarEntrega(viajeId, nota, clave));
+  }
+
+  rechazarEntrega(viajeId: string, motivo: string) {
+    return this.intentos.enviar(`rechazarEntrega:${viajeId}`, { motivo }, (clave) => this.repo.rechazarEntrega(viajeId, motivo, clave));
+  }
+
+  resolverIntervencion(viajeId: string, opcion: OpcionIntervencion, nota: string | undefined) {
+    return this.intentos.enviar(`resolverIntervencion:${viajeId}`, { opcion, nota }, (clave) =>
+      this.repo.resolverIntervencion(viajeId, opcion, nota, clave),
+    );
+  }
+
+  /** `refetch` del mismo `watch`: al resolver, `datos()` ya trae la respuesta nueva (V4-1). */
+  recargar(): Promise<unknown> {
+    return this.consulta?.refetch() ?? Promise.resolve();
+  }
+}
+
+/** Mapa en vivo (spec 005): la última posición de cada viaje en ruta, cada 15 s; el riesgo, solo a quien lo puede ver. */
+@Injectable()
+export class MapaFachada {
+  private readonly datos = toSignal(
+    inject(ViajesRepositorio).observarMapa({ verRiesgo: puedeVer(inject(Sesion).roles(), 'riesgo') }, 15_000),
+  );
+  readonly viajes = computed(() => completo<MapaQuery>(this.datos())?.viajesEnCurso ?? []);
+  readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
+  readonly cargando = computed(() => cargandoDe(this.datos()));
+}
+
+@Injectable()
+export class EntregasFachada {
+  readonly datos = toSignal(inject(ViajesRepositorio).observarEntregasObservadas(15_000));
+  readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
+  readonly cargando = computed(() => cargandoDe(this.datos()));
+}
+
+@Injectable()
+export class IntervencionesFachada {
+  readonly datos = toSignal(inject(ViajesRepositorio).observarIntervenciones(15_000));
+  readonly error = computed(() => this.datos()?.error);
+  readonly datosAl = computed(() => this.datos()?.datosAl);
+  readonly cargando = computed(() => cargandoDe(this.datos()));
+}

@@ -1,0 +1,6 @@
+[
+  { "choferId": "01933c00-0000-7000-8000-000000000041", "nombre": "Marco Quispe", "usuarioSub": "0193a000-0000-7000-8000-000000000011", "licenciaCategoria": "C", "licenciaVenceElDiasDesdeHoy": 400, "activo": true },
+  { "choferId": "01933c00-0000-7000-8000-000000000042", "nombre": "René Choque", "usuarioSub": "0193a000-0000-7000-8000-000000000012", "licenciaCategoria": "C", "licenciaVenceElDiasDesdeHoy": 520, "activo": true },
+  { "choferId": "01933c00-0000-7000-8000-000000000043", "nombre": "Luis Mamani", "usuarioSub": "0193a000-0000-7000-8000-000000000013", "licenciaCategoria": "C", "licenciaVenceElDiasDesdeHoy": 300, "activo": true },
+  { "choferId": "01933c00-0000-7000-8000-000000000044", "nombre": "Pedro Flores", "usuarioSub": "0193a000-0000-7000-8000-000000000014", "licenciaCategoria": "C", "licenciaVenceElDiasDesdeHoy": 610, "activo": true }
+]

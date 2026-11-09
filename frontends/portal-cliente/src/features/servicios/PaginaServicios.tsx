@@ -1,0 +1,122 @@
+import Button from '@mui/material/Button';
+import Paper from '@mui/material/Paper';
+import Stack from '@mui/material/Stack';
+import Table from '@mui/material/Table';
+import TableBody from '@mui/material/TableBody';
+import TableCell from '@mui/material/TableCell';
+import TableHead from '@mui/material/TableHead';
+import TableRow from '@mui/material/TableRow';
+import Typography from '@mui/material/Typography';
+import { useInfiniteQuery } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
+import { createColumnHelper, flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
+import { useMemo } from 'react';
+import { getListarServiciosQueryKey, listarServicios, type Servicio, useListarRutas } from '../../api/generado/viajes';
+import { dinero, fecha, numero, TIPOS_CARGA } from '../../compartido/formato/formato';
+import { Antiguedad } from '../../compartido/offline/Antiguedad';
+import { useClienteActivo } from '../../compartido/sesion/ClienteActivo';
+import { BotonEnlace } from '../../compartido/ui/BotonEnlace';
+import { EstadoServicio } from '../../compartido/ui/EstadoServicio';
+import { desdeEnlace, Enlace } from '../../compartido/ui/Enlace';
+import { Problema } from '../../compartido/ui/Problema';
+import { Cargando } from '../../compartido/ui/Cargando';
+import { alinear, TABLA_SX } from '../../compartido/ui/tabla';
+
+const col = createColumnHelper<Servicio>();
+
+/** Los servicios del cliente del token, del más reciente al más antiguo, por páginas (cursor). */
+export function PaginaServicios() {
+  const navegar = useNavigate();
+  const rutas = useListarRutas();
+  const activo = useClienteActivo();
+  const params = activo.modoComercial ? { clienteId: activo.clienteId } : undefined;
+  const paginas = useInfiniteQuery({
+    queryKey: getListarServiciosQueryKey(params),
+    queryFn: ({ pageParam, signal }) => listarServicios({ ...params, ...(pageParam ? { cursor: pageParam } : {}) }, { signal }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: (p) => p.siguienteCursor ?? undefined,
+    enabled: !activo.modoComercial || !!activo.clienteId,
+  });
+  const nombreRuta = useMemo(() => new Map((rutas.data ?? []).map((r) => [r.rutaId, r.nombre])), [rutas.data]);
+  const columnas = useMemo(
+    () => [
+      // La celda principal es el enlace al detalle: la fila clicable es solo un atajo del mouse (V3-1).
+      col.accessor('creadoEn', {
+        header: 'Pedido',
+        cell: (c) => (
+          <Enlace to="/servicios/$servicioId" params={{ servicioId: c.row.original.servicioId }}>
+            {fecha(c.getValue().slice(0, 10))}
+          </Enlace>
+        ),
+      }),
+      col.accessor('rutaId', { header: 'Ruta', cell: (c) => nombreRuta.get(c.getValue() ?? '') ?? 'Sin dato' }),
+      col.accessor('tipoCarga', { header: 'Carga', cell: (c) => (c.getValue() ? TIPOS_CARGA[c.getValue()!] : 'Sin dato') }),
+      col.accessor('toneladas', { header: 'Toneladas', cell: (c) => numero(c.getValue()) }),
+      col.accessor('monto', { header: 'Monto', cell: (c) => (c.getValue() ? dinero(c.getValue()!) : 'Sin dato') }),
+      col.accessor('estado', { header: 'Estado', cell: (c) => <EstadoServicio estado={c.getValue()} etapa={c.row.original.etapa} /> }),
+    ],
+    [nombreRuta],
+  );
+  const datos = useMemo(() => paginas.data?.pages.flatMap((p) => p.items) ?? [], [paginas.data]);
+  // React Compiler deja sin memoizar este componente (TanStack Table no es compatible); es lo esperado.
+  // eslint-disable-next-line react-hooks/incompatible-library
+  const tabla = useReactTable({ data: datos, columns: columnas, getCoreRowModel: getCoreRowModel() });
+
+  if (paginas.isPending) return paginas.fetchStatus === 'fetching' ? <Cargando /> : null;
+  if (paginas.isError && !paginas.data) return <Problema error={paginas.error} reintentar={paginas.refetch} />;
+  return (
+    <Stack spacing={2}>
+      <Typography variant="h5" component="h1">
+        Mis servicios
+      </Typography>
+      <Antiguedad actualizadoEn={paginas.dataUpdatedAt} fallo={paginas.isError} />
+      {datos.length === 0 ? (
+        <Paper variant="outlined" sx={{ p: 3 }}>
+          <Typography gutterBottom>Todavía no pediste servicios.</Typography>
+          <BotonEnlace to="/cotizar" variant="contained">
+            Cotizar
+          </BotonEnlace>
+        </Paper>
+      ) : (
+        <Paper variant="outlined" sx={{ overflowX: 'auto' }}>
+          <Table size="small" sx={TABLA_SX}>
+            <TableHead>
+              {tabla.getHeaderGroups().map((g) => (
+                <TableRow key={g.id}>
+                  {g.headers.map((h) => (
+                    <TableCell key={h.id} align={alinear(h.column.id)}>
+                      {flexRender(h.column.columnDef.header, h.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableHead>
+            <TableBody>
+              {tabla.getRowModel().rows.map((f) => (
+                <TableRow
+                  key={f.id}
+                  hover
+                  sx={{ cursor: 'pointer' }}
+                  onClick={(e) => {
+                    if (!desdeEnlace(e)) void navegar({ to: '/servicios/$servicioId', params: { servicioId: f.original.servicioId } });
+                  }}
+                >
+                  {f.getVisibleCells().map((c) => (
+                    <TableCell key={c.id} align={alinear(c.column.id)}>
+                      {flexRender(c.column.columnDef.cell, c.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </Paper>
+      )}
+      {paginas.hasNextPage && (
+        <Button onClick={() => void paginas.fetchNextPage()} loading={paginas.isFetchingNextPage} sx={{ alignSelf: 'flex-start' }}>
+          Ver más
+        </Button>
+      )}
+    </Stack>
+  );
+}

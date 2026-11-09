@@ -1,0 +1,38 @@
+package bo.transporte.viajes.aplicacion.puerto.salida;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+/** Autoridad de idempotencia de 000 §4.1 (tabla operacion_idempotente), dentro de la transacción del cambio. */
+public interface RegistroIdempotente {
+    enum Estado {
+        EN_PROCESO,
+        COMPLETADA
+    }
+
+    record Operacion(UUID clave, String tipo, String hashCuerpo, Estado estado, Integer codigoHttp, Object respuesta) {}
+
+    Optional<Operacion> buscar(UUID clave);
+
+    /** Guarda la operación ya terminada con su respuesta; si la clave ya existe lanza {@link ClaveRepetida}. */
+    void guardarCompletada(UUID clave, String tipo, String hashCuerpo, int codigoHttp, Object respuesta);
+
+    /**
+     * Guarda la operación en EN_PROCESO con la respuesta que tendrá al completarse: un reenvío en EN_PROCESO la
+     * necesita para repetir el paso pendiente (D43). Si la clave ya existe lanza {@link ClaveRepetida}.
+     */
+    void guardarEnProceso(UUID clave, String tipo, String hashCuerpo, int codigoHttp, Object respuesta);
+
+    void completar(UUID clave);
+
+    /** Claves de {@code tipo} que siguen EN_PROCESO desde antes de {@code limite}, como mucho {@code maximo}. */
+    List<UUID> enProcesoAntesDe(String tipo, Instant limite, int maximo);
+
+    class ClaveRepetida extends RuntimeException {
+        public ClaveRepetida(UUID clave) {
+            super("Clave de idempotencia ya registrada: " + clave);
+        }
+    }
+}

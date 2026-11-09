@@ -1,0 +1,5 @@
+# HTTPS de Viajes (B3). CADDY_TLS: el correo de ACME en la nube (Let's Encrypt) o `internal` en la Mac.
+viajes.{$DOMINIO} {
+	tls {$CADDY_TLS}
+	reverse_proxy viajes:8101
+}

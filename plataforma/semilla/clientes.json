@@ -1,0 +1,36 @@
+[
+  {
+    "clienteId": "0193a000-0000-7000-8000-0000000c0001",
+    "sub": "0193a000-0000-7000-8000-000000000021",
+    "razonSocial": "Agroexport SRL",
+    "nit": "1023456019",
+    "correo": "cobranzas@agroexport.example",
+    "telefono": "+59133456789",
+    "direccion": "Av. Banzer km 7, Santa Cruz",
+    "canal": "PORTAL",
+    "limiteCredito": "30000.00"
+  },
+  {
+    "clienteId": "0193a000-0000-7000-8000-0000000c0002",
+    "sub": "0193a000-0000-7000-8000-000000000022",
+    "razonSocial": "Agro Moroso",
+    "nit": "2034567012",
+    "correo": "pagos@agromoroso.example",
+    "telefono": "+59133567890",
+    "direccion": "Parque Industrial, Mz. 12, Santa Cruz",
+    "canal": "PORTAL",
+    "limiteCredito": "30000.00"
+  },
+  {
+    "clienteId": "0193a000-0000-7000-8000-0000000c0003",
+    "sub": null,
+    "creadoPor": "0193a000-0000-7000-8000-000000000005",
+    "razonSocial": "Ferretería Sin Crédito",
+    "nit": "3045678015",
+    "correo": "compras@ferreteria.example",
+    "telefono": "+59133678901",
+    "direccion": "Av. Grigotá 2450, Santa Cruz",
+    "canal": "TELEFONO",
+    "limiteCredito": "5000.00"
+  }
+]

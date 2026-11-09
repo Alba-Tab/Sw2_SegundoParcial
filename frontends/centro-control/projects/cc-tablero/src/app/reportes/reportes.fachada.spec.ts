@@ -1,0 +1,89 @@
+import { TestBed } from '@angular/core/testing';
+import { CombinedGraphQLErrors } from '@apollo/client/errors';
+import { defer, of, Subject, throwError, type Observable } from 'rxjs';
+import { Sesion } from 'ui-comun';
+import { ReportesRepositorio } from './data/reportes.repositorio';
+import { ConsultaReportes, ReportesFachada } from './reportes.fachada';
+
+function fachada(catalogo: Observable<unknown>, roles: string[] = ['gerente'], pedidos: boolean[] = []) {
+  TestBed.configureTestingModule({
+    providers: [
+      ReportesFachada,
+      { provide: Sesion, useValue: { roles: () => roles } },
+      {
+        provide: ReportesRepositorio,
+        useValue: {
+          catalogo: (verClientes: boolean) => {
+            pedidos.push(verClientes);
+            return catalogo;
+          },
+        },
+      },
+    ],
+  });
+  return TestBed.inject(ReportesFachada);
+}
+
+describe('ReportesFachada: el catálogo no se traga el error', () => {
+  it('con Analítica caída expone el error junto con lo que llegó', () => {
+    const error = new CombinedGraphQLErrors({
+      errors: [{ message: 'Analítica no responde', path: ['catalogoReportes'], extensions: { codigo: 'DEPENDENCIA_NO_DISPONIBLE' } }],
+    });
+    const f = fachada(of({ data: { catalogoReportes: null, clientes: { items: [] }, rutas: [] }, error }));
+    expect(f.errorCatalogo()).toBe(error);
+    expect(f.catalogo()?.catalogoReportes).toBeNull();
+    expect(f.cargandoCatalogo()).toBe(false);
+  });
+
+  it('un error que sale del observable (red) también queda expuesto, sin romper la página', () => {
+    const red = new TypeError('Failed to fetch');
+    const f = fachada(throwError(() => red));
+    expect(f.errorCatalogo()).toBe(red);
+    expect(f.catalogo()).toBeUndefined();
+  });
+
+  it('reintentar resuelve con la respuesta nueva y, mientras tanto, conserva el aviso (V4-3)', async () => {
+    const red = new TypeError('Failed to fetch');
+    let respuesta: Observable<unknown> = throwError(() => red);
+    const pendiente = new Subject<unknown>();
+    const f = fachada(defer(() => respuesta));
+    expect(f.errorCatalogo()).toBe(red);
+    respuesta = pendiente;
+    let listo = false;
+    const promesa = f.recargarCatalogo().then(() => (listo = true));
+    expect(f.cargandoCatalogo()).toBe(true);
+    expect(f.errorCatalogo()).toBe(red);
+    await Promise.resolve();
+    expect(listo).toBe(false);
+    pendiente.next({ data: { catalogoReportes: [], clientes: { items: [] }, rutas: [] } });
+    await promesa;
+    expect(f.errorCatalogo()).toBeUndefined();
+    expect(f.cargandoCatalogo()).toBe(false);
+  });
+
+  it('a jefe_flota no le pide clientes (Viajes no se los lista)', () => {
+    const pedidos: boolean[] = [];
+    fachada(of({ data: { catalogoReportes: [], rutas: [] } }), ['jefe_flota'], pedidos);
+    expect(pedidos).toEqual([false]);
+  });
+});
+
+describe('ConsultaReportes: exportar en Excel o PDF (D110)', () => {
+  it('manda el formato y el PDF no reusa la clave de un Excel que falló por la red', async () => {
+    const pedidos: { formato: string; clave: string }[] = [];
+    let fallar = true;
+    const repo = {
+      exportar: (_id: unknown, _params: unknown, formato: string, clave: string) => {
+        pedidos.push({ formato, clave });
+        if (fallar) return throwError(() => new TypeError('Failed to fetch'));
+        return of({ data: { exportarReporte: { url: `/exportaciones/${formato}` } } });
+      },
+    } as unknown as ReportesRepositorio;
+    const c = new ConsultaReportes(repo);
+    await expect(c.exportar('CUENTAS_POR_COBRAR', {}, 'EXCEL')).rejects.toThrow();
+    fallar = false;
+    expect(await c.exportar('CUENTAS_POR_COBRAR', {}, 'PDF')).toBe('/exportaciones/PDF');
+    expect(pedidos.map((p) => p.formato)).toEqual(['EXCEL', 'PDF']);
+    expect(pedidos[1].clave).not.toBe(pedidos[0].clave);
+  });
+});

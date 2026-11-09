@@ -1,0 +1,125 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/eventos/viajes/ViajeConfirmado.v1.schema.json",
+  "title": "ViajeConfirmado v1",
+  "description": "El viaje pasó el pivote de la saga (paso 4; spec 003). También dispara el push 'Viaje asignado' al chofer (D45). Clave de enrutamiento: viajes.viaje-confirmado.v1. Consumen: analitica.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../sobre.schema.json"
+    }
+  ],
+  "properties": {
+    "tipo": {
+      "const": "ViajeConfirmado"
+    },
+    "version": {
+      "const": 1
+    },
+    "productor": {
+      "const": "viajes"
+    },
+    "datos": {
+      "type": "object",
+      "required": [
+        "viajeId",
+        "servicioId",
+        "clienteId",
+        "rutaId",
+        "tipoCarga",
+        "toneladas",
+        "fechaViaje",
+        "monto",
+        "canal",
+        "placa",
+        "tractoId",
+        "remolqueId",
+        "choferId",
+        "choferNombre",
+        "choferUsuarioSub"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "viajeId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "servicioId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "clienteId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "rutaId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "tipoCarga": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/TipoCarga"
+        },
+        "toneladas": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Toneladas"
+        },
+        "fechaViaje": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Fecha"
+        },
+        "monto": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Monto"
+        },
+        "canal": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/CanalServicio"
+        },
+        "placa": {
+          "type": "string",
+          "pattern": "^[0-9]{3,4}[A-Z]{3}$"
+        },
+        "tractoId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "remolqueId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "choferId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "choferNombre": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 120
+        },
+        "choferUsuarioSub": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Sub"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "01933d03-0000-7000-8000-000000000003",
+      "tipo": "ViajeConfirmado",
+      "version": 1,
+      "ocurridoEn": "2026-11-03T15:20:01Z",
+      "correlationId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8dff",
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "productor": "viajes",
+      "datos": {
+        "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+        "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
+        "clienteId": "01933b5a-1f00-7a20-8b11-0c2d3e4f5a01",
+        "rutaId": "01933a00-0000-7000-8000-000000000004",
+        "tipoCarga": "GRANOS",
+        "toneladas": 28,
+        "fechaViaje": "2026-11-03",
+        "monto": {
+          "monto": "2800.00",
+          "moneda": "BOB"
+        },
+        "canal": "PORTAL",
+        "placa": "4521KTR",
+        "tractoId": "01933900-0000-7000-8000-00000000a101",
+        "remolqueId": "01933900-0000-7000-8000-00000000b201",
+        "choferId": "01933900-0000-7000-8000-00000000c301",
+        "choferNombre": "Juan Mamani Quispe",
+        "choferUsuarioSub": "9c4d5e6f-7a8b-4c9d-8e0f-1a2b3c4d5e6f"
+      }
+    }
+  ]
+}

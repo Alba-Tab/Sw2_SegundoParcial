@@ -1,0 +1,34 @@
+# Portal del cliente
+
+React 19 + Vite, PWA. Material 3 con **MUI v7** y el tema de `libs/design-tokens` (D46, D47); React Compiler por Babel; TanStack Query, Router y Table (D48); clientes y esquemas zod generados con Orval desde `contratos/openapi` (D49). Puerto **5173**.
+
+| Comando | Qué hace |
+|---|---|
+| `npm ci` | Instala (los tokens se enlazan desde `../../libs/design-tokens`) |
+| `cp .env.example .env` | El issuer de Keycloak con el mismo host que `OIDC_ISSUER` de `plataforma/compose/.env` (los servicios rechazan otro issuer) |
+| `npm run generar:contratos` | Regenera `src/api/generado` (Orval: funciones `fetch`, *hooks* de TanStack Query y esquemas zod) desde `contratos/openapi`; CI falla si no coincide |
+| `npm run dev` | Servidor de desarrollo en http://localhost:5173 |
+| `npm run verificar` | Tipos, ESLint, Prettier y Vitest |
+| `npm run build` | Compila a `dist/` |
+| `npm run storybook` | Catálogo de componentes en http://localhost:6006 (tema claro y oscuro desde la barra) |
+
+## Sesión y API
+
+- `react-oidc-context` con el cliente público `portal-cliente` (PKCE). Tokens en memoria y renovación con el refresh token, sin iframe (propuesta 7.7). "Crear cuenta" abre el registro de Keycloak con `prompt=create`.
+- Al ir a Keycloak, la página actual viaja como `state` y se restaura a la vuelta: el enlace del correo (`/servicios/{id}`, `/facturas/{id}`) llega a su página después de iniciar sesión. Si Keycloak rechaza la renovación (`invalid_grant`) o un servicio responde 401 con token, se olvida el usuario y se vuelve a Keycloak con la misma página (sin redirigir dos veces en 30 s); un corte de red no saca a nadie.
+- `src/api/cliente.ts` es el *mutator* de Orval: agrega el token, usa `VITE_VIAJES_URL` o `VITE_FINANZAS_URL` y lanza `ErrorApi` con el Problem Details en cualquier respuesta que no sea 2xx. Cada escritura lleva una `Idempotency-Key` nueva por intento; los reintentos automáticos del mismo intento repiten la clave.
+- Spec 001: sin cliente en el token, el portal solo deja completar los datos de la empresa; si Keycloak no vinculó, "Reintentar vinculación"; al vincular, renueva el token.
+- Spec 002: cotizar con las reglas del contrato más las de la spec (≤ 30 t, fecha de hoy a 60 días); un 503 `CLIENTE_NO_REPLICADO` se reintenta solo con la misma clave.
+
+- Spec 003: "Confirmar servicio" con una clave por intento (un corte de red reintenta con la misma, FS7); el servicio se consulta cada 2 s mientras está `PROGRAMANDO`, con su etapa y "En aprobación".
+- Specs 004 a 006: cancelar con motivo (mensajes de `CONFIRMACION_EN_CURSO` y `CANCELACION_NO_PERMITIDA`), seguimiento con la última posición y el POD con las URL firmadas de la foto y la firma.
+
+- Specs 006 y 008: facturas con TanStack Table (orden por columna, "Solo con saldo", días vencida) y la línea de crédito (disponible, utilizado, reservado, mora).
+- **Modo comercial** (rol `comercial`, propuesta 7.6): primero se elige el cliente (o se registra uno sin cuenta, canal `TELEFONO`); un aviso fijo dice a quién se atiende y quién registra; cotizar, confirmar, servicios, facturas y crédito llevan ese `clienteId`. "Ver como cliente" abre el portal con `?clienteId=`, que se guarda en la pestaña para sobrevivir al inicio de sesión.
+- **Sin conexión** (propuesta 6.4 y 6.6): `vite-plugin-pwa` guarda la app; TanStack Query persiste en `localStorage` solo las lecturas de servicios, facturas, crédito y rutas, y cada vista muestra la antigüedad de lo guardado. La caché se borra al salir y si entra otro usuario; hasta comprobar de quién es, no se monta ninguna página. Sin sesión ni conexión, se pueden ver servicios y facturas guardados.
+
+## Estructura
+
+- `src/compartido/`: tema, componentes comunes (con su historia de Storybook y su prueba).
+- `src/features/<feature>/`: una carpeta por flujo (cuenta, cotizar, servicios, facturas), con sus pruebas (`fetch` simulado en `src/pruebas/`). Cada página se carga aparte (`lazyRouteComponent` en `src/rutas.tsx`).
+- `src/api/generado/`: lo genera Orval; no se edita.

@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/eventos/flota/LecturaSensorCombustible.v1.schema.json",
+  "title": "LecturaSensorCombustible v1",
+  "description": "Mensaje MQTT del sensor simulado de combustible, en el tema camion/{placa}/combustible (cada 10 s, D08). No lleva sobre. RabbitMQ lo deja en amq.topic con la clave camion.{placa}.combustible y Flota lo consume por AMQP (D30).",
+  "type": "object",
+  "required": ["placa", "nivelPct", "velocidadKmh", "medidoEn"],
+  "additionalProperties": false,
+  "properties": {
+    "placa": { "type": "string", "pattern": "^[0-9]{3,4}[A-Z]{3}$" },
+    "nivelPct": { "type": "number", "minimum": 0, "maximum": 100 },
+    "capacidadLitros": { "type": "number", "exclusiveMinimum": 0 },
+    "velocidadKmh": { "type": "number", "minimum": 0, "maximum": 200 },
+    "medidoEn": { "$ref": "../../comun/tipos.schema.json#/$defs/Instante" }
+  },
+  "examples": [{ "placa": "4521KTR", "nivelPct": 61.8, "capacidadLitros": 600, "velocidadKmh": 0, "medidoEn": "2026-11-03T14:01:50Z" }]
+}

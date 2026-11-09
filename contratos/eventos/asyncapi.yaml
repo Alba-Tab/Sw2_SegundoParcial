@@ -1,0 +1,839 @@
+asyncapi: 3.1.0
+info:
+  title: Eventos del Sistema de Transporte de Carga
+  version: 1.0.0
+  description: |
+    Catálogo de eventos v1 (000 §6). Todos se publican en el exchange `transporte.events` (topic, durable)
+    con Outbox, y cada consumidor los lee de su propia cola quorum `<consumidor>.eventos` con Inbox
+    (`id` del sobre como llave) y cola de fallidos `<consumidor>.eventos.dlq`. Colas y bindings en README.md.
+defaultContentType: application/json
+servers:
+  local:
+    host: localhost:5672
+    protocol: amqp
+    description: RabbitMQ del docker compose local.
+  nube:
+    host: '{ipElastica}.sslip.io:5671'
+    protocol: amqps
+    description: RabbitMQ en la EC2 de plataforma, con usuarios por servicio y TLS con la CA del proyecto.
+    variables:
+      ipElastica:
+        description: IP elástica de la EC2 con guiones (por ejemplo 3-91-10-20).
+  sensor:
+    host: '{ipElastica}.sslip.io:8883'
+    protocol: mqtts
+    description: Plugin MQTT de RabbitMQ para el simulador de combustible (en local, mqtt en 1883).
+    variables:
+      ipElastica:
+        description: IP elástica de la EC2 con guiones.
+channels:
+  clienteActualizado:
+    address: viajes.cliente-actualizado.v1
+    description: Clave de enrutamiento de ClienteActualizado.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      ClienteActualizado:
+        $ref: '#/components/messages/ClienteActualizado'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  rutaActualizada:
+    address: viajes.ruta-actualizada.v1
+    description: Clave de enrutamiento de RutaActualizada.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      RutaActualizada:
+        $ref: '#/components/messages/RutaActualizada'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  choferActualizado:
+    address: flota.chofer-actualizado.v1
+    description: Clave de enrutamiento de ChoferActualizado.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      ChoferActualizado:
+        $ref: '#/components/messages/ChoferActualizado'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  viajeConfirmado:
+    address: viajes.viaje-confirmado.v1
+    description: Clave de enrutamiento de ViajeConfirmado.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      ViajeConfirmado:
+        $ref: '#/components/messages/ViajeConfirmado'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  viajeCancelado:
+    address: viajes.viaje-cancelado.v1
+    description: Clave de enrutamiento de ViajeCancelado.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      ViajeCancelado:
+        $ref: '#/components/messages/ViajeCancelado'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  viajeIniciado:
+    address: viajes.viaje-iniciado.v1
+    description: Clave de enrutamiento de ViajeIniciado.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      ViajeIniciado:
+        $ref: '#/components/messages/ViajeIniciado'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  hitoRegistrado:
+    address: viajes.hito-registrado.v1
+    description: Clave de enrutamiento de HitoRegistrado.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      HitoRegistrado:
+        $ref: '#/components/messages/HitoRegistrado'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  posicionActualizada:
+    address: viajes.posicion-actualizada.v1
+    description: Clave de enrutamiento de PosicionActualizada.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      PosicionActualizada:
+        $ref: '#/components/messages/PosicionActualizada'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  eventoConduccionRegistrado:
+    address: viajes.evento-conduccion-registrado.v1
+    description: Clave de enrutamiento de EventoConduccionRegistrado.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      EventoConduccionRegistrado:
+        $ref: '#/components/messages/EventoConduccionRegistrado'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  entregaConfirmada:
+    address: viajes.entrega-confirmada.v1
+    description: Clave de enrutamiento de EntregaConfirmada.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      EntregaConfirmada:
+        $ref: '#/components/messages/EntregaConfirmada'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  entregaObservada:
+    address: viajes.entrega-observada.v1
+    description: Clave de enrutamiento de EntregaObservada.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      EntregaObservada:
+        $ref: '#/components/messages/EntregaObservada'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  entregaRechazada:
+    address: viajes.entrega-rechazada.v1
+    description: Clave de enrutamiento de EntregaRechazada.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      EntregaRechazada:
+        $ref: '#/components/messages/EntregaRechazada'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  viajeRequiereIntervencion:
+    address: viajes.viaje-requiere-intervencion.v1
+    description: Clave de enrutamiento de ViajeRequiereIntervencion.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      ViajeRequiereIntervencion:
+        $ref: '#/components/messages/ViajeRequiereIntervencion'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  facturaEmitida:
+    address: finanzas.factura-emitida.v1
+    description: Clave de enrutamiento de FacturaEmitida.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      FacturaEmitida:
+        $ref: '#/components/messages/FacturaEmitida'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  pagoRegistrado:
+    address: finanzas.pago-registrado.v1
+    description: Clave de enrutamiento de PagoRegistrado.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      PagoRegistrado:
+        $ref: '#/components/messages/PagoRegistrado'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  cargaCombustibleRegistrada:
+    address: flota.carga-combustible-registrada.v1
+    description: Clave de enrutamiento de CargaCombustibleRegistrada.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      CargaCombustibleRegistrada:
+        $ref: '#/components/messages/CargaCombustibleRegistrada'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  caidaCombustibleDetectada:
+    address: flota.caida-combustible-detectada.v1
+    description: Clave de enrutamiento de CaidaCombustibleDetectada.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      CaidaCombustibleDetectada:
+        $ref: '#/components/messages/CaidaCombustibleDetectada'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  mantenimientoRequerido:
+    address: flota.mantenimiento-requerido.v1
+    description: Clave de enrutamiento de MantenimientoRequerido.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      MantenimientoRequerido:
+        $ref: '#/components/messages/MantenimientoRequerido'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  avisoClienteAprobado:
+    address: analitica.aviso-cliente-aprobado.v1
+    description: Clave de enrutamiento de AvisoClienteAprobado.
+    servers:
+      - $ref: '#/servers/local'
+      - $ref: '#/servers/nube'
+    messages:
+      AvisoClienteAprobado:
+        $ref: '#/components/messages/AvisoClienteAprobado'
+    bindings:
+      amqp:
+        is: routingKey
+        exchange:
+          name: transporte.events
+          type: topic
+          durable: true
+          autoDelete: false
+          vhost: /
+        bindingVersion: 0.3.0
+  lecturaSensorCombustible:
+    address: camion/{placa}/combustible
+    description: Tema MQTT del sensor. RabbitMQ lo publica en amq.topic con la clave camion.{placa}.combustible.
+    servers:
+      - $ref: '#/servers/sensor'
+    parameters:
+      placa:
+        description: Placa del tracto, por ejemplo 4521KTR.
+    messages:
+      LecturaSensorCombustible:
+        $ref: '#/components/messages/LecturaSensorCombustible'
+operations:
+  viajesPublicaClienteActualizado:
+    action: send
+    summary: viajes publica ClienteActualizado por Outbox.
+    channel:
+      $ref: '#/channels/clienteActualizado'
+  finanzasRecibeClienteActualizado:
+    action: receive
+    summary: finanzas consume ClienteActualizado desde la cola finanzas.eventos con Inbox.
+    channel:
+      $ref: '#/channels/clienteActualizado'
+  analiticaRecibeClienteActualizado:
+    action: receive
+    summary: analitica consume ClienteActualizado desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/clienteActualizado'
+  viajesPublicaRutaActualizada:
+    action: send
+    summary: viajes publica RutaActualizada por Outbox.
+    channel:
+      $ref: '#/channels/rutaActualizada'
+  finanzasRecibeRutaActualizada:
+    action: receive
+    summary: finanzas consume RutaActualizada desde la cola finanzas.eventos con Inbox.
+    channel:
+      $ref: '#/channels/rutaActualizada'
+  analiticaRecibeRutaActualizada:
+    action: receive
+    summary: analitica consume RutaActualizada desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/rutaActualizada'
+  flotaPublicaChoferActualizado:
+    action: send
+    summary: flota publica ChoferActualizado por Outbox.
+    channel:
+      $ref: '#/channels/choferActualizado'
+  analiticaRecibeChoferActualizado:
+    action: receive
+    summary: analitica consume ChoferActualizado desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/choferActualizado'
+  viajesPublicaViajeConfirmado:
+    action: send
+    summary: viajes publica ViajeConfirmado por Outbox.
+    channel:
+      $ref: '#/channels/viajeConfirmado'
+  analiticaRecibeViajeConfirmado:
+    action: receive
+    summary: analitica consume ViajeConfirmado desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/viajeConfirmado'
+  viajesPublicaViajeCancelado:
+    action: send
+    summary: viajes publica ViajeCancelado por Outbox.
+    channel:
+      $ref: '#/channels/viajeCancelado'
+  finanzasRecibeViajeCancelado:
+    action: receive
+    summary: finanzas consume ViajeCancelado desde la cola finanzas.eventos con Inbox.
+    channel:
+      $ref: '#/channels/viajeCancelado'
+  flotaRecibeViajeCancelado:
+    action: receive
+    summary: flota consume ViajeCancelado desde la cola flota.eventos con Inbox.
+    channel:
+      $ref: '#/channels/viajeCancelado'
+  analiticaRecibeViajeCancelado:
+    action: receive
+    summary: analitica consume ViajeCancelado desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/viajeCancelado'
+  viajesPublicaViajeIniciado:
+    action: send
+    summary: viajes publica ViajeIniciado por Outbox.
+    channel:
+      $ref: '#/channels/viajeIniciado'
+  flotaRecibeViajeIniciado:
+    action: receive
+    summary: flota consume ViajeIniciado desde la cola flota.eventos con Inbox.
+    channel:
+      $ref: '#/channels/viajeIniciado'
+  analiticaRecibeViajeIniciado:
+    action: receive
+    summary: analitica consume ViajeIniciado desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/viajeIniciado'
+  viajesPublicaHitoRegistrado:
+    action: send
+    summary: viajes publica HitoRegistrado por Outbox.
+    channel:
+      $ref: '#/channels/hitoRegistrado'
+  analiticaRecibeHitoRegistrado:
+    action: receive
+    summary: analitica consume HitoRegistrado desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/hitoRegistrado'
+  viajesPublicaPosicionActualizada:
+    action: send
+    summary: viajes publica PosicionActualizada por Outbox.
+    channel:
+      $ref: '#/channels/posicionActualizada'
+  analiticaRecibePosicionActualizada:
+    action: receive
+    summary: analitica consume PosicionActualizada desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/posicionActualizada'
+  viajesPublicaEventoConduccionRegistrado:
+    action: send
+    summary: viajes publica EventoConduccionRegistrado por Outbox.
+    channel:
+      $ref: '#/channels/eventoConduccionRegistrado'
+  analiticaRecibeEventoConduccionRegistrado:
+    action: receive
+    summary: analitica consume EventoConduccionRegistrado desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/eventoConduccionRegistrado'
+  viajesPublicaEntregaConfirmada:
+    action: send
+    summary: viajes publica EntregaConfirmada por Outbox.
+    channel:
+      $ref: '#/channels/entregaConfirmada'
+  finanzasRecibeEntregaConfirmada:
+    action: receive
+    summary: finanzas consume EntregaConfirmada desde la cola finanzas.eventos con Inbox.
+    channel:
+      $ref: '#/channels/entregaConfirmada'
+  flotaRecibeEntregaConfirmada:
+    action: receive
+    summary: flota consume EntregaConfirmada desde la cola flota.eventos con Inbox.
+    channel:
+      $ref: '#/channels/entregaConfirmada'
+  analiticaRecibeEntregaConfirmada:
+    action: receive
+    summary: analitica consume EntregaConfirmada desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/entregaConfirmada'
+  viajesPublicaEntregaObservada:
+    action: send
+    summary: viajes publica EntregaObservada por Outbox.
+    channel:
+      $ref: '#/channels/entregaObservada'
+  analiticaRecibeEntregaObservada:
+    action: receive
+    summary: analitica consume EntregaObservada desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/entregaObservada'
+  viajesPublicaEntregaRechazada:
+    action: send
+    summary: viajes publica EntregaRechazada por Outbox.
+    channel:
+      $ref: '#/channels/entregaRechazada'
+  finanzasRecibeEntregaRechazada:
+    action: receive
+    summary: finanzas consume EntregaRechazada desde la cola finanzas.eventos con Inbox.
+    channel:
+      $ref: '#/channels/entregaRechazada'
+  flotaRecibeEntregaRechazada:
+    action: receive
+    summary: flota consume EntregaRechazada desde la cola flota.eventos con Inbox.
+    channel:
+      $ref: '#/channels/entregaRechazada'
+  analiticaRecibeEntregaRechazada:
+    action: receive
+    summary: analitica consume EntregaRechazada desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/entregaRechazada'
+  viajesPublicaViajeRequiereIntervencion:
+    action: send
+    summary: viajes publica ViajeRequiereIntervencion por Outbox.
+    channel:
+      $ref: '#/channels/viajeRequiereIntervencion'
+  analiticaRecibeViajeRequiereIntervencion:
+    action: receive
+    summary: analitica consume ViajeRequiereIntervencion desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/viajeRequiereIntervencion'
+  finanzasPublicaFacturaEmitida:
+    action: send
+    summary: finanzas publica FacturaEmitida por Outbox.
+    channel:
+      $ref: '#/channels/facturaEmitida'
+  viajesRecibeFacturaEmitida:
+    action: receive
+    summary: viajes consume FacturaEmitida desde la cola viajes.eventos con Inbox.
+    channel:
+      $ref: '#/channels/facturaEmitida'
+  n8nRecibeFacturaEmitida:
+    action: receive
+    summary: n8n consume FacturaEmitida desde la cola n8n.eventos con Inbox.
+    channel:
+      $ref: '#/channels/facturaEmitida'
+  analiticaRecibeFacturaEmitida:
+    action: receive
+    summary: analitica consume FacturaEmitida desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/facturaEmitida'
+  finanzasPublicaPagoRegistrado:
+    action: send
+    summary: finanzas publica PagoRegistrado por Outbox.
+    channel:
+      $ref: '#/channels/pagoRegistrado'
+  analiticaRecibePagoRegistrado:
+    action: receive
+    summary: analitica consume PagoRegistrado desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/pagoRegistrado'
+  flotaPublicaCargaCombustibleRegistrada:
+    action: send
+    summary: flota publica CargaCombustibleRegistrada por Outbox.
+    channel:
+      $ref: '#/channels/cargaCombustibleRegistrada'
+  analiticaRecibeCargaCombustibleRegistrada:
+    action: receive
+    summary: analitica consume CargaCombustibleRegistrada desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/cargaCombustibleRegistrada'
+  flotaPublicaCaidaCombustibleDetectada:
+    action: send
+    summary: flota publica CaidaCombustibleDetectada por Outbox.
+    channel:
+      $ref: '#/channels/caidaCombustibleDetectada'
+  analiticaRecibeCaidaCombustibleDetectada:
+    action: receive
+    summary: analitica consume CaidaCombustibleDetectada desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/caidaCombustibleDetectada'
+  flotaPublicaMantenimientoRequerido:
+    action: send
+    summary: flota publica MantenimientoRequerido por Outbox.
+    channel:
+      $ref: '#/channels/mantenimientoRequerido'
+  analiticaRecibeMantenimientoRequerido:
+    action: receive
+    summary: analitica consume MantenimientoRequerido desde la cola analitica.eventos con Inbox.
+    channel:
+      $ref: '#/channels/mantenimientoRequerido'
+  analiticaPublicaAvisoClienteAprobado:
+    action: send
+    summary: analitica publica AvisoClienteAprobado por Outbox.
+    channel:
+      $ref: '#/channels/avisoClienteAprobado'
+  n8nRecibeAvisoClienteAprobado:
+    action: receive
+    summary: n8n consume AvisoClienteAprobado desde la cola n8n.eventos con Inbox.
+    channel:
+      $ref: '#/channels/avisoClienteAprobado'
+  simuladorPublicaLecturaSensorCombustible:
+    action: send
+    summary: El simulador publica una lectura cada 10 s.
+    channel:
+      $ref: '#/channels/lecturaSensorCombustible'
+  flotaRecibeLecturaSensorCombustible:
+    action: receive
+    summary: Flota consume por AMQP desde amq.topic (camion.*.combustible), cola flota.sensor (D30).
+    channel:
+      $ref: '#/channels/lecturaSensorCombustible'
+components:
+  messages:
+    ClienteActualizado:
+      name: ClienteActualizado
+      title: ClienteActualizado v1
+      summary: 'Copia del cliente para Finanzas y Analítica (alta y cambios; spec 001). El primero de un cliente crea su línea de crédito en Finanzas (D01).'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './viajes/ClienteActualizado.v1.schema.json'
+    RutaActualizada:
+      name: RutaActualizada
+      title: RutaActualizada v1
+      summary: 'Copia de la ruta para Finanzas (tarifas) y Analítica (spec 002).'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './viajes/RutaActualizada.v1.schema.json'
+    ChoferActualizado:
+      name: ChoferActualizado
+      title: ChoferActualizado v1
+      summary: 'Copia del chofer para Analítica (reportes por chofer).'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './flota/ChoferActualizado.v1.schema.json'
+    ViajeConfirmado:
+      name: ViajeConfirmado
+      title: ViajeConfirmado v1
+      summary: 'El viaje pasó el pivote de la saga (paso 4; spec 003). También dispara el push ''Viaje asignado'' al chofer (D45).'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './viajes/ViajeConfirmado.v1.schema.json'
+    ViajeCancelado:
+      name: ViajeCancelado
+      title: ViajeCancelado v1
+      summary: 'Viaje cancelado por el usuario (spec 004) o por la saga al compensar o al resolver una intervención (specs 003 y 011). Los consumidores liberan crédito y unidad de forma idempotente.'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './viajes/ViajeCancelado.v1.schema.json'
+    ViajeIniciado:
+      name: ViajeIniciado
+      title: ViajeIniciado v1
+      summary: 'El chofer registró la salida (spec 005). Flota pasa la unidad a EN_VIAJE (D20); Analítica guarda la hora real de salida.'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './viajes/ViajeIniciado.v1.schema.json'
+    HitoRegistrado:
+      name: HitoRegistrado
+      title: HitoRegistrado v1
+      summary: 'Bloqueo, parada, punto de control o falla registrados en ruta, por ejemplo desde la bitácora por voz.'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './viajes/HitoRegistrado.v1.schema.json'
+    PosicionActualizada:
+      name: PosicionActualizada
+      title: PosicionActualizada v1
+      summary: 'Última posición de un viaje; uno por lote de GPS recibido, no uno por punto (D19).'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './viajes/PosicionActualizada.v1.schema.json'
+    EventoConduccionRegistrado:
+      name: EventoConduccionRegistrado
+      title: EventoConduccionRegistrado v1
+      summary: 'Frenada brusca (≥ 0,4 g, D08) o alerta de fatiga detectada en el celular. Analítica calcula el puntaje de conducción.'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './viajes/EventoConduccionRegistrado.v1.schema.json'
+    EntregaConfirmada:
+      name: EntregaConfirmada
+      title: EntregaConfirmada v1
+      summary: 'Entrega válida (dentro de la geocerca y con firma) o entrega observada aprobada por el despachador (specs 006 y 007). Finanzas factura, Flota libera la unidad y suma kmRecorridos (D07).'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './viajes/EntregaConfirmada.v1.schema.json'
+    EntregaObservada:
+      name: EntregaObservada
+      title: EntregaObservada v1
+      summary: 'Entrega fuera de la geocerca o sin firma; queda para revisión del despachador (spec 007).'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './viajes/EntregaObservada.v1.schema.json'
+    EntregaRechazada:
+      name: EntregaRechazada
+      title: EntregaRechazada v1
+      summary: 'El receptor rechazó la carga, o el despachador rechazó una entrega observada (spec 007). Finanzas no factura y libera el crédito; Flota libera la unidad.'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './viajes/EntregaRechazada.v1.schema.json'
+    ViajeRequiereIntervencion:
+      name: ViajeRequiereIntervencion
+      title: ViajeRequiereIntervencion v1
+      summary: 'Una compensación de la saga se agotó (spec 011). Analítica crea la alerta para el despachador.'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './viajes/ViajeRequiereIntervencion.v1.schema.json'
+    FacturaEmitida:
+      name: FacturaEmitida
+      title: FacturaEmitida v1
+      summary: 'Factura interna emitida por una entrega confirmada (spec 006). Viajes cierra el viaje; n8n avisa al cliente con los datos que ya trae el evento; Analítica actualiza cuentas por cobrar.'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './finanzas/FacturaEmitida.v1.schema.json'
+    PagoRegistrado:
+      name: PagoRegistrado
+      title: PagoRegistrado v1
+      summary: 'Administración registró un pago (spec 008); la línea de crédito se abonó.'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './finanzas/PagoRegistrado.v1.schema.json'
+    CargaCombustibleRegistrada:
+      name: CargaCombustibleRegistrada
+      title: CargaCombustibleRegistrada v1
+      summary: 'Carga de combustible registrada por el chofer (spec 009); idempotente por opId.'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './flota/CargaCombustibleRegistrada.v1.schema.json'
+    CaidaCombustibleDetectada:
+      name: CaidaCombustibleDetectada
+      title: CaidaCombustibleDetectada v1
+      summary: 'El nivel del tanque cayó 8 % o más en 10 min con el camión detenido (D08): posible robo.'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './flota/CaidaCombustibleDetectada.v1.schema.json'
+    MantenimientoRequerido:
+      name: MantenimientoRequerido
+      title: MantenimientoRequerido v1
+      summary: 'Al liberar una unidad, Flota detectó kilometraje o documentos por vencer (spec 010, D07). La unidad queda en MANTENIMIENTO_PENDIENTE.'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './flota/MantenimientoRequerido.v1.schema.json'
+    AvisoClienteAprobado:
+      name: AvisoClienteAprobado
+      title: AvisoClienteAprobado v1
+      summary: 'El despachador aprobó un aviso propuesto por el agente (spec 014). n8n lo envía tal cual.'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './analitica/AvisoClienteAprobado.v1.schema.json'
+    LecturaSensorCombustible:
+      name: LecturaSensorCombustible
+      title: LecturaSensorCombustible v1
+      summary: 'Lectura del sensor de combustible.'
+      contentType: application/json
+      payload:
+        schemaFormat: application/schema+json;version=draft-07
+        schema:
+          $ref: './flota/LecturaSensorCombustible.v1.schema.json'

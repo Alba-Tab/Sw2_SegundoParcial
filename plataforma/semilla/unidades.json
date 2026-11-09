@@ -1,0 +1,245 @@
+[
+  {
+    "unidadId": "01933c00-0000-7000-8000-000000000001",
+    "tipoUnidad": "TRACTO",
+    "placa": "4521KTR",
+    "estado": "DISPONIBLE",
+    "kilometraje": 184000,
+    "kmDesdeUltimoMantenimiento": 8200,
+    "documentos": [
+      {
+        "tipo": "SOAT",
+        "venceElDiasDesdeHoy": 200
+      },
+      {
+        "tipo": "INSPECCION_TECNICA",
+        "venceElDiasDesdeHoy": 160
+      }
+    ],
+    "atributos": {
+      "capacidadTanqueLitros": 600,
+      "potenciaHp": 460
+    }
+  },
+  {
+    "unidadId": "01933c00-0000-7000-8000-000000000002",
+    "tipoUnidad": "TRACTO",
+    "placa": "3187LPZ",
+    "estado": "DISPONIBLE",
+    "kilometraje": 96500,
+    "kmDesdeUltimoMantenimiento": 3100,
+    "documentos": [
+      {
+        "tipo": "SOAT",
+        "venceElDiasDesdeHoy": 200
+      },
+      {
+        "tipo": "INSPECCION_TECNICA",
+        "venceElDiasDesdeHoy": 160
+      }
+    ],
+    "atributos": {
+      "capacidadTanqueLitros": 600,
+      "potenciaHp": 460
+    }
+  },
+  {
+    "unidadId": "01933c00-0000-7000-8000-000000000003",
+    "tipoUnidad": "TRACTO",
+    "placa": "2964SCZ",
+    "estado": "DISPONIBLE",
+    "kilometraje": 152300,
+    "kmDesdeUltimoMantenimiento": 2500,
+    "documentos": [
+      {
+        "tipo": "SOAT",
+        "venceElDiasDesdeHoy": 200
+      },
+      {
+        "tipo": "INSPECCION_TECNICA",
+        "venceElDiasDesdeHoy": 160
+      }
+    ],
+    "atributos": {
+      "capacidadTanqueLitros": 800,
+      "potenciaHp": 460
+    }
+  },
+  {
+    "unidadId": "01933c00-0000-7000-8000-000000000004",
+    "tipoUnidad": "TRACTO",
+    "placa": "5530CBB",
+    "estado": "DISPONIBLE",
+    "kilometraje": 71200,
+    "kmDesdeUltimoMantenimiento": 6400,
+    "documentos": [
+      {
+        "tipo": "SOAT",
+        "venceElDiasDesdeHoy": 200
+      },
+      {
+        "tipo": "INSPECCION_TECNICA",
+        "venceElDiasDesdeHoy": 160
+      }
+    ],
+    "atributos": {
+      "capacidadTanqueLitros": 600,
+      "potenciaHp": 460
+    }
+  },
+  {
+    "unidadId": "01933c00-0000-7000-8000-000000000005",
+    "tipoUnidad": "TRACTO",
+    "placa": "1876ORU",
+    "estado": "DISPONIBLE",
+    "kilometraje": 210400,
+    "kmDesdeUltimoMantenimiento": 1200,
+    "documentos": [
+      {
+        "tipo": "SOAT",
+        "venceElDiasDesdeHoy": 200
+      },
+      {
+        "tipo": "INSPECCION_TECNICA",
+        "venceElDiasDesdeHoy": 160
+      }
+    ],
+    "atributos": {
+      "capacidadTanqueLitros": 900,
+      "potenciaHp": 460
+    }
+  },
+  {
+    "unidadId": "01933c00-0000-7000-8000-000000000011",
+    "tipoUnidad": "REMOLQUE",
+    "placa": "2210KDN",
+    "tipoRemolque": "FURGON",
+    "capacidadToneladas": 30,
+    "estado": "DISPONIBLE",
+    "kmDesdeUltimoMantenimiento": 9950,
+    "documentos": [
+      {
+        "tipo": "SOAT",
+        "venceElDiasDesdeHoy": 220
+      },
+      {
+        "tipo": "INSPECCION_TECNICA",
+        "venceElDiasDesdeHoy": 180
+      }
+    ],
+    "atributos": {
+      "volumenM3": 90
+    }
+  },
+  {
+    "unidadId": "01933c00-0000-7000-8000-000000000012",
+    "tipoUnidad": "REMOLQUE",
+    "placa": "3348KDN",
+    "tipoRemolque": "FURGON",
+    "capacidadToneladas": 30,
+    "estado": "DISPONIBLE",
+    "kmDesdeUltimoMantenimiento": 4300,
+    "documentos": [
+      {
+        "tipo": "SOAT",
+        "venceElDiasDesdeHoy": 220
+      },
+      {
+        "tipo": "INSPECCION_TECNICA",
+        "venceElDiasDesdeHoy": 180
+      }
+    ],
+    "atributos": {
+      "volumenM3": 85
+    }
+  },
+  {
+    "unidadId": "01933c00-0000-7000-8000-000000000013",
+    "tipoUnidad": "REMOLQUE",
+    "placa": "4472KDN",
+    "tipoRemolque": "FURGON",
+    "capacidadToneladas": 30,
+    "estado": "DISPONIBLE",
+    "kmDesdeUltimoMantenimiento": 800,
+    "documentos": [
+      {
+        "tipo": "SOAT",
+        "venceElDiasDesdeHoy": 220
+      },
+      {
+        "tipo": "INSPECCION_TECNICA",
+        "venceElDiasDesdeHoy": 180
+      }
+    ],
+    "atributos": {
+      "volumenM3": 95
+    }
+  },
+  {
+    "unidadId": "01933c00-0000-7000-8000-000000000021",
+    "tipoUnidad": "REMOLQUE",
+    "placa": "5120PLT",
+    "tipoRemolque": "PLATAFORMA",
+    "capacidadToneladas": 28,
+    "estado": "DISPONIBLE",
+    "kmDesdeUltimoMantenimiento": 5200,
+    "documentos": [
+      {
+        "tipo": "SOAT",
+        "venceElDiasDesdeHoy": 240
+      },
+      {
+        "tipo": "INSPECCION_TECNICA",
+        "venceElDiasDesdeHoy": 190
+      }
+    ],
+    "atributos": {
+      "largoMetros": 13.6
+    }
+  },
+  {
+    "unidadId": "01933c00-0000-7000-8000-000000000022",
+    "tipoUnidad": "REMOLQUE",
+    "placa": "6235PLT",
+    "tipoRemolque": "PLATAFORMA",
+    "capacidadToneladas": 30,
+    "estado": "DISPONIBLE",
+    "kmDesdeUltimoMantenimiento": 2100,
+    "documentos": [
+      {
+        "tipo": "SOAT",
+        "venceElDiasDesdeHoy": 240
+      },
+      {
+        "tipo": "INSPECCION_TECNICA",
+        "venceElDiasDesdeHoy": 190
+      }
+    ],
+    "atributos": {
+      "largoMetros": 14.6
+    }
+  },
+  {
+    "unidadId": "01933c00-0000-7000-8000-000000000031",
+    "tipoUnidad": "REMOLQUE",
+    "placa": "7341CST",
+    "tipoRemolque": "CISTERNA",
+    "capacidadToneladas": 25,
+    "estado": "MANTENIMIENTO_PENDIENTE",
+    "kmDesdeUltimoMantenimiento": 10380,
+    "documentos": [
+      {
+        "tipo": "SOAT",
+        "venceElDiasDesdeHoy": 150
+      },
+      {
+        "tipo": "INSPECCION_TECNICA",
+        "venceElDiasDesdeHoy": 120
+      }
+    ],
+    "atributos": {
+      "compartimentos": 3,
+      "capacidadLitros": 30000
+    }
+  }
+]

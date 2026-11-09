@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/eventos/viajes/ClienteActualizado.v1.schema.json",
+  "title": "ClienteActualizado v1",
+  "description": "Copia del cliente para Finanzas y Analítica (alta y cambios; spec 001). El primero de un cliente crea su línea de crédito en Finanzas (D01). Clave de enrutamiento: viajes.cliente-actualizado.v1. Consumen: finanzas, analitica.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../sobre.schema.json"
+    }
+  ],
+  "properties": {
+    "tipo": {
+      "const": "ClienteActualizado"
+    },
+    "version": {
+      "const": 1
+    },
+    "productor": {
+      "const": "viajes"
+    },
+    "datos": {
+      "type": "object",
+      "required": [
+        "clienteId",
+        "versionAgregado",
+        "razonSocial",
+        "nit",
+        "correo",
+        "telefono",
+        "direccion",
+        "canal",
+        "tieneCuenta",
+        "activo"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "clienteId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "versionAgregado": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "razonSocial": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 120
+        },
+        "nit": {
+          "type": "string",
+          "pattern": "^[0-9]{5,20}$"
+        },
+        "correo": {
+          "type": "string",
+          "format": "email"
+        },
+        "telefono": {
+          "type": "string",
+          "minLength": 6,
+          "maxLength": 20
+        },
+        "direccion": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 200
+        },
+        "canal": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/CanalServicio"
+        },
+        "tieneCuenta": {
+          "type": "boolean"
+        },
+        "activo": {
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "01933d00-0000-7000-8000-000000000000",
+      "tipo": "ClienteActualizado",
+      "version": 1,
+      "ocurridoEn": "2026-11-03T15:20:01Z",
+      "correlationId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8dff",
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "productor": "viajes",
+      "datos": {
+        "clienteId": "01933b5a-1f00-7a20-8b11-0c2d3e4f5a01",
+        "versionAgregado": 1,
+        "razonSocial": "Agroexport SRL",
+        "nit": "1023456019",
+        "correo": "cobranzas@agroexport.example",
+        "telefono": "+59133456789",
+        "direccion": "Av. Banzer km 7, Santa Cruz",
+        "canal": "PORTAL",
+        "tieneCuenta": true,
+        "activo": true
+      }
+    }
+  ]
+}

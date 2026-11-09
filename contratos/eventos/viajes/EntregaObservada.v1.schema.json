@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://transporte.local/contratos/eventos/viajes/EntregaObservada.v1.schema.json",
+  "title": "EntregaObservada v1",
+  "description": "Entrega fuera de la geocerca o sin firma; queda para revisión del despachador (spec 007). Clave de enrutamiento: viajes.entrega-observada.v1. Consumen: analitica.",
+  "type": "object",
+  "allOf": [
+    {
+      "$ref": "../sobre.schema.json"
+    }
+  ],
+  "properties": {
+    "tipo": {
+      "const": "EntregaObservada"
+    },
+    "version": {
+      "const": 1
+    },
+    "productor": {
+      "const": "viajes"
+    },
+    "datos": {
+      "type": "object",
+      "required": [
+        "viajeId",
+        "servicioId",
+        "entregaId",
+        "razones",
+        "posicion",
+        "registradaEn"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "viajeId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "servicioId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "entregaId": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Uuid"
+        },
+        "razones": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "FUERA_GEOCERCA",
+              "SIN_FIRMA"
+            ]
+          }
+        },
+        "distanciaMetros": {
+          "type": "number",
+          "minimum": 0
+        },
+        "posicion": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Coordenadas"
+        },
+        "registradaEn": {
+          "$ref": "../../comun/tipos.schema.json#/$defs/Instante"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "id": "01933d10-0000-7000-8000-000000000010",
+      "tipo": "EntregaObservada",
+      "version": 1,
+      "ocurridoEn": "2026-11-03T15:20:01Z",
+      "correlationId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8dff",
+      "traceparent": "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-01",
+      "productor": "viajes",
+      "datos": {
+        "viajeId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d02",
+        "servicioId": "01933b6e-4c2a-7d10-9a3e-5f1c2b7a8d01",
+        "entregaId": "01933c10-0000-7000-8000-00000000e001",
+        "razones": [
+          "FUERA_GEOCERCA"
+        ],
+        "distanciaMetros": 2170,
+        "posicion": {
+          "lat": -17.79,
+          "lng": -63.18
+        },
+        "registradaEn": "2026-11-03T15:20:00Z"
+      }
+    }
+  ]
+}
