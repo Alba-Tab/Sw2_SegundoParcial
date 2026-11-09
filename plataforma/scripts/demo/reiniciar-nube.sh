@@ -7,12 +7,12 @@
 # Variables: DOMINIO, KC_ADMIN, KC_ADMIN_CLAVE, N8N_DB_URL (postgresql://n8n:…@<B1MS>/n8n?sslmode=require).
 # Con SIMULAR=1 solo imprime los comandos.
 set -euo pipefail
-AWS_REGION=${AWS_REGION:-us-east-1}
+AWS_REGION=${AWS_REGION:-us-east-2}
 AZURE_RG=${AZURE_RG:-rg-transporte}
 GCP_PROYECTO=${GCP_PROYECTO:-appchofer-transporte}
 : "${DOMINIO:?}" "${KC_ADMIN:?}" "${KC_ADMIN_CLAVE:?}" "${N8N_DB_URL:?}"
 # Consumidores y relays de Azure, con las réplicas a las que vuelven (las de encender-demo.sh).
-CONSUMIDORES="finanzas-worker:1:1 analitica:1:1 n8n:1:1 finanzas-api:0:2"
+CONSUMIDORES="finanzas-worker:1:1 analitica:1:1 n8n:1:1 finanzas-api:1:1"
 
 c() { echo "+ $*" >&2; [ -n "${SIMULAR:-}" ] || "$@"; }
 replicas() { c az containerapp update -g "$AZURE_RG" -n "$1" --min-replicas "$2" --max-replicas "$3" --output none; }

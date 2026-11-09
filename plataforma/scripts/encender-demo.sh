@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Enciende la nube para pruebas o la demo (guía §11), en orden de dependencias: la B1MS (Keycloak, Finanzas, n8n y
 # Analítica la necesitan), la EC2 (Temporal, RabbitMQ y Viajes), las Container Apps y el worker de Flota.
-# Uso: PSQL_SERVIDOR=psql-transporte-<sufijo> plataforma/scripts/encender-demo.sh   (SIMULAR=1 solo imprime)
+# Uso: plataforma/scripts/encender-demo.sh   (SIMULAR=1 solo imprime)
 . "$(dirname "$0")/demo/nube.sh"
 
 paso "PostgreSQL B1MS"
