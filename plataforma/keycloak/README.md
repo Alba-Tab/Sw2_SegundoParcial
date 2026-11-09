@@ -72,7 +72,7 @@ La semilla de los servicios (D102, `plataforma/semilla/`) usa estos mismos ids: 
 | `demo-cli` | Público, *device grant* (y *direct grant* en local) | `gateway`, `viajes`, `finanzas`, `flota`, `analitica` | Todos menos `agente_lectura` |
 | `gateway`, `mcp-server` | Confidencial, intercambio estándar | La que piden con `audience` y `scope=aud-<cliente>` | Los del usuario |
 | `agente` | Confidencial, *client credentials* | `mcp-server` | `agente_lectura` |
-| `viajes` | Confidencial, cuenta de servicio con FGAP v2 y `query-users` | — | — |
+| `viajes` | Confidencial, cuenta de servicio con FGAP v2, `query-users` y el scope `kc-admin-api` (la Admin API lo exige desde 26.8.2) | — | — |
 | `analitica`, `finanzas`, `flota` | Solo validan tokens | — | — |
 
 Notas:

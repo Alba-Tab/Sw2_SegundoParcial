@@ -587,7 +587,8 @@
       "defaultClientScopes": [
         "basic",
         "acr",
-        "roles"
+        "roles",
+        "kc-admin-api"
       ],
       "optionalClientScopes": []
     },

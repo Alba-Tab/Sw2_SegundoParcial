@@ -354,7 +354,7 @@ services:
 
   keycloak:
     <<: *comun
-    image: quay.io/keycloak/keycloak:26.8
+    image: quay.io/keycloak/keycloak:26.8.2
     profiles: [plataforma]
     command: ["start-dev"]
     depends_on: { postgres-azure: { condition: service_healthy } }

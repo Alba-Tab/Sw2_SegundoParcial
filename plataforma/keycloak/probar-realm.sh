@@ -107,8 +107,9 @@ ok "gerente1 no ve la cuenta de servicio de viajes" "$(g "$A/users/$SV")" 403
 ok "gerente1 no cambia la cuenta de servicio de viajes" "$(g -X PUT "$A/users/$SV" -d "$(adm "$A/users/$SV")")" 403
 ok "gerente1 no se da realm-admin" "$(g -X POST "$A/users/$GU/role-mappings/clients/$RM" -d "[$RA]")" 403
 ok "gerente1 no impersona" "$(g -X POST "$A/users/$DE/impersonation")" 403
-ok "con el token de demo-cli, gerente1 no ve a un interno" "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $T" "$A/users/$DE")" 403
-ok "despachador1 no lista usuarios" "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $(login despachador1 | jq -r .access_token)" "$A/users")" 403
+# Desde Keycloak 26.8.2 (CVE-2026-19688) la Admin API rechaza con 401 un token sin el scope kc-admin-api.
+ok "con el token de demo-cli, gerente1 no ve a un interno" "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $T" "$A/users/$DE")" 401
+ok "despachador1 no lista usuarios" "$(curl -s -o /dev/null -w '%{http_code}' -H "Authorization: Bearer $(login despachador1 | jq -r .access_token)" "$A/users")" 401
 adm -X DELETE "$A/users/$N" >/dev/null
 
 echo "== D39 y D27"
