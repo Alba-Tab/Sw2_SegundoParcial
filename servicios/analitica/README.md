@@ -90,4 +90,6 @@ docker compose --profile core --profile plataforma --profile ia up -d analitica
 curl localhost:8104/health/ready
 ```
 
+En la nube, AMQPS (B2) va solo en la URL: `AMQP_URL=amqps://analitica:…@mq.<dominio>:5671/?cafile=/secretos/ca.pem`. aiormq lee `cafile` de la URL y verifica el certificado y el nombre del broker (`tests/test_amqps.py`); no hace falta `ssl_context` propio.
+
 En OrbStack, Testcontainers necesita `DOCKER_HOST=unix://$HOME/.orbstack/run/docker.sock TESTCONTAINERS_RYUK_DISABLED=true`.

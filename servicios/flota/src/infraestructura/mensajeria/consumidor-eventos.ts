@@ -9,6 +9,7 @@ import { ProcesarLectura } from '../../aplicacion/combustible/procesar-lectura';
 import type { Lectura } from '../../dominio/combustible/caida';
 import { entorno } from '../configuracion/entorno';
 import { contexto, traceparentValido } from '../observabilidad/contexto';
+import { opcionesAmqp } from './conexion-amqp';
 import { ValidadorEventos } from './validador-eventos';
 
 const COLA = 'flota.eventos';
@@ -62,7 +63,7 @@ export class ConsumidorEventos implements OnApplicationBootstrap, OnApplicationS
   private async escuchar(): Promise<void> {
     while (!this.apagando) {
       try {
-        const conexion = await amqp.connect(entorno().AMQP_URL);
+        const conexion = await amqp.connect(entorno().AMQP_URL, opcionesAmqp(entorno()));
         this.conexion = conexion;
         let avisarCaida!: () => void;
         const caida = new Promise<void>((r) => (avisarCaida = r));

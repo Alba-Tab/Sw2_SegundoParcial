@@ -16,6 +16,12 @@ cd plataforma/simulador-combustible && npm ci
 MQTT_CLAVE=sensor-sim npm run simular -- --placa 4521KTR --escenario robo
 ```
 
+En la nube corre desde la Mac contra la VM por MQTTS (B2), con la CA de `plataforma/vm/certificados.sh`:
+
+```bash
+MQTT_URL=mqtts://mq.<dominio>:8883 MQTT_CA=../vm/certs/ca.pem MQTT_CLAVE=<RABBITMQ_CLAVE_SENSOR> npm run simular -- --placa 4521KTR
+```
+
 O dentro de compose (usa `RABBITMQ_CLAVE_SENSOR` de `.env` y `mqtt://rabbitmq:1883`):
 
 ```bash

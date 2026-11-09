@@ -1,14 +1,26 @@
 import { Injectable, Logger, OnApplicationBootstrap, OnApplicationShutdown } from '@nestjs/common';
 import { InjectConnection } from '@nestjs/mongoose';
 import { DefaultLogger, NativeConnection, Runtime, Worker } from '@temporalio/worker';
+import type { TLSConfig } from '@temporalio/worker';
+import { readFileSync } from 'node:fs';
 import type { Connection } from 'mongoose';
-import { entorno } from '../configuracion/entorno';
+import { entorno, type Entorno } from '../configuracion/entorno';
 import { loggerJson } from '../observabilidad/logger';
 import { crearIndicesFlota } from '../persistencia/colecciones-flota';
 import { ActividadesFlota } from './actividades-flota';
 
 const NIVELES = { TRACE: 'trace', DEBUG: 'debug', INFO: 'info', WARN: 'warn', ERROR: 'error' } as const;
 let runtimeInstalado = false;
+
+/** mTLS hacia Temporal (B1): con la CA arma TLS; con certificado y clave, además, el par del cliente. Sin CA, sin TLS. */
+export function tlsTemporal(e: Entorno, leer: (ruta: string) => Buffer = readFileSync): TLSConfig | undefined {
+  if (!e.TEMPORAL_TLS_CA) return undefined;
+  return {
+    serverRootCACertificate: leer(e.TEMPORAL_TLS_CA),
+    clientCertPair:
+      e.TEMPORAL_TLS_CERT && e.TEMPORAL_TLS_KEY ? { crt: leer(e.TEMPORAL_TLS_CERT), key: leer(e.TEMPORAL_TLS_KEY) } : undefined,
+  };
+}
 
 /**
  * Los logs del SDK de Temporal (y los del core nativo, reenviados desde WARN) salen en el mismo JSON de 000 §10 que el
@@ -49,7 +61,10 @@ export class TrabajadorTemporal implements OnApplicationBootstrap, OnApplication
   private async correr(): Promise<void> {
     while (!this.apagando) {
       try {
-        const connection = await NativeConnection.connect({ address: entorno().TEMPORAL_ADDRESS });
+        const connection = await NativeConnection.connect({
+          address: entorno().TEMPORAL_ADDRESS,
+          tls: tlsTemporal(entorno()),
+        });
         this.worker = await Worker.create({
           connection,
           namespace: 'transporte',

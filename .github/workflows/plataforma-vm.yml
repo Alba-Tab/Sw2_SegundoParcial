@@ -1,0 +1,14 @@
+name: plataforma-vm
+on:
+  push:
+    branches: [main]
+    paths: ['plataforma/vm/**', 'plataforma/compose/postgres/**', 'plataforma/compose/temporal/**', 'plataforma/compose/rabbitmq/**', 'plataforma/compose/iniciar/rabbitmq-usuarios.sh']
+  workflow_dispatch:
+permissions: { contents: read, packages: write, id-token: write }
+jobs:
+  desplegar:
+    uses: ./.github/workflows/_deploy-ec2.yml
+  smoke:
+    needs: desplegar
+    uses: ./.github/workflows/_smoke.yml
+    with: { url: 'https://viajes.${{ vars.DOMINIO }}/health/ready' }

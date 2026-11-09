@@ -23,6 +23,17 @@ cp .env.example .env
 
 Hasta que exista el compose (T3a.1), Keycloak se levanta con ese `docker run`. Necesita `docker`, `curl` y `jq`.
 
+## Job `keycloak-config` en la nube (B5, T11.3)
+
+`Dockerfile.config` arma la imagen del Job: keycloak-config-cli con `jq` (la base es Ubuntu y ya trae `bash` y `curl`), el realm, el perfil, la semilla y los dos scripts. Con `KC_CONFIG_EN_CONTENEDOR=1`, que la imagen trae fijo, `aplicar-realm.sh` corre el jar directo en vez de `docker run` y luego `configurar-api.sh`. Los valores son los secretos del Job (guía de despliegue §7): `KC_URL`, `KC_ADMIN`, `KC_ADMIN_CLAVE`, los `KC_SECRETO_*` y `KC_CLAVE_*`, y las `KC_URL_*` de las webs.
+
+```bash
+docker build -f Dockerfile.config -t keycloak-config .
+docker run --rm --network host --env-file .env keycloak-config   # contra el Keycloak de localhost:8080
+```
+
+Keycloak usa la imagen oficial con `start`; no hace falta una propia. Su salud está en el puerto de gestión 9000 (`/health/ready`), que sirve de sonda en Container Apps.
+
 ## Variables
 
 | Variable | Local (`.env.example`) | Nube |

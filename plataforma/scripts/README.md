@@ -1,6 +1,6 @@
 # Scripts de demo y de fallos
 
-Escenarios de `specs/guion-fallos.md` contra el compose local. Por ahora son solo locales; las variantes `--nube` llegan en F11.
+Escenarios de `specs/guion-fallos.md` contra el compose local. `reiniciar-demo.sh` y `escenario-completo.sh` tienen además `--nube` (ver abajo).
 
 **Antes de empezar:**
 
@@ -27,7 +27,7 @@ Cada uno imprime ✔ o ✘ por cada resultado esperado y termina con código 1 s
 
 | Script | Qué hace |
 |---|---|
-| `reiniciar-demo.sh [--nube]` | Reinicia la demo en el orden de D102: (1) detiene relays y consumidores (los 4 servicios y n8n); (2) purga todas las colas y termina los workflows abiertos de Temporal; (3) corre `demo:reiniciar` en cada servicio y vacía `n8n_inbox`; (4) borra en Keycloak a los usuarios del grupo `registro-portal` (nunca las cuentas de servicio); (5) los vuelve a encender. `demo:reiniciar` es un comando, nunca un endpoint: `--semilla.cargar=reiniciar` (Viajes), `node dist/semilla.js --reiniciar` (Flota), `php artisan demo:reiniciar` (Finanzas), `python -m app.demo reiniciar` (Analítica, que carga además los 3 meses sintéticos). `--nube` llega en F11 |
+| `reiniciar-demo.sh [--nube]` | Reinicia la demo en el orden de D102: (1) detiene relays y consumidores (los 4 servicios y n8n); (2) purga todas las colas y termina los workflows abiertos de Temporal; (3) corre `demo:reiniciar` en cada servicio y vacía `n8n_inbox`; (4) borra en Keycloak a los usuarios del grupo `registro-portal` (nunca las cuentas de servicio); (5) los vuelve a encender. `demo:reiniciar` es un comando, nunca un endpoint: `--semilla.cargar=reiniciar` (Viajes), `node dist/semilla.js --reiniciar` (Flota), `php artisan demo:reiniciar` (Finanzas), `python -m app.demo reiniciar` (Analítica, que carga además los 3 meses sintéticos) |
 | `escenario-completo.sh [--nube]` | Recorre por API los pasos que ya existen (plan-desarrollo §4): 2-3 (saga del Aula con chofer1 y, con chofer1 ocupado, La Paz con chofer2), 4-5 (inicio, GPS, hito, frenada y la primera carga de 4521KTR), 6 (entrega, factura, cierre y correo) y 7 (FF2 con la carga exagerada y el simulador de chofer2 hasta `RIESGO_RETRASO`). Con `BITACORA_MALICIOSA=1` el simulador siembra la bitácora de FM2. Crece en cada hito |
 
 Antes de cada ensayo: `reiniciar-demo.sh` y después `escenario-completo.sh`.
@@ -79,4 +79,10 @@ Antes de cada ensayo: `reiniciar-demo.sh` y después `escenario-completo.sh`.
 | `encender-demo.sh` | Enciende la B1MS, la EC2 (el compose arranca solo), las Container Apps con sus réplicas de la guía §7 y el worker pool de Flota en 1 |
 | `apagar-demo.sh` | Al revés: Container Apps en 0 réplicas mínimas, el worker pool en 0, la EC2 detenida y la B1MS detenida |
 
-Necesitan `aws`, `az` y `gcloud` con sesión iniciada, y `PSQL_SERVIDOR=psql-transporte-<sufijo>`. Con `SIMULAR=1` solo imprimen los comandos. La tabla de réplicas está en `demo/nube.sh`; `n8n` va fijo en 1 durante la demo porque consume de RabbitMQ sin ingress y con 0 réplicas no despertaría.
+Necesitan `aws`, `az` y `gcloud` con sesión iniciada, y `PSQL_SERVIDOR` (por defecto, `psql-transporte-sw2bg-gp`). Con `SIMULAR=1` solo imprimen los comandos. La tabla de réplicas está en `demo/nube.sh`; `n8n` va fijo en 1 durante la demo porque consume de RabbitMQ sin ingress y con 0 réplicas no despertaría.
+
+## En la nube (`--nube`, B10)
+
+- **Tokens (D39):** en la nube `demo-cli` no tiene *direct grant*. `demo/comun.sh` pide cada token por *device grant* (imprime la URL en la que se entra como ese usuario) y guarda el `refresh_token` en `~/.cache/transporte-demo/<usuario>` (600), así cada usuario inicia sesión una sola vez mientras dure su sesión.
+- **`escenario-completo.sh --nube`:** necesita `DOMINIO`, `FLOTA_URL` (la `run.app`) y `ANALITICA_URL` (la `azurecontainerapps.io`). El estado del viaje sale de la API en vez de `psql`, y el correo de la factura se revisa en el buzón (Brevo no se puede contar como Mailpit).
+- **`reiniciar-demo.sh --nube`** (`demo/reiniciar-nube.sh`, T8.8): Viajes, la purga de colas y el `workflow terminate` por SSM en la EC2; `demo:reiniciar` de Finanzas y Analítica con los Container Apps Jobs `finanzas-demo` y `analitica-demo`, y de Flota con el Cloud Run Job `flota-demo` (hay que crearlos con la imagen y el comando de cada servicio); `n8n_inbox` con `psql "$N8N_DB_URL"`; Keycloak por la Admin API (`demo/keycloak-registros.sh`, el mismo paso que en local). Necesita `DOMINIO`, `KC_ADMIN`, `KC_ADMIN_CLAVE` y `N8N_DB_URL`. Con `SIMULAR=1` solo imprime los comandos.

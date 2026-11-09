@@ -1,0 +1,12 @@
+# mTLS hacia Temporal (B1): solo lo incluye .rr.nube.yaml. Repite la sección temporal de .rr.yaml (include reemplaza
+# la sección entera, no la mezcla) y le agrega tls; la prueba RoadRunnerTlsTest las mantiene iguales.
+version: "3"
+temporal:
+  address: ${TEMPORAL_ADDRESS}
+  namespace: transporte
+  activities:
+    num_workers: 2
+  tls:
+    key: ${TEMPORAL_TLS_KEY}
+    cert: ${TEMPORAL_TLS_CERT}
+    root_ca: ${TEMPORAL_TLS_CA}

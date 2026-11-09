@@ -1,0 +1,67 @@
+# Construye y sube una imagen etiquetada con el SHA (B8, guía §9). Nunca `latest`.
+#   ghcr: ghcr.io/<dueño>/<nombre> (público; .dockerignore deja fuera los .env.*), para Azure.
+#   ecr:  <cuenta>.dkr.ecr.<región>.amazonaws.com/<nombre>, para la VM de AWS.
+#   gar:  us-central1-docker.pkg.dev/<proyecto>/transporte/<nombre>, para Cloud Run.
+name: _build-push-image
+
+on:
+  workflow_call:
+    inputs:
+      nombre: { type: string, required: true }
+      dockerfile: { type: string, required: true }
+      contexto: { type: string, default: . }
+      target: { type: string, default: '' }
+      registro: { type: string, required: true, description: 'ghcr, ecr o gar' }
+      environment: { type: string, required: true }
+      plataforma: { type: string, default: linux/amd64 }
+    outputs:
+      imagen: { value: '${{ jobs.imagen.outputs.imagen }}' }
+
+permissions: { contents: read, packages: write, id-token: write }
+
+jobs:
+  imagen:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    outputs: { imagen: '${{ steps.ref.outputs.imagen }}' }
+    steps:
+      - uses: actions/checkout@v7
+      - if: inputs.registro == 'ecr'
+        uses: aws-actions/configure-aws-credentials@v6
+        with: { role-to-assume: '${{ vars.AWS_ROLE_ARN }}', aws-region: '${{ vars.AWS_REGION }}' }
+      - if: inputs.registro == 'ecr'
+        id: ecr
+        uses: aws-actions/amazon-ecr-login@v2
+      - if: inputs.registro == 'gar'
+        uses: google-github-actions/auth@v3
+        with: { workload_identity_provider: '${{ vars.GCP_WIF_PROVIDER }}', service_account: '${{ vars.GCP_SA }}' }
+      - if: inputs.registro == 'gar'
+        uses: google-github-actions/setup-gcloud@v3
+      - if: inputs.registro == 'gar'
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev --quiet
+      - if: inputs.registro == 'ghcr'
+        uses: docker/login-action@v4
+        with: { registry: ghcr.io, username: '${{ github.actor }}', password: '${{ secrets.GITHUB_TOKEN }}' }
+      - id: ref
+        env:
+          REGISTRO: ${{ inputs.registro }}
+          NOMBRE: ${{ inputs.nombre }}
+          ECR: ${{ steps.ecr.outputs.registry }}
+          GCP_PROYECTO: ${{ vars.GCP_PROYECTO }}
+        run: |
+          case "$REGISTRO" in
+            ghcr) base="ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/$NOMBRE" ;;
+            ecr) base="$ECR/$NOMBRE" ;;
+            gar) base="us-central1-docker.pkg.dev/$GCP_PROYECTO/transporte/$NOMBRE" ;;
+            *) echo "registro desconocido: $REGISTRO"; exit 1 ;;
+          esac
+          echo "imagen=$base:$GITHUB_SHA" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-buildx-action@v4
+      - uses: docker/build-push-action@v7
+        with:
+          context: ${{ inputs.contexto }}
+          file: ${{ inputs.dockerfile }}
+          target: ${{ inputs.target }}
+          platforms: ${{ inputs.plataforma }}
+          push: true
+          tags: ${{ steps.ref.outputs.imagen }}

@@ -1,0 +1,44 @@
+# Despliegue en la VM de AWS por SSM (B8): sin SSH ni claves. La VM tiene el repo clonado en /opt/transporte.
+# Pone el repo en el SHA, arma .env y certs/ (cargar-secretos.sh), fija la imagen de Viajes y corre docker compose up.
+name: _deploy-ec2
+
+on:
+  workflow_call:
+    inputs:
+      imagen: { type: string, default: '', description: 'Imagen de Viajes; vacía = la de la última vez (.env.imagen)' }
+      servicios: { type: string, default: '', description: 'Servicios del compose; vacío = todos' }
+
+permissions: { contents: read, id-token: write }
+
+jobs:
+  vm:
+    runs-on: ubuntu-latest
+    environment: aws
+    steps:
+      - uses: aws-actions/configure-aws-credentials@v6
+        with: { role-to-assume: '${{ vars.AWS_ROLE_ARN }}', aws-region: '${{ vars.AWS_REGION }}' }
+      - name: docker compose up por SSM
+        env:
+          IMAGEN: ${{ inputs.imagen }}
+          SERVICIOS: ${{ inputs.servicios }}
+        run: |
+          ID=$(aws ec2 describe-instances --filters Name=tag:Name,Values=transporte-vm Name=instance-state-name,Values=running \
+            --query 'Reservations[0].Instances[0].InstanceId' --output text)
+          [ "$ID" != None ] || { echo "::error::transporte-vm no está encendida (encender-demo.sh)"; exit 1; }
+          SCRIPT=$(cat <<SH
+          set -eu
+          cd /opt/transporte && git fetch --quiet origin && git checkout --quiet --detach $GITHUB_SHA
+          cd plataforma/vm && AWS_REGION=$AWS_REGION bash cargar-secretos.sh
+          [ -z "$IMAGEN" ] || echo "VIAJES_IMAGEN=$IMAGEN" > .env.imagen
+          I=\$(sed -n 's/^VIAJES_IMAGEN=//p' .env.imagen)
+          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin "\${I%%/*}"
+          docker compose --env-file .env --env-file .env.imagen up -d --wait $SERVICIOS
+          SH
+          )
+          CMD=$(aws ssm send-command --instance-ids "$ID" --document-name AWS-RunShellScript \
+            --parameters "$(jq -nc --arg s "$SCRIPT" '{commands: [$s], executionTimeout: ["900"]}')" \
+            --query Command.CommandId --output text)
+          aws ssm wait command-executed --command-id "$CMD" --instance-id "$ID" || true
+          aws ssm get-command-invocation --command-id "$CMD" --instance-id "$ID" \
+            --query '[Status, StandardOutputContent, StandardErrorContent]' --output text
+          [ "$(aws ssm get-command-invocation --command-id "$CMD" --instance-id "$ID" --query Status --output text)" = Success ]

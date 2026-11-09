@@ -10,6 +10,8 @@ return [
         'puerto' => (int) env('AMQP_PORT', 5672),
         'usuario' => env('AMQP_USUARIO', 'finanzas'),
         'clave' => env('AMQP_CLAVE', 'finanzas'),
+        // AMQPS en la nube (B2): ruta a la CA propia, con AMQP_PORT=5671. Vacía = sin TLS.
+        'ca' => (string) env('AMQP_CA', ''),
     ],
     // host:puerto del frontend de Temporal; /health/ready lo revisa (finanzas.yaml) y el worker lo usa (.rr.yaml).
     'temporal' => (string) env('TEMPORAL_ADDRESS', ''),
