@@ -1,0 +1,13 @@
+name: web-portal-cliente
+on:
+  push:
+    branches: [main]
+    paths: ['frontends/portal-cliente/**', 'libs/design-tokens/**', 'contratos/openapi/viajes.yaml', 'contratos/openapi/finanzas.yaml', 'contratos/openapi/comun.yaml']
+  workflow_dispatch:
+    inputs:
+      ensayo: { type: boolean, default: false, description: 'Publicar en un entorno de ensayo, sin tocar producción' }
+permissions: { contents: read, id-token: write }
+jobs:
+  desplegar:
+    uses: ./.github/workflows/_deploy-web.yml
+    with: { app: portal-cliente, entorno: "${{ inputs.ensayo && 'ensayo' || '' }}" }
