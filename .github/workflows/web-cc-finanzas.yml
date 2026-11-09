@@ -1,0 +1,13 @@
+name: web-cc-finanzas
+on:
+  push:
+    branches: [main]
+    paths: ['frontends/centro-control/projects/cc-finanzas/**', 'frontends/centro-control/projects/ui-comun/**', 'libs/design-tokens/**', 'contratos/graphql/**']
+  workflow_dispatch:
+    inputs:
+      ensayo: { type: boolean, default: false, description: 'Publicar en un entorno de ensayo, sin tocar producción' }
+permissions: { contents: read, id-token: write }
+jobs:
+  desplegar:
+    uses: ./.github/workflows/_deploy-web.yml
+    with: { app: cc-finanzas, entorno: "${{ inputs.ensayo && 'ensayo' || '' }}" }
