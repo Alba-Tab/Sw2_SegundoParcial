@@ -2,6 +2,7 @@
 
 namespace App\Infraestructura\Consola;
 
+use App\Aplicacion\Puertos\Reloj;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 
@@ -16,11 +17,11 @@ final class CargarSemilla extends Command
 
     protected $description = 'Carga la semilla de demo de Finanzas';
 
-    public function handle(): int
+    public function handle(Reloj $reloj): int
     {
         $dir = rtrim((string) config('servicio.semilla'), '/');
         $leer = fn (string $archivo): array => json_decode((string) file_get_contents("$dir/$archivo"), true, flags: JSON_THROW_ON_ERROR);
-        $hoy = new \DateTimeImmutable('today', new \DateTimeZone('America/La_Paz'));
+        $hoy = $reloj->ahora()->setTimezone(new \DateTimeZone('America/La_Paz'))->setTime(0, 0);
         $dia = fn (int $dias): string => $hoy->modify(sprintf('%+d days', $dias))->format('Y-m-d');
 
         $clientes = $leer('clientes.json');
