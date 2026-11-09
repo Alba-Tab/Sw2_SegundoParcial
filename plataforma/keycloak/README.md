@@ -43,7 +43,7 @@ Keycloak usa la imagen oficial con `start`; no hace falta una propia. Su salud e
 | `KC_DEMO_CLI_DIRECT_GRANT` | `true` | `false` (solo *device grant*, D39) |
 | `KC_ACCESS_TOKEN_SEG` | `300` (demo: `120`) | `300` |
 | `KC_SSL_REQUIRED` | `none` | `external` (valor por defecto) |
-| `KC_URL_CC_TABLERO`, `KC_URL_CC_OPERACIONES`, `KC_URL_CC_FLOTA`, `KC_URL_CC_FINANZAS`, `KC_URL_PORTAL` | `http://localhost:4201` … `4204`, `5173` (valores por defecto) | URLs de Firebase Hosting |
+| `KC_URL_CC_TABLERO`, `KC_URL_CC_OPERACIONES`, `KC_URL_CC_FLOTA`, `KC_URL_CC_FINANZAS`, `KC_URL_PORTAL` | `http://localhost:4201` … `4204`, `5173` (valores por defecto) | URLs de Static Web Apps (D114) |
 
 ## Usuarios de prueba (solo local)
 

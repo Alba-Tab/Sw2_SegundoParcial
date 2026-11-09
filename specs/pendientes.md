@@ -2,11 +2,9 @@
 
 Lo que quedó abierto al cerrar las iteraciones de UX del 31-10 y 01-11-2026 (app del chofer, Centro de Control y portal) y la prueba integral del 03-11-2026 (`revisiones/pruebas-ia-y-flujos-2026-11-03.md`). Las decisiones que salieron de ellas están en `decisiones.md` (D60, D103, D104); los planes y las revisiones de esas iteraciones se borraron al fusionarlas.
 
-## 1. Integración (04-11-2026)
+## 1. Integración
 
-Todo lo abierto ya está en `develop`: las 6 ramas de las vueltas del 01-11 y los PRs #118 (500 de la voz), #116 (D112), #114 (los 4 arreglos de «Cargar más» y `PaginasCursor`), #115 (D110, D111) y #117 (web responsiva; su conflicto con #114 y #115 se resolvió en la rama, con `npm run verificar` en verde). No queda ningún PR abierto.
-
-Falta: en local, `aplicar-realm.sh` y reconstruir las imágenes; después, `develop` → `main` (H10, P9), que es de donde sale el despliegue.
+Todo lo abierto entró a `develop` y pasó a `main` el 08-11-2026. Sin PR abiertos.
 
 ## 2. Abiertos
 
@@ -25,7 +23,6 @@ P3 salvo los marcados.
 | La CLI `choferes:actualizar` no aplica la regla de licencia con reserva | flota | Pasar por `editarChofer()` |
 | Las fotos de una entrega FALLIDA quedan en el celular hasta cerrar sesión; los celulares con un FALLIDA de antes de D106 conservan la marca | app-chofer | Borrarlas al registrar de nuevo; migración de una sola vez |
 | Viajes a veces pasa de los 3 s del Gateway (D98) | viajes | Medir con las trazas OTel antes de proponer un arreglo |
-| Las `VITE_*` del portal no tienen build de nube | despliegue | Definirlas en el workflow de Firebase (T3b.4, T11.9) |
 | «Volver a la app» desde una alerta lleva a la raíz de la app | ui-comun | `?desde=<app>&ruta=<path>` si se quiere la página |
 
 **De la prueba integral del 03-11-2026:**
@@ -72,7 +69,9 @@ P3 salvo los marcados.
 
 ## 4. Despliegue y ensayo
 
-Nada desplegado todavía: no hay `plataforma/vm/`, `plataforma/llm/` ni workflows de despliegue (solo `ci.yml`), y **ningún servicio se conecta todavía por TLS a Temporal ni a RabbitMQ** (B1 y B2 de la guía), que es obligatorio entre nubes. Reparto por nube: D113 (GCP solo en su capa gratis; Gateway y MCP en Azure). FCM no corre en local: falta `FCM_PROYECTO` (en iPhone no hace falta, D112). Falta F3b (esqueleto en AWS y GCP, T3b.1–T3b.5), F11 (Azure y el resto, T11.1–T11.12) y F12 (guion de fallos en la nube, grabaciones, README final, cambios para ICONIX). Qué va a cada nube: `plan-despliegue.md` §2. Cómo hacerlo, paso a paso (cuentas, recursos, dominio de name.com, CI/CD y monitoreo): `guia-despliegue.md`.
+Todo está desplegado en las tres nubes salvo el LLM, y `main` es la rama que despliega. Estado, operación y lista de lo que falta: `guia-despliegue.md` (§8).
+
+Sin probar en la nube: viaje en ruta, entrega, factura y correo de punta a punta; voz y misiones del agente; guion de fallos (F12). Falta también README final, grabaciones y cambios para ICONIX.
 
 ## 5. Para ICONIX
 

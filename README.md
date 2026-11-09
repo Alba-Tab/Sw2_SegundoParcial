@@ -11,7 +11,7 @@ Sistema para una empresa de transporte de carga pesada con base en Santa Cruz: e
 
 > La carpeta `docs/` (propuesta, análisis, PlantUML, modelos de EA) no se sube al repositorio: cada integrante la tiene en local.
 
-> **Estado:** todo corre en local (fases F0 a F10 de [specs/plan-desarrollo.md](specs/plan-desarrollo.md)). Falta el despliegue multinube con CI/CD (F11) y el ensayo de fallos en la nube (F12).
+> **Estado:** desplegado en AWS, Azure y GCP sobre `albas.dev`; `main` es la rama que despliega. Falta el LLM en la nube y el ensayo de fallos (F12). Ver [specs/guia-despliegue.md](specs/guia-despliegue.md).
 
 ---
 

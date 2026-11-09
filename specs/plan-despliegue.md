@@ -1,71 +1,36 @@
 # Plan de despliegue multinube
 
-Estado: **aprobado** (28/10/2026; reparto cambiado por D113 el 04/11/2026). Parte de [plan-desarrollo.md](plan-desarrollo.md). Las tareas que lo ejecutan son F3b (esqueleto en AWS y GCP) y F11 (despliegue completo).
+Por qué cada pieza está donde está y cuánto cuesta. Aprobado el 28/10/2026 y ajustado por D113, D114 y D115. El detalle de recursos y la operación están en [guia-despliegue.md](guia-despliegue.md). Las tareas son F3b y F11 de [plan-desarrollo.md](plan-desarrollo.md).
 
-## Costos estimados (verificar en la calculadora de cada nube antes de crear recursos)
+## Qué va a cada nube
 
-| Recurso | Estimación | Nota |
+Un microservicio de dominio por nube (requisito 1).
+
+| Nube | Unidades | Motivo |
 |---|---|---|
-| EC2 t3.medium | ~0,042 USD/h (~30 USD/mes encendida siempre) | Se apaga fuera de los hitos |
-| EBS gp3 30 GB | ~2,4 USD/mes | Se cobra aunque la VM esté apagada |
-| IPv4 pública | ~3,6 USD/mes | Se cobra aunque la VM esté apagada |
-| Egreso entre nubes | Variable | Bajo con el volumen de la demo |
-| DynamoDB provisionado | 0 USD | Dentro de 25 WCU/RCU |
-| flota-worker en Cloud Run | 0 USD dentro de la capa gratis (unas 66 h al mes con 1 vCPU) | Encendido solo en pruebas y demo (D113) |
-| Container Apps con mínimo 1 (keycloak, finanzas-worker) y el resto en 0 (finanzas-api, analitica, n8n, gateway, mcp-server) | A calcular; la capa gratis de Container Apps cubre una parte | Se bajan con `apagar-demo.sh` |
-| Azure PostgreSQL B1MS | 0 USD por 12 meses | — |
-| GPU T4 en Container Apps | Por segundo, a calcular | Escala a cero |
-| MongoDB Atlas M0 | 0 USD | — |
-| Firebase Hosting y FCM (plan Spark) | 0 USD | Sin tarjeta |
-| Cloud Run (Flota) | 0 USD dentro de la capa gratis | Prueba gratuita de GCP sin activar la cuenta completa (D113) |
+| AWS (`us-east-2`) | EC2 con Viajes, PostgreSQL, Temporal, RabbitMQ y Caddy; DynamoDB; S3 | Una sola VM concentra el núcleo de mensajería y orquestación. Ohio por la experiencia nueva de la cuenta (D115) |
+| GCP (`us-central1`) | Flota (API y worker en Cloud Run), Atlas M0 y FCM | Sin pagar: prueba gratuita y capa gratis (D113) |
+| Azure (`eastus`, `eastus2`) | Keycloak, Finanzas, Analítica, n8n, Gateway y MCP en Container Apps; PostgreSQL; las 5 webs en Static Web Apps; LLM cuando haya cuota | Mismo entorno para lo que se comunica por nombre interno (D113, D114) |
 
-## Despliegue
+## Costos
 
-### 1 Calendario de cuentas
-
-| Nube | Cuándo | Reglas |
+| Recurso | Costo | Nota |
 |---|---|---|
-| AWS | Inicio de F3b (jornada 10,25) | D41; Budgets desde el primer día; EC2 apagada fuera de los hitos |
-| GCP | F3b | D113: prueba gratuita y capa gratis, **sin activar la cuenta completa**. Proyecto: el de Firebase, `appchofer-transporte`. Si la prueba de 90 días vence antes de la defensa, los recursos se detienen: anotar la fecha |
-| Azure | Inicio de F11 (jornada 50,5), o inicio de F9 si quedan 30 días o menos hasta la defensa (T9.9) | Pago por uso el mismo día |
+| EC2 `m7i-flex.large` | Por hora, con los créditos de AWS | Límite de gasto de 40 USD: al llegar, AWS pausa el proyecto |
+| EBS 30 GB e IP elástica | ~6 USD/mes | Se cobran con la VM apagada |
+| DynamoDB | 0 USD | Provisionado dentro de la capa gratis |
+| Azure PostgreSQL `D2ds_v5` | ~0,18 USD/h | B1ms no estaba disponible en la región (D115). Es lo primero que se detiene |
+| Container Apps | ~3 USD la primera semana | Réplicas fijas durante la demo |
+| GPU T4 | Por segundo | Sin cuota todavía |
+| Cloud Run y worker pool | Crédito de la prueba de GCP (vence ~03/02/2027) | El prepago de USD 30 se reembolsa a pedido |
+| Atlas M0, Static Web Apps Free, FCM, Brevo | 0 USD | — |
 
-### 2 Qué va a cada nube
+## Secretos
 
-| Nube | Unidades |
-|---|---|
-| AWS | EC2: viajes, PostgreSQL de Viajes y Temporal, Temporal y su UI (por túnel), RabbitMQ (consola por túnel), Caddy. DynamoDB (20/5). S3 (POD) |
-| GCP | Cloud Run: flota y flota-worker (este, solo en pruebas y demo). Atlas M0. Firebase Hosting con 5 sitios y FCM (plan Spark) |
-| Azure | Container Apps: keycloak, finanzas, finanzas-worker, analitica, n8n (`maxReplicas = 1`), **gateway-erp y mcp-server** (D113). B1MS. LLM con GPU |
-
-El orden y las tareas de F11 están en la tabla T11.1–T11.12.
-
-### 3 CI/CD por unidad
-
-Reutilizables: `_build-push-image`, `_deploy-ec2`, `_deploy-cloudrun`, `_deploy-containerapp`, `_deploy-firebase`, `_smoke`.
-
-| Workflow | Se dispara con | En `main` |
-|---|---|---|
-| viajes | `servicios/viajes/**`, OpenAPI de viajes, eventos, temporal | ECR, SSM |
-| plataforma-vm | `plataforma/vm/**` | SSM |
-| flota | `servicios/flota/**`, OpenAPI de flota, eventos, temporal | Cloud Run (API y worker) |
-| finanzas | `servicios/finanzas/**`, OpenAPI de finanzas, eventos, temporal | GHCR y Container Apps |
-| analitica | `servicios/analitica/**`, `analitica.yaml`, eventos | GHCR y Container Apps (entrena el `.joblib` en el build) |
-| gateway / mcp-server | Su carpeta, `libs/intercambio-token/**`, `contratos/graphql/**` u `openapi/**` | GHCR y Container Apps (D113) |
-| keycloak | `plataforma/keycloak/**` | Imagen sin realm; dispara el Job `keycloak-config` (T11.3) |
-| **n8n** | `plataforma/n8n/**` | Importación por la API de n8n (recortable en nivel 1: importación manual) |
-| llm | `plataforma/llm/**` | Container Apps con GPU |
-| cc-* (4) | `projects/<app>/**`, `projects/ui-comun/**`, `libs/design-tokens/**`, `contratos/graphql/**` | `firebase deploy --only hosting:<app>` |
-| portal-cliente | `frontends/portal-cliente/**`, tokens de diseño, OpenAPI de viajes y finanzas | Firebase |
-| app-chofer | `movil/app-chofer/**` | Sin despliegue |
-| `ci.yml` (PR) | Todo | `ci-ok` y gitleaks |
-
-### 4 Secretos
-
-- **GitHub Environments** `aws`, `gcp` y `azure`, solo desde `main`: identificadores de OIDC, WIF y Azure. Ninguna clave guardada.
-- **SSM:** certificados de la EC2, RabbitMQ, PostgreSQL y el secreto de `viajes`. FCM no usa clave: WIF de GCP con el rol de la EC2 (D45).
-- **Build de la app:** `google-services.json` sale de un secreto en el build; no se versiona.
-- **Secret Manager de GCP:** certificado de cliente de flota-worker, usuario de Atlas y RabbitMQ de Flota.
-- **Secretos de Container Apps:** B1MS, administrador de Keycloak, **`KC_SECRETO_*` y `KC_CLAVE_*` del realm**, certificado de Temporal para Finanzas, n8n, SMTP, `analitica`, `agente`, `gateway`, `mcp-server` y `EXPORTACION_HMAC_SECRETO`.
-- El realm y las imágenes públicas **solo llevan `$(env:...)`**, y gitleaks lo verifica.
-
----
+- **GitHub Environments** `aws`, `gcp` y `azure`: solo identificadores de OIDC, WIF y Azure. Ninguna clave.
+- **Parameter Store:** certificados de la EC2, RabbitMQ, PostgreSQL y el secreto de `viajes`.
+- **Secret Manager:** URI de Atlas, RabbitMQ de Flota y certificado de cliente de `flota-worker`.
+- **Secretos de Container Apps:** bases, Keycloak, certificado de Temporal, SMTP y clientes OIDC.
+- **`.env.nube`** (ignorado por git): la copia local de todo lo anterior.
+- El realm y las imágenes públicas solo llevan `$(env:...)`, y gitleaks lo verifica.
+- La clave de los usuarios de semilla es única y sencilla, solo para la demostración (D116). Su valor tampoco va al repo.
