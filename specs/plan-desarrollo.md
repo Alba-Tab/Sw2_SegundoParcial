@@ -170,8 +170,8 @@ Criterios en la sección 7. Orden: PoC-1 → T2.2 → PoC-2 → PoC-4 → PoC-3.
 |---|---|---|---|---|
 | T3b.1 Base de AWS | `feat/plataforma/vm-aws` | T3a | Cuenta (D41) y Budgets; `plataforma/aws/crear-recursos.sh`; EC2; CA propia; `plataforma/vm/compose.yaml` (Temporal con mTLS, AMQPS y MQTTS, Caddy solo para Viajes); DynamoDB 20/5; S3; ECR; rol OIDC; SSM | Temporal acepta mTLS desde la Mac |
 | T3b.2 Pipeline de Viajes | `ci/ci/deploy-viajes-aws` | T3b.1 | `viajes.yml` y `_deploy-ec2.yml` | Smoke `/health` por HTTPS |
-| T3b.3 Base de GCP | `feat/plataforma/gcp-base` | T3b.1 (certificados) | Cuenta de pago (D42) y presupuesto; WIF; Artifact Registry; Atlas M0 con lista de acceso `0.0.0.0/0` y usuario fuerte (las IP de salida de Cloud Run cambian); 5 sitios de Firebase; pedido de cuota de GPU | Recursos creados |
-| T3b.4 Pipelines de Flota y Firebase | `ci/ci/deploy-flota-gcp` | T3b.3 | `flota.yml` (servicio y worker pool), `_deploy-firebase.yml` con un sitio "hola" | La Temporal UI (por túnel) muestra el worker de `flota` |
+| T3b.3 Base de GCP | `feat/plataforma/gcp-base` | T3b.1 (certificados) | Prueba gratuita sin activar la cuenta completa, en el proyecto `appchofer-transporte` (D113), y presupuesto; WIF; Artifact Registry; Atlas M0 con lista de acceso `0.0.0.0/0` y usuario fuerte (las IP de salida de Cloud Run cambian); 5 sitios de Firebase; pedido de cuota de GPU | Recursos creados |
+| T3b.4 Pipelines de Flota y Firebase | `ci/ci/deploy-flota-gcp` | T3b.3 | `flota.yml` (API y worker en Cloud Run; el worker, solo en pruebas y demo, D113), las webs en Static Web Apps (D114), publicadas a mano | La Temporal UI (por túnel) muestra el worker de `flota` |
 | T3b.5 Encender y apagar | `feat/plataforma/scripts-encender-apagar` | T3b.2, T3b.4 | `encender-demo.sh` y `apagar-demo.sh` (EC2, worker pool y luego Container Apps) | **Después de H3, la EC2 queda detenida y el worker pool en 0** |
 
 **H3:** primera promoción a `main` (P9). Un push despliega solo lo que cambió.
@@ -290,8 +290,8 @@ Primero las specs 014 y 015 (`docs/specs/agente-voz`) y la micro-PoC de Whisper 
 | T11.5 Analítica (`maxReplicas = 1`) | `ci/ci/deploy-analitica-azure` | T11.3 | Una sola misión por intervalo |
 | T11.6 n8n (`maxReplicas = 1`), flujos importados por su API | `feat/plataforma/n8n-nube`, `ci/ci/deploy-n8n` | T11.2 | Llega un correo real |
 | T11.7 LLM con GPU | `feat/plataforma/llm-gpu` | T11.1 | Responde en menos de 10 s ya despierto; no está expuesto sin autenticación |
-| T11.8 Gateway y MCP en Cloud Run | `ci/ci/deploy-gateway-mcp` | T11.5, T11.11 | La suscripción funciona; el Inspector funciona contra la nube |
-| T11.9 Las 5 apps, `CORS_ORIGENES` y Web Origins en el realm, modelos servidos | `ci/ci/deploy-firebase` | T11.8 | Salto de SSO en la nube |
+| T11.8 Gateway y MCP en Container Apps (D113) | `ci/ci/deploy-gateway-mcp` | T11.5, T11.11 | La suscripción funciona; el Inspector funciona contra la nube |
+| T11.9 Las 5 apps en Static Web Apps (D114), `CORS_ORIGENES` y Web Origins en el realm, modelos servidos | — (a mano) | T11.8 | Salto de SSO en la nube |
 | T11.10 EC2: túnel SSM para la Temporal UI y la consola de RabbitMQ (el respaldo automático se descartó el 31/10/2026: no aporta al examen) | `feat/plataforma/vm-tuneles` | — | Los puertos 8233 y 15672 no son accesibles desde internet |
 | T11.11 Configuración de AWS y GCP (`OIDC_ISSUER`, URLs, CORS) y semilla en la nube | `chore/plataforma/config-nube` | T11.3 | `reiniciar-demo.sh --nube` en verde |
 | T11.12 Escenario en la nube | `test/plataforma/escenario-nube` | Todas | `escenario-completo.sh --nube` en verde y `pg_stat_activity` con 35 conexiones o menos |

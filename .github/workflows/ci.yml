@@ -248,9 +248,9 @@ jobs:
     defaults: { run: { working-directory: plataforma/keycloak } }
     steps:
       - uses: actions/checkout@v7
-      - name: Keycloak 26.8 limpio
+      - name: Keycloak 26.8.2 limpio
         run: |
-          docker run -d --name kc -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak:26.8 start-dev
+          docker run -d --name kc -p 8080:8080 -e KC_BOOTSTRAP_ADMIN_USERNAME=admin -e KC_BOOTSTRAP_ADMIN_PASSWORD=admin quay.io/keycloak/keycloak:26.8.2 start-dev
           timeout 180 bash -c 'until curl -sf localhost:8080/realms/master >/dev/null; do sleep 3; done'
       - name: Aplicar el realm con la imagen del Job (B5), otra vez con docker run (idempotente) y probarlo
         run: |

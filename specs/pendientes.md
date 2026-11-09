@@ -1,22 +1,14 @@
 # Pendientes
 
-Lo que quedó abierto al cerrar las iteraciones de UX del 31-10 y 01-11-2026 (app del chofer, Centro de Control y portal). Las decisiones que salieron de ellas están en `decisiones.md` (D60, D103, D104); los planes y las revisiones de esas iteraciones se borraron al fusionarlas.
+Lo que quedó abierto al cerrar las iteraciones de UX del 31-10 y 01-11-2026 (app del chofer, Centro de Control y portal) y la prueba integral del 03-11-2026 (`revisiones/pruebas-ia-y-flujos-2026-11-03.md`). Las decisiones que salieron de ellas están en `decisiones.md` (D60, D103, D104); los planes y las revisiones de esas iteraciones se borraron al fusionarlas.
 
-## 1. Para publicar lo de las vueltas del 01-11-2026
+## 1. Integración
 
-Las seis ramas son locales y están probadas juntas: verificación completa, `probar-realm.sh` y flujos de punta a punta sobre `chore/repo/integracion-vuelta-3`, que no se publica. Orden de merge a `develop`:
-1. `docs/specs/decision-d60-fatiga-y-entrega`
-2. `fix/plataforma/gerente-consola-y-portal`
-3. `fix/app-chofer/decisiones-fatiga-entrega`
-4. `feat/finanzas/ajuste-linea-credito`
-5. `feat/flota/gestion-flota`
-6. `feat/viajes/gestion-rutas-clientes`
+Todo lo abierto entró a `develop` y pasó a `main` el 08-11-2026. Sin PR abiertos.
 
-Después, una rama aparte con los 4 commits de arreglo que solo aplican con todo junto (están en la rama de integración): `78e2527` (cc-flota usa `PaginasCursor`), `f0166ab` y `c19239d` (filas de «Cargar más» en líneas de crédito) y `eb91e14` (prueba de complejidad). En los merges, `specs/pendientes.md` y la línea 11 de la spec 016 los gana la rama docs.
+## 2. Abiertos
 
-Después del merge, en local y en cada nube: `aplicar-realm.sh` y reconstruir las imágenes de viajes, flota, finanzas, gateway y analítica.
-
-## 2. Abiertos (todos P3)
+P3 salvo los marcados.
 
 | Qué | Dónde | Arreglo |
 |---|---|---|
@@ -31,8 +23,30 @@ Después del merge, en local y en cada nube: `aplicar-realm.sh` y reconstruir la
 | La CLI `choferes:actualizar` no aplica la regla de licencia con reserva | flota | Pasar por `editarChofer()` |
 | Las fotos de una entrega FALLIDA quedan en el celular hasta cerrar sesión; los celulares con un FALLIDA de antes de D106 conservan la marca | app-chofer | Borrarlas al registrar de nuevo; migración de una sola vez |
 | Viajes a veces pasa de los 3 s del Gateway (D98) | viajes | Medir con las trazas OTel antes de proponer un arreglo |
-| Las `VITE_*` del portal no tienen build de nube | despliegue | Definirlas en el workflow de Firebase (T3b.4, T11.9) |
 | «Volver a la app» desde una alerta lleva a la raíz de la app | ui-comun | `?desde=<app>&ruta=<path>` si se quiere la página |
+
+**De la prueba integral del 03-11-2026:**
+
+| Qué | Dónde | Arreglo |
+|---|---|---|
+| **P1.** Recargar (F5 o una URL directa) pierde la sesión del portal aunque la de Keycloak siga viva; las apps Angular sí la recuperan | portal-cliente | *check-sso* silencioso al arrancar |
+| **P2.** La redacción de `VIAJES_EN_RIESGO` dijo «no hay viajes atrasados» con riesgo 0,737; la regla de números lo deja pasar | analitica, `Voz.redactar` | Plantilla para ese reporte, o pasar el umbral en el prompt |
+| **P2.** El agente propone acciones con riesgo bajo el umbral (0,32); solo lo frena la regla de Analítica | mcp-server, prompt `mision_vigilar_viajes` | Reforzar «solo si `enRiesgo`» en el prompt |
+| **P2.** Un 500 se muestra como «Un servicio no responde» | ui-comun | Texto propio para `ERROR_INTERNO` |
+| **P2.** En el teléfono, el encabezado de cada misión (alto fijo de 48 px) se monta sobre la fila siguiente | cc-tablero › Agente | Alto automático en el encabezado del panel |
+| **P2.** El diálogo «Cancelar el servicio» es semitransparente | portal-cliente | Superficie opaca del diálogo |
+| **P2.** «Ver servicio» de las facturas de la semilla da «No lo encontramos»: los viajes `01933e00-…` no están en Viajes | plataforma/semilla, viajes | Cargar esos servicios históricos en la semilla de Viajes |
+| «esta semana» nunca incluye facturas vencidas: `incluirVencidas` no sirve si `desde` es hoy | analitica, spec 015 | **Decidir** si «me deben pagar esta semana» suma las vencidas |
+| La regla de números acepta «7046.53»; la plantilla dice «1 filas» | analitica | Exigir formato boliviano; plural |
+| `.env` tiene `LLM_TURNO_S=60`; D85 dice 20 s | plataforma/compose | Alinear (con 20 s, en la Mac hay más misiones `FALLIDA`) |
+| La evidencia del agente guarda `fuente: "bitacora_chofer"`, no el nombre de la herramienta | analitica o mcp-server | `buscar_bitacora` |
+| «18.200,00 BOB» se parte en dos líneas en la tarjeta de cuentas por cobrar | cc-tablero › Tablero | `nowrap` en el monto |
+| Viajes en riesgo muestra el UUID completo y la tabla se corta a la derecha | cc-tablero › Reportes | Placa o id corto |
+| Mientras dice «Confirmando», carga, toneladas y monto salen «Sin dato» | portal-cliente | Mostrar los de la cotización |
+| «Reintentar» en un 404 | portal-cliente | Solo «Volver» (como en el Centro de Control) |
+| `verificar.sh` espera 11 colas y hay 12 (`flota.sensor.dlq`) | plataforma/compose | Esperar 12 |
+| Con 10.070 km el texto accesible dice «cerca del mantenimiento» | cc-flota › Unidades | «Mantenimiento vencido» |
+| El límite de 90 s de la misión no corre mientras la Mac duerme | analitica | Aceptado: en la nube no pasa |
 
 **Riesgos aceptados (D103):**
 - El gerente, con `manage` sobre el personal interno, puede restablecer contraseñas, escribir atributos de un interno, cerrar sesiones y deshabilitar usuarios.
@@ -42,7 +56,8 @@ Después del merge, en local y en cada nube: `aplicar-realm.sh` y reconstruir la
 
 ## 3. Sin probar
 
-- **UI en el navegador:** el login se sirve en `MacBook-Air-de-Brayan.local` (emisor fijo), así que las pruebas automáticas no pueden iniciar sesión en localhost. Faltan las sesiones por rol, axe, «Cargar más» con «Reintentar», la confirmación de D108 y el foco tras «Reintentar».
+- **UI en el navegador:** el login se sirve en `MacBook-Air-de-Brayan.local` (emisor fijo), así que las pruebas automáticas no pueden iniciar sesión en localhost. El 03-11 se recorrieron como `gerente1` las 4 apps y como `agroexport` el portal (cotizar, confirmar, cancelar). Faltan las pantallas de escritura de despachador, jefe de flota y administración, rechazar una acción del agente desde la pantalla, axe, «Cargar más» con «Reintentar», la confirmación de D108 y el foco tras «Reintentar».
+- **Agente con Ollama detenido** (FR4: `SALTADA` y 503), escenarios de fallo de `scripts/demo/` (FC1–FC5, FS1–FS9) y la voz con micrófono y Whisper.
 - **App del chofer en un iPhone o un Android real:**
   - Detector de fatiga: rendimiento, rostros chicos, umbral de ojos de noche y con lentes, y la gorra.
   - Alarma en bucle.
@@ -51,6 +66,12 @@ Después del merge, en local y en cada nube: `aplicar-realm.sh` y reconstruir la
   - Barra «Siguiente / Listo» en iOS.
   - Build nativo con `react-native-worklets` 0.10.1.
   - Foto, firma y `captureRef` en Android.
+
+## 4. Despliegue y ensayo
+
+Todo está desplegado en las tres nubes salvo el LLM, y `main` es la rama que despliega. Estado, operación y lista de lo que falta: `guia-despliegue.md` (§8).
+
+Sin probar en la nube: viaje en ruta, entrega, factura y correo de punta a punta; voz y misiones del agente; guion de fallos (F12). Falta también README final, grabaciones y cambios para ICONIX.
 
 ## 5. Para ICONIX
 
