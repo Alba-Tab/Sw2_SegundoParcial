@@ -72,6 +72,15 @@ Antes de cada ensayo: `reiniciar-demo.sh` y después `escenario-completo.sh`.
 | `detener-rabbitmq.sh`, `encender-rabbitmq.sh` | RabbitMQ. Al encenderlo, vuelve a publicar el flujo de n8n y reinicia n8n (su disparador no se reconecta) |
 | `republicar-evento.sh <eventId>` | Vuelve a publicar un evento tal cual quedó en el Outbox de Viajes, Finanzas o Flota |
 
+## Encender y apagar la nube (B9, guía §11)
+
+| Script | Qué hace |
+|---|---|
+| `encender-demo.sh` | Enciende la B1MS, la EC2 (el compose arranca solo), las Container Apps con sus réplicas de la guía §7 y el worker pool de Flota en 1 |
+| `apagar-demo.sh` | Al revés: Container Apps en 0 réplicas mínimas, el worker pool en 0, la EC2 detenida y la B1MS detenida |
+
+Necesitan `aws`, `az` y `gcloud` con sesión iniciada, y `PSQL_SERVIDOR` (por defecto, `psql-transporte-sw2bg-gp`). Con `SIMULAR=1` solo imprimen los comandos. La tabla de réplicas está en `demo/nube.sh`; `n8n` va fijo en 1 durante la demo porque consume de RabbitMQ sin ingress y con 0 réplicas no despertaría.
+
 ## En la nube (`--nube`, B10)
 
 - **Tokens (D39):** en la nube `demo-cli` no tiene *direct grant*. `demo/comun.sh` pide cada token por *device grant* (imprime la URL en la que se entra como ese usuario) y guarda el `refresh_token` en `~/.cache/transporte-demo/<usuario>` (600), así cada usuario inicia sesión una sola vez mientras dure su sesión.

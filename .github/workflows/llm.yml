@@ -1,8 +1,6 @@
 name: llm
 on:
-  push:
-    branches: [main]
-    paths: ['plataforma/llm/**']
+  # shortcut: solo manual porque sin cuota de GPU no existe la Container App `llm`; volver a `push` a main cuando exista.
   workflow_dispatch:
 permissions: { contents: read, packages: write, id-token: write }
 jobs:
