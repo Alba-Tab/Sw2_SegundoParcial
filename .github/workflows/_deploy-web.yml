@@ -3,6 +3,7 @@
 #   - 4 apps del Centro de Control: configuracion.json de nube sobre el de la app (oidcIssuer, gatewayUrl, urls; sin jaegerUrl).
 #   - Portal: VITE_* en el build (sin ellas, Vite dejaría las de localhost).
 # Ruteo de SPA en el hosting: toda ruta devuelve index.html, menos configuracion.json, salud.json y modelos/.
+# salud.json se sirve con Access-Control-Allow-Origin: * para que la barra de las otras apps pueda leerlo.
 name: _deploy-web
 
 on:
@@ -65,10 +66,15 @@ jobs:
 
       # Toda ruta devuelve index.html, menos los archivos que el código pide por su nombre: sin esta exclusión, uno que
       # falte respondería 200 con la portada y fallaría más adelante, sin decir por qué.
+      # salud.json lleva CORS abierto: la barra de las otras apps lo lee con mode 'cors' (D100); sin la cabecera las marca
+      # "no disponible". Es público y sin datos, así que '*' no expone nada.
       - name: Ruteo de SPA
         run: |
           cat > "$SALIDA/staticwebapp.config.json" <<'JSON'
-          { "navigationFallback": { "rewrite": "/index.html", "exclude": ["/configuracion.json", "/salud.json", "/modelos/*", "/tesseract/*"] } }
+          {
+            "routes": [{ "route": "/salud.json", "headers": { "Access-Control-Allow-Origin": "*" } }],
+            "navigationFallback": { "rewrite": "/index.html", "exclude": ["/configuracion.json", "/salud.json", "/modelos/*", "/tesseract/*"] }
+          }
           JSON
 
       - uses: azure/login@v3
