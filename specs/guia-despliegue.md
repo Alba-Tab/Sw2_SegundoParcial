@@ -106,7 +106,7 @@ Los workflows de `main` pasan. Con `workflow_dispatch` y `ensayo` una web se pub
 
 ## 6. Publicar lo que no tiene pipeline
 
-**Webs, solo como respaldo si falla su workflow** (desde la Mac, con el token de `az staticwebapp secrets list -n <swa>`): compilar con la configuración de §3, escribir `staticwebapp.config.json` en la salida con `navigationFallback` a `index.html`, excluyendo `configuracion.json`, `salud.json`, `modelos/` y `tesseract/`, con los modelos bajados antes (`npm run modelos`), y publicar con `swa deploy <salida> --env production`.
+**Webs, solo como respaldo si falla su workflow** (desde la Mac, con el token de `az staticwebapp secrets list -n <swa>`): compilar con la configuración de §3, escribir `staticwebapp.config.json` en la salida con `navigationFallback` a `index.html`, excluyendo `configuracion.json`, `salud.json`, `modelos/` y `tesseract/`, y una ruta que sirva `/salud.json` con `Access-Control-Allow-Origin: *` (sin ella la barra marca las otras apps «no disponible»), con los modelos bajados antes (`npm run modelos`), y publicar con `swa deploy <salida> --env production`.
 
 **App del chofer en el iPhone** (`movil/app-chofer/ios`, con las variables de §3 en el entorno):
 
